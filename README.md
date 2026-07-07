@@ -44,3 +44,9 @@
 
 - 기획서를 완벽히 뽑고 개발하는 대신, 확보 가능한 3D 에셋(캐릭터 모션, 무기 모델링, 허수아비 등)을 먼저 배치한 뒤 그 비주얼에 맞춰 기획 수치와 연출을 역산.
 - 클로드 코드를 활용해 초반에 [투명창 세팅 + 글로벌 후킹 + 콤보 타이머]라는 핵심 기술 스파이크(프로토타입)를 빠르게 검증하여 개발 리스크 최소화.
+
+## 5. 진행 상황 (Progress)
+
+- ✅ 기술 스파이크 1: 투명 창 + 우하단 배치 + 클릭-관통 뼈대 — [Assets/Scripts/DesktopWindow](Assets/Scripts/DesktopWindow), 설정 가이드는 [Docs/tech-spike-transparent-window.md](Docs/tech-spike-transparent-window.md) 참고.
+- ⬜ 기술 스파이크 2: 글로벌 키보드 후킹 (비활성 창 상태에서 타수 감지)
+- ⬜ 기술 스파이크 3: 콤보 타이머 및 이펙트 스케일링
