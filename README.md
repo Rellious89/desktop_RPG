@@ -47,6 +47,6 @@
 
 ## 5. 진행 상황 (Progress)
 
-- ✅ 기술 스파이크 1: 투명 창 + 우하단 배치 + 클릭-관통 뼈대 — [Assets/Scripts/DesktopWindow](Assets/Scripts/DesktopWindow), 설정 가이드는 [Docs/tech-spike-transparent-window.md](Docs/tech-spike-transparent-window.md) 참고.
+- ✅ 기술 스파이크 1: 투명 창(모니터 전체 커버) + 클릭-관통 뼈대 — [Assets/Scripts/DesktopWindow](Assets/Scripts/DesktopWindow), 설정 가이드는 [Docs/tech-spike-transparent-window.md](Docs/tech-spike-transparent-window.md) 참고.
 - ⬜ 기술 스파이크 2: 글로벌 키보드 후킹 (비활성 창 상태에서 타수 감지)
 - ⬜ 기술 스파이크 3: 콤보 타이머 및 이펙트 스케일링

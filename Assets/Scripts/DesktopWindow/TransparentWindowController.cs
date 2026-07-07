@@ -7,7 +7,8 @@ namespace DesktopWindow
 {
     /// <summary>
     /// 빌드된 Windows 스탠드얼론 실행 파일의 창을 테두리 없는 투명 창으로 바꾸고,
-    /// 화면 우하단 구석에 고정한 뒤, 캐릭터/UI가 없는 영역은 클릭이 관통되도록 만든다.
+    /// 주 모니터 전체를 덮도록 배치한 뒤, 캐릭터/UI가 없는 영역은 클릭이 관통되도록 만든다.
+    /// 창 자체가 모니터 전체 크기이므로 화면 어디든(하단 건물, 상단 UI 등) 게임 콘텐츠를 자유롭게 배치할 수 있다.
     /// Win32 API 기반이라 Windows 빌드에서만 동작하며, 에디터/다른 플랫폼에서는 아무 동작도 하지 않는다.
     /// (macOS 등 다른 플랫폼에서 동일 기능이 필요하면 별도의 네이티브 플러그인 구현이 필요함)
     /// </summary>
@@ -15,10 +16,6 @@ namespace DesktopWindow
     public class TransparentWindowController : MonoBehaviour
     {
         [Header("Window Placement")]
-        [SerializeField] private int windowWidth = 480;
-        [SerializeField] private int windowHeight = 480;
-        [SerializeField] private int marginRight = 24;
-        [SerializeField] private int marginBottom = 48;
         [SerializeField] private bool alwaysOnTop = true;
 
         [Header("Click-Through Hit Test")]
@@ -28,6 +25,8 @@ namespace DesktopWindow
 #if UNITY_STANDALONE_WIN
         private IntPtr hwnd;
         private bool isClickThroughActive;
+        private int screenWidth;
+        private int screenHeight;
         private readonly List<RaycastResult> uiRaycastResults = new List<RaycastResult>();
 #endif
 
@@ -55,7 +54,7 @@ namespace DesktopWindow
 
             RemoveWindowBorder();
             EnableWindowTransparency();
-            PositionWindowBottomRight();
+            CoverEntireScreen();
             SetClickThrough(true);
 #else
             Debug.LogWarning("[TransparentWindowController] 이 기능은 Win32 API 기반이라 Windows 빌드에서만 지원됩니다. 현재 플랫폼에서는 기본 창으로 동작합니다.");
@@ -97,15 +96,12 @@ namespace DesktopWindow
                 0, 0, 0, 0, Win32Interop.SWP_NOMOVE | Win32Interop.SWP_NOSIZE | Win32Interop.SWP_FRAMECHANGED);
         }
 
-        private void PositionWindowBottomRight()
+        private void CoverEntireScreen()
         {
-            int screenWidth = Win32Interop.GetSystemMetrics(Win32Interop.SM_CXSCREEN);
-            int screenHeight = Win32Interop.GetSystemMetrics(Win32Interop.SM_CYSCREEN);
+            screenWidth = Win32Interop.GetSystemMetrics(Win32Interop.SM_CXSCREEN);
+            screenHeight = Win32Interop.GetSystemMetrics(Win32Interop.SM_CYSCREEN);
 
-            int x = screenWidth - windowWidth - marginRight;
-            int y = screenHeight - windowHeight - marginBottom;
-
-            Win32Interop.SetWindowPos(hwnd, IntPtr.Zero, x, y, windowWidth, windowHeight, Win32Interop.SWP_NOZORDER);
+            Win32Interop.SetWindowPos(hwnd, IntPtr.Zero, 0, 0, screenWidth, screenHeight, Win32Interop.SWP_NOZORDER);
         }
 
         private void SetClickThrough(bool enabled)
@@ -132,8 +128,8 @@ namespace DesktopWindow
             var clientPoint = screenPoint;
             Win32Interop.ScreenToClient(hwnd, ref clientPoint);
 
-            bool insideWindow = clientPoint.X >= 0 && clientPoint.X < windowWidth &&
-                                 clientPoint.Y >= 0 && clientPoint.Y < windowHeight;
+            bool insideWindow = clientPoint.X >= 0 && clientPoint.X < screenWidth &&
+                                 clientPoint.Y >= 0 && clientPoint.Y < screenHeight;
 
             if (!insideWindow)
             {
@@ -142,7 +138,7 @@ namespace DesktopWindow
             }
 
             // Win32 클라이언트 좌표는 좌상단 원점, Unity 화면 좌표는 좌하단 원점이므로 Y를 뒤집는다.
-            Vector2 unityScreenPoint = new Vector2(clientPoint.X, windowHeight - clientPoint.Y);
+            Vector2 unityScreenPoint = new Vector2(clientPoint.X, screenHeight - clientPoint.Y);
 
             bool hitSomething = IsPointerOverUI(unityScreenPoint) || IsPointerOverObject(unityScreenPoint);
             SetClickThrough(!hitSomething);
