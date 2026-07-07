@@ -1,4 +1,4 @@
-#if !UNITY_EDITOR
+#if UNITY_STANDALONE_WIN
 using System;
 using System.Runtime.InteropServices;
 

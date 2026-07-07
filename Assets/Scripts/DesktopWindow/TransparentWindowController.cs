@@ -6,9 +6,10 @@ using UnityEngine.EventSystems;
 namespace DesktopWindow
 {
     /// <summary>
-    /// 빌드된 스탠드얼론 실행 파일의 창을 테두리 없는 투명 창으로 바꾸고,
+    /// 빌드된 Windows 스탠드얼론 실행 파일의 창을 테두리 없는 투명 창으로 바꾸고,
     /// 화면 우하단 구석에 고정한 뒤, 캐릭터/UI가 없는 영역은 클릭이 관통되도록 만든다.
-    /// 에디터 Play 모드에서는 동작하지 않는다(빌드 exe 전용).
+    /// Win32 API 기반이라 Windows 빌드에서만 동작하며, 에디터/다른 플랫폼에서는 아무 동작도 하지 않는다.
+    /// (macOS 등 다른 플랫폼에서 동일 기능이 필요하면 별도의 네이티브 플러그인 구현이 필요함)
     /// </summary>
     [DisallowMultipleComponent]
     public class TransparentWindowController : MonoBehaviour
@@ -24,7 +25,7 @@ namespace DesktopWindow
         [SerializeField] private Camera targetCamera;
         [SerializeField] private LayerMask hitTestLayers = ~0;
 
-#if !UNITY_EDITOR
+#if UNITY_STANDALONE_WIN
         private IntPtr hwnd;
         private bool isClickThroughActive;
         private readonly List<RaycastResult> uiRaycastResults = new List<RaycastResult>();
@@ -41,8 +42,8 @@ namespace DesktopWindow
         private void Start()
         {
 #if UNITY_EDITOR
-            Debug.LogWarning("[TransparentWindowController] 투명/보더리스 창 효과는 빌드된 실행 파일(.exe)에서만 동작합니다. Editor Play 모드에서는 적용되지 않습니다.");
-#else
+            Debug.LogWarning("[TransparentWindowController] 투명/보더리스 창 효과는 빌드된 Windows 실행 파일(.exe)에서만 동작합니다. Editor Play 모드에서는 적용되지 않습니다.");
+#elif UNITY_STANDALONE_WIN
             SetupCameraBackground();
 
             hwnd = Win32Interop.GetActiveWindow();
@@ -56,10 +57,12 @@ namespace DesktopWindow
             EnableWindowTransparency();
             PositionWindowBottomRight();
             SetClickThrough(true);
+#else
+            Debug.LogWarning("[TransparentWindowController] 이 기능은 Win32 API 기반이라 Windows 빌드에서만 지원됩니다. 현재 플랫폼에서는 기본 창으로 동작합니다.");
 #endif
         }
 
-#if !UNITY_EDITOR
+#if UNITY_STANDALONE_WIN
         private void Update()
         {
             UpdateClickThroughState();

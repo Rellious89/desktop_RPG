@@ -1,7 +1,13 @@
 # 기술 스파이크 1: 투명 창 + 우하단 배치 세팅 가이드
 
-`Assets/Scripts/DesktopWindow/` 스크립트를 실제로 씬에 적용하는 절차. Windows 스탠드얼론 빌드에서만 동작하며,
-**Editor Play 모드에서는 창 변형이 적용되지 않는다** (`TransparentWindowController`가 자동으로 감지해 스킵함).
+`Assets/Scripts/DesktopWindow/` 스크립트를 실제로 씬에 적용하는 절차. **Win32 API 기반이라 Windows 빌드에서만 동작**하며,
+**Editor Play 모드에서는 창 변형이 적용되지 않는다** (`TransparentWindowController`가 플랫폼/에디터 여부를 자동 감지해 스킵함).
+
+## 개발 환경이 macOS일 때
+
+- 개발은 macOS(Unity 2022.3.62f3)에서 하고, 이 기능 검증은 실제 Windows 머신에서 빌드 실행으로 진행하는 흐름을 전제로 한다.
+- macOS에서 Play 모드로 돌리거나 macOS용으로 빌드해도 크래시 없이 "Windows 전용 기능" 경고 로그만 남기고 기본 창으로 정상 실행된다(`UNITY_STANDALONE_WIN`으로 가드).
+- **Mac 버전 동시 출시를 고려 중이라면**: user32.dll/dwmapi.dll에 대응하는 범용 API가 macOS엔 없어서, 동일한 투명/보더리스/클릭관통 효과를 내려면 Objective-C/Swift로 별도의 네이티브 플러그인(.bundle)을 만들어 Unity가 사용하는 NSWindow에 접근해야 한다. 글로벌 키보드 후킹도 macOS는 손쉬운 후킹이 아니라 접근성(Accessibility) 권한 승인 UX가 추가로 필요하다. 이 부분은 별도의 기술 스파이크로 분리해서 우선순위를 정할 것.
 
 ## 준비된 스크립트
 
