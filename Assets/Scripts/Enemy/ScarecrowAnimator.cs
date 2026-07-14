@@ -11,37 +11,47 @@ namespace Enemy
     /// 그 자세를 유지한 채 매 타격마다 플래시만 갱신해서 "계속 맞고 있는" 느낌을 준다.
     /// 마지막 HitPoint 이후 holdTimeout이 지나면 복귀 프레임(recoveryFrame)을 보여준 뒤 Idle로 돌아간다.
     /// 복귀 중에 새 HitPoint가 들어오면 즉시 피격 상태로 되돌아간다.
+    ///
+    /// HitPoint가 전달하는 데미지량을 그대로 Target.ApplyDamage에 넘기고 DamageNumberSpawner로 숫자를 띄운다.
+    /// 내구도/처치/리젠 타이밍은 전부 Target이 담당한다 - 이 스크립트는 Target이 보내는 이벤트(OnDefeated,
+    /// OnRespawned)를 듣고 그에 맞는 자세만 보여준다: 처치되면 지금 피격 자세를 그대로 유지("Defeated" 상태로
+    /// 전환만 하고 별도 타이머는 없음), Target이 리젠을 마치고 OnRespawned를 보내오면 그때 기존 복귀 흐름
+    /// (Recovery -> Idle)을 재사용해 돌아간다. respawnDelay가 0이면 두 이벤트가 같은 프레임에 연달아 오므로
+    /// 사실상 즉시 Recovery로 넘어간다 - 사망 리소스 없이 임시 처치를 표현한다.
     /// </summary>
     [RequireComponent(typeof(SpriteRenderer))]
     [RequireComponent(typeof(FlashOnCue))]
+    [RequireComponent(typeof(Target))]
+    [RequireComponent(typeof(DamageNumberSpawner))]
     public class ScarecrowAnimator : MonoBehaviour
     {
-        /// <summary>HitPoint를 받아 실제로 반응할 때마다 발생(연타 중에는 매 타격마다). 데미지/체력 감소 트리거로 쓴다.</summary>
+        /// <summary>HitPoint를 받아 실제로 반응할 때마다 발생(연타 중에는 매 타격마다).</summary>
         public event Action ReceiveImpact;
 
         [System.Serializable]
         public class FrameAnimation
         {
-            public Sprite sheet;
-            public int frameWidth = 512;
-            public int frameHeight = 512;
-            public int frameCount;
-            public float framesPerSecond = 3f;
+            public Sprite[] frames;
+
+            [Tooltip("이 애니메이션의 프레임 재생 속도(초당 프레임 전환 횟수)")]
+            public float animationFps = 3f;
         }
 
-        /// <summary>Hit는 항상 3프레임 고정 구조. holdFrame을 연타 중 계속 유지하고, recoveryFrame은 종료 시 한 번만 보여준다.</summary>
+        /// <summary>
+        /// 피격 애니메이션 데이터. 프레임 낱장 Sprite를 배열로 직접 받는다(아틀라스 슬라이싱 아님).
+        /// holdFrame을 연타 중 계속 유지하고, recoveryFrame은 종료 시 한 번만 보여준다 - 둘 다 실제
+        /// 프레임 수(frames.Length) 범위로 자동 보정된다.
+        /// </summary>
         [System.Serializable]
         public class HitAnimation
         {
-            public Sprite sheet;
-            public int frameWidth = 512;
-            public int frameHeight = 512;
+            public Sprite[] frames;
 
             [Tooltip("피격 중 유지할 프레임 인덱스(0부터). 연타 동안 이 프레임을 계속 유지한다.")]
-            public int holdFrame = 1;
+            public int holdFrame = 0;
 
             [Tooltip("피격이 끝난 뒤 보여줄 복귀 프레임 인덱스")]
-            public int recoveryFrame = 2;
+            public int recoveryFrame = 1;
 
             [Tooltip("복귀 프레임을 보여주는 시간(초)")]
             public float recoveryDuration = 0.12f;
@@ -60,9 +70,7 @@ namespace Enemy
             public float shakeDecayDuration = 0.15f;
         }
 
-        private const int HitFrameCount = 3;
-
-        private enum HitPhase { None, Reacting, Recovery }
+        private enum HitPhase { None, Reacting, Recovery, Defeated }
 
         [Header("Base Idle (계속 루프)")]
         [SerializeField] private FrameAnimation idle;
@@ -70,12 +78,10 @@ namespace Enemy
         [Header("Hit (연속 타격에 맞춰 유지/갱신)")]
         [SerializeField] private HitAnimation hit;
 
-        [Header("Sprite Slicing")]
-        [SerializeField] private float pixelsPerUnit = 200f;
-        [SerializeField] private Vector2 pivot = new Vector2(0.5f, 0.0703125f);
-
         private SpriteRenderer spriteRenderer;
         private FlashOnCue flashOnCue;
+        private Target target;
+        private DamageNumberSpawner damageNumberSpawner;
 
         private Sprite[] idleFrames;
         private Sprite[] hitFrames;
@@ -95,10 +101,12 @@ namespace Enemy
         {
             spriteRenderer = GetComponent<SpriteRenderer>();
             flashOnCue = GetComponent<FlashOnCue>();
+            target = GetComponent<Target>();
+            damageNumberSpawner = GetComponent<DamageNumberSpawner>();
             basePosition = transform.localPosition;
 
-            idleFrames = SliceFrames(idle);
-            hitFrames = SliceHitFrames(hit);
+            idleFrames = idle?.frames ?? Array.Empty<Sprite>();
+            hitFrames = hit?.frames ?? Array.Empty<Sprite>();
 
             idleCurrentFrame = 0;
             ApplyIdleFrame();
@@ -107,73 +115,21 @@ namespace Enemy
         private void OnEnable()
         {
             CatKnightIdleAnimator.HitPoint += OnHitPoint;
+            target.OnDefeated += HandleDefeated;
+            target.OnRespawned += HandleRespawned;
         }
 
         private void OnDisable()
         {
             CatKnightIdleAnimator.HitPoint -= OnHitPoint;
+            target.OnDefeated -= HandleDefeated;
+            target.OnRespawned -= HandleRespawned;
         }
 
-        private Sprite[] SliceFrames(FrameAnimation anim)
+        private void OnHitPoint(int damageAmount)
         {
-            if (anim == null || anim.sheet == null || anim.sheet.texture == null || anim.frameCount <= 0)
-            {
-                return new Sprite[0];
-            }
+            if (target.IsDefeated) return; // 처치 연출/리젠 중에는 추가 타격을 완전히 무시한다.
 
-            Texture2D texture = anim.sheet.texture;
-            int requiredWidth = anim.frameWidth * anim.frameCount;
-
-            if (texture.width < requiredWidth || texture.height < anim.frameHeight)
-            {
-                Debug.LogError($"[ScarecrowAnimator] '{texture.name}' 텍스처 크기({texture.width}x{texture.height})가 " +
-                    $"기대한 프레임 배치({requiredWidth}x{anim.frameHeight})보다 작습니다. " +
-                    "임포트가 덜 끝난 상태일 수 있으니 해당 텍스처를 Reimport 해보세요.");
-                return new Sprite[0];
-            }
-
-            var frames = new Sprite[anim.frameCount];
-
-            for (int i = 0; i < anim.frameCount; i++)
-            {
-                var rect = new Rect(i * anim.frameWidth, 0, anim.frameWidth, anim.frameHeight);
-                frames[i] = Sprite.Create(texture, rect, pivot, pixelsPerUnit, 0, SpriteMeshType.FullRect);
-            }
-
-            return frames;
-        }
-
-        private Sprite[] SliceHitFrames(HitAnimation anim)
-        {
-            if (anim == null || anim.sheet == null || anim.sheet.texture == null)
-            {
-                return new Sprite[0];
-            }
-
-            Texture2D texture = anim.sheet.texture;
-            int requiredWidth = anim.frameWidth * HitFrameCount;
-
-            if (texture.width < requiredWidth || texture.height < anim.frameHeight)
-            {
-                Debug.LogError($"[ScarecrowAnimator] '{texture.name}' 텍스처 크기({texture.width}x{texture.height})가 " +
-                    $"기대한 프레임 배치({requiredWidth}x{anim.frameHeight})보다 작습니다. " +
-                    "임포트가 덜 끝난 상태일 수 있으니 해당 텍스처를 Reimport 해보세요.");
-                return new Sprite[0];
-            }
-
-            var frames = new Sprite[HitFrameCount];
-
-            for (int i = 0; i < HitFrameCount; i++)
-            {
-                var rect = new Rect(i * anim.frameWidth, 0, anim.frameWidth, anim.frameHeight);
-                frames[i] = Sprite.Create(texture, rect, pivot, pixelsPerUnit, 0, SpriteMeshType.FullRect);
-            }
-
-            return frames;
-        }
-
-        private void OnHitPoint()
-        {
             lastHitTime = Time.time;
 
             if (hitPhase != HitPhase.Reacting)
@@ -187,7 +143,24 @@ namespace Enemy
             }
 
             TriggerShake();
+
+            target.ApplyDamage(damageAmount);
+            damageNumberSpawner.Spawn(damageAmount);
+
             ReceiveImpact?.Invoke();
+        }
+
+        private void HandleDefeated(string targetId)
+        {
+            // 데미지 적용과 피격 자세/플래시/흔들림은 이 처치를 유발한 타격에서 OnHitPoint가 이미 처리했다.
+            // 여기서는 그 자세를 그대로 붙잡아두는 상태 전환만 한다. 얼마나 오래 붙잡을지는 Target의
+            // respawnDelay가 정하고, 그 시간이 지나면 Target이 OnRespawned로 알려준다.
+            hitPhase = HitPhase.Defeated;
+        }
+
+        private void HandleRespawned(string targetId)
+        {
+            EnterRecovery(); // 기존 복귀 흐름(Recovery -> Idle)을 그대로 재사용한다.
         }
 
         private void TriggerShake()
@@ -269,6 +242,11 @@ namespace Enemy
                     }
                     break;
 
+                case HitPhase.Defeated:
+                    // 아무것도 하지 않는다. Target이 respawnDelay만큼 기다렸다가 OnRespawned로 알려주면
+                    // HandleRespawned가 EnterRecovery를 호출해 다음 단계로 넘어간다.
+                    break;
+
                 default:
                     AdvanceIdle();
                     break;
@@ -277,9 +255,9 @@ namespace Enemy
 
         private void AdvanceIdle()
         {
-            if (idleFrames.Length == 0 || idle.framesPerSecond <= 0f) return;
+            if (idleFrames.Length == 0 || idle.animationFps <= 0f) return;
 
-            float frameDuration = 1f / idle.framesPerSecond;
+            float frameDuration = 1f / idle.animationFps;
             idleFrameTimer += Time.deltaTime;
 
             if (idleFrameTimer < frameDuration) return;
