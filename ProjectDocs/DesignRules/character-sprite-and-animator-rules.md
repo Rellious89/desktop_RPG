@@ -13,9 +13,10 @@ CatKnight(플레이어)와 Scarecrow(몬스터) 둘을 만들면서 실제로 In
 
 | 항목 | 규칙 | 근거 |
 |---|---|---|
-| 캔버스 크기 | 512 x 512 px / 프레임 | 지금까지 CatKnight, Scarecrow 모두 동일 |
+| 캔버스 크기 | 512 x 512 px / 프레임 (**고정값 아님, 현재 기준일 뿐** — 지금까지 CatKnight, Scarecrow가 우연히 같은 크기를 썼을 뿐 캔버스 크기 자체는 가변) | 지금까지 CatKnight, Scarecrow 모두 동일 |
 | Pixels Per Unit | 200 | 캐릭터마다 다르면 씬 안에서 서로 상대적 크기가 어긋난다 |
 | 텍스처 임포트 | Sprite(Single), Point Filter(No Compression), Alpha Is Transparency 켬 | 픽셀아트가 흐려지지 않게, 배경 투명 유지 |
+| 텍스처 임포트 자동 적용 | **`KeyBuddy Actor Sprite.preset` 생성 완료.** `Assets/Art/Character`, `Assets/Art/Enemy` 폴더에 Default Preset으로 지정해두면 새 PNG를 넣을 때 위 임포트 설정이 자동 적용된다 | 새 캐릭터 추가 시 Import 설정 누락 방지 — 코드 없이 Unity Preset만으로 현재 규모에 충분 |
 | 프레임 저장 방식 | **아틀라스(가로 1행 스트립)가 아니라 프레임마다 개별 PNG 파일** | 아래 "아틀라스 구조 정정" 참고 |
 | 프레임 참조 방식 | `Sprite[] frames` 배열로 Inspector에서 직접 받는다. 런타임에 `Rect`를 계산해서 자르지 않는다 | 개별 스프라이트를 그대로 쓰면 프레임 수는 `frames.Length`가 곧 정답이라 별도 계산/입력이 필요 없다 |
 | Pivot / PPU | 각 프레임 PNG의 임포트 설정(`spritePivot`, `spritePixelsToUnits`)에 직접 박아둔다. Animator 컴포넌트에는 pivot/PPU 필드가 없다 | 스프라이트 자체가 이미 올바른 좌표계를 갖고 있으면 코드가 더 단순해진다 |
