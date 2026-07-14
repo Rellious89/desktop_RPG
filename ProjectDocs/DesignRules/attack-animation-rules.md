@@ -94,8 +94,15 @@ Sprite Pivot은 Actor Origin이며 애니메이션 프레임 내부에서는 바
 
 ## 타격 이펙트 (Hit Effect)
 
-`CatKnightIdleAnimator.HitPoint → Target.ApplyDamage → 피격 반응(플래시/흔들림) → 데미지 숫자 → 타격 이펙트` 순서를
+`CatKnightIdleAnimator.HitPoint → Target.ApplyDamage → 피격 반응(자세/플래시/흔들림) → 데미지 숫자 → 타격 이펙트` 순서를
 `Assets/Scripts/Enemy/ScarecrowAnimator.cs`의 `OnHitPoint`가 그대로 유지한다. 이펙트 생성 자체는 재사용 컴포넌트로 분리했다.
+
+- `Target.ApplyDamage`는 이번 타격이 처치를 유발하면 `OnDefeated`를 동기 호출하고, `respawnDelay`가 0이면 그 안에서
+  곧바로 `OnRespawned`까지 이어서 호출한다 - 즉 `ApplyDamage` 호출이 끝난 시점에 이미 `hitPhase`가 `Defeated` 또는
+  (즉시 리스폰이면) `Recovery`로 넘어가 있을 수 있다. `OnHitPoint`는 `HandleDefeated`가 동기적으로 켜주는
+  `defeatedByCurrentHit` 플래그로 이 케이스를 감지해서, 피격 반응 단계가 그 상태 전이를 덮어쓰지 않도록 한다
+  (Defeated로 남아있으면 피격 홀드 포즈만 다시 그리고, 이미 Recovery로 넘어갔으면 손대지 않는다). 두 경우 모두
+  플래시는 갱신해서 처치를 유발한 마지막 타격도 반응이 눈에 보이게 한다.
 
 - `Assets/Scripts/Common/HitEffectSpawner.cs`: 피격 대상에 붙는 재사용 컴포넌트(Target, DamageNumberSpawner와 같은 패턴). `defaultEffectPrefab`/`impactPoint`/`fallbackOffset`/`defaultDuration`을 Inspector에서 받는다. `Spawn(prefabOverride, durationOverride)`에 다른 prefab을 넘기면 강공격/콤보 티어/치명타 전용 이펙트도 같은 구조로 재생할 수 있다(아직 기본 이펙트 1종만 연결됨).
 - 생성된 이펙트 인스턴스는 어떤 Transform에도 부모로 붙이지 않는다 - 생성 시점의 월드 좌표만 스냅샷으로 쓰고, 이후 대상이 흔들리거나(Scarecrow shake) 이동해도(AttackMovement 등) 따라가지 않는다.
