@@ -23,6 +23,7 @@ namespace Enemy
     [RequireComponent(typeof(FlashOnCue))]
     [RequireComponent(typeof(Target))]
     [RequireComponent(typeof(DamageNumberSpawner))]
+    [RequireComponent(typeof(HitEffectSpawner))]
     public class ScarecrowAnimator : MonoBehaviour
     {
         /// <summary>HitPoint를 받아 실제로 반응할 때마다 발생(연타 중에는 매 타격마다).</summary>
@@ -82,6 +83,7 @@ namespace Enemy
         private FlashOnCue flashOnCue;
         private Target target;
         private DamageNumberSpawner damageNumberSpawner;
+        private HitEffectSpawner hitEffectSpawner;
 
         private Sprite[] idleFrames;
         private Sprite[] hitFrames;
@@ -103,6 +105,7 @@ namespace Enemy
             flashOnCue = GetComponent<FlashOnCue>();
             target = GetComponent<Target>();
             damageNumberSpawner = GetComponent<DamageNumberSpawner>();
+            hitEffectSpawner = GetComponent<HitEffectSpawner>();
             basePosition = transform.localPosition;
 
             idleFrames = idle?.frames ?? Array.Empty<Sprite>();
@@ -128,7 +131,10 @@ namespace Enemy
 
         private void OnHitPoint(int damageAmount)
         {
-            if (target.IsDefeated) return; // 처치 연출/리젠 중에는 추가 타격을 완전히 무시한다.
+            // 진입 시점 상태를 기준으로 판정한다: 이미 처치된 상태로 들어온 타격은 여기서 완전히
+            // 무시한다. 반대로 이 시점에 살아 있었다면, ApplyDamage로 처치를 유발해 아래에서
+            // IsDefeated가 true로 바뀌더라도 데미지 숫자/이펙트까지 반드시 끝까지 표시한다.
+            if (target.IsDefeated) return;
 
             lastHitTime = Time.time;
 
@@ -144,8 +150,10 @@ namespace Enemy
 
             TriggerShake();
 
+            // 순서 고정: damage -> hit reaction(위에서 이미 처리) -> damage number -> hit effect.
             target.ApplyDamage(damageAmount);
             damageNumberSpawner.Spawn(damageAmount);
+            hitEffectSpawner.Spawn();
 
             ReceiveImpact?.Invoke();
         }

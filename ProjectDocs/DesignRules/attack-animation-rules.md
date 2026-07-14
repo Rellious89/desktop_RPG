@@ -91,3 +91,16 @@ Sprite Pivot은 Actor Origin이며 애니메이션 프레임 내부에서는 바
 - Attack Movement는 Transform 위치만 움직이며, `SpriteFlipbook`의 애니메이션 재생과는 독립적이다.
 - 공격별 선택 사항이다 — 이동이 필요 없는 공격은 이동 거리를 **0**으로 설정한다.
 - 현재 구현: `Assets/Scripts/Character/AttackMovement.cs` (클래스명 `KeyPunchReaction` → `AttackMovement`, 필드명도 함께 리네임했다). `moveDistance`(이동 거리), `moveOutDuration`(전진 시간), `moveBackDuration`(복귀 시간)로 구성된다.
+
+## 타격 이펙트 (Hit Effect)
+
+`CatKnightIdleAnimator.HitPoint → Target.ApplyDamage → 피격 반응(플래시/흔들림) → 데미지 숫자 → 타격 이펙트` 순서를
+`Assets/Scripts/Enemy/ScarecrowAnimator.cs`의 `OnHitPoint`가 그대로 유지한다. 이펙트 생성 자체는 재사용 컴포넌트로 분리했다.
+
+- `Assets/Scripts/Common/HitEffectSpawner.cs`: 피격 대상에 붙는 재사용 컴포넌트(Target, DamageNumberSpawner와 같은 패턴). `defaultEffectPrefab`/`impactPoint`/`fallbackOffset`/`defaultDuration`을 Inspector에서 받는다. `Spawn(prefabOverride, durationOverride)`에 다른 prefab을 넘기면 강공격/콤보 티어/치명타 전용 이펙트도 같은 구조로 재생할 수 있다(아직 기본 이펙트 1종만 연결됨).
+- 생성된 이펙트 인스턴스는 어떤 Transform에도 부모로 붙이지 않는다 - 생성 시점의 월드 좌표만 스냅샷으로 쓰고, 이후 대상이 흔들리거나(Scarecrow shake) 이동해도(AttackMovement 등) 따라가지 않는다.
+- `impactPoint`를 비워두면 `fallbackOffset`을 이 오브젝트 기준으로 더한 위치를 안전하게 대신 쓴다. prefab이 비어 있거나 duration이 비정상값(0 이하/NaN/Infinity)이어도 예외 없이 무시하거나 기본값(0.15초)으로 보정한다.
+- 처치 판정은 `OnHitPoint` 진입 시점(`target.IsDefeated`)을 기준으로 한다 - 이미 처치된 상태로 들어온 타격은 맨 앞에서 걸러지고, 살아있던 대상을 처치하는 마지막 타격은 `ApplyDamage` 이후 `IsDefeated`가 true가 되어도 데미지 숫자/이펙트까지 끝까지 표시한다.
+- `Assets/Scripts/Common/HitEffectPop.cs`: 기본 이펙트 prefab에 붙는 더미 연출 - 짧게 확대되며 페이드아웃한 뒤 스스로 파괴된다. `HitEffectSpawner`도 별도로 `duration` 이후 같은 인스턴스를 Destroy하므로, prefab이 스스로 정리되지 않는 경우에도 스포너 쪽에서 안전망 역할을 한다.
+- 기본 이펙트 에셋: `Assets/Art/Effects/HitBasic/HitBasic-spark-00.png`(128×128, PPU 200, pivot 중앙) + `Assets/Prefabs/Effects/HitEffect_Basic.prefab`. 정식 아트 리소스가 없어 만든 더미용 스타버스트 스프라이트다 - 실제 이펙트 아트가 준비되면 이 prefab의 `SpriteRenderer`만 교체하면 된다.
+- Scarecrow의 `ImpactPoint` 자식 Transform(`Assets/Scenes/desktopScene.unity`)이 `HitEffectSpawner.impactPoint`에 연결되어 있다 - Scarecrow 기준 대략 몸통 높이(로컬 y 0.5)에 둔 임시 지점이며, 정확한 피격 위치는 아트가 확정되면 다시 조정될 수 있다.
