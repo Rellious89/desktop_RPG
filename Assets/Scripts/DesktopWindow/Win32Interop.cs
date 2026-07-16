@@ -1,6 +1,7 @@
 #if UNITY_STANDALONE_WIN
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace DesktopWindow
 {
@@ -35,20 +36,15 @@ namespace DesktopWindow
         public const uint MONITOR_DEFAULTTONULL = 0x00000000;
         public const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
 
-        public const int GWLP_WNDPROC = -4;
-        public const uint WM_NCHITTEST = 0x0084;
-        public const int HTCLIENT = 1;
-        public const int HTTRANSPARENT = -1;
+        public const uint WM_QUIT = 0x0012;
 
         public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
         public static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
 
         public delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
 
-        /// <summary>커스텀 WndProc 서브클래싱에 쓰는 델리게이트. 네이티브 코드가 함수 포인터로만
-        /// 들고 있으므로, 이 델리게이트 인스턴스를 관리형 쪽에서 계속 살아있게(rooted) 유지해야
-        /// GC가 수거해서 콜백이 끊기는 사고를 막을 수 있다.</summary>
-        public delegate IntPtr WndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+        /// <summary>EnumWindows 콜백. true를 반환하면 다음 창으로 계속 진행하고, false를 반환하면 즉시 순회를 멈춘다.</summary>
+        public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
         [StructLayout(LayoutKind.Sequential)]
         public struct MARGINS
@@ -84,7 +80,24 @@ namespace DesktopWindow
             public uint dwFlags;
         }
 
-        /// <summary>WH_KEYBOARD_LL 콜백의 lParam이 가리키는 구조체. vkCode로 실제 눌린 키를 구분한다.</summary>
+        /// <summary>GetMessage가 채우는 스레드 메시지 큐 항목. 저수준 훅 전용 스레드의 메시지 루프에서 쓴다.</summary>
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MSG
+        {
+            public IntPtr hwnd;
+            public uint message;
+            public IntPtr wParam;
+            public IntPtr lParam;
+            public uint time;
+            public POINT pt;
+        }
+
+        /// <summary>
+        /// WH_KEYBOARD_LL 콜백의 lParam이 가리키는 구조체 레이아웃 문서화용. vkCode(첫 필드, DWORD)만
+        /// 필요하면 GlobalKeyboardHook에서 이 구조체로 마샬링하지 않고 Marshal.ReadInt32(lParam)로
+        /// 직접 읽는다 - 매 키 입력마다 박싱 할당이 생기는 걸 피하기 위함(전역 후크라 이 앱과 무관한
+        /// 입력에도 호출됨).
+        /// </summary>
         [StructLayout(LayoutKind.Sequential)]
         public struct KBDLLHOOKSTRUCT
         {
@@ -95,8 +108,27 @@ namespace DesktopWindow
             public UIntPtr dwExtraInfo;
         }
 
+        /// <summary>
+        /// 최상위(top-level) 창만 순회한다(EnumWindows 자체가 자식 창은 건너뛴다). 콜백이 false를
+        /// 반환하면 순회를 즉시 중단한다.
+        /// </summary>
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
         [DllImport("user32.dll")]
-        public static extern IntPtr GetActiveWindow();
+        public static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern bool IsWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+        [DllImport("kernel32.dll")]
+        public static extern uint GetCurrentProcessId();
 
         [DllImport("user32.dll", SetLastError = true)]
         public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
@@ -144,24 +176,20 @@ namespace DesktopWindow
         [DllImport("user32.dll")]
         public static extern bool ClientToScreen(IntPtr hWnd, ref POINT lpPoint);
 
+        /// <summary>
+        /// 저수준 훅 전용 스레드의 메시지 루프. WH_KEYBOARD_LL 콜백은 훅을 설치한 스레드가 이 함수로
+        /// 메시지 큐를 계속 펌핑해야 실제로 디스패치된다 - 그래서 GlobalKeyboardHook은 이 함수를
+        /// Unity 메인 스레드가 아닌 전용 백그라운드 스레드에서 블로킹 호출한다.
+        /// </summary>
         [DllImport("user32.dll")]
-        public static extern IntPtr CallWindowProc(IntPtr lpPrevWndFunc, IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+        public static extern int GetMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
 
-        // GWLP_WNDPROC은 포인터 크기 값이라 32/64비트에서 서로 다른 실제 API(SetWindowLong vs
-        // SetWindowLongPtr)를 써야 한다. SetWindowLongPtr은 32비트 user32.dll에 심볼 자체가 없어서
-        // 엔트리 포인트를 분리해두고, IntPtr.Size로 런타임에 골라 쓴다.
-        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", SetLastError = true)]
-        private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+        /// <summary>훅 스레드의 메시지 큐에 WM_QUIT을 넣어 GetMessage 루프를 빠져나오게 한다(스레드 종료 신호).</summary>
+        [DllImport("user32.dll")]
+        public static extern bool PostThreadMessage(uint idThread, uint msg, IntPtr wParam, IntPtr lParam);
 
-        [DllImport("user32.dll", EntryPoint = "SetWindowLong", SetLastError = true)]
-        private static extern IntPtr SetWindowLongPtr32(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
-
-        public static IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong)
-        {
-            return IntPtr.Size == 8
-                ? SetWindowLongPtr64(hWnd, nIndex, dwNewLong)
-                : SetWindowLongPtr32(hWnd, nIndex, dwNewLong);
-        }
+        [DllImport("kernel32.dll")]
+        public static extern uint GetCurrentThreadId();
     }
 }
 #endif

@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using TMPro;
 using UnityEngine;
@@ -6,13 +7,16 @@ namespace Common
 {
     /// <summary>
     /// 짧게 떠올랐다가 사라지는 데미지 숫자 하나의 수명을 담당한다.
-    /// DamageNumberSpawner가 생성 직후 Initialize를 호출해 값을 넘겨준다.
+    /// DamageNumberSpawner가 재생 직전 Initialize를 호출해 값과 완료 콜백을 넘겨준다.
     /// fontSize는 TMP의 fontSize를 그대로 사용한다 - 값을 올리면 즉시, 직접적으로 커진다.
+    /// 재생이 끝나면 Destroy하지 않고 onComplete(this)로 스포너의 풀에 돌려준다.
     /// </summary>
     [RequireComponent(typeof(TextMeshPro))]
     public class DamageNumberPopup : MonoBehaviour
     {
-        public void Initialize(string text, Color color, float fontSize, float riseDistance, float duration)
+        private Coroutine activeRoutine;
+
+        public void Initialize(string text, Color color, float fontSize, float riseDistance, float duration, Action<DamageNumberPopup> onComplete)
         {
             var tmp = GetComponent<TextMeshPro>();
             tmp.text = text;
@@ -20,10 +24,14 @@ namespace Common
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.fontSize = fontSize;
 
-            StartCoroutine(RiseAndFade(tmp, color, riseDistance, duration));
+            if (activeRoutine != null)
+            {
+                StopCoroutine(activeRoutine);
+            }
+            activeRoutine = StartCoroutine(RiseAndFade(tmp, color, riseDistance, duration, onComplete));
         }
 
-        private IEnumerator RiseAndFade(TextMeshPro tmp, Color color, float riseDistance, float duration)
+        private IEnumerator RiseAndFade(TextMeshPro tmp, Color color, float riseDistance, float duration, Action<DamageNumberPopup> onComplete)
         {
             Vector3 start = transform.position;
             Vector3 end = start + Vector3.up * riseDistance;
@@ -43,7 +51,8 @@ namespace Common
                 yield return null;
             }
 
-            Destroy(gameObject);
+            activeRoutine = null;
+            onComplete?.Invoke(this);
         }
     }
 }

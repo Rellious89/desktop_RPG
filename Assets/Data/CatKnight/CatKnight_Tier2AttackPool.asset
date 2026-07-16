@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f016b2a4220d444bb663543fb24b5ff1, type: 3}
+  m_Name: CatKnight_Tier2AttackPool
+  m_EditorClassIdentifier: 
+  motions:
+  - {fileID: 11400000, guid: 5f728f81380b4dfc83ae4072b24580c5, type: 2}
+  - {fileID: 11400000, guid: 26870bd48d13493fbdfa0cf441a0cc5d, type: 2}

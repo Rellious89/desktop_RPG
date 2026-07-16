@@ -1,8 +1,10 @@
 using System;
+using System.Collections;
 using UnityEngine;
 
 #if UNITY_STANDALONE_WIN
 using System.Runtime.InteropServices;
+using System.Text;
 #endif
 
 namespace DesktopWindow
@@ -13,17 +15,21 @@ namespace DesktopWindow
     /// 아무 동작도 하지 않는다(macOS 등 다른 플랫폼에서 동일 기능이 필요하면 별도의 네이티브 플러그인
     /// 구현이 필요함).
     ///
-    /// 기본 클릭 관통은 창 전체를 켰다 끄는 방식(WS_EX_TRANSPARENT)이 아니라, WM_NCHITTEST를
-    /// 서브클래싱해서 픽셀 단위로 처리한다: controlDockRect의 실제 화면 좌표 안이면 HTCLIENT(정상
-    /// 클릭 영역), 그 밖이면 HTTRANSPARENT(클릭 관통)를 매 히트테스트마다 반환한다. 그래서 ControlDock
-    /// 버튼은 항상 클릭 가능하고, 그 외 투명 영역은 항상 클릭 관통 상태를 유지한다 - 모드 전환이 필요 없다.
+    /// 클릭 관통은 WS_EX_TRANSPARENT 켜고 끄기로 처리한다(OS 레벨). 예전에는 WM_NCHITTEST를
+    /// 서브클래싱해서 픽셀 단위로 처리했는데, 그 방식은 커서가 창 위를 지날 때마다 OS가 우리 창의
+    /// WndProc에 히트테스트를 묻고 응답을 기다려야 했다 - 이 앱이 FpsLimiter로 30fps 제한이라
+    /// 응답 자체가 프레임 주기에 묶여 지연됐고, 결과적으로 마우스 반응성 저하의 한 원인이었다.
+    /// 지금은 Update()에서 GetCursorPos로 커서 위치를 읽어 controlDockScreenRect(ControlDock의
+    /// 화면 좌표, RecomputeControlDockScreenRect가 계산) 안인지만 비교한다: 안이면 WS_EX_TRANSPARENT
+    /// OFF(클릭 가능), 밖이면 ON(클릭 관통) - 상태가 실제로 바뀔 때만 SetWindowLong을 호출해서
+    /// 불필요한 시스템 콜을 피한다. 반응이 최대 한 프레임(~33ms) 늦을 수 있지만 OS가 우리 창의
+    /// 응답을 기다리는 구간 자체가 없어져서 다른 프로그램 입력을 막지 않는다.
     ///
     /// 창 이동은 두 가지 경로로 시작될 수 있다:
     /// - MoveHandle(기본 UX): ControlDock 안의 버튼이 OnPointerDown에서 BeginManualDrag()를 호출한다.
-    /// - F9 배치 모드(레거시, 제거하지 않음): placementModeToggleKey로 전환하면 CustomWndProc이
-    ///   ControlDock 판정을 건너뛰고 창 전체를 기본 처리(클릭 가능)로 넘겨서, 아무 곳이나 눌러서
-    ///   드래그할 수 있다. WS_EX_TRANSPARENT는 어느 경로에서도 쓰지 않는다 - 클릭 라우팅은 항상
-    ///   WM_NCHITTEST 서브클래싱 하나로만 처리한다.
+    /// - F9 배치 모드(레거시, 제거하지 않음): placementModeToggleKey로 전환하면 isPlacementMode 동안
+    ///   ControlDock 판정과 무관하게 WS_EX_TRANSPARENT를 강제로 끈다(창 전체 클릭 가능) - 아무 곳이나
+    ///   눌러서 드래그할 수 있다. 모드 종료 시 커서 위치 기준으로 즉시 재평가된다.
     /// 두 경로 모두 GetCursorPos/GetAsyncKeyState 폴링으로 이동을 진행하고, 같은 저장 로직(마우스를
     /// 놓는 순간 WindowPlacementSaveSystem에 저장)을 공유한다.
     ///
@@ -49,7 +55,7 @@ namespace DesktopWindow
         [SerializeField] private int marginBottom = 24;
 
         [Header("Control Dock (선택적 클릭 관통)")]
-        [Tooltip("이 RectTransform의 화면 영역만 클릭 가능하게 남기고, 나머지는 계속 클릭 관통 처리한다.")]
+        [Tooltip("이 RectTransform의 화면 영역 위에 커서가 있을 때만 클릭 가능하게 하고, 나머지는 클릭 관통 처리한다.")]
         [SerializeField] private RectTransform controlDockRect;
 
         [Header("Placement Mode (레거시 - MoveHandle 사용을 기본으로 한다)")]
@@ -69,15 +75,21 @@ namespace DesktopWindow
         private int ScaledHeight => Mathf.Max(1, Mathf.RoundToInt(windowHeight * sizeScale));
 
 #if UNITY_STANDALONE_WIN
+        /// <summary>hwnd를 찾기 위해 재시도하는 총 시간 한도. Unity 시작 타이밍에 따라 메인 창이 아직
+        /// 활성화(포그라운드)되지 않았을 수 있어 즉시 실패시키지 않고 짧게 폴링한다.</summary>
+        private const float HandleSearchTimeoutSeconds = 5f;
+        private const float HandleSearchIntervalSeconds = 0.1f;
+
         private IntPtr hwnd;
         private bool isDragging;
         private Win32Interop.POINT dragStartCursor;
         private Win32Interop.RECT dragStartWindowRect;
 
-        private Win32Interop.WndProc wndProcDelegate;
-        private IntPtr originalWndProc = IntPtr.Zero;
         private Win32Interop.RECT controlDockScreenRect;
         private readonly Vector3[] controlDockWorldCorners = new Vector3[4];
+
+        /// <summary>지금 실제로 적용되어 있는 WS_EX_TRANSPARENT 상태 캐시. 값이 바뀔 때만 SetWindowLong을 호출한다.</summary>
+        private bool clickThroughApplied;
 #endif
 
         private void Awake()
@@ -101,20 +113,7 @@ namespace DesktopWindow
             Debug.LogWarning("[TransparentWindowController] 투명/보더리스 창 효과는 빌드된 Windows 실행 파일(.exe)에서만 동작합니다. Editor Play 모드에서는 적용되지 않습니다.");
 #elif UNITY_STANDALONE_WIN
             SetupCameraBackground();
-
-            hwnd = Win32Interop.GetActiveWindow();
-            if (hwnd == IntPtr.Zero)
-            {
-                Debug.LogError("[TransparentWindowController] 윈도우 핸들을 가져오지 못했습니다.");
-                return;
-            }
-
-            RemoveWindowBorder();
-            EnableWindowTransparency();
-            // 클릭 관통은 창 전체 토글(WS_EX_TRANSPARENT)이 아니라 WM_NCHITTEST 서브클래싱으로
-            // 픽셀 단위로 처리한다.
-            InstallHitTestSubclass();
-            ApplyStartupPlacement();
+            StartCoroutine(FindWindowHandleAndInitialize());
 #else
             Debug.LogWarning("[TransparentWindowController] 이 기능은 Win32 API 기반이라 Windows 빌드에서만 지원됩니다. 현재 플랫폼에서는 기본 창으로 동작합니다.");
 #endif
@@ -131,6 +130,7 @@ namespace DesktopWindow
             if (hwnd == IntPtr.Zero) return;
 
             RecomputeControlDockScreenRect();
+            UpdateClickThroughState();
 
             if (isPlacementMode && !isDragging)
             {
@@ -149,7 +149,6 @@ namespace DesktopWindow
         {
             if (hwnd != IntPtr.Zero)
             {
-                UninstallHitTestSubclass();
                 SaveCurrentWindowPosition();
             }
         }
@@ -160,9 +159,9 @@ namespace DesktopWindow
             isPlacementMode = !isPlacementMode;
 
 #if UNITY_STANDALONE_WIN
-            // WS_EX_TRANSPARENT는 쓰지 않는다 - 클릭 라우팅은 WM_NCHITTEST 서브클래싱(CustomWndProc)이
-            // 전담한다. isPlacementMode가 true인 동안은 CustomWndProc이 ControlDock 밖에서도 항상
-            // 기본 처리(클릭 가능)로 넘기도록 분기하므로, 여기서는 상태만 뒤집으면 된다.
+            // WS_EX_TRANSPARENT 자체는 여기서 건드리지 않는다 - 다음 Update()의
+            // UpdateClickThroughState()가 isPlacementMode 값을 보고 바로 재평가한다(같은 프레임 안에서
+            // 이 메서드 호출 직후 실행되므로 지연 없이 반영된다).
             if (!isPlacementMode)
             {
                 isDragging = false;
@@ -221,6 +220,165 @@ namespace DesktopWindow
             targetCamera.backgroundColor = new Color(0f, 0f, 0f, 0f);
         }
 
+        /// <summary>
+        /// GetActiveWindow()/GetForegroundWindow() 단발 호출에 의존하지 않는다 - 둘 다 호출 시점에
+        /// 우리 창이 활성/포그라운드가 아니면(Unity 시작 타이밍 문제, 혹은 시작 직후 다른 프로그램
+        /// 창이 앞에 있는 경우) IntPtr.Zero를 반환하거나 엉뚱한 창을 잡을 수 있다. 특히
+        /// GetForegroundWindow만 단독으로 쓰면 시작 순간 우연히 앞에 있던 다른 프로그램 창의 스타일을
+        /// 잘못 바꿔버릴 위험이 있어 사용하지 않는다. 대신 현재 프로세스 PID가 소유한 visible
+        /// top-level 창을 EnumWindows로 직접 찾고, 창이 아직 생성되지 않았을 케이스에 대비해
+        /// 100ms 간격으로 최대 5초까지 재시도한다. 핸들을 찾으면 InitializeWindow()가 정확히 한 번만
+        /// 실행된다.
+        /// </summary>
+        private IEnumerator FindWindowHandleAndInitialize()
+        {
+            uint currentPid = Win32Interop.GetCurrentProcessId();
+            int attempts = 0;
+            int lastWin32Error = 0;
+            float elapsed = 0f;
+
+            while (elapsed < HandleSearchTimeoutSeconds)
+            {
+                attempts++;
+                // 검색 제한 시간 동안에는 Unity 플레이어 클래스가 확인된 preferred 창만 채택한다.
+                // 같은 PID의 보조/스플래시 창을 먼저 발견해 스타일을 잘못 바꾸는 첫 실행 레이스를 막는다.
+                IntPtr found = FindOwnedTopLevelWindow(currentPid, false,
+                    out lastWin32Error, out string className, out bool isPreferred);
+                if (found != IntPtr.Zero)
+                {
+                    hwnd = found;
+                    InitializeWindow(currentPid, attempts, className, isPreferred);
+                    yield break;
+                }
+
+                yield return new WaitForSeconds(HandleSearchIntervalSeconds);
+                elapsed += HandleSearchIntervalSeconds;
+            }
+
+            // Unity 버전별 클래스명 차이에 대비한 최후의 안전망. 5초 동안 preferred를 찾지 못한
+            // 경우에만 같은 PID의 visible top-level 창을 fallback으로 허용하고 명확히 경고한다.
+            attempts++;
+            IntPtr fallback = FindOwnedTopLevelWindow(currentPid, true,
+                out lastWin32Error, out string fallbackClassName, out bool fallbackIsPreferred);
+            if (fallback != IntPtr.Zero)
+            {
+                Debug.LogWarning($"[TransparentWindowController] preferred Unity 창을 제한 시간 안에 찾지 못해 " +
+                    $"fallback 창을 사용합니다. (hwnd: {fallback}, PID: {currentPid}, " +
+                    $"class: {fallbackClassName}, attempts: {attempts})");
+                hwnd = fallback;
+                InitializeWindow(currentPid, attempts, fallbackClassName, fallbackIsPreferred);
+                yield break;
+            }
+
+            Debug.LogError($"[TransparentWindowController] 윈도우 핸들을 가져오지 못했습니다. " +
+                $"(시도 횟수: {attempts}, PID: {currentPid}, 마지막 Win32 오류 코드: {lastWin32Error})");
+        }
+
+        /// <summary>
+        /// EnumWindows로 모든 최상위 창을 순회하며 현재 프로세스(PID) 소유의 visible 창을 찾는다.
+        /// class name이 "UnityWndClass"를 포함하는 창을 우선으로 채택하고(Unity 메인 플레이어 창
+        /// 확인), 없으면 같은 PID의 첫 visible 최상위 창을 대체 후보로 반환한다 - class name 규칙은
+        /// Unity 버전/설정에 따라 달라질 수 있어 참고용 검증이지 필수 조건은 아니다.
+        /// </summary>
+        private static IntPtr FindOwnedTopLevelWindow(uint currentPid, bool allowFallback,
+            out int lastWin32Error, out string className, out bool isPreferred)
+        {
+            lastWin32Error = 0;
+            IntPtr fallbackCandidate = IntPtr.Zero;
+            string fallbackClassName = string.Empty;
+            IntPtr preferredCandidate = IntPtr.Zero;
+            string preferredClassName = string.Empty;
+
+            Win32Interop.EnumWindows((candidateHwnd, _) =>
+            {
+                if (!Win32Interop.IsWindowVisible(candidateHwnd)) return true;
+
+                Win32Interop.GetWindowThreadProcessId(candidateHwnd, out uint pid);
+                if (pid != currentPid) return true;
+
+                string candidateClassName = GetWindowClassName(candidateHwnd);
+
+                if (fallbackCandidate == IntPtr.Zero)
+                {
+                    fallbackCandidate = candidateHwnd;
+                    fallbackClassName = candidateClassName;
+                }
+
+                // 실제 Windows 플레이어에서 "UnityWndClass"와 "Unity WndClass"가 모두 관찰됐다.
+                // 공백 차이를 제거한 뒤 비교해 두 표기를 동일한 preferred 클래스로 취급한다.
+                string normalizedClassName = candidateClassName.Replace(" ", string.Empty);
+                if (normalizedClassName.IndexOf("UnityWndClass", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    preferredCandidate = candidateHwnd;
+                    preferredClassName = candidateClassName;
+                    return false; // 원하는 class name을 찾았으니 순회를 멈춘다
+                }
+
+                return true;
+            }, IntPtr.Zero);
+
+            if (preferredCandidate != IntPtr.Zero)
+            {
+                className = preferredClassName;
+                isPreferred = true;
+                return preferredCandidate;
+            }
+
+            if (allowFallback && fallbackCandidate != IntPtr.Zero)
+            {
+                className = fallbackClassName;
+                isPreferred = false;
+                return fallbackCandidate;
+            }
+
+            className = string.Empty;
+            isPreferred = false;
+            lastWin32Error = Marshal.GetLastWin32Error();
+            return IntPtr.Zero;
+        }
+
+        private static string GetWindowClassName(IntPtr targetHwnd)
+        {
+            var buffer = new StringBuilder(256);
+            int length = Win32Interop.GetClassName(targetHwnd, buffer, buffer.Capacity);
+            return length > 0 ? buffer.ToString() : string.Empty;
+        }
+
+        /// <summary>
+        /// FindWindowHandleAndInitialize()가 핸들을 찾은 직후 정확히 한 번만 호출된다. 스타일을
+        /// 바꾸기 전에 IsWindow와 GetWindowThreadProcessId로 핸들이 여전히 유효하고 현재 프로세스
+        /// 소유인지 다시 한번 검증한다(탐색과 초기화 사이 창이 파괴되는 극단적인 경우 대비).
+        /// </summary>
+        private void InitializeWindow(uint currentPid, int attempts, string className, bool isPreferredCandidate)
+        {
+            if (!Win32Interop.IsWindow(hwnd))
+            {
+                Debug.LogError("[TransparentWindowController] 찾은 윈도우 핸들이 더 이상 유효하지 않습니다.");
+                hwnd = IntPtr.Zero;
+                return;
+            }
+
+            Win32Interop.GetWindowThreadProcessId(hwnd, out uint ownerPid);
+            if (ownerPid != currentPid)
+            {
+                Debug.LogError("[TransparentWindowController] 찾은 윈도우 핸들이 현재 프로세스 소유가 아닙니다.");
+                hwnd = IntPtr.Zero;
+                return;
+            }
+
+            string candidateType = isPreferredCandidate ? "preferred" : "fallback";
+            Debug.Log($"[TransparentWindowController] 창 핸들 획득 성공 " +
+                $"(hwnd: {hwnd}, PID: {currentPid}, ownerPID: {ownerPid}, class: {className}, " +
+                $"attempts: {attempts}, candidate: {candidateType})");
+
+            RemoveWindowBorder();
+            EnableWindowTransparency();
+            // 기본 상태는 클릭 관통(ON)이다 - Update()의 UpdateClickThroughState()가 매 프레임
+            // 커서 위치를 보고 필요할 때만(ControlDock 위/배치 모드) 끈다.
+            ApplyClickThrough(true);
+            ApplyStartupPlacement();
+        }
+
         private void RemoveWindowBorder()
         {
             int style = Win32Interop.GetWindowLong(hwnd, Win32Interop.GWL_STYLE);
@@ -241,6 +399,43 @@ namespace DesktopWindow
 
             Win32Interop.SetWindowPos(hwnd, alwaysOnTop ? Win32Interop.HWND_TOPMOST : Win32Interop.HWND_NOTOPMOST,
                 0, 0, 0, 0, Win32Interop.SWP_NOMOVE | Win32Interop.SWP_NOSIZE | Win32Interop.SWP_FRAMECHANGED);
+        }
+
+        /// <summary>WS_EX_TRANSPARENT를 켜고 끈다. Always On Top(z-order)은 건드리지 않는다.</summary>
+        private void ApplyClickThrough(bool passThrough)
+        {
+            int exStyle = Win32Interop.GetWindowLong(hwnd, Win32Interop.GWL_EXSTYLE);
+            exStyle = passThrough
+                ? exStyle | (int)Win32Interop.WS_EX_TRANSPARENT
+                : exStyle & ~(int)Win32Interop.WS_EX_TRANSPARENT;
+            Win32Interop.SetWindowLong(hwnd, Win32Interop.GWL_EXSTYLE, (uint)exStyle);
+            clickThroughApplied = passThrough;
+        }
+
+        /// <summary>
+        /// 매 프레임 커서 위치만 보고 클릭 관통 여부를 재평가한다. F9 배치 모드 중에는 ControlDock
+        /// 판정과 무관하게 항상 클릭 가능(관통 OFF)하게 한다. 상태가 실제로 바뀔 때만 ApplyClickThrough
+        /// (SetWindowLong 호출)를 실행해서 불필요한 시스템 콜을 피한다.
+        /// </summary>
+        private void UpdateClickThroughState()
+        {
+            bool shouldPassThrough;
+
+            if (isPlacementMode)
+            {
+                shouldPassThrough = false;
+            }
+            else
+            {
+                Win32Interop.GetCursorPos(out Win32Interop.POINT cursor);
+                bool insideDock = cursor.X >= controlDockScreenRect.Left && cursor.X <= controlDockScreenRect.Right &&
+                                   cursor.Y >= controlDockScreenRect.Top && cursor.Y <= controlDockScreenRect.Bottom;
+                shouldPassThrough = !insideDock;
+            }
+
+            if (shouldPassThrough == clickThroughApplied) return;
+
+            ApplyClickThrough(shouldPassThrough);
         }
 
         /// <summary>
@@ -379,52 +574,6 @@ namespace DesktopWindow
                 positionX = rect.Left,
                 positionY = rect.Top,
             });
-        }
-
-        /// <summary>WM_NCHITTEST를 가로채는 WndProc으로 교체한다. 원래 WndProc은 다른 모든 메시지를 그대로 넘기는 데 쓴다.</summary>
-        private void InstallHitTestSubclass()
-        {
-            wndProcDelegate = CustomWndProc;
-            IntPtr newProcPtr = Marshal.GetFunctionPointerForDelegate(wndProcDelegate);
-            originalWndProc = Win32Interop.SetWindowLongPtr(hwnd, Win32Interop.GWLP_WNDPROC, newProcPtr);
-
-            if (originalWndProc == IntPtr.Zero)
-            {
-                Debug.LogError("[TransparentWindowController] WM_NCHITTEST 서브클래싱에 실패했습니다. ControlDock이 클릭되지 않을 수 있습니다.");
-            }
-        }
-
-        private void UninstallHitTestSubclass()
-        {
-            if (originalWndProc == IntPtr.Zero) return;
-            Win32Interop.SetWindowLongPtr(hwnd, Win32Interop.GWLP_WNDPROC, originalWndProc);
-            originalWndProc = IntPtr.Zero;
-        }
-
-        /// <summary>
-        /// controlDockScreenRect 안이면 기존 WndProc(기본 처리, 정상 클릭)으로 넘기고, 밖이면
-        /// HTTRANSPARENT를 반환해 이 지점의 클릭을 아래 창으로 통과시킨다. F9 배치 모드 중에는
-        /// ControlDock 판정 자체를 건너뛰고 창 전체를 기본 처리(클릭 가능)로 넘긴다. 그 외 메시지는
-        /// 전부 원래 WndProc으로 그대로 전달한다.
-        /// </summary>
-        private IntPtr CustomWndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
-        {
-            if (msg == Win32Interop.WM_NCHITTEST && !isPlacementMode)
-            {
-                long raw = lParam.ToInt64();
-                int x = unchecked((short)(raw & 0xFFFF));
-                int y = unchecked((short)((raw >> 16) & 0xFFFF));
-
-                bool insideDock = x >= controlDockScreenRect.Left && x <= controlDockScreenRect.Right &&
-                                   y >= controlDockScreenRect.Top && y <= controlDockScreenRect.Bottom;
-
-                if (!insideDock)
-                {
-                    return new IntPtr(Win32Interop.HTTRANSPARENT);
-                }
-            }
-
-            return Win32Interop.CallWindowProc(originalWndProc, hWnd, msg, wParam, lParam);
         }
 
         /// <summary>

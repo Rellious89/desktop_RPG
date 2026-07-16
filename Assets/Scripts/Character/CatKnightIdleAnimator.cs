@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Common;
 using DesktopWindow;
 using UnityEngine;
@@ -19,6 +20,16 @@ namespace Character
     /// 각 애니메이션은 프레임 낱장 Sprite를 Inspector에서 배열로 직접 받는다(아틀라스 런타임 슬라이싱
     /// 아님). 프레임 수는 배열 길이(frames.Length)가 그대로 정답이라 별도로 입력받지 않는다.
     /// Pivot/PPU도 각 스프라이트의 임포트 설정에 이미 들어있어서 여기서 따로 지정하지 않는다.
+    ///
+    /// 콤보 티어별 공격 모션 풀: tier1/2/3Pool(ComboTierAttackPool 에셋) 중 ComboManager.CurrentTier에
+    /// 대응하는 풀에서 매 StartWindup() 시점에 모션을 하나 완전 랜덤으로 뽑아 그 사이클(Windup ->
+    /// Strike -> Recovery) 동안 그대로 쓴다 - 입력 처리/대기열/전환 규칙은 전혀 건드리지 않고 "어떤
+    /// 프레임 배열을 재생할지"만 매 사이클마다 다시 고른다(직전 모션과 같아도 그대로 허용). 상위 티어
+    /// 풀이 비어 있으면 한 단계씩 낮은 티어로 폴백하고(Tier3 -> Tier2 -> Tier1), 레거시 단일 attack
+    /// 필드는 tier1Pool이 비어 있을 때만 Tier 1 풀의 유일한 항목으로 자동 편입된다(기존에 이미 붙여둔
+    /// 스프라이트를 잃지 않기 위한 하위 호환). 모션 데이터 자체는 AttackMotionDefinition/
+    /// ComboTierAttackPool ScriptableObject 에셋에 있고, 여기서는 IAttackMotion 인터페이스로만
+    /// 다뤄서 레거시 AttackAnimation과 동일한 재생 루프를 공유한다.
     /// </summary>
     [RequireComponent(typeof(SpriteRenderer))]
     [RequireComponent(typeof(FlashOnCue))]
@@ -43,11 +54,13 @@ namespace Character
         }
 
         /// <summary>
-        /// 공격 애니메이션 데이터. 0번 프레임이 항상 시작(Windup)이고, hitFrameIndex가 타격 프레임,
-        /// 그 이후부터 마지막 프레임까지가 복귀(Recovery)다. 프레임 개수는 frames.Length 그대로다.
+        /// 레거시 단일 슬롯용 공격 애니메이션 데이터. 0번 프레임이 항상 시작(Windup)이고,
+        /// hitFrameIndex가 타격 프레임, 그 이후부터 마지막 프레임까지가 복귀(Recovery)다. 프레임
+        /// 개수는 frames.Length 그대로다. IAttackMotion을 구현해서 ScriptableObject 기반
+        /// AttackMotionDefinition과 같은 재생 루프를 공유한다.
         /// </summary>
         [System.Serializable]
-        public class AttackAnimation
+        public class AttackAnimation : IAttackMotion
         {
             public Sprite[] frames;
 
@@ -68,6 +81,12 @@ namespace Character
             [Tooltip("마지막 입력 이후 이 시간(초) 동안 새 입력이 없으면, 남아있는 예약(대기열)을 전부 취소하고 " +
                      "진행 중인 재생만 마친 뒤 복귀한다. 0.15~0.25 권장")]
             public float queueExpireTimeout = 0.15f;
+
+            public Sprite[] Frames => frames ?? Array.Empty<Sprite>();
+            public float AnimationFps => animationFps;
+            public int HitFrameIndex => hitFrameIndex;
+            public float EndFrameDuration => endFrameDuration;
+            public float QueueExpireTimeout => queueExpireTimeout;
         }
 
         private const int IdleIndex = 0;
@@ -82,8 +101,20 @@ namespace Character
         [SerializeField] private FrameAnimation idleB;
         [SerializeField] private FrameAnimation idleC;
 
-        [Header("Attack (연속 입력 유지형)")]
+        [Header("Attack (레거시 단일 슬롯)")]
+        [Tooltip("tier1Pool이 비어 있을 때만 Tier 1 풀의 유일한 항목으로 자동 사용된다(하위 호환용). " +
+                 "새로 작업할 때는 아래 tier1Pool 에셋에 직접 등록하는 것을 권장한다.")]
         [SerializeField] private AttackAnimation attack;
+
+        [Header("Combo Tier Attack Pools (콤보 티어별 공격 모션 풀 에셋)")]
+        [Tooltip("Tier 0/1(Normal)에서 사용할 공격 모션 풀 에셋(ComboTierAttackPool). 비어 있으면 위 attack 필드를 자동으로 사용한다.")]
+        [SerializeField] private ComboTierAttackPool tier1Pool;
+
+        [Tooltip("Tier 2(Boost)에서 사용할 공격 모션 풀 에셋. 비어 있으면 Tier 1 풀로 폴백한다.")]
+        [SerializeField] private ComboTierAttackPool tier2Pool;
+
+        [Tooltip("Tier 3(Fever)에서 사용할 공격 모션 풀 에셋. 비어 있으면 Tier 2 -> Tier 1 순으로 폴백한다.")]
+        [SerializeField] private ComboTierAttackPool tier3Pool;
 
         [Header("Combat")]
         [Tooltip("기본 공격 1회(타격 1번)당 적용할 데미지량. 강공격/치명타 등 추가 계산식은 아직 없다.")]
@@ -95,7 +126,6 @@ namespace Character
         private SpriteRenderer spriteRenderer;
         private FlashOnCue flashOnCue;
         private FrameAnimation[] animations;
-        private Sprite[] attackFrames;
 
         private int activeAnimIndex;
         private int currentFrame;
@@ -109,21 +139,40 @@ namespace Character
         private int pendingAttacks;
         private float lastInputTime;
 
-        private int HitFrameIndex => attackFrames.Length == 0
+        // 콤보 티어별로 정리된 재생 가능한 모션 풀(frames가 비어 있는 항목은 제외) - Awake에서 한 번만 만든다.
+        private readonly List<IAttackMotion> resolvedTier1 = new List<IAttackMotion>();
+        private readonly List<IAttackMotion> resolvedTier2 = new List<IAttackMotion>();
+        private readonly List<IAttackMotion> resolvedTier3 = new List<IAttackMotion>();
+
+        // 이번 Windup~Recovery 사이클 동안 재생 중인 모션 - StartWindup()에서만 새로 뽑는다.
+        private IAttackMotion activeMotion;
+        private Sprite[] activeMotionFrames = Array.Empty<Sprite>();
+
+        private int ActiveHitFrameIndex => activeMotionFrames.Length == 0
             ? 0
-            : Mathf.Clamp(attack.hitFrameIndex, 0, attackFrames.Length - 1);
+            : Mathf.Clamp(activeMotion.HitFrameIndex, 0, activeMotionFrames.Length - 1);
 
         private void Awake()
         {
             spriteRenderer = GetComponent<SpriteRenderer>();
             flashOnCue = GetComponent<FlashOnCue>();
             animations = new[] { idle, idleA, idleB, idleC };
-            attackFrames = SafeFrames(attack?.frames);
 
             for (int i = 0; i < animations.Length; i++)
             {
                 animations[i].frames = SafeFrames(animations[i].frames);
             }
+
+            BuildResolvedPool(resolvedTier1, tier1Pool);
+            if (resolvedTier1.Count == 0 && attack != null)
+            {
+                // 하위 호환: tier1Pool 에셋을 아직 연결하지 않았다면, 기존에 이미 붙여둔 레거시 attack
+                // 필드를 Tier 1 풀의 유일한 항목으로 그대로 쓴다 - 이미 배정된 스프라이트를 잃지 않는다.
+                attack.frames = SafeFrames(attack.frames);
+                if (attack.frames.Length > 0) resolvedTier1.Add(attack);
+            }
+            BuildResolvedPool(resolvedTier2, tier2Pool);
+            BuildResolvedPool(resolvedTier3, tier3Pool);
 
             activeAnimIndex = IdleIndex;
             currentFrame = 0;
@@ -131,6 +180,50 @@ namespace Character
         }
 
         private static Sprite[] SafeFrames(Sprite[] frames) => frames ?? Array.Empty<Sprite>();
+
+        /// <summary>pool 에셋에서 Frames가 비어 있는 항목을 제외하고 destination에 채운다(재생
+        /// 불가능한 슬롯이 랜덤 선택에 걸리지 않도록). destination은 항상 먼저 비운 뒤 다시 채운다.
+        /// AttackMotionDefinition은 참조만 담기 때문에, 에셋 자체를 나중에 수정하면(프레임/타이밍)
+        /// 그 변경이 다음 재생부터 곧바로 반영된다 - 여기서는 복사하지 않는다.</summary>
+        private static void BuildResolvedPool(List<IAttackMotion> destination, ComboTierAttackPool pool)
+        {
+            destination.Clear();
+            if (pool == null) return;
+
+            IReadOnlyList<AttackMotionDefinition> motions = pool.Motions;
+            for (int i = 0; i < motions.Count; i++)
+            {
+                AttackMotionDefinition motion = motions[i];
+                if (motion == null) continue;
+                if (motion.Frames.Length == 0) continue;
+                destination.Add(motion);
+            }
+        }
+
+        /// <summary>Tier3 -> Tier2 -> Tier1 순으로 폴백한다. resolvedTier1은 Awake에서 레거시 attack
+        /// 필드까지 반영된 뒤이므로, 하나라도 모션이 등록돼 있었다면 항상 최소 1개는 채워져 있다.</summary>
+        private List<IAttackMotion> GetPoolForTier(int tier)
+        {
+            if (tier >= 3)
+            {
+                if (resolvedTier3.Count > 0) return resolvedTier3;
+                if (resolvedTier2.Count > 0) return resolvedTier2;
+                return resolvedTier1;
+            }
+            if (tier >= 2)
+            {
+                if (resolvedTier2.Count > 0) return resolvedTier2;
+                return resolvedTier1;
+            }
+            return resolvedTier1;
+        }
+
+        /// <summary>pool에서 모션을 완전 균등 확률로 랜덤 선택한다 - 직전에 재생한 모션과 같아도
+        /// 그대로 허용한다(중복 방지 없음).</summary>
+        private static IAttackMotion SelectMotion(List<IAttackMotion> pool)
+        {
+            return pool[UnityEngine.Random.Range(0, pool.Count)];
+        }
 
         private void Update()
         {
@@ -181,7 +274,7 @@ namespace Character
 
         private void BeginAttackSession()
         {
-            if (attackFrames.Length == 0) return;
+            if (GetPoolForTier(ComboManager.CurrentTier).Count == 0) return;
 
             playingVariant = false;
             AttackStarted?.Invoke();
@@ -190,12 +283,17 @@ namespace Character
 
         private void StartWindup()
         {
+            // 콤보 티어는 매 사이클(대기열에서 하나 꺼내 재생을 시작하는 시점)마다 다시 확인한다 -
+            // 재생 중인 공격을 끊지 않고 "다음 공격 시작부터" 새 티어가 반영되도록 하기 위함이다.
+            activeMotion = SelectMotion(GetPoolForTier(ComboManager.CurrentTier));
+            activeMotionFrames = activeMotion.Frames;
+
             attackPhase = AttackPhase.Windup;
             attackFrame = 0;
             attackPhaseTimer = 0f;
             ApplyAttackFrame();
 
-            if (HitFrameIndex <= 0)
+            if (ActiveHitFrameIndex <= 0)
             {
                 Strike(); // hitFrameIndex가 0이면 시작하자마자 타격
             }
@@ -208,10 +306,10 @@ namespace Character
             flashOnCue.Flash();
             HitPoint?.Invoke(basicAttackPower);
 
-            bool inputStillFresh = Time.time - lastInputTime < attack.queueExpireTimeout;
+            bool inputStillFresh = Time.time - lastInputTime < activeMotion.QueueExpireTimeout;
             if (pendingAttacks > 0 && inputStillFresh)
             {
-                StartWindup(); // 대기 중인 타격이 있고 입력이 이어지고 있으면 곧바로 다음 재생으로
+                StartWindup(); // 대기 중인 타격이 있고 입력이 이어지고 있으면 곧바로 다음 재생으로(모션은 여기서 새로 뽑힌다)
             }
             else
             {
@@ -250,7 +348,7 @@ namespace Character
                         attackFrame++;
                         ApplyAttackFrame();
 
-                        if (attackFrame >= HitFrameIndex)
+                        if (attackFrame >= ActiveHitFrameIndex)
                         {
                             Strike();
                         }
@@ -258,14 +356,14 @@ namespace Character
                     break;
 
                 case AttackPhase.Recovery:
-                    if (attackFrame < attackFrames.Length - 1)
+                    if (attackFrame < activeMotionFrames.Length - 1)
                     {
                         AdvanceStep(() =>
                         {
                             attackFrame++;
                             ApplyAttackFrame();
 
-                            if (attackFrame >= attackFrames.Length - 1)
+                            if (attackFrame >= activeMotionFrames.Length - 1)
                             {
                                 attackPhaseTimer = 0f; // 스텝 타이머 -> 유지 타이머로 전환하기 전 리셋
                             }
@@ -274,7 +372,7 @@ namespace Character
                     else
                     {
                         attackPhaseTimer += Time.deltaTime;
-                        if (attackPhaseTimer >= attack.endFrameDuration)
+                        if (attackPhaseTimer >= activeMotion.EndFrameDuration)
                         {
                             FinishSession();
                         }
@@ -285,9 +383,9 @@ namespace Character
 
         private void AdvanceStep(Action onStepComplete)
         {
-            if (attack.animationFps <= 0f) return;
+            if (activeMotion.AnimationFps <= 0f) return;
 
-            float step = 1f / attack.animationFps;
+            float step = 1f / activeMotion.AnimationFps;
             attackPhaseTimer += Time.deltaTime;
 
             if (attackPhaseTimer < step) return;
@@ -298,8 +396,8 @@ namespace Character
 
         private void ApplyAttackFrame()
         {
-            if (attackFrame < 0 || attackFrame >= attackFrames.Length) return;
-            spriteRenderer.sprite = attackFrames[attackFrame];
+            if (attackFrame < 0 || attackFrame >= activeMotionFrames.Length) return;
+            spriteRenderer.sprite = activeMotionFrames[attackFrame];
         }
 
         // ---- Idle / Idle 변형 ----
