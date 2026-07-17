@@ -89,6 +89,7 @@ namespace Common
         /// <summary>다른 보상 토스트에도 재사용할 수 있는 진입점.</summary>
         public void ShowToast(string message)
         {
+            Debug.Log($"[RewardToast] Queue: \"{message}\" (pending={pending.Count + 1}, activeInHierarchy={gameObject.activeInHierarchy})");
             pending.Enqueue(message);
             if (!playing)
             {
@@ -111,6 +112,7 @@ namespace Common
 
         private IEnumerator PlayOne(string message)
         {
+            Debug.Log($"[RewardToast] Display: \"{message}\" (activeInHierarchy={gameObject.activeInHierarchy}, canvasGroupAlphaBefore={canvasGroup.alpha})");
             text.text = message;
 
             // ContentSizeFitter는 자식(lb_toast)의 preferredSize가 먼저 갱신된 뒤에야 부모(bg_RewardToast)를

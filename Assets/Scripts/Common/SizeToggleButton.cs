@@ -1,4 +1,3 @@
-using DesktopWindow;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -6,9 +5,11 @@ using UnityEngine.UI;
 namespace Common
 {
     /// <summary>
-    /// ControlDock의 tgl_size 버튼. 클릭할 때마다 sizePercentages를 순환하며 창 크기(=게임 해상도)를
-    /// 바꾼다. 실제 리사이즈는 TransparentWindowController.SetSizeScale이 담당하고, 이 버튼은 "다음
-    /// 배율이 뭔지 정하고 요청만 보내는" 역할만 한다.
+    /// ControlDock의 tgl_size 버튼. 클릭할 때마다 sizePercentages를 순환하며 StageVisualRoot(캐릭터/적
+    /// 등 게임 그래픽)의 화면상 크기를 바꾼다. 전체 모니터 Overlay 구조로 전환되기 전에는 네이티브
+    /// 창 크기 자체를 바꿨지만, 지금은 StageVisualRootController.SetUserScale이 카메라 Viewport Rect만
+    /// 조정한다 - 네이티브 창(모니터 Work Area 전체)은 이 배율과 무관하게 그대로 유지된다. 이 버튼은
+    /// "다음 배율이 뭔지 정하고 요청만 보내는" 역할만 한다.
     ///
     /// sizePercentages는 Inspector에서 자유롭게 조정 가능하다 - 비율 구성이 나중에 바뀔 수 있다는
     /// 전제로 하드코딩하지 않았다. 저장은 배열의 인덱스가 아니라 실제 배율값(예: 1.5)으로 하므로,
@@ -68,9 +69,9 @@ namespace Common
 
             float scale = sizePercentages[currentIndex];
 
-            if (TransparentWindowController.Instance != null)
+            if (StageVisualRootController.Instance != null)
             {
-                TransparentWindowController.Instance.SetSizeScale(scale);
+                StageVisualRootController.Instance.SetUserScale(scale);
             }
 
             if (save)
