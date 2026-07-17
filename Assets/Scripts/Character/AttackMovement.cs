@@ -1,3 +1,4 @@
+using Common;
 using DesktopWindow;
 using UnityEngine;
 
@@ -7,6 +8,10 @@ namespace Character
     /// 어떤 키보드 입력이든 감지하면 캐릭터가 앞으로 살짝 이동했다가 원래 위치로 돌아온다.
     /// SpriteFlipbook의 Idle 루프와는 독립적으로 Transform 위치만 움직인다.
     /// GlobalKeyboardHook을 통해 이 앱이 비활성 상태여도(다른 앱 사용 중이어도) 반응한다.
+    ///
+    /// 공격 가능한 Target이 없으면(Target.HasAttackableTarget == false) 새 입력으로 이동을 시작하지
+    /// 않는다 - CatKnightIdleAnimator/ComboManager와 같은 기준으로 "허공 공격" 중 캐릭터만 움직이는
+    /// 것을 막는다. 이미 진행 중인 이동은 끊지 않고 기존 방식대로 끝까지 재생한다.
     /// </summary>
     public class AttackMovement : MonoBehaviour
     {
@@ -26,7 +31,7 @@ namespace Character
 
         private void Update()
         {
-            if (GlobalKeyboardHook.AnyKeyDownThisFrame)
+            if (GlobalKeyboardHook.AnyKeyDownThisFrame && Target.HasAttackableTarget)
             {
                 StartMove();
             }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using Character;
 using Common;
 using UnityEngine;
@@ -14,16 +15,21 @@ namespace Enemy
     ///
     /// 타격 처리 순서는 고정이다: damage 적용(Target.ApplyDamage) -> 피격 반응(자세/플래시/흔들림) ->
     /// 데미지 숫자(DamageNumberSpawner) -> 타격 이펙트(HitEffectSpawner). ApplyDamage는 이번 타격이
-    /// 처치를 유발하면 OnDefeated를 동기 호출하고, respawnDelay가 0이면 그 안에서 곧바로 OnRespawned까지
-    /// 연달아 호출한다 - 즉 ApplyDamage가 끝난 시점에 이미 hitPhase가 Defeated 또는(0지연 리스폰이면) Recovery로
-    /// 넘어가 있을 수 있다. 피격 반응 단계는 이 상태 전이를 덮어쓰지 않고 그 위에서 플래시/자세만 보정한다 -
+    /// 처치를 유발하면 OnDefeated를 동기 호출한다 - 즉 ApplyDamage가 끝난 시점에 이미 hitPhase가
+    /// Defeated로 넘어가 있을 수 있다. Target은 그 뒤로 Fade-out/대기/Fade-in을 전부 코루틴으로
+    /// 순서대로 진행하며(같은 프레임에 몰리지 않는다), OnRespawnStarted/OnRespawned는 항상 이후
+    /// 프레임에 온다. 피격 반응 단계는 이 상태 전이를 덮어쓰지 않고 그 위에서 플래시/자세만 보정한다 -
     /// 자세한 규칙은 OnHitPoint/HandleDefeated 주석 참고.
     ///
-    /// 내구도/처치/리젠 타이밍은 전부 Target이 담당한다 - 이 스크립트는 Target이 보내는 이벤트(OnDefeated,
-    /// OnRespawned)를 듣고 그에 맞는 자세만 보여준다: 처치되면 지금 피격 자세를 그대로 유지("Defeated" 상태로
-    /// 전환만 하고 별도 타이머는 없음), Target이 리젠을 마치고 OnRespawned를 보내오면 그때 기존 복귀 흐름
-    /// (Recovery -> Idle)을 재사용해 돌아간다. respawnDelay가 0이면 두 이벤트가 같은 프레임에 연달아 오므로
-    /// 사실상 즉시 Recovery로 넘어간다 - 사망 리소스 없이 임시 처치를 표현한다.
+    /// 내구도/처치/리젠 "시간"은 전부 Target이 담당한다 - 이 스크립트는 Target이 보내는 이벤트
+    /// (OnDefeated, OnRespawnStarted, OnRespawned)를 듣고 그에 맞는 자세와 알파만 보여준다: 처치되면
+    /// 지금 피격 자세를 그대로 유지("Defeated" 상태로 전환만 하고 별도 타이머는 없음)한 채
+    /// Target.DefeatFadeDuration에 맞춰 알파를 0으로 페이드한다. Target이 대기를 마치고
+    /// OnRespawnStarted를 보내오면 이전 Hit/Defeated 프레임이 노출되지 않도록 먼저 Idle 기준 자세로
+    /// 정리한 뒤 Target.RespawnFadeDuration에 맞춰 알파를 원래 값으로 페이드한다. Fade-in이 끝나
+    /// Target이 OnRespawned를 보내오면 그때 기존 복귀 흐름(Recovery -> Idle)을 재사용해 돌아간다.
+    /// 알파 Fade는 스케일/위치/회전과 완전히 분리된 별도 코루틴(fadeRoutine)이 SpriteRenderer의
+    /// color.a만 건드리며, hitPhase 기반의 자세 전환 로직과는 서로 간섭하지 않는다.
     /// </summary>
     [RequireComponent(typeof(SpriteRenderer))]
     [RequireComponent(typeof(FlashOnCue))]
@@ -110,6 +116,13 @@ namespace Enemy
         private bool shaking;
         private float shakeStartTime;
 
+        // 처치/리젠 알파 Fade 대상. Awake에서 자신 및 자식의 SpriteRenderer를 전부 수집한다 -
+        // ReceivePoint/ImpactPoint/DamageAnchor 같은 비시각 앵커는 SpriteRenderer가 없으므로 자동으로
+        // 제외된다. RGB는 절대 건드리지 않고 각자의 원래 알파만 개별로 저장해 그 값 기준으로 Fade한다.
+        private SpriteRenderer[] visualRenderers;
+        private float[] originalAlphas;
+        private Coroutine fadeRoutine;
+
         private void Awake()
         {
             spriteRenderer = GetComponent<SpriteRenderer>();
@@ -124,12 +137,20 @@ namespace Enemy
 
             idleCurrentFrame = 0;
             ApplyIdleFrame();
+
+            visualRenderers = GetComponentsInChildren<SpriteRenderer>(true);
+            originalAlphas = new float[visualRenderers.Length];
+            for (int i = 0; i < visualRenderers.Length; i++)
+            {
+                originalAlphas[i] = visualRenderers[i].color.a;
+            }
         }
 
         private void OnEnable()
         {
             CatKnightIdleAnimator.HitPoint += OnHitPoint;
             target.OnDefeated += HandleDefeated;
+            target.OnRespawnStarted += HandleRespawnStarted;
             target.OnRespawned += HandleRespawned;
         }
 
@@ -137,7 +158,14 @@ namespace Enemy
         {
             CatKnightIdleAnimator.HitPoint -= OnHitPoint;
             target.OnDefeated -= HandleDefeated;
+            target.OnRespawnStarted -= HandleRespawnStarted;
             target.OnRespawned -= HandleRespawned;
+
+            if (fadeRoutine != null)
+            {
+                StopCoroutine(fadeRoutine);
+                fadeRoutine = null;
+            }
         }
 
         private void OnHitPoint(int damageAmount)
@@ -159,14 +187,10 @@ namespace Enemy
 
             if (defeatedByCurrentHit)
             {
-                // 처치를 유발한 타격: hitPhase는 이미 Defeated(지연 리스폰) 또는 Recovery(즉시 리스폰)로
-                // 결정되어 있다 - 여기서 hitPhase 자체는 건드리지 않는다. Defeated로 남아있다면 그 자세를
-                // "피격 홀드 포즈"로 보여주고(리스폰 전까지 유지), Recovery라면 EnterRecovery가 이미 올바른
-                // 복귀 포즈를 그려뒀으니 손대지 않는다. 두 경우 모두 이번 타격이 눈에 보이도록 플래시는 갱신한다.
-                if (hitPhase == HitPhase.Defeated)
-                {
-                    ApplyHitPose();
-                }
+                // 처치를 유발한 타격: HandleDefeated가 이미 hitPhase를 Defeated로 옮겨뒀다(Fade-out은
+                // 별도 코루틴으로 이미 시작된 상태) - 여기서는 그 홀드 포즈만 그려주고(리스폰 전까지
+                // 유지) 이번 타격이 눈에 보이도록 플래시를 갱신한다.
+                ApplyHitPose();
                 flashOnCue.Flash();
             }
             else if (hitPhase == HitPhase.Reacting)
@@ -196,11 +220,84 @@ namespace Enemy
             // HandleRespawned가 곧바로 Recovery로 덮어쓰므로 여기서 미리 그릴 필요가 없다).
             defeatedByCurrentHit = true;
             hitPhase = HitPhase.Defeated;
+
+            StartFade(toOriginal: false, duration: target.DefeatFadeDuration);
+        }
+
+        /// <summary>Target의 WaitingForRespawn이 끝나 Fade-in이 시작될 때 호출된다. 아직 Alive는
+        /// 아니다(OnRespawned는 별도로 온다) - 이전 Hit/Defeated 프레임이 Fade-in 동안 노출되지 않게
+        /// 먼저 Idle 기준 자세로 정리한 뒤 알파를 원래 값으로 페이드한다.</summary>
+        private void HandleRespawnStarted(string targetId)
+        {
+            ExitToIdle();
+            StartFade(toOriginal: true, duration: target.RespawnFadeDuration);
         }
 
         private void HandleRespawned(string targetId)
         {
             EnterRecovery(); // 기존 복귀 흐름(Recovery -> Idle)을 그대로 재사용한다.
+        }
+
+        /// <summary>처치/리젠 Fade를 시작한다. 진행 중이던 Fade가 있으면 안전하게 중단하고, 새 Fade는
+        /// 그 순간의 실제 알파를 시작값으로 삼아 이어간다 - 그래야 처치와 리젠 Fade가 같은 Renderer를
+        /// 동시에 제어하거나 순간이동하는 일이 없다.</summary>
+        private void StartFade(bool toOriginal, float duration)
+        {
+            if (fadeRoutine != null)
+            {
+                StopCoroutine(fadeRoutine);
+                fadeRoutine = null;
+            }
+            fadeRoutine = StartCoroutine(FadeRoutine(toOriginal, duration));
+        }
+
+        private IEnumerator FadeRoutine(bool toOriginal, float duration)
+        {
+            int count = visualRenderers.Length;
+            var startAlphas = new float[count];
+            for (int i = 0; i < count; i++)
+            {
+                startAlphas[i] = visualRenderers[i] != null ? visualRenderers[i].color.a : 0f;
+            }
+
+            if (duration <= 0f)
+            {
+                ApplyTargetAlphas(toOriginal);
+                fadeRoutine = null;
+                yield break;
+            }
+
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                for (int i = 0; i < count; i++)
+                {
+                    if (visualRenderers[i] == null) continue;
+                    float targetAlpha = toOriginal ? originalAlphas[i] : 0f;
+                    Color c = visualRenderers[i].color;
+                    c.a = Mathf.Lerp(startAlphas[i], targetAlpha, t);
+                    visualRenderers[i].color = c;
+                }
+                yield return null;
+            }
+
+            ApplyTargetAlphas(toOriginal);
+            fadeRoutine = null;
+        }
+
+        /// <summary>각 Renderer의 알파를 목표값으로 정확히 맞춘다 - toOriginal이면 Awake에서 저장해둔
+        /// 그 Renderer만의 원래 알파로(무조건 1이 아니다), 아니면 0으로. RGB는 절대 건드리지 않는다.</summary>
+        private void ApplyTargetAlphas(bool toOriginal)
+        {
+            for (int i = 0; i < visualRenderers.Length; i++)
+            {
+                if (visualRenderers[i] == null) continue;
+                Color c = visualRenderers[i].color;
+                c.a = toOriginal ? originalAlphas[i] : 0f;
+                visualRenderers[i].color = c;
+            }
         }
 
         private void TriggerShake()

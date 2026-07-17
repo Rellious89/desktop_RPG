@@ -8,9 +8,12 @@ namespace Common
     /// 유효한 키 입력이 들어올 때마다 콤보를 올리고, 현재 티어에 해당하는 타임아웃 동안 입력이
     /// 없으면 콤보를 0으로 되돌린다. 티어가 높을수록(Fever에 가까울수록) 타임아웃을 짧게 잡아서
     /// 콤보를 유지하려면 더 빠르게 계속 입력해야 하는 긴장감을 준다.
-    /// GlobalKeyboardHook의 입력 신호만 보고 동작하며, 공격 애니메이션/HitPoint/데미지와는
-    /// 완전히 독립적이다 - 입력 리듬을 보여주는 순수 시각적 시스템이고, 아직 데미지·강공격 등
-    /// 실제 전투 계산에는 연결하지 않는다.
+    /// GlobalKeyboardHook의 입력 신호를 보되, 실제 HitPoint/데미지와는 여전히 무관하다(콤보는
+    /// "유효한 전투 키 입력" 자체를 카운트하는 정책을 유지한다) - 다만 공격 가능한 Target이 하나도
+    /// 없는 동안(Target.HasAttackableTarget == false)에는 입력을 콤보로 인정하지 않고, 만료
+    /// 타이머(sinceLastInput)도 그 값 그대로 멈춰둔다(0으로 초기화하지 않는다) - 적이 없어서
+    /// 못 때리는 동안 콤보 제한 시간이 흘러 강제로 끊기는 것을 막기 위함이다. Target이 다시
+    /// Alive가 되면 남은 시간부터 타이머가 이어서 진행된다.
     /// 씬에 하나만 두면 된다. 다른 스크립트는 정적 프로퍼티/이벤트로 콤보 상태를 읽는다
     /// (Target.AnyTargetDefeated, SessionKillCounter와 같은 패턴).
     /// </summary>
@@ -53,12 +56,19 @@ namespace Common
 
         private void Update()
         {
-            if (GlobalKeyboardHook.AnyKeyDownThisFrame)
+            bool canAttack = Target.HasAttackableTarget;
+
+            if (canAttack && GlobalKeyboardHook.AnyKeyDownThisFrame)
             {
                 RegisterInput();
             }
 
             if (CurrentCombo <= 0) return;
+
+            // 공격 가능한 Target이 없는 동안에는 콤보 값과 sinceLastInput을 그대로 둔 채 만료 타이머만
+            // 멈춘다 - BreakCombo를 호출하지 않는다. Fade-in이 끝나 다시 canAttack이 true가 되면 이
+            // 남은 값부터 이어서 진행된다(초기화하지 않는다).
+            if (!canAttack) return;
 
             sinceLastInput += Time.deltaTime;
             if (sinceLastInput >= CurrentTimeout())

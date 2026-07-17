@@ -3829,7 +3829,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   targetId: Scarecrow
   maxDurability: 30
-  respawnDelay: 0
+  defeatFadeDuration: 0.25
+  respawnDelay: 1
+  respawnFadeDuration: 0.25
 --- !u!114 &1500000107
 MonoBehaviour:
   m_ObjectHideFlags: 0

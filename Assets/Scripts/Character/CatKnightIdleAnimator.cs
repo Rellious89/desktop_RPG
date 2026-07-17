@@ -21,6 +21,12 @@ namespace Character
     /// 아님). 프레임 수는 배열 길이(frames.Length)가 그대로 정답이라 별도로 입력받지 않는다.
     /// Pivot/PPU도 각 스프라이트의 임포트 설정에 이미 들어있어서 여기서 따로 지정하지 않는다.
     ///
+    /// 공격 가능한 Target이 하나도 없으면(Target.HasAttackableTarget == false) 새 키 입력을 아예
+    /// 대기열에 올리지 않는다 - 처치 직후 Fade-out/리젠 대기/Fade-in 중에는 허공 공격이 시작되지
+    /// 않는다. 이미 진행 중인 Windup~Recovery는 끊지 않고 그대로 마무리하되, Strike() 직후 다음
+    /// Windup으로 이어갈지 판단할 때도 다시 한번 확인해서 - 마지막 남은 Target을 죽인 타격이었다면
+    /// 그 뒤에 밀려 있던 예약 공격(pendingAttacks)은 전부 버리고 Recovery로 빠진다.
+    ///
     /// 콤보 티어별 공격 모션 풀: tier1/2/3Pool(ComboTierAttackPool 에셋) 중 ComboManager.CurrentTier에
     /// 대응하는 풀에서 매 StartWindup() 시점에 모션을 하나 완전 랜덤으로 뽑아 그 사이클(Windup ->
     /// Strike -> Recovery) 동안 그대로 쓴다 - 입력 처리/대기열/전환 규칙은 전혀 건드리지 않고 "어떤
@@ -227,7 +233,10 @@ namespace Character
 
         private void Update()
         {
-            if (GlobalKeyboardHook.AnyKeyDownThisFrame)
+            // 공격 가능한 Target이 하나도 없으면 새 입력을 아예 공격으로 등록하지 않는다(대기열도
+            // 늘리지 않는다) - 처치/리젠 대기 중 허공 공격을 막기 위함이다. 이미 진행 중인 Windup/
+            // Recovery는 아래 AdvanceAttack()에서 그대로 마무리된다(여기서 끊지 않는다).
+            if (GlobalKeyboardHook.AnyKeyDownThisFrame && Target.HasAttackableTarget)
             {
                 OnKeyInput();
             }
@@ -304,16 +313,20 @@ namespace Character
             if (pendingAttacks > 0) pendingAttacks--; // 이 타격으로 대기열에서 요청 하나를 소비(확정)한다.
 
             flashOnCue.Flash();
-            HitPoint?.Invoke(basicAttackPower);
+            HitPoint?.Invoke(basicAttackPower); // 이 호출이 처치를 유발하면 Target.HasAttackableTarget이 여기서 이미 false로 바뀌어 있을 수 있다.
 
+            // 처치를 유발한 타격이었다면(마지막 남은 Target이었을 경우) 이 시점에 이미 공격 불가 상태다 -
+            // 아직 실행하지 않은 예약 공격은 전부 폐기하고 새 Windup을 시작하지 않는다. 지금 재생 중인
+            // 이번 공격의 Recovery는 그대로 자연스럽게 마무리한다(끊지 않는다).
+            bool canAttack = Target.HasAttackableTarget;
             bool inputStillFresh = Time.time - lastInputTime < activeMotion.QueueExpireTimeout;
-            if (pendingAttacks > 0 && inputStillFresh)
+            if (canAttack && pendingAttacks > 0 && inputStillFresh)
             {
                 StartWindup(); // 대기 중인 타격이 있고 입력이 이어지고 있으면 곧바로 다음 재생으로(모션은 여기서 새로 뽑힌다)
             }
             else
             {
-                pendingAttacks = 0; // 입력이 끊겼으면 밀린 예약은 버리고 지금 재생만 마무리한다
+                pendingAttacks = 0; // 입력이 끊겼거나 더 이상 공격 대상이 없으면 밀린 예약은 버리고 지금 재생만 마무리한다
                 StartRecovery();
             }
         }
