@@ -27,14 +27,15 @@ Idle
 
 ### 현재 구현 상태
 
-`Assets/Scripts/Character/CatKnightIdleAnimator.cs`가 이 타입 하나만 구현한 상태다.
+`Assets/Scripts/Character/PlayerCharacterAnimator.cs`가 이 타입을 구현한다.
 
 - `AttackAnimation` 데이터: `animationFps`(Windup/Recovery 프레임 전환 속도, 이전 이름 `stepFramesPerSecond`), `endFrameDuration`(복귀 프레임 노출 시간), `queueExpireTimeout`(마지막 입력 이후 예약을 취소하는 유예 시간)
 - Idle 계열(`FrameAnimation`)의 프레임 재생 속도 필드도 동일하게 `animationFps`로 통일했다 — Idle과 Attack 모두 "이 애니메이션의 프레임을 초당 몇 번 전환할지"라는 같은 의미로 같은 이름을 쓴다.
-- 상태: `AttackPhase.None → Ready → Strike → End → None`
+- 상태: `AttackPhase.None → Windup → Strike → Recovery → None`
 - 키 입력은 애니메이션을 직접 트리거하지 않고 `pendingAttacks` 대기열에 쌓이며, Strike가 끝날 때마다 하나씩 소비된다. 입력이 끊기면(`queueExpireTimeout` 경과) 남은 예약은 버리고 진행 중인 사이클만 마친 뒤 복귀한다.
 - 이벤트: `AttackStarted`(세션 시작 1회), `HitPoint`(타격마다, 위 규칙의 `HitPoint`와 동일), `AttackEnded`(Idle 복귀 시 1회)
-- 콤보 단계별 변형(속도/전진 거리/이펙트/피격 강도 변화)은 아직 미구현 — 현재는 콤보 개념 없이 단일 기본 공격만 존재한다.
+- 콤보 티어별 공격 모션은 `ComboTierAttackPool` 에셋을 통해 선택한다. Tier 3 풀은 비어 있을 경우 Tier 2 → Tier 1 순으로 폴백하고, Tier 2는 Tier 1로 폴백한다.
+- `PlayerCharacterAnimator`의 레거시 `attack` 필드는 Tier 1 풀을 아직 연결하지 않은 기존 씬의 하위 호환용이다. 새 리소스는 `tier1Pool`/`tier2Pool` 에셋에 등록한다.
 
 #### `queueExpireTimeout` 동작 (시간값 점검 결과 반영)
 
@@ -94,20 +95,19 @@ Sprite Pivot은 Actor Origin이며 애니메이션 프레임 내부에서는 바
 
 ## 타격 이펙트 (Hit Effect)
 
-`CatKnightIdleAnimator.HitPoint → Target.ApplyDamage → 피격 반응(자세/플래시/흔들림) → 데미지 숫자 → 타격 이펙트` 순서를
-`Assets/Scripts/Enemy/ScarecrowAnimator.cs`의 `OnHitPoint`가 그대로 유지한다. 이펙트 생성 자체는 재사용 컴포넌트로 분리했다.
+`PlayerCharacterAnimator.HitPoint → Target.ApplyDamage → 피격 반응(자세/플래시/흔들림) → 데미지 숫자 → 타격 이펙트` 순서를
+`Assets/Scripts/Enemy/TargetCombatController.cs`의 `OnHitPoint`가 유지한다. 이펙트 생성 자체는 재사용 컴포넌트로 분리했다.
 
-- `Target.ApplyDamage`는 이번 타격이 처치를 유발하면 `OnDefeated`를 동기 호출하고, `respawnDelay`가 0이면 그 안에서
-  곧바로 `OnRespawned`까지 이어서 호출한다 - 즉 `ApplyDamage` 호출이 끝난 시점에 이미 `hitPhase`가 `Defeated` 또는
-  (즉시 리스폰이면) `Recovery`로 넘어가 있을 수 있다. `OnHitPoint`는 `HandleDefeated`가 동기적으로 켜주는
-  `defeatedByCurrentHit` 플래그로 이 케이스를 감지해서, 피격 반응 단계가 그 상태 전이를 덮어쓰지 않도록 한다
-  (Defeated로 남아있으면 피격 홀드 포즈만 다시 그리고, 이미 Recovery로 넘어갔으면 손대지 않는다). 두 경우 모두
-  플래시는 갱신해서 처치를 유발한 마지막 타격도 반응이 눈에 보이게 한다.
+- `Target.ApplyDamage`는 이번 타격이 처치를 유발하면 `OnDefeated`를 동기 호출한다. 이후
+  `defeatFadeDuration → respawnDelay → OnRespawnStarted → respawnFadeDuration → OnRespawned` 순서로 진행한다.
+  Fade-in 완료 전까지 `Target.IsDefeated`가 true이므로 새 공격과 콤보 입력은 차단되고, 콤보 만료 타이머는 유예된다.
+- `OnHitPoint`는 `HandleDefeated`가 동기적으로 설정하는 `defeatedByCurrentHit`로 처치 타격을 구분한다.
+  처치를 유발한 마지막 타격의 피격 자세·플래시·데미지 숫자·히트 이펙트는 정상 출력하되, 이후 예약 공격은 폐기한다.
 
 - `Assets/Scripts/Common/HitEffectSpawner.cs`: 피격 대상에 붙는 재사용 컴포넌트(Target, DamageNumberSpawner와 같은 패턴). `defaultEffectPrefab`/`impactPoint`/`fallbackOffset`/`defaultDuration`을 Inspector에서 받는다. `Spawn(prefabOverride, durationOverride)`에 다른 prefab을 넘기면 강공격/콤보 티어/치명타 전용 이펙트도 같은 구조로 재생할 수 있다(아직 기본 이펙트 1종만 연결됨).
-- 생성된 이펙트 인스턴스는 어떤 Transform에도 부모로 붙이지 않는다 - 생성 시점의 월드 좌표만 스냅샷으로 쓰고, 이후 대상이 흔들리거나(Scarecrow shake) 이동해도(AttackMovement 등) 따라가지 않는다.
+- 생성된 이펙트는 `StageVisualRoot` 하위의 공통 `CombatFxRoot`에 풀링한다. 생성 순간 `ImpactPoint`의 월드 위치를 `CombatFxRoot` 로컬 좌표로 변환해 스냅샷으로 사용하므로 Stage 위치/배율은 정확히 한 번 상속하지만, 이후 Target의 흔들림이나 이동은 따라가지 않는다.
 - `impactPoint`를 비워두면 `fallbackOffset`을 이 오브젝트 기준으로 더한 위치를 안전하게 대신 쓴다. prefab이 비어 있거나 duration이 비정상값(0 이하/NaN/Infinity)이어도 예외 없이 무시하거나 기본값(0.15초)으로 보정한다.
 - 처치 판정은 `OnHitPoint` 진입 시점(`target.IsDefeated`)을 기준으로 한다 - 이미 처치된 상태로 들어온 타격은 맨 앞에서 걸러지고, 살아있던 대상을 처치하는 마지막 타격은 `ApplyDamage` 이후 `IsDefeated`가 true가 되어도 데미지 숫자/이펙트까지 끝까지 표시한다.
-- `Assets/Scripts/Common/HitEffectPop.cs`: 기본 이펙트 prefab에 붙는 더미 연출 - 짧게 확대되며 페이드아웃한 뒤 스스로 파괴된다. `HitEffectSpawner`도 별도로 `duration` 이후 같은 인스턴스를 Destroy하므로, prefab이 스스로 정리되지 않는 경우에도 스포너 쪽에서 안전망 역할을 한다.
+- `Assets/Scripts/Common/HitEffectPop.cs`: 기본 이펙트 prefab의 짧은 확대·Fade 재생을 담당하며, 완료 콜백으로 `HitEffectSpawner` 풀에 반환된다. `HitEffectPop`이 없는 prefab은 스포너의 대기 코루틴이 대신 회수한다.
 - 기본 이펙트 에셋: `Assets/Art/Effects/HitBasic/HitBasic-spark-00.png`(128×128, PPU 200, pivot 중앙) + `Assets/Prefabs/Effects/HitEffect_Basic.prefab`. 정식 아트 리소스가 없어 만든 더미용 스타버스트 스프라이트다 - 실제 이펙트 아트가 준비되면 이 prefab의 `SpriteRenderer`만 교체하면 된다.
 - Scarecrow의 `ImpactPoint` 자식 Transform(`Assets/Scenes/desktopScene.unity`)이 `HitEffectSpawner.impactPoint`에 연결되어 있다 - Scarecrow 기준 대략 몸통 높이(로컬 y 0.5)에 둔 임시 지점이며, 정확한 피격 위치는 아트가 확정되면 다시 조정될 수 있다.

@@ -10,7 +10,7 @@ namespace Character
     /// GlobalKeyboardHook을 통해 이 앱이 비활성 상태여도(다른 앱 사용 중이어도) 반응한다.
     ///
     /// 공격 가능한 Target이 없으면(Target.HasAttackableTarget == false) 새 입력으로 이동을 시작하지
-    /// 않는다 - CatKnightIdleAnimator/ComboManager와 같은 기준으로 "허공 공격" 중 캐릭터만 움직이는
+    /// 않는다 - PlayerCharacterAnimator/ComboManager와 같은 기준으로 "허공 공격" 중 캐릭터만 움직이는
     /// 것을 막는다. 이미 진행 중인 이동은 끊지 않고 기존 방식대로 끝까지 재생한다.
     /// </summary>
     public class AttackMovement : MonoBehaviour

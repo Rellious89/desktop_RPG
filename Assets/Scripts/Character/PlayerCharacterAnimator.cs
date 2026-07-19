@@ -39,7 +39,7 @@ namespace Character
     /// </summary>
     [RequireComponent(typeof(SpriteRenderer))]
     [RequireComponent(typeof(FlashOnCue))]
-    public class CatKnightIdleAnimator : MonoBehaviour
+    public class PlayerCharacterAnimator : MonoBehaviour
     {
         /// <summary>공격 세션에 처음 진입하는 순간(Idle -> Attack) 발생.</summary>
         public static event Action AttackStarted;

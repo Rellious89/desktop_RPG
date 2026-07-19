@@ -7,7 +7,7 @@ using UnityEngine;
 namespace Enemy
 {
     /// <summary>
-    /// 기본 Idle을 계속 루프하다가, 플레이어 공격의 HitPoint(CatKnightIdleAnimator.HitPoint)를 받으면
+    /// 기본 Idle을 계속 루프하다가, 플레이어 공격의 HitPoint(PlayerCharacterAnimator.HitPoint)를 받으면
     /// 즉시 피격 자세(holdFrame)로 전환해 유지한다. 연타 중에는 애니메이션을 처음부터 재시작하지 않고
     /// 그 자세를 유지한 채 매 타격마다 플래시만 갱신해서 "계속 맞고 있는" 느낌을 준다.
     /// 마지막 HitPoint 이후 holdTimeout이 지나면 복귀 프레임(recoveryFrame)을 보여준 뒤 Idle로 돌아간다.
@@ -36,7 +36,7 @@ namespace Enemy
     [RequireComponent(typeof(Target))]
     [RequireComponent(typeof(DamageNumberSpawner))]
     [RequireComponent(typeof(HitEffectSpawner))]
-    public class ScarecrowAnimator : MonoBehaviour
+    public class TargetCombatController : MonoBehaviour
     {
         /// <summary>HitPoint를 받아 실제로 반응할 때마다 발생(연타 중에는 매 타격마다).</summary>
         public event Action ReceiveImpact;
@@ -148,7 +148,7 @@ namespace Enemy
 
         private void OnEnable()
         {
-            CatKnightIdleAnimator.HitPoint += OnHitPoint;
+            PlayerCharacterAnimator.HitPoint += OnHitPoint;
             target.OnDefeated += HandleDefeated;
             target.OnRespawnStarted += HandleRespawnStarted;
             target.OnRespawned += HandleRespawned;
@@ -156,7 +156,7 @@ namespace Enemy
 
         private void OnDisable()
         {
-            CatKnightIdleAnimator.HitPoint -= OnHitPoint;
+            PlayerCharacterAnimator.HitPoint -= OnHitPoint;
             target.OnDefeated -= HandleDefeated;
             target.OnRespawnStarted -= HandleRespawnStarted;
             target.OnRespawned -= HandleRespawned;

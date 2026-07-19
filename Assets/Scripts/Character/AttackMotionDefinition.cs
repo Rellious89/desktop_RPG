@@ -6,7 +6,7 @@ namespace Character
     /// <summary>
     /// 공격 모션 1개(프레임 배열 + 재생 타이밍)를 담는 독립 에셋. 여러 ComboTierAttackPool이 같은
     /// 에셋을 참조로 공유할 수 있다 - 데이터를 복제하지 않으므로 이 에셋을 수정하면 그것을 참조하는
-    /// 모든 풀에 즉시 반영된다. 필드 구성은 기존 CatKnightIdleAnimator.AttackAnimation과 동일하다
+    /// 모든 풀에 즉시 반영된다. 필드 구성은 기존 PlayerCharacterAnimator.AttackAnimation과 동일하다
     /// (0번 프레임이 Windup 시작, hitFrameIndex가 타격 프레임, 그 이후가 Recovery).
     /// </summary>
     [CreateAssetMenu(fileName = "AttackMotionDefinition", menuName = "Character/Attack Motion Definition")]

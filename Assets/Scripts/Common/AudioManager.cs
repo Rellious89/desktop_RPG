@@ -5,7 +5,7 @@ using UnityEngine;
 namespace Common
 {
     /// <summary>
-    /// 최소 SFX 시스템. 공격/처치/레벨업이 이미 쏘고 있는 기존 정적 이벤트(CatKnightIdleAnimator.HitPoint,
+    /// 최소 SFX 시스템. 공격/처치/레벨업이 이미 쏘고 있는 기존 정적 이벤트(PlayerCharacterAnimator.HitPoint,
     /// Target.AnyTargetDefeated, PlayerProgress.OnLevelUp)를 직접 구독해서 재생 "요청"을 받는다 -
     /// 이벤트를 쏘는 쪽은 이 매니저의 존재를 몰라도 되고 수정할 필요도 없다(SessionKillCounter,
     /// RewardToast와 같은 구독 패턴). AudioSource도 이 컴포넌트 하나만 갖고 있고, 다른 스크립트는
@@ -78,14 +78,14 @@ namespace Common
 
         private void OnEnable()
         {
-            CatKnightIdleAnimator.HitPoint += HandleHitPoint;
+            PlayerCharacterAnimator.HitPoint += HandleHitPoint;
             Target.AnyTargetDefeated += HandleAnyTargetDefeated;
             PlayerProgress.OnLevelUp += HandleLevelUp;
         }
 
         private void OnDisable()
         {
-            CatKnightIdleAnimator.HitPoint -= HandleHitPoint;
+            PlayerCharacterAnimator.HitPoint -= HandleHitPoint;
             Target.AnyTargetDefeated -= HandleAnyTargetDefeated;
             PlayerProgress.OnLevelUp -= HandleLevelUp;
         }

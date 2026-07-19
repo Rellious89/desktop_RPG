@@ -14,15 +14,15 @@ namespace Common
     /// "다시 피격 가능해지는 시점"을 분리하기 위함이다(보이지도 않는/아직 다 안 나타난 몬스터가
     /// 공격받는 문제를 막는다). ApplyDamage는 이 값 하나만 보고 데미지를 무시하므로 안전하다.
     ///
-    /// 실제 알파 Fade는 이 컴포넌트가 하지 않는다 - SpriteRenderer 등 시각 요소는 ScarecrowAnimator
-    /// 같은 전용 시각 컴포넌트의 책임이다. 이 컴포넌트는 defeatFadeDuration/respawnFadeDuration
+    /// 실제 알파 Fade는 이 컴포넌트가 하지 않는다 - SpriteRenderer 등 시각 요소는 TargetCombatController
+    /// 같은 Target 전투 표현 컴포넌트의 책임이다. 이 컴포넌트는 defeatFadeDuration/respawnFadeDuration
     /// "시간"만 소유하고(Inspector에서 조정하는 단일 기준점), OnDefeated/OnRespawnStarted 이벤트를
     /// 시각 컴포넌트가 그 시간에 맞춰 자기 알파를 페이드하도록 신호로만 쓴다 - 게임 상태가 렌더러를
     /// 직접 조작하지 않도록 분리한다.
     ///
     /// 활성 Target 전체를 정적 등록소(activeTargets)에 모아두고, 그중 Alive(IsDefeated==false)인
     /// 개수(aliveCount)를 증감분만 갱신해 HasAttackableTarget을 O(1)로 판정한다 - 매 프레임 여러
-    /// 컴포넌트(CatKnightIdleAnimator/ComboManager/AttackMovement)가 이 값을 읽으므로 순회 없이
+    /// 컴포넌트(PlayerCharacterAnimator/ComboManager/AttackMovement)가 이 값을 읽으므로 순회 없이
     /// 즉시 답할 수 있어야 한다. 특정 몬스터 이름이나 타입에 의존하지 않으므로 몬스터가 늘어나거나
     /// 종류가 달라져도 그대로 쓸 수 있다.
     /// </summary>
