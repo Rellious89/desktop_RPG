@@ -12,6 +12,9 @@ namespace Character
     [CreateAssetMenu(fileName = "AttackMotionDefinition", menuName = "Character/Attack Motion Definition")]
     public class AttackMotionDefinition : ScriptableObject, IAttackMotion
     {
+        [Tooltip("Motion Editor에서만 참고하는 제작 메모. 런타임 공격 로직에는 사용하지 않는다.")]
+        [SerializeField] private string editorDescription;
+
         [Tooltip("프레임 낱장 Sprite 배열(아틀라스 런타임 슬라이싱 아님). 프레임 수는 이 배열 길이 그대로다.")]
         [SerializeField] private Sprite[] frames;
 
@@ -33,10 +36,27 @@ namespace Character
                  "진행 중인 재생만 마친 뒤 복귀한다. 0.15~0.25 권장")]
         [SerializeField] private float queueExpireTimeout = 0.15f;
 
+        [Header("Hit Presentation")]
+        [Tooltip("이 공격의 Hit Frame에서 사용할 이펙트 프리팹. 런타임 연결 전에도 Motion Editor에서 배치 기준으로 사용한다.")]
+        [SerializeField] private GameObject hitEffectPrefab;
+
+        [Tooltip("선택한 몬스터의 Receive Point를 기준으로 더할 이펙트 위치(월드 유닛)")]
+        [SerializeField] private Vector2 hitEffectOffset;
+
+        [Min(0.01f)]
+        [SerializeField] private float hitEffectScale = 1f;
+
+        [Tooltip("이 공격의 Hit Frame에서 사용할 사운드. 런타임 프레임 Cue 연결은 후속 단계에서 적용한다.")]
+        [SerializeField] private AudioClip hitSound;
+
         public Sprite[] Frames => frames ?? Array.Empty<Sprite>();
         public float AnimationFps => animationFps;
         public int HitFrameIndex => hitFrameIndex;
         public float EndFrameDuration => endFrameDuration;
         public float QueueExpireTimeout => queueExpireTimeout;
+        public GameObject HitEffectPrefab => hitEffectPrefab;
+        public Vector2 HitEffectOffset => hitEffectOffset;
+        public float HitEffectScale => Mathf.Max(0.01f, hitEffectScale);
+        public AudioClip HitSound => hitSound;
     }
 }

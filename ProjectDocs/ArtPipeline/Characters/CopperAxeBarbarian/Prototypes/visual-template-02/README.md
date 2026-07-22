@@ -35,7 +35,7 @@ Files:
 - Proportion: 2.5-head-tall companion.
 - Large head and hands while preserving a clear warrior body.
 - Best current balance between CatKnight-like charm, readable equipment and manageable production.
-- Preliminary recommended candidate for the next motion prototype.
+- Provides the equipment-readability side of the current B–C intermediate direction.
 
 Files:
 
@@ -83,9 +83,19 @@ Files:
 6. Swap to one alternate weapon set without changing the body or anchors.
 7. Produce one short attack test at the actual game display size.
 
+## Current decision after runtime testing
+
+- The project did **not** select LOW-B or LOW-C as an exact single template.
+- The current visual-direction target is the **B–C intermediate**: LOW-B's readable equipment and action room,
+  combined with LOW-C's compact desktop-companion character impression.
+- This decision is about body proportion and simplification language. It does not prove a final logical pixel
+  resolution, PerfectPixel Frame cell size, or a guaranteed output pixel density.
+- This comparison is not the top-level KeyBuddy character-family style reference. Use `class-lineup-03` to judge
+  face/eye language, camera angle, silhouette and costume simplification across different professions.
+- New character Masters must be compared against this B–C visual target before they are sent to PerfectPixel.
+
 ## Production note
 
 - The built-in image generation tool produced the three candidates together to preserve palette and identity.
 - The flat chroma-key background was removed locally.
 - `build_candidates.py` separates candidates, creates proposed logical-size stress tests and rebuilds the comparison images.
-

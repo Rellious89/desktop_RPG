@@ -29,10 +29,10 @@ PerfectPixel 참조 이미지이며, 최종 프레임은 PerfectPixel 이후 개
 | 외부 그림자 | 캐릭터 PNG에 포함하지 않음 |
 | Actor Origin | 전방 디딤발의 지면 접촉점 |
 | 프레임 정렬 | 같은 Actor의 모든 프레임에서 위 접촉점을 동일 픽셀 좌표에 고정 |
-| 크기 표현 | 원화의 픽셀 크기로 표현, Unity Transform Scale은 기본 1 |
+| 크기 표현 | 승인된 저밀도 원화의 픽셀 크기로 표현, Unity Transform/VisualRoot Scale은 기본 1 |
 | 최종 저장 | 프레임별 개별 PNG, 2자리 번호 |
 | 시점 | 엄격한 사이드뷰를 공통 강제하지 않음. Actor별 Master Design에서 승인한 시점을 전 프레임에 고정 |
-| 화면 진행 방향 | 현재 기본 화면 진행 방향 한 방향만 제작; FlipX 정책은 아직 확정하지 않음 |
+| 화면 진행 방향 | 현재 1차 생산 Master는 **화면 오른쪽(screen-right)** 방향으로 통일한다. 다른 화면 방향/FlipX 정책은 아직 확정하지 않음 |
 | 좌우 용어 | 수식어 없는 좌우는 캐릭터의 해부학적 기준. 이미지/게임 화면 기준은 `화면 오른쪽/왼쪽`으로 명시 |
 | 공격 판정 | 프레임 번호 자체가 아니라 `HitPoint`; 리소스에는 후보 `hitFrameIndex`를 기록 |
 | 전체 전진 | 프레임/Pivot 이동이 아니라 별도 Attack Movement로 처리 |
@@ -52,6 +52,7 @@ Role: Player | Enemy
 한 문장 콘셉트:
 승인할 시점(사이드/3/4 등):
 기본 화면 진행 방향:
+시각 언어 후보: `Low Companion v1` (변경은 별도 프로토타입 승인 후에만 가능)
 CatKnight 대비 키 비율:
 머리:몸 비율:
 실루엣 핵심 3개:
@@ -152,7 +153,8 @@ Attack Movement 필요 여부와 방향(거리 수치는 Unity에서 튜닝):
 PerfectPixel Animation name:
 PerfectPixel Frames / FPS / Repeat:
 PerfectPixel Motion description (6~18단어 한 줄):
-PerfectPixel Facing direction:
+PerfectPixel Facing direction 드롭다운 선택값:
+재생성 Feedback 후보(출력 확인 뒤에만 작성):
 ```
 
 ### Player 기본 공격 (`LoopableBasic`)
@@ -193,9 +195,14 @@ Actor별로 다음을 함께 넘긴다.
 `ProjectDocs/ArtPipeline/perfectpixel-input-and-review.md` 규칙에 따라 아래처럼 축약한다.
 
 ```text
-Character: 기준 이미지 + 이름 + 짧은 외형 설명
-Animation: Frames + FPS + Repeat + 짧은 Motion description + Facing direction
+자유 입력: 기준 이미지 + 이름 + 짧은 Character description
+드롭다운/수치 선택: Art style + Frame cell size + Frames + FPS + Repeat + Facing direction
+재생성 시 자유 입력: 짧은 Feedback 한 줄
 ```
+
+`Facing direction`은 Animation description에 쓰는 문장이 아니라 UI 드롭다운이다. 기준 이미지가 올바른
+방향이면 `Not set`으로 첫 Attempt를 만들고, 방향이 반전되는 경우에만 드롭다운 옵션을 바꾼 별도 Attempt를
+비교한다. 방향을 긴 프롬프트로 보정하려 하지 않는다.
 
 Character Brief와 Motion Brief의 상세 내용은 PerfectPixel 출력물을 판정하는 내부 기준이다.
 PerfectPixel에서는 애니메이션 단위로 여러 프레임을 생성한다. 1프레임짜리 독립 생성을 기본 공정으로
@@ -220,6 +227,23 @@ PerfectPixel에서는 애니메이션 단위로 여러 프레임을 생성한다
 다음은 수정 후 사용 가능하다: 위치 1~2px 오차, 국소적인 외곽선/색상 오차, 장비 각도 오차.
 다음은 원칙적으로 폐기한다: 머리/몸 비율 변화, 다른 장비로 변형, 방향 반전, 팔다리 오류,
 캐릭터 정체성이 달라진 프레임.
+
+## 6-1. 현재 시각 언어 상태 — `Low Companion v1` (확정)
+
+- 최상위 기준은 실제 빌드에서 승인된 바바리안 최종 스프라이트다.
+  기준 파일: `Assets/Art/ReferenceSheets/low-companion-v1-barbarian-reference.png`.
+  새 Actor는 이 파일과 같은 게임 안에 나란히 놓였을 때 다른 해상도·다른 게임처럼 보이면 Reject한다.
+- 방향은 화면 오른쪽의 친근한 3/4 전신. 체형은 약 2~2.5등신의 작은 데스크톱 컴패니언 비율이며,
+  직업을 읽게 하는 장비는 한두 개의 큰 덩어리로 단순화한다.
+- 최종 게임 표시에서 보이는 픽셀 덩어리는 바바리안과 같은 **굵은 저밀도(후가공 기준 약 3×3)**를 목표로 한다.
+  이는 소스 논리 해상도 강제가 아니라, PerfectPixel 출력과 FireAlpaca 후보정 뒤의 납품 품질 기준이다.
+- 외곽선은 진한 거의 검정색의 굵은 계단형 외곽선, 색은 적은 수의 명확한 색면과 소수의 하이라이트로 끝낸다.
+  부드러운 그라데이션, 미세한 질감, 2×2 이하의 과도하게 촘촘한 디테일은 생산용 Master에서 사용하지 않는다.
+- `class-lineup-03`과 LOW-B/LOW-C 시트는 직업·의상·실루엣 발상 참고용이다. 더 이상 캐릭터군의
+  해상도·얼굴 묘사·마감 밀도를 결정하는 상위 기준이 아니다.
+- 고밀도 Master 및 Unity `VisualRoot Scale 0.35` 적용은 비교 실험으로는 합격이었지만, 프레임 수작업
+  보정 비용이 높으므로 현재 1차 생산 규격에는 채택하지 않는다. 다시 도입하려면 여러 Actor의 Idle/Attack
+  후가공 비용까지 포함한 별도 프로토타입 승인이 필요하다.
 
 ## 7. 1차 생산 순서
 

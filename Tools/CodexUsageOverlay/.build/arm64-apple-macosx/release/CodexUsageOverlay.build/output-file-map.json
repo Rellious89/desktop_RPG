@@ -1,0 +1,19 @@
+{
+  "": {
+    "dependencies": "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/CodexUsageOverlay.d",
+    "object": "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/CodexUsageOverlay.o",
+    "swift-dependencies": "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/primary.swiftdeps"
+  },
+  "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/Sources/CodexUsageOverlay/main.swift": {
+    "object": "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/main.swift.o",
+    "swiftmodule": "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/main.swiftdeps",
+    "diagnostics": "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/main.dia"
+  },
+  "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/DerivedSources/resource_bundle_accessor.swift": {
+    "object": "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/resource_bundle_accessor.swift.o",
+    "swiftmodule": "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/resource_bundle_accessor~partial.swiftmodule",
+    "swift-dependencies": "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/resource_bundle_accessor.swiftdeps",
+    "diagnostics": "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/resource_bundle_accessor.dia"
+  }
+}

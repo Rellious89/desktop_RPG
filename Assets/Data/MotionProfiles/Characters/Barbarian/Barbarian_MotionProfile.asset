@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4a8746ce2a8483a8d6a1b3f4ef0c912, type: 3}
+  m_Name: Barbarian_MotionProfile
+  m_EditorClassIdentifier: 
+  displayName: Barbarian
+  resourceFolderPath: Assets/Art/Character/Barbarian
+  baseIdle:
+    displayName: Base Idle
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: c8ae0dd55fb214ef29a471dd240549e0, type: 3}
+    - {fileID: 21300000, guid: 96f279382258341e2b2430d48307f5ed, type: 3}
+    - {fileID: 21300000, guid: 20bfb3517764c4a8695ebfd227ca168d, type: 3}
+    - {fileID: 21300000, guid: aa35fd65e2ad9459bbecbd6cf095f175, type: 3}
+    animationFps: 6
+  idleEvents:
+  - displayName: idle a
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 796297ca0e12d41b2bc180244803081d, type: 3}
+    - {fileID: 21300000, guid: e63b3b0f27c434d60a7494695c5bec3a, type: 3}
+    - {fileID: 21300000, guid: cd2cf8fe83f8744f1af7f391199f028b, type: 3}
+    - {fileID: 21300000, guid: 8372c8e9bceb849e5a849357db8ca01e, type: 3}
+    animationFps: 6
+  - displayName: idle b
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: e354f737ab4764402b5da4e1298e3746, type: 3}
+    - {fileID: 21300000, guid: 93440b7ebab3345b8a651dd481430c35, type: 3}
+    - {fileID: 21300000, guid: d6e2dc719f90a49c384e694b0253e83e, type: 3}
+    - {fileID: 21300000, guid: 2660f68a267bb4620888688907fc8f7b, type: 3}
+    animationFps: 6
+  idleEventCheckInterval: 4
+  idleEventChance: 0.5
+  tier1Pool: {fileID: 11400000, guid: 931938485082748e18ea6c383e6cd1fd, type: 2}
+  tier2Pool: {fileID: 0}
+  tier3Pool: {fileID: 0}
+  attackMovement:
+    overrideComponentValues: 1
+    moveDistance: 0.2
+    moveOutDuration: 0.14
+    moveBackDuration: 0.05
+  preview:
+    targetIdleSprite: {fileID: 0}
+    targetHitSprite: {fileID: 0}
+    characterOffset: {x: 0, y: 0}
+    targetOffset: {x: 1.15, y: 0}
+    receivePointOffset: {x: 0, y: 0.35}
+    characterScale: 1
+    targetScale: 1

@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a793bf2a4d96489da376ed10ce30d0c1, type: 3}
+  m_Name: Scarecrow_MotionProfile
+  m_EditorClassIdentifier: 
+  displayName: Scarecrow
+  resourceFolderPath: Assets/Art/Enemy/Scarecrow
+  baseIdle:
+    displayName: Base Idle
+    frames:
+    - {fileID: 21300000, guid: e604348805ed4bfca390f5710d90e771, type: 3}
+    - {fileID: 21300000, guid: d401c16d0ca94215bd670e9d94791577, type: 3}
+    - {fileID: 21300000, guid: d4d33c4bccfb4579ad701ec9c98ddceb, type: 3}
+    - {fileID: 21300000, guid: 6d371dd427724d60a29b6bd81ce9be3d, type: 3}
+    animationFps: 6
+  idleEvents: []
+  hit:
+    displayName: Hit
+    frames:
+    - {fileID: 21300000, guid: 2d1030e06585412c90742c9e7eb67dd5, type: 3}
+    - {fileID: 21300000, guid: b2af80d361ff473a9f3076c9f2846db1, type: 3}
+    animationFps: 6
+  defeat:
+    displayName: Defeat
+    frames: []
+    animationFps: 6
+  hitReaction:
+    holdFrame: 0
+    recoveryFrame: 1
+    recoveryDuration: 0.12
+    holdTimeout: 0.2
+    shakeStrength: 0.04
+    shakeFrequency: 35
+    shakeDecayDuration: 0.15
+  preview:
+    actorOffset: {x: 0, y: 0}
+    receivePointOffset: {x: 0, y: 0.35}
+    actorScale: 1

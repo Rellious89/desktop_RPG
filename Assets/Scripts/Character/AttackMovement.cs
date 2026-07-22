@@ -23,10 +23,16 @@ namespace Character
         private float timer;
         private bool isMoving;
         private bool returning;
+        private float activeMoveDistance;
+        private float activeMoveOutDuration;
+        private float activeMoveBackDuration;
+        private PlayerCharacterAnimator characterAnimator;
 
         private void Awake()
         {
             basePosition = transform.localPosition;
+            characterAnimator = GetComponent<PlayerCharacterAnimator>();
+            ResolveActiveSettings();
         }
 
         private void Update()
@@ -44,6 +50,7 @@ namespace Character
 
         private void StartMove()
         {
+            ResolveActiveSettings();
             isMoving = true;
             returning = false;
             timer = 0f;
@@ -55,8 +62,8 @@ namespace Character
 
             if (!returning)
             {
-                float t = Mathf.Clamp01(timer / moveOutDuration);
-                transform.localPosition = basePosition + Vector3.right * (moveDistance * t);
+                float t = Mathf.Clamp01(timer / activeMoveOutDuration);
+                transform.localPosition = basePosition + Vector3.right * (activeMoveDistance * t);
 
                 if (t >= 1f)
                 {
@@ -66,8 +73,8 @@ namespace Character
             }
             else
             {
-                float t = Mathf.Clamp01(timer / moveBackDuration);
-                transform.localPosition = Vector3.Lerp(basePosition + Vector3.right * moveDistance, basePosition, t);
+                float t = Mathf.Clamp01(timer / activeMoveBackDuration);
+                transform.localPosition = Vector3.Lerp(basePosition + Vector3.right * activeMoveDistance, basePosition, t);
 
                 if (t >= 1f)
                 {
@@ -75,6 +82,24 @@ namespace Character
                     isMoving = false;
                 }
             }
+        }
+
+        private void ResolveActiveSettings()
+        {
+            CharacterMotionProfile profile = characterAnimator != null ? characterAnimator.MotionProfile : null;
+            CharacterMotionProfile.AttackMovementSettings profileSettings = profile != null ? profile.AttackMovement : null;
+
+            if (profileSettings != null && profileSettings.OverrideComponentValues)
+            {
+                activeMoveDistance = profileSettings.MoveDistance;
+                activeMoveOutDuration = profileSettings.MoveOutDuration;
+                activeMoveBackDuration = profileSettings.MoveBackDuration;
+                return;
+            }
+
+            activeMoveDistance = Mathf.Max(0f, moveDistance);
+            activeMoveOutDuration = Mathf.Max(0.001f, moveOutDuration);
+            activeMoveBackDuration = Mathf.Max(0.001f, moveBackDuration);
         }
     }
 }

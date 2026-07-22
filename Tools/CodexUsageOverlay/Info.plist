@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>CodexUsageOverlay</string>
+<key>CFBundleIdentifier</key><string>dev.rellious.CodexUsageOverlay</string>
+<key>CFBundleName</key><string>Codex Usage Overlay</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>CFBundleShortVersionString</key><string>1.0</string>
+<key>LSUIElement</key><true/>
+<key>NSPrincipalClass</key><string>NSApplication</string>
+<key>NSAccessibilityUsageDescription</key><string>Codex 입력창 위치에 사용량 표시를 맞추기 위해 접근성 정보가 필요합니다.</string>
+</dict></plist>

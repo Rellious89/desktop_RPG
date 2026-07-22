@@ -19,6 +19,15 @@ Player / Enemy
 ## [Style]
 [Art Direction]
 
+## [Style Reference Hierarchy]
+
+1. 승인된 실제 게임 스프라이트: `Assets/Art/ReferenceSheets/low-companion-v1-barbarian-reference.png`의 저밀도 픽셀 덩어리, 외곽선, 화면상 읽힘
+2. Character Brief: 해당 Actor의 종족·직업·장비·색상과 화면 방향
+3. `class-lineup-03` 및 LOW-B/LOW-C 비교: 직업·의상·실루엣 발상 참고
+
+새 캐릭터가 바바리안보다 지나치게 촘촘하거나 부드러운 고해상도 마감으로 보이면 Master Design을 Reject한다.
+목표는 바바리안과 같은 굵은 저밀도 픽셀 덩어리(후가공 기준 약 3×3)와 작은 컴패니언 비율이다.
+
 ## [View]
 [Approved Side / Three-Quarter View], facing screen [Right/Left]
 

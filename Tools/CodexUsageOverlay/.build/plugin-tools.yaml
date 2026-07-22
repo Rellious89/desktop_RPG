@@ -1,0 +1,77 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "CodexUsageOverlay-arm64-apple-macosx-release.exe": ["<CodexUsageOverlay-arm64-apple-macosx-release.exe>"]
+  "CodexUsageOverlay-arm64-apple-macosx-release.module": ["<CodexUsageOverlay-arm64-apple-macosx-release.module>"]
+  "PackageStructure": ["<PackageStructure>"]
+  "main": ["<CodexUsageOverlay-arm64-apple-macosx-release.exe>","<CodexUsageOverlay-arm64-apple-macosx-release.module>"]
+  "test": ["<CodexUsageOverlay-arm64-apple-macosx-release.exe>","<CodexUsageOverlay-arm64-apple-macosx-release.module>"]
+default: "main"
+nodes:
+  "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/Sources/CodexUsageOverlay/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+commands:
+  "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/Sources/CodexUsageOverlay/main.swift","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/DerivedSources/resource_bundle_accessor.swift"]
+    outputs: ["/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/sources"]
+    description: "Write auxiliary file /Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/sources"
+
+  "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/main.swift.o","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/resource_bundle_accessor.swift.o"]
+    outputs: ["/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.product/Objects.LinkFileList"
+
+  "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay_CodexUsageOverlay.bundle/config.json":
+    tool: copy-tool
+    inputs: ["/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/Sources/CodexUsageOverlay/config.json"]
+    outputs: ["/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay_CodexUsageOverlay.bundle/config.json"]
+    description: "Copying /Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/Sources/CodexUsageOverlay/config.json"
+
+  "/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"]
+    outputs: ["/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt"
+
+  "<CodexUsageOverlay-arm64-apple-macosx-release.exe>":
+    tool: phony
+    inputs: ["/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay"]
+    outputs: ["<CodexUsageOverlay-arm64-apple-macosx-release.exe>"]
+
+  "<CodexUsageOverlay-arm64-apple-macosx-release.module>":
+    tool: phony
+    inputs: ["/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/main.swift.o","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/resource_bundle_accessor.swift.o","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/Modules/CodexUsageOverlay.swiftmodule"]
+    outputs: ["<CodexUsageOverlay-arm64-apple-macosx-release.module>"]
+
+  "C.CodexUsageOverlay-arm64-apple-macosx-release.exe":
+    tool: shell
+    inputs: ["/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/main.swift.o","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/resource_bundle_accessor.swift.o","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.product/Objects.LinkFileList"]
+    outputs: ["/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay"]
+    description: "Linking ./.build/arm64-apple-macosx/release/CodexUsageOverlay"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-L","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release","-o","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay","-module-name","CodexUsageOverlay","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-dead_strip","-Xlinker","-alias","-Xlinker","_CodexUsageOverlay_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx14.0","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g"]
+
+  "C.CodexUsageOverlay-arm64-apple-macosx-release.module":
+    tool: shell
+    inputs: ["/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/Sources/CodexUsageOverlay/main.swift","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/DerivedSources/resource_bundle_accessor.swift","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/swift-version--58304C5D6DBC2206.txt","<CodexUsageOverlay-arm64-apple-macosx-release.module-resources>","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/sources"]
+    outputs: ["/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/main.swift.o","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/resource_bundle_accessor.swift.o","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/Modules/CodexUsageOverlay.swiftmodule"]
+    description: "Compiling Swift Module 'CodexUsageOverlay' (2 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","CodexUsageOverlay","-emit-dependencies","-emit-module","-emit-module-path","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/Modules/CodexUsageOverlay.swiftmodule","-output-file-map","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/output-file-map.json","-whole-module-optimization","-num-threads","11","-c","@/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay.build/sources","-I","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/Modules","-target","arm64-apple-macosx14.0","-whole-module-optimization","-num-threads","11","-serialize-diagnostics","-O","-j11","-DSWIFT_PACKAGE","-DSWIFT_MODULE_RESOURCE_BUNDLE_AVAILABLE","-module-cache-path","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","CodexUsageOverlay_main","-swift-version","6","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","codexusageoverlay"]
+
+  "CodexUsageOverlay-arm64-apple-macosx-release.module-resources":
+    tool: phony
+    inputs: ["/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/.build/arm64-apple-macosx/release/CodexUsageOverlay_CodexUsageOverlay.bundle/config.json"]
+    outputs: ["<CodexUsageOverlay-arm64-apple-macosx-release.module-resources>"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/Sources/CodexUsageOverlay/","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/Package.swift","/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG/Tools/CodexUsageOverlay/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+

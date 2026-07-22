@@ -97,7 +97,24 @@ namespace Character
 
         private const int IdleIndex = 0;
 
+        private sealed class RuntimeFrameAnimation
+        {
+            public readonly Sprite[] Frames;
+            public readonly float AnimationFps;
+
+            public RuntimeFrameAnimation(Sprite[] frames, float animationFps)
+            {
+                Frames = frames ?? Array.Empty<Sprite>();
+                AnimationFps = animationFps;
+            }
+        }
+
         private enum AttackPhase { None, Windup, Recovery }
+
+        [Header("Character Motion Profile (optional)")]
+        [Tooltip("연결하면 Idle/Idle Event/공격 풀/AttackMovement 제작값을 캐릭터별 프로필에서 가져온다. " +
+                 "비어 있으면 아래 기존 Inspector 값을 그대로 사용한다.")]
+        [SerializeField] private CharacterMotionProfile motionProfile;
 
         [Header("Base Idle (계속 루프)")]
         [SerializeField] private FrameAnimation idle;
@@ -131,7 +148,9 @@ namespace Character
 
         private SpriteRenderer spriteRenderer;
         private FlashOnCue flashOnCue;
-        private FrameAnimation[] animations;
+        private RuntimeFrameAnimation[] animations;
+        private bool usesProfileIdleEvents;
+        private float profileIdleEventChance;
 
         private int activeAnimIndex;
         private int currentFrame;
@@ -158,18 +177,19 @@ namespace Character
             ? 0
             : Mathf.Clamp(activeMotion.HitFrameIndex, 0, activeMotionFrames.Length - 1);
 
+        public CharacterMotionProfile MotionProfile => motionProfile;
+
         private void Awake()
         {
             spriteRenderer = GetComponent<SpriteRenderer>();
             flashOnCue = GetComponent<FlashOnCue>();
-            animations = new[] { idle, idleA, idleB, idleC };
+            BuildRuntimeConfiguration();
 
-            for (int i = 0; i < animations.Length; i++)
-            {
-                animations[i].frames = SafeFrames(animations[i].frames);
-            }
+            ComboTierAttackPool resolvedTier1Pool = motionProfile != null ? motionProfile.Tier1Pool : tier1Pool;
+            ComboTierAttackPool resolvedTier2Pool = motionProfile != null ? motionProfile.Tier2Pool : tier2Pool;
+            ComboTierAttackPool resolvedTier3Pool = motionProfile != null ? motionProfile.Tier3Pool : tier3Pool;
 
-            BuildResolvedPool(resolvedTier1, tier1Pool);
+            BuildResolvedPool(resolvedTier1, resolvedTier1Pool);
             if (resolvedTier1.Count == 0 && attack != null)
             {
                 // 하위 호환: tier1Pool 에셋을 아직 연결하지 않았다면, 기존에 이미 붙여둔 레거시 attack
@@ -177,12 +197,47 @@ namespace Character
                 attack.frames = SafeFrames(attack.frames);
                 if (attack.frames.Length > 0) resolvedTier1.Add(attack);
             }
-            BuildResolvedPool(resolvedTier2, tier2Pool);
-            BuildResolvedPool(resolvedTier3, tier3Pool);
+            BuildResolvedPool(resolvedTier2, resolvedTier2Pool);
+            BuildResolvedPool(resolvedTier3, resolvedTier3Pool);
 
             activeAnimIndex = IdleIndex;
             currentFrame = 0;
             ApplyFrame();
+        }
+
+        private void BuildRuntimeConfiguration()
+        {
+            if (motionProfile != null && motionProfile.BaseIdle != null && motionProfile.BaseIdle.Frames.Length > 0)
+            {
+                var runtimeAnimations = new List<RuntimeFrameAnimation>
+                {
+                    new RuntimeFrameAnimation(motionProfile.BaseIdle.Frames, motionProfile.BaseIdle.AnimationFps)
+                };
+
+                IReadOnlyList<CharacterMotionProfile.FrameClip> idleEvents = motionProfile.IdleEvents;
+                for (int i = 0; i < idleEvents.Count; i++)
+                {
+                    CharacterMotionProfile.FrameClip clip = idleEvents[i];
+                    if (clip == null || clip.Frames.Length == 0) continue;
+                    runtimeAnimations.Add(new RuntimeFrameAnimation(clip.Frames, clip.AnimationFps));
+                }
+
+                animations = runtimeAnimations.ToArray();
+                usesProfileIdleEvents = true;
+                profileIdleEventChance = motionProfile.IdleEventChance;
+                variantCheckInterval = motionProfile.IdleEventCheckInterval;
+                return;
+            }
+
+            animations = new[]
+            {
+                new RuntimeFrameAnimation(SafeFrames(idle.frames), idle.animationFps),
+                new RuntimeFrameAnimation(SafeFrames(idleA.frames), idleA.animationFps),
+                new RuntimeFrameAnimation(SafeFrames(idleB.frames), idleB.animationFps),
+                new RuntimeFrameAnimation(SafeFrames(idleC.frames), idleC.animationFps),
+            };
+            usesProfileIdleEvents = false;
+            profileIdleEventChance = 0f;
         }
 
         private static Sprite[] SafeFrames(Sprite[] frames) => frames ?? Array.Empty<Sprite>();
@@ -416,10 +471,18 @@ namespace Character
         // ---- Idle / Idle 변형 ----
         private void RollVariant()
         {
-            int choice = UnityEngine.Random.Range(0, 4); // 0 = idle 유지, 1/2/3 = a/b/c
-            if (choice == 0) return;
-
-            if (animations[choice].frames.Length == 0) return;
+            int choice;
+            if (usesProfileIdleEvents)
+            {
+                if (animations.Length <= 1 || UnityEngine.Random.value > profileIdleEventChance) return;
+                choice = UnityEngine.Random.Range(1, animations.Length);
+            }
+            else
+            {
+                choice = UnityEngine.Random.Range(0, 4); // 기존 동작: 0 = idle 유지, 1/2/3 = a/b/c
+                if (choice == 0) return;
+                if (animations[choice].Frames.Length == 0) return;
+            }
 
             playingVariant = true;
             activeAnimIndex = choice;
@@ -430,11 +493,11 @@ namespace Character
 
         private void AdvanceFrame()
         {
-            Sprite[] frames = animations[activeAnimIndex].frames;
-            FrameAnimation anim = animations[activeAnimIndex];
-            if (frames.Length == 0 || anim.animationFps <= 0f) return;
+            Sprite[] frames = animations[activeAnimIndex].Frames;
+            RuntimeFrameAnimation anim = animations[activeAnimIndex];
+            if (frames.Length == 0 || anim.AnimationFps <= 0f) return;
 
-            float frameDuration = 1f / anim.animationFps;
+            float frameDuration = 1f / anim.AnimationFps;
             frameTimer += Time.deltaTime;
 
             if (frameTimer < frameDuration) return;
@@ -462,7 +525,7 @@ namespace Character
 
         private void ApplyFrame()
         {
-            Sprite[] frames = animations[activeAnimIndex].frames;
+            Sprite[] frames = animations[activeAnimIndex].Frames;
             if (frames.Length == 0) return;
             spriteRenderer.sprite = frames[Mathf.Clamp(currentFrame, 0, frames.Length - 1)];
         }
