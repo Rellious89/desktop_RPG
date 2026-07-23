@@ -23,15 +23,31 @@ MonoBehaviour:
     - {fileID: 21300000, guid: 1cdd6bfee9faf479eb2e4d3332852c7f, type: 3}
     - {fileID: 21300000, guid: f9501406c561349da8f213c1bdbcc0ef, type: 3}
     animationFps: 6
-  idleEvents: []
+  idleEvents:
+  - displayName: Idle Event 1
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 2a963e267257a42a1980b855e9d678ca, type: 3}
+    - {fileID: 21300000, guid: 3aab30733b8a643f3aff9ad383be65ed, type: 3}
+    - {fileID: 21300000, guid: 4d0b4406febf04a9cac218b15e13c2e6, type: 3}
+    - {fileID: 21300000, guid: 3a18dede6423542758a070d488737bae, type: 3}
+    animationFps: 6
+  - displayName: Idle Event 2
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: acb90c1bce8fd4c19b5e3aaca157afd1, type: 3}
+    - {fileID: 21300000, guid: 1869889f6b541497ba168044c349c290, type: 3}
+    - {fileID: 21300000, guid: 73b6d9199bdbc407aa13d4f180f2ddfe, type: 3}
+    - {fileID: 21300000, guid: 1063d0a4554fc4d87b95fb74c0ff2d92, type: 3}
+    animationFps: 6
   idleEventCheckInterval: 4
   idleEventChance: 0.5
-  tier1Pool: {fileID: 0}
+  tier1Pool: {fileID: 11400000, guid: 9776e529858094c7497231c2faefa602, type: 2}
   tier2Pool: {fileID: 0}
   tier3Pool: {fileID: 0}
   attackMovement:
     overrideComponentValues: 1
-    moveDistance: 0
+    moveDistance: -0.66
     moveOutDuration: 0.001
     moveBackDuration: 0.001
   preview:
@@ -40,5 +56,5 @@ MonoBehaviour:
     characterOffset: {x: 0, y: 0}
     targetOffset: {x: 1.15, y: 0}
     receivePointOffset: {x: 0, y: 0.35}
-    characterScale: 0.35
+    characterScale: 1
     targetScale: 1

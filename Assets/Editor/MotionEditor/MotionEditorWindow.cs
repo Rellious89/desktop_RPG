@@ -995,8 +995,7 @@ namespace CharacterEditor
                     DrawAttackEditor();
                     break;
                 case Workspace.Movement:
-                    EditorGUILayout.LabelField("Attack Movement", EditorStyles.boldLabel);
-                    EditorGUILayout.PropertyField(activeProfileObject.FindProperty("attackMovement"), GUIContent.none, true);
+                    EditorGUILayout.PropertyField(activeProfileObject.FindProperty("attackMovement"), new GUIContent("Attack Movement"), true);
                     EditorGUILayout.HelpBox("이 값은 캐릭터별로 저장되며, 프로필이 연결된 AttackMovement가 우선 사용합니다.", MessageType.Info);
                     break;
             }
@@ -1871,7 +1870,7 @@ namespace CharacterEditor
 
         private static float EvaluateMovement(float time, float distance, float outDuration, float backDuration)
         {
-            if (time <= 0f || distance <= 0f) return 0f;
+            if (time <= 0f) return 0f;
             if (time < outDuration) return distance * Mathf.Clamp01(time / outDuration);
             if (time < outDuration + backDuration) return Mathf.Lerp(distance, 0f, (time - outDuration) / backDuration);
             return 0f;

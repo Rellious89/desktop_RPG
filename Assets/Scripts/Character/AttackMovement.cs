@@ -15,6 +15,7 @@ namespace Character
     /// </summary>
     public class AttackMovement : MonoBehaviour
     {
+        [Tooltip("Positive: move forward. Negative: move backward. Zero: no movement.")]
         [SerializeField] private float moveDistance = 0.15f;
         [SerializeField] private float moveOutDuration = 0.05f;
         [SerializeField] private float moveBackDuration = 0.12f;
@@ -97,7 +98,7 @@ namespace Character
                 return;
             }
 
-            activeMoveDistance = Mathf.Max(0f, moveDistance);
+            activeMoveDistance = moveDistance;
             activeMoveOutDuration = Mathf.Max(0.001f, moveOutDuration);
             activeMoveBackDuration = Mathf.Max(0.001f, moveBackDuration);
         }

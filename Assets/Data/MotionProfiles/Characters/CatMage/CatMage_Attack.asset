@@ -10,18 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2308662e2ef446ad90232e6be015a1ca, type: 3}
-  m_Name: CatKnight_BasicAttack_A
+  m_Name: CatMage_Attack
   m_EditorClassIdentifier: 
   editorDescription: 
   frames:
-  - {fileID: 21300000, guid: c33f718582be41a5a3a6a744411a5aab, type: 3}
-  - {fileID: 21300000, guid: 331ec9194c474153ba79a102a97dfa6d, type: 3}
-  - {fileID: 21300000, guid: 34866bf00b8846768783d3263645aa4d, type: 3}
+  - {fileID: 21300000, guid: 47878abb1145a4e2b9c93a3f3b2eb1e5, type: 3}
+  - {fileID: 21300000, guid: f65962854081348f08321d8dac5a2362, type: 3}
+  - {fileID: 21300000, guid: a471184ba0b7f443ea77032e21cc7e69, type: 3}
   animationFps: 18
   hitFrameIndex: 1
   endFrameDuration: 0.12
   queueExpireTimeout: 0.15
   hitEffectPrefab: {fileID: 1000000, guid: 45a18ea5b786491d8064f8ef5b7e6dc0, type: 3}
-  hitEffectOffset: {x: 0, y: 0}
+  hitEffectOffset: {x: 0.24, y: 0.27}
   hitEffectScale: 1
-  hitSound: {fileID: 0}
+  hitSound: {fileID: 8300000, guid: a652877b012108e41871f867ada9f176, type: 3}

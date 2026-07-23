@@ -32,7 +32,7 @@ namespace Character
         {
             [Tooltip("켜면 AttackMovement 컴포넌트의 Inspector 값 대신 이 프로필 값을 사용한다.")]
             [SerializeField] private bool overrideComponentValues = true;
-            [Min(0f)]
+            [Tooltip("Positive: move forward. Negative: move backward. Zero: no movement.")]
             [SerializeField] private float moveDistance = 0.2f;
             [Min(0.001f)]
             [SerializeField] private float moveOutDuration = 0.14f;
@@ -40,7 +40,7 @@ namespace Character
             [SerializeField] private float moveBackDuration = 0.05f;
 
             public bool OverrideComponentValues => overrideComponentValues;
-            public float MoveDistance => Mathf.Max(0f, moveDistance);
+            public float MoveDistance => moveDistance;
             public float MoveOutDuration => Mathf.Max(0.001f, moveOutDuration);
             public float MoveBackDuration => Mathf.Max(0.001f, moveBackDuration);
         }

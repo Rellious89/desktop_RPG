@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2308662e2ef446ad90232e6be015a1ca, type: 3}
   m_Name: Barbarian_attack
   m_EditorClassIdentifier: 
+  editorDescription: 
   frames:
   - {fileID: 21300000, guid: e5950061ab53a44eb941258701ecf317, type: 3}
   - {fileID: 21300000, guid: 4c1bc6667634a481ba3d0ba65b63f01e, type: 3}
@@ -20,7 +21,7 @@ MonoBehaviour:
   hitFrameIndex: 1
   endFrameDuration: 0.12
   queueExpireTimeout: 0.15
-  hitEffectPrefab: {fileID: 0}
+  hitEffectPrefab: {fileID: 1000000, guid: 45a18ea5b786491d8064f8ef5b7e6dc0, type: 3}
   hitEffectOffset: {x: 0, y: 0}
   hitEffectScale: 1
   hitSound: {fileID: 0}
