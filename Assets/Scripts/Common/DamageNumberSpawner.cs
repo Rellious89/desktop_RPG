@@ -80,7 +80,19 @@ namespace Common
             return popup;
         }
 
-        public void Spawn(int amount)
+        /// <summary>
+        /// centerOverride가 있으면(예: Monster Motion Profile의 Damage Number Offset으로 호출부가 이미
+        /// 계산해둔 최종 월드 위치) anchor Transform 대신 그 지점을 기준점으로 쓴다 - anchor는 이 경우
+        /// 완전히 무시되고, jitter 폭/방향만 anchor의 회전·스케일을 빌려 계산한다(스케일이 바뀌어도
+        /// 지터 폭이 캐릭터 크기에 비례해서 따라가는 기존 동작을 유지하기 위함). null이면(기본값)
+        /// 기존처럼 anchor Transform 자체를 기준점으로 쓴다 - Profile이 없는 몬스터는 완전히 기존 동작 그대로다.
+        ///
+        /// presentationOverride가 있으면(Monster Motion Profile의 Damage Number 연출값) Jitter/Rise
+        /// Distance/Duration/Text Color/Font Size/Sorting Order를 이 컴포넌트의 Inspector 값 대신 쓴다.
+        /// Min Spawn Interval/Pool Size는 몬스터별 연출값이 아니라 이 스포너의 성능 안전장치라 override
+        /// 대상이 아니다 - 항상 이 컴포넌트 자신의 값을 쓴다.
+        /// </summary>
+        public void Spawn(int amount, Vector3? centerOverride = null, DamageNumberPresentation? presentationOverride = null)
         {
             if (Time.time - lastSpawnTime < minSpawnInterval) return;
             lastSpawnTime = Time.time;
@@ -89,21 +101,33 @@ namespace Common
             // 정상적인 연타 빈도에서는 poolSize만으로 충분해서 이 경로를 거의 타지 않는다.
             DamageNumberPopup popup = pool.Count > 0 ? pool.Dequeue() : CreatePooledInstance();
 
+            float activeJitter = presentationOverride?.RandomHorizontalJitter ?? randomHorizontalJitter;
+            float activeRiseDistance = presentationOverride?.RiseDistance ?? riseDistance;
+            float activeDuration = presentationOverride?.Duration ?? duration;
+            Color activeTextColor = presentationOverride?.TextColor ?? textColor;
+            float activeFontSize = presentationOverride?.FontSize ?? fontSize;
+            int activeSortingOrder = presentationOverride?.SortingOrder ?? sortingOrder;
+
             Transform t = popup.transform;
             t.SetParent(null, true);
 
-            // 지터는 anchor의 로컬 좌표로 잡고 TransformPoint로 변환한다 - anchor의 현재 스케일이
-            // 그대로 반영되므로, StageVisualRoot 배율이 바뀌어도 지터 폭이 캐릭터 크기에 비례해서
-            // 따라간다(화면/월드 고정 오프셋이 아니다).
-            Vector3 localJitter = new Vector3(Random.Range(-randomHorizontalJitter, randomHorizontalJitter), 0f, 0f);
-            t.position = anchor.TransformPoint(localJitter);
+            // 지터는 anchor의 로컬 좌표로 잡고 TransformPoint/TransformVector로 변환한다 - anchor의
+            // 현재 스케일이 그대로 반영되므로, StageVisualRoot 배율이 바뀌어도 지터 폭이 캐릭터 크기에
+            // 비례해서 따라간다(화면/월드 고정 오프셋이 아니다).
+            Vector3 localJitter = new Vector3(Random.Range(-activeJitter, activeJitter), 0f, 0f);
+            t.position = centerOverride.HasValue
+                ? centerOverride.Value + anchor.TransformVector(localJitter)
+                : anchor.TransformPoint(localJitter);
 
             popup.gameObject.SetActive(true);
+            // sortingOrder는 풀 생성 시점에 한 번만 굳어 있던 값이었는데, 몬스터마다 다른 값을 override로
+            // 받을 수 있게 됐으니 Spawn 시점에 실제 Renderer에 매번 다시 적용한다.
+            popup.GetComponent<MeshRenderer>().sortingOrder = activeSortingOrder;
             // riseDistance도 anchor의 스케일만큼 함께 줄어들어야 캐릭터가 작을 때 숫자만 과하게 크게
             // 떠오르는 어색함이 없다 - anchor가 StageVisualRoot 하위 계층이라 lossyScale에 이미 그
             // 배율이 정확히 한 번 반영돼 있다.
-            float scaledRiseDistance = riseDistance * anchor.lossyScale.y;
-            popup.Initialize(amount.ToString(), textColor, fontSize, scaledRiseDistance, duration, ReturnToPool);
+            float scaledRiseDistance = activeRiseDistance * anchor.lossyScale.y;
+            popup.Initialize(amount.ToString(), activeTextColor, activeFontSize, scaledRiseDistance, activeDuration, ReturnToPool);
         }
 
         private void ReturnToPool(DamageNumberPopup popup)

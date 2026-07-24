@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using Character;
 using Common;
 using UnityEngine;
@@ -85,6 +86,31 @@ namespace Enemy
 
         private enum HitPhase { None, Reacting, Recovery, Defeated }
 
+        private sealed class RuntimeFrameAnimation
+        {
+            public readonly Sprite[] Frames;
+            public readonly float AnimationFps;
+
+            public RuntimeFrameAnimation(Sprite[] frames, float animationFps)
+            {
+                Frames = frames ?? Array.Empty<Sprite>();
+                AnimationFps = animationFps;
+            }
+        }
+
+        private const int BaseIdleAnimIndex = 0;
+
+        [Header("Monster Motion Profile (optional)")]
+        [Tooltip("연결하면 Idle/Hit Reaction/Defeat 프레임과 Hit Reaction 제작값을 몬스터별 프로필에서 가져온다. " +
+                 "비어 있으면(또는 프로필에 해당 모션이 비어 있으면) 아래 기존 Inspector 값을 그대로 사용한다.")]
+        [SerializeField] private MonsterMotionProfile motionProfile;
+
+        [Header("Combat Stage Layout (optional)")]
+        [Tooltip("연결하면 시작 위치를 Monster Slot Position + 이 몬스터 프로필의 Actor Offset으로 계산하고, " +
+                 "Actor Scale도 함께 적용한다(Motion Editor Preview와 동일한 공식). 비어 있으면 기존처럼 씬에 " +
+                 "배치된 현재 Transform 위치/스케일을 그대로 쓴다.")]
+        [SerializeField] private CombatStageLayout stageLayout;
+
         [Header("Base Idle (계속 루프)")]
         [SerializeField] private FrameAnimation idle;
 
@@ -97,8 +123,25 @@ namespace Enemy
         private DamageNumberSpawner damageNumberSpawner;
         private HitEffectSpawner hitEffectSpawner;
 
-        private Sprite[] idleFrames;
+        // [0] = Base Idle(항상 존재), [1..] = Motion Profile의 Idle Events - PlayerCharacterAnimator의
+        // animations 배열과 같은 구조. 몬스터에는 캐릭터의 idleA/b/c 같은 레거시 인라인 변형 슬롯이
+        // 없었으므로 Idle Event는 전적으로 프로필 데이터로만 채워진다(직접 설정 fallback 없음).
+        private RuntimeFrameAnimation[] idleAnimations;
+        private int idleAnimIndex;
+        private bool playingIdleEvent;
+        private float idleEventTimer;
+        private float idleEventCheckInterval = 4f;
+        private float idleEventChance = 0.5f;
+
         private Sprite[] hitFrames;
+        private int hitHoldFrame;
+        private int hitRecoveryFrame;
+        private float hitRecoveryDuration;
+        private float hitHoldTimeout;
+        private float hitShakeStrength;
+        private float hitShakeFrequency;
+        private float hitShakeDecayDuration;
+        private Sprite[] defeatFrames;
 
         private int idleCurrentFrame;
         private float idleFrameTimer;
@@ -123,6 +166,8 @@ namespace Enemy
         private float[] originalAlphas;
         private Coroutine fadeRoutine;
 
+        public MonsterMotionProfile MotionProfile => motionProfile;
+
         private void Awake()
         {
             spriteRenderer = GetComponent<SpriteRenderer>();
@@ -130,10 +175,16 @@ namespace Enemy
             target = GetComponent<Target>();
             damageNumberSpawner = GetComponent<DamageNumberSpawner>();
             hitEffectSpawner = GetComponent<HitEffectSpawner>();
-            basePosition = transform.localPosition;
 
-            idleFrames = idle?.frames ?? Array.Empty<Sprite>();
-            hitFrames = hit?.frames ?? Array.Empty<Sprite>();
+            basePosition = ResolveInitialBasePosition();
+            transform.localPosition = basePosition;
+            ApplyActorScale();
+
+            // 프로필이 없으면 SpriteRenderer에 이미 authored된 flipX 값(기존 수동 설정)을 그대로 둔다 -
+            // 프로필이 연결됐을 때만 그 값으로 넘겨받는다.
+            if (motionProfile != null) spriteRenderer.flipX = motionProfile.SpriteFlipX;
+
+            BuildRuntimeConfiguration();
 
             idleCurrentFrame = 0;
             ApplyIdleFrame();
@@ -143,6 +194,110 @@ namespace Enemy
             for (int i = 0; i < visualRenderers.Length; i++)
             {
                 originalAlphas[i] = visualRenderers[i].color.a;
+            }
+        }
+
+        /// <summary>Preview(DrawPairedStage)와 같은 공식: Slot + Actor Offset. stageLayout이 없는
+        /// 몬스터(기존 프리팹/씬)는 지금 Transform 위치를 그대로 기준점으로 쓴다 - 아무것도 깨지지 않는다.</summary>
+        private Vector3 ResolveInitialBasePosition()
+        {
+            if (stageLayout == null) return transform.localPosition;
+
+            Vector2 offset = motionProfile != null ? motionProfile.Preview.ActorOffset : Vector2.zero;
+            Vector2 slot = stageLayout.MonsterSlotPosition;
+            return new Vector3(slot.x + offset.x, slot.y + offset.y, transform.localPosition.z);
+        }
+
+        private void ApplyActorScale()
+        {
+            if (stageLayout == null) return;
+
+            float scale = motionProfile != null ? motionProfile.Preview.ActorScale : 1f;
+            transform.localScale = new Vector3(scale, scale, 1f);
+        }
+
+        /// <summary>Motion Editor의 "Apply Preview Layout to Open Stage"나 향후 런타임 배치 갱신이
+        /// 호출하는 진입점 - basePosition과 실제 Transform 위치를 함께 새 기준점으로 맞추고, 진행 중이던
+        /// 흔들림은 안전하게 취소한다(그대로 두면 다음 프레임에 옛 basePosition 기준으로 튈 수 있다).
+        /// 피격 반응이 진행 중이 아닐 때(선택/교체/초기화 시점)만 호출해야 한다.</summary>
+        public void SetPresentationBasePosition(Vector3 localPosition)
+        {
+            basePosition = localPosition;
+            transform.localPosition = localPosition;
+            shaking = false;
+        }
+
+        /// <summary>Idle/Hit은 motionProfile에 프레임이 있으면 그 값(및 Hit Reaction 제작값)을 쓰고,
+        /// 없으면 기존처럼 이 컴포넌트에 직접 설정한 idle/hit 필드로 fallback한다 - 프로필이 없는
+        /// 기존 프리팹이 그대로 동작해야 하기 때문이다. Defeat는 기존에 직접 설정하는 필드 자체가
+        /// 없었던 완전히 새로운 값이라 프로필에만 있으면 쓰고, 없으면 조용히 빈 배열이다(경고 없음 -
+        /// Defeat 프레임 없이 페이드아웃만 하는 것은 지금까지의 정상 동작이다).</summary>
+        private void BuildRuntimeConfiguration()
+        {
+            MonsterMotionProfile.FrameClip profileIdle = motionProfile != null ? motionProfile.BaseIdle : null;
+            if (profileIdle != null && profileIdle.Frames.Length > 0)
+            {
+                var runtimeIdleAnimations = new List<RuntimeFrameAnimation>
+                {
+                    new RuntimeFrameAnimation(profileIdle.Frames, profileIdle.AnimationFps)
+                };
+
+                IReadOnlyList<MonsterMotionProfile.FrameClip> idleEvents = motionProfile.IdleEvents;
+                for (int i = 0; i < idleEvents.Count; i++)
+                {
+                    MonsterMotionProfile.FrameClip clip = idleEvents[i];
+                    if (clip == null || clip.Frames.Length == 0) continue;
+                    runtimeIdleAnimations.Add(new RuntimeFrameAnimation(clip.Frames, clip.AnimationFps));
+                }
+
+                idleAnimations = runtimeIdleAnimations.ToArray();
+                idleEventCheckInterval = motionProfile.IdleEventCheckInterval;
+                idleEventChance = motionProfile.IdleEventChance;
+            }
+            else
+            {
+                idleAnimations = new[]
+                {
+                    new RuntimeFrameAnimation(idle?.frames ?? Array.Empty<Sprite>(), idle != null ? idle.animationFps : 3f)
+                };
+                idleEventCheckInterval = 4f;
+                idleEventChance = 0.5f;
+            }
+
+            MonsterMotionProfile.FrameClip profileHit = motionProfile != null ? motionProfile.Hit : null;
+            if (profileHit != null && profileHit.Frames.Length > 0)
+            {
+                hitFrames = profileHit.Frames;
+                MonsterMotionProfile.HitReactionSettings reaction = motionProfile.HitReaction;
+                hitHoldFrame = reaction.HoldFrame;
+                hitRecoveryFrame = reaction.RecoveryFrame;
+                hitRecoveryDuration = reaction.RecoveryDuration;
+                hitHoldTimeout = reaction.HoldTimeout;
+                hitShakeStrength = reaction.ShakeStrength;
+                hitShakeFrequency = reaction.ShakeFrequency;
+                hitShakeDecayDuration = reaction.ShakeDecayDuration;
+            }
+            else
+            {
+                hitFrames = hit?.frames ?? Array.Empty<Sprite>();
+                hitHoldFrame = hit != null ? hit.holdFrame : 0;
+                hitRecoveryFrame = hit != null ? hit.recoveryFrame : 1;
+                hitRecoveryDuration = hit != null ? hit.recoveryDuration : 0.12f;
+                hitHoldTimeout = hit != null ? hit.holdTimeout : 0.2f;
+                hitShakeStrength = hit != null ? hit.shakeStrength : 0.04f;
+                hitShakeFrequency = hit != null ? hit.shakeFrequency : 35f;
+                hitShakeDecayDuration = hit != null ? hit.shakeDecayDuration : 0.15f;
+            }
+
+            defeatFrames = motionProfile != null && motionProfile.Defeat != null ? motionProfile.Defeat.Frames : Array.Empty<Sprite>();
+
+            if (idleAnimations[BaseIdleAnimIndex].Frames.Length == 0)
+            {
+                Debug.LogWarning($"[TargetCombatController] '{name}': Idle 프레임이 없습니다(프로필 또는 직접 설정 확인).", this);
+            }
+            if (hitFrames.Length == 0)
+            {
+                Debug.LogWarning($"[TargetCombatController] '{name}': Hit 프레임이 없습니다(프로필 또는 직접 설정 확인).", this);
             }
         }
 
@@ -168,7 +323,7 @@ namespace Enemy
             }
         }
 
-        private void OnHitPoint(int damageAmount)
+        private void OnHitPoint(AttackHitCue cue)
         {
             // 진입 시점 상태를 기준으로 판정한다: 이미 처치된 상태로 들어온 타격은 여기서 완전히
             // 무시한다. 반대로 이 시점에 살아 있었다면, 아래에서 ApplyDamage로 처치를 유발해
@@ -183,14 +338,15 @@ namespace Enemy
             // Recovery로 넘어간다 - defeatedByCurrentHit로 그 전이를 감지해 아래 피격 반응 단계가
             // 덮어쓰지 않도록 한다.
             defeatedByCurrentHit = false;
-            target.ApplyDamage(damageAmount);
+            target.ApplyDamage(cue.Damage);
 
             if (defeatedByCurrentHit)
             {
-                // 처치를 유발한 타격: HandleDefeated가 이미 hitPhase를 Defeated로 옮겨뒀다(Fade-out은
-                // 별도 코루틴으로 이미 시작된 상태) - 여기서는 그 홀드 포즈만 그려주고(리스폰 전까지
-                // 유지) 이번 타격이 눈에 보이도록 플래시를 갱신한다.
-                ApplyHitPose();
+                // 처치를 유발한 타격: HandleDefeated가 이미 hitPhase를 Defeated로 옮기고(Fade-out은
+                // 별도 코루틴으로 이미 시작된 상태), Defeat 프레임이 있으면 그 포즈로 이미 바꿔뒀다 -
+                // 여기서는 그 포즈를 덮어쓰지 않는다. Defeat 프레임이 없으면 기존처럼 Hit 홀드 포즈를
+                // 유지(리스폰 전까지)하고, 이번 타격이 눈에 보이도록 플래시를 갱신한다.
+                if (defeatFrames.Length == 0) ApplyHitPose();
                 flashOnCue.Flash();
             }
             else if (hitPhase == HitPhase.Reacting)
@@ -206,8 +362,32 @@ namespace Enemy
 
             TriggerShake();
 
-            damageNumberSpawner.Spawn(damageAmount);
-            hitEffectSpawner.Spawn();
+            // Motion Profile이 연결돼 있으면 그 Damage Number Offset을 타격 시점의 최종 위치(현재
+            // transform - CombatStageLayout/Actor Offset이 이미 반영된 값) 기준으로 변환해서 쓴다.
+            // Shake는 이 시점에는 아직 시작 전(TriggerShake는 방금 shaking 플래그만 켰을 뿐 위치는
+            // 다음 프레임 UpdateShake부터 움직인다)이라 "타격 시점의" 위치가 곧 흔들리기 직전의 기준
+            // 위치와 같다 - Hit Effect/Receive Point와 동일한 타이밍 규칙이다. 프로필이 없으면 null을
+            // 넘겨 DamageNumberSpawner가 기존 anchor 기준으로 그대로 동작하게 둔다.
+            Vector3? damageNumberCenter = motionProfile != null
+                ? transform.TransformPoint(motionProfile.HitReaction.DamageNumberOffset)
+                : (Vector3?)null;
+            // 위치뿐 아니라 Jitter/Rise Distance/Duration/색상/폰트 크기/Sorting Order도 프로필이
+            // 있으면 그 값을 우선 쓴다(연결 안 됐으면 null - DamageNumberSpawner가 기존 Inspector
+            // 값 그대로 동작).
+            DamageNumberPresentation? damageNumberPresentation = motionProfile != null
+                ? new DamageNumberPresentation(
+                    motionProfile.HitReaction.DamageNumberRandomHorizontalJitter,
+                    motionProfile.HitReaction.DamageNumberRiseDistance,
+                    motionProfile.HitReaction.DamageNumberDuration,
+                    motionProfile.HitReaction.DamageNumberTextColor,
+                    motionProfile.HitReaction.DamageNumberFontSize,
+                    motionProfile.HitReaction.DamageNumberSortingOrder)
+                : (DamageNumberPresentation?)null;
+            damageNumberSpawner.Spawn(cue.Damage, damageNumberCenter, damageNumberPresentation);
+            // 공격별 Hit Effect(cue.EffectPrefab)가 비어 있으면 hitEffectSpawner의 defaultEffectPrefab으로
+            // 자동 fallback한다(Spawn() 자체 로직) - Offset/Scale은 프리팹 오버라이드 여부와 무관하게
+            // 공격 모션 값을 그대로 적용한다.
+            hitEffectSpawner.Spawn(cue.EffectPrefab, offsetOverride: cue.EffectOffset, scaleOverride: cue.EffectScale);
 
             ReceiveImpact?.Invoke();
         }
@@ -220,8 +400,18 @@ namespace Enemy
             // HandleRespawned가 곧바로 Recovery로 덮어쓰므로 여기서 미리 그릴 필요가 없다).
             defeatedByCurrentHit = true;
             hitPhase = HitPhase.Defeated;
+            ApplyDefeatPose();
 
             StartFade(toOriginal: false, duration: target.DefeatFadeDuration);
+        }
+
+        /// <summary>Defeat 프레임(motionProfile.Defeat)이 있으면 그 첫 프레임을 즉시 보여준다 - 페이드아웃
+        /// 되는 동안 유지되는 정지 포즈일 뿐이라 별도로 재생/루프하지 않는다. 없으면 아무것도 하지
+        /// 않는다(OnHitPoint가 기존처럼 Hit 홀드 포즈를 유지한다).</summary>
+        private void ApplyDefeatPose()
+        {
+            if (defeatFrames.Length == 0) return;
+            spriteRenderer.sprite = defeatFrames[0];
         }
 
         /// <summary>Target의 WaitingForRespawn이 끝나 Fade-in이 시작될 때 호출된다. 아직 Alive는
@@ -302,7 +492,7 @@ namespace Enemy
 
         private void TriggerShake()
         {
-            if (hit.shakeStrength <= 0f) return;
+            if (hitShakeStrength <= 0f) return;
 
             shaking = true;
             shakeStartTime = Time.time;
@@ -313,15 +503,15 @@ namespace Enemy
             if (!shaking) return;
 
             float elapsed = Time.time - shakeStartTime;
-            if (elapsed >= hit.shakeDecayDuration)
+            if (elapsed >= hitShakeDecayDuration)
             {
                 shaking = false;
                 transform.localPosition = basePosition;
                 return;
             }
 
-            float remaining = 1f - (elapsed / hit.shakeDecayDuration);
-            float offsetX = Mathf.Sin(elapsed * hit.shakeFrequency * Mathf.PI * 2f) * hit.shakeStrength * remaining;
+            float remaining = 1f - (elapsed / hitShakeDecayDuration);
+            float offsetX = Mathf.Sin(elapsed * hitShakeFrequency * Mathf.PI * 2f) * hitShakeStrength * remaining;
             transform.localPosition = basePosition + new Vector3(offsetX, 0f, 0f);
         }
 
@@ -332,11 +522,11 @@ namespace Enemy
             flashOnCue.Flash();
         }
 
-        /// <summary>피격 홀드 프레임(hit.holdFrame)만 그린다 - hitPhase는 건드리지 않는다.</summary>
+        /// <summary>피격 홀드 프레임(hitHoldFrame)만 그린다 - hitPhase는 건드리지 않는다.</summary>
         private void ApplyHitPose()
         {
             if (hitFrames.Length == 0) return;
-            int frame = Mathf.Clamp(hit.holdFrame, 0, hitFrames.Length - 1);
+            int frame = Mathf.Clamp(hitHoldFrame, 0, hitFrames.Length - 1);
             spriteRenderer.sprite = hitFrames[frame];
         }
 
@@ -347,16 +537,22 @@ namespace Enemy
 
             if (hitFrames.Length > 0)
             {
-                int frame = Mathf.Clamp(hit.recoveryFrame, 0, hitFrames.Length - 1);
+                int frame = Mathf.Clamp(hitRecoveryFrame, 0, hitFrames.Length - 1);
                 spriteRenderer.sprite = hitFrames[frame];
             }
         }
 
+        /// <summary>Hit/Recovery를 마치고, 또는 Respawn Fade-in 준비로 Idle에 복귀할 때 호출된다.
+        /// 진행 중이던 Idle Event는 여기서 무조건 취소되고 Base Idle 0번 프레임부터 다시 시작한다 -
+        /// "Hit/Recovery 종료 후에는 Idle Event가 이어지지 않고 Base Idle부터 재개"를 보장한다.</summary>
         private void ExitToIdle()
         {
             hitPhase = HitPhase.None;
+            playingIdleEvent = false;
+            idleAnimIndex = BaseIdleAnimIndex;
             idleCurrentFrame = 0;
             idleFrameTimer = 0f;
+            idleEventTimer = 0f;
             ApplyIdleFrame();
         }
 
@@ -367,7 +563,7 @@ namespace Enemy
             switch (hitPhase)
             {
                 case HitPhase.Reacting:
-                    if (Time.time - lastHitTime >= hit.holdTimeout)
+                    if (Time.time - lastHitTime >= hitHoldTimeout)
                     {
                         EnterRecovery();
                     }
@@ -375,7 +571,7 @@ namespace Enemy
 
                 case HitPhase.Recovery:
                     hitPhaseTimer += Time.deltaTime;
-                    if (hitPhaseTimer >= hit.recoveryDuration)
+                    if (hitPhaseTimer >= hitRecoveryDuration)
                     {
                         ExitToIdle();
                     }
@@ -388,28 +584,77 @@ namespace Enemy
 
                 default:
                     AdvanceIdle();
+
+                    // Idle Event는 Hit/Recovery/Defeated 중에는(위 case들이라 여기 도달하지 않음)
+                    // 시작하지 않는다. fadeRoutine이 도는 동안(Respawn Fade-in 포함)도 hitPhase는
+                    // 이미 None으로 돌아와 있을 수 있어 별도로 막는다 - Fade 중에는 새 Idle Event를
+                    // 굴리지 않는다(카운트다운도 그동안은 멈춘다).
+                    if (!playingIdleEvent && fadeRoutine == null)
+                    {
+                        idleEventTimer += Time.deltaTime;
+                        if (idleEventTimer >= idleEventCheckInterval)
+                        {
+                            idleEventTimer = 0f;
+                            RollIdleEvent();
+                        }
+                    }
                     break;
             }
         }
 
+        /// <summary>PlayerCharacterAnimator.RollVariant()의 Idle Event 분기와 동일한 규칙: 등록된
+        /// Idle Event가 하나도 없으면(Base Idle 하나뿐이면) 아무것도 하지 않고, Chance 판정에
+        /// 성공하면 Idle Event 중 하나를 완전 균등 확률로 골라 한 번 재생한다.</summary>
+        private void RollIdleEvent()
+        {
+            if (idleAnimations.Length <= 1 || UnityEngine.Random.value > idleEventChance) return;
+
+            int choice = UnityEngine.Random.Range(1, idleAnimations.Length);
+            playingIdleEvent = true;
+            idleAnimIndex = choice;
+            idleCurrentFrame = 0;
+            idleFrameTimer = 0f;
+            ApplyIdleFrame();
+        }
+
         private void AdvanceIdle()
         {
-            if (idleFrames.Length == 0 || idle.animationFps <= 0f) return;
+            RuntimeFrameAnimation anim = idleAnimations[idleAnimIndex];
+            Sprite[] frames = anim.Frames;
+            if (frames.Length == 0 || anim.AnimationFps <= 0f) return;
 
-            float frameDuration = 1f / idle.animationFps;
+            float frameDuration = 1f / anim.AnimationFps;
             idleFrameTimer += Time.deltaTime;
 
             if (idleFrameTimer < frameDuration) return;
 
             idleFrameTimer -= frameDuration;
-            idleCurrentFrame = (idleCurrentFrame + 1) % idleFrames.Length;
+            idleCurrentFrame++;
+
+            if (idleCurrentFrame >= frames.Length)
+            {
+                if (playingIdleEvent)
+                {
+                    // Idle Event 재생 종료 - Base Idle로 자연스럽게 복귀(다음 Check Interval도 여기서부터 새로 센다).
+                    playingIdleEvent = false;
+                    idleAnimIndex = BaseIdleAnimIndex;
+                    idleCurrentFrame = 0;
+                    idleEventTimer = 0f;
+                }
+                else
+                {
+                    idleCurrentFrame = 0; // Base Idle은 계속 Loop
+                }
+            }
+
             ApplyIdleFrame();
         }
 
         private void ApplyIdleFrame()
         {
-            if (idleFrames.Length == 0) return;
-            spriteRenderer.sprite = idleFrames[idleCurrentFrame];
+            Sprite[] frames = idleAnimations[idleAnimIndex].Frames;
+            if (frames.Length == 0) return;
+            spriteRenderer.sprite = frames[Mathf.Clamp(idleCurrentFrame, 0, frames.Length - 1)];
         }
     }
 }

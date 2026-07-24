@@ -1008,13 +1008,14 @@ GameObject:
   - component: {fileID: 390770567}
   - component: {fileID: 390770566}
   - component: {fileID: 390770565}
+  - component: {fileID: 390770569}
   m_Layer: 0
   m_Name: Cha_CatMage
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &390770564
 Transform:
   m_ObjectHideFlags: 0
@@ -1059,6 +1060,7 @@ MonoBehaviour:
   moveDistance: 0.2
   moveOutDuration: 0.14
   moveBackDuration: 0.05
+  stageLayout: {fileID: 0}
 --- !u!114 &390770567
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1109,6 +1111,15 @@ MonoBehaviour:
     hitFrameIndex: 1
     endFrameDuration: 0.12
     queueExpireTimeout: 0.15
+    castFrameIndex: 0
+    castEffectPrefab: {fileID: 0}
+    castEffectOffset: {x: 0, y: 0}
+    castEffectScale: 1
+    castSound: {fileID: 0}
+    hitEffectPrefab: {fileID: 0}
+    hitEffectOffset: {x: 0, y: 0}
+    hitEffectScale: 1
+    hitSound: {fileID: 0}
   tier1Pool: {fileID: 0}
   tier2Pool: {fileID: 0}
   tier3Pool: {fileID: 0}
@@ -1166,6 +1177,26 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+--- !u!114 &390770569
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 390770563}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 450d6ff224ad40e79f52f37c8be75379, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  defaultEffectPrefab: {fileID: 0}
+  impactPoint: {fileID: 0}
+  spawnJitterX: 0.08
+  spawnJitterY: 0.08
+  fallbackOffset: {x: 0, y: 0.3}
+  defaultDuration: 0.15
+  minSpawnInterval: 0.05
+  poolSize: 8
 --- !u!1 &407334993
 GameObject:
   m_ObjectHideFlags: 0
@@ -1389,13 +1420,14 @@ GameObject:
   - component: {fileID: 554845289}
   - component: {fileID: 554845288}
   - component: {fileID: 554845287}
+  - component: {fileID: 800000002}
   m_Layer: 0
   m_Name: Cha_Barbarian
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &554845286
 Transform:
   m_ObjectHideFlags: 0
@@ -1440,6 +1472,7 @@ MonoBehaviour:
   moveDistance: 0.2
   moveOutDuration: 0.14
   moveBackDuration: 0.05
+  stageLayout: {fileID: 11400000, guid: a11674de15554c8586ea98384fdb2df5, type: 2}
 --- !u!114 &554845289
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1490,6 +1523,15 @@ MonoBehaviour:
     hitFrameIndex: 1
     endFrameDuration: 0.12
     queueExpireTimeout: 0.15
+    castFrameIndex: 0
+    castEffectPrefab: {fileID: 0}
+    castEffectOffset: {x: 0, y: 0}
+    castEffectScale: 1
+    castSound: {fileID: 0}
+    hitEffectPrefab: {fileID: 0}
+    hitEffectOffset: {x: 0, y: 0}
+    hitEffectScale: 1
+    hitSound: {fileID: 0}
   tier1Pool: {fileID: 0}
   tier2Pool: {fileID: 0}
   tier3Pool: {fileID: 0}
@@ -2656,6 +2698,46 @@ MonoBehaviour:
   - {fileID: 1500000001}
   - {fileID: 554845285}
   defaultCharacterIndex: 1
+--- !u!114 &800000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 554845285}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 450d6ff224ad40e79f52f37c8be75379, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  defaultEffectPrefab: {fileID: 0}
+  impactPoint: {fileID: 0}
+  spawnJitterX: 0
+  spawnJitterY: 0
+  fallbackOffset: {x: 0, y: 0}
+  defaultDuration: 0.15
+  minSpawnInterval: 0.05
+  poolSize: 4
+--- !u!114 &800000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1500000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 450d6ff224ad40e79f52f37c8be75379, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  defaultEffectPrefab: {fileID: 0}
+  impactPoint: {fileID: 0}
+  spawnJitterX: 0
+  spawnJitterY: 0
+  fallbackOffset: {x: 0, y: 0}
+  defaultDuration: 0.15
+  minSpawnInterval: 0.05
+  poolSize: 4
 --- !u!1 &824843951
 GameObject:
   m_ObjectHideFlags: 0
@@ -4015,6 +4097,7 @@ GameObject:
   - component: {fileID: 1500000006}
   - component: {fileID: 1500000005}
   - component: {fileID: 1500000007}
+  - component: {fileID: 800000003}
   m_Layer: 0
   m_Name: Cha_CatKnight
   m_TagString: Untagged
@@ -4104,6 +4187,7 @@ MonoBehaviour:
   moveDistance: 0.2
   moveOutDuration: 0.14
   moveBackDuration: 0.05
+  stageLayout: {fileID: 11400000, guid: a11674de15554c8586ea98384fdb2df5, type: 2}
 --- !u!114 &1500000006
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4155,6 +4239,15 @@ MonoBehaviour:
     hitFrameIndex: 1
     endFrameDuration: 0.12
     queueExpireTimeout: 0.15
+    castFrameIndex: 0
+    castEffectPrefab: {fileID: 0}
+    castEffectOffset: {x: 0, y: 0}
+    castEffectScale: 1
+    castSound: {fileID: 0}
+    hitEffectPrefab: {fileID: 0}
+    hitEffectOffset: {x: 0, y: 0}
+    hitEffectScale: 1
+    hitSound: {fileID: 0}
   tier1Pool: {fileID: 11400000, guid: 58e789b616554da690b8e287516a0fe4, type: 2}
   tier2Pool: {fileID: 11400000, guid: 5b0086c1a12343fc8c99cc976eee1fac, type: 2}
   tier3Pool: {fileID: 0}
@@ -4190,7 +4283,7 @@ GameObject:
   - component: {fileID: 1500000107}
   - component: {fileID: 1500000108}
   m_Layer: 0
-  m_Name: Scarecrow
+  m_Name: Monster
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4237,12 +4330,12 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: 21300000, guid: e604348805ed4bfca390f5710d90e771, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 9717fc5f94a9e418cae91d9564b3c7f0, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_FlipX: 0
+  m_FlipX: 1
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 1, y: 1}
+  m_Size: {x: 2.56, y: 2.56}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -4260,6 +4353,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b1f989010ad14b97bbb4a10e13ef7a08, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  motionProfile: {fileID: 11400000, guid: a22d25df0b21c47fe90e7f6c48b64e1c, type: 2}
+  stageLayout: {fileID: 11400000, guid: a11674de15554c8586ea98384fdb2df5, type: 2}
   idle:
     frames:
     - {fileID: 21300000, guid: e604348805ed4bfca390f5710d90e771, type: 3}
@@ -4287,7 +4382,7 @@ Transform:
   m_GameObject: {fileID: 1500000101}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.1, y: 0, z: 0}
+  m_LocalPosition: {x: 0.70000005, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -4450,7 +4545,7 @@ MonoBehaviour:
   stageCamera: {fileID: 2046182837}
   placementBounds: {fileID: 1064650507}
   baseVisualScale: 3
-  defaultRightMarginFraction: 0.02
+  defaultRightMarginFraction: 0.08
   defaultBottomMarginFraction: 0.02
   highlightVisual: {fileID: 0}
   combatFxRoot: {fileID: 1500000104}

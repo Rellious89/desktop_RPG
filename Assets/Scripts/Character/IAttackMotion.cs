@@ -15,5 +15,16 @@ namespace Character
         int HitFrameIndex { get; }
         float EndFrameDuration { get; }
         float QueueExpireTimeout { get; }
+
+        int CastFrameIndex { get; }
+        GameObject CastEffectPrefab { get; }
+        Vector2 CastEffectOffset { get; }
+        float CastEffectScale { get; }
+        AudioClip CastSound { get; }
+
+        GameObject HitEffectPrefab { get; }
+        Vector2 HitEffectOffset { get; }
+        float HitEffectScale { get; }
+        AudioClip HitSound { get; }
     }
 }

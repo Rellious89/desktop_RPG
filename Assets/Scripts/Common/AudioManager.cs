@@ -79,6 +79,7 @@ namespace Common
         private void OnEnable()
         {
             PlayerCharacterAnimator.HitPoint += HandleHitPoint;
+            PlayerCharacterAnimator.CastSoundCue += HandleCastSoundCue;
             Target.AnyTargetDefeated += HandleAnyTargetDefeated;
             PlayerProgress.OnLevelUp += HandleLevelUp;
         }
@@ -86,13 +87,19 @@ namespace Common
         private void OnDisable()
         {
             PlayerCharacterAnimator.HitPoint -= HandleHitPoint;
+            PlayerCharacterAnimator.CastSoundCue -= HandleCastSoundCue;
             Target.AnyTargetDefeated -= HandleAnyTargetDefeated;
             PlayerProgress.OnLevelUp -= HandleLevelUp;
         }
 
-        private void HandleHitPoint(int damageAmount)
+        private void HandleHitPoint(AttackHitCue cue)
         {
-            RequestHitSfx();
+            RequestHitSfx(cue.Sound);
+        }
+
+        private void HandleCastSoundCue(AudioClip clip)
+        {
+            RequestCastSfx(clip);
         }
 
         private void HandleAnyTargetDefeated(string targetId)
@@ -105,12 +112,21 @@ namespace Common
             RequestLevelUpSfx();
         }
 
-        /// <summary>hitSfxCooldown 안에 들어오는 추가 요청은 무시한다 - 시각/데미지 처리는 그대로 매 타격마다 일어나고, 소리만 압축한다.</summary>
-        public void RequestHitSfx()
+        /// <summary>hitSfxCooldown 안에 들어오는 추가 요청은 무시한다 - 시각/데미지 처리는 그대로 매 타격마다 일어나고, 소리만 압축한다.
+        /// overrideClip이 있으면(공격별 Hit Sound) 그 클립만 재생하고 씬 기본 hitClip은 재생하지 않는다 -
+        /// 어떤 클립을 재생할지는 여기서만 결정되므로 한 타격에 두 소리가 겹칠 일이 없다.</summary>
+        public void RequestHitSfx(AudioClip overrideClip = null)
         {
             if (Time.time - lastHitSfxTime < hitSfxCooldown) return;
             lastHitSfxTime = Time.time;
-            PlayOneShot(hitClip);
+            PlayOneShot(overrideClip != null ? overrideClip : hitClip);
+        }
+
+        /// <summary>공격 모션의 Cast Sound를 재생한다. 기본 Cast 사운드 개념은 없으므로 clip이 비어
+        /// 있으면 PlayOneShot이 조용히 무시한다.</summary>
+        public void RequestCastSfx(AudioClip clip)
+        {
+            PlayOneShot(clip);
         }
 
         public void RequestDefeatSfx()

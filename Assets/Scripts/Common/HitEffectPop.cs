@@ -39,8 +39,9 @@ namespace Common
         /// <summary>
         /// 재생을 (재)시작한다. onComplete를 넘기면 재생이 끝났을 때 Destroy 대신 그 콜백을 호출한다
         /// (HitEffectSpawner가 풀로 반환할 때 사용). onComplete가 null이면 기존처럼 스스로 Destroy한다.
+        /// scaleMultiplier는 startScale/endScale에 곱해져 재생 내내 적용된다(기본 1 = 원래 배율 그대로).
         /// </summary>
-        public void Play(float playDuration, Action<HitEffectPop> onComplete)
+        public void Play(float playDuration, Action<HitEffectPop> onComplete, float scaleMultiplier = 1f)
         {
             if (playRoutine != null)
             {
@@ -50,11 +51,14 @@ namespace Common
             float safeDuration = playDuration > 0f && !float.IsNaN(playDuration) && !float.IsInfinity(playDuration)
                 ? playDuration
                 : 0.15f;
+            float safeScale = scaleMultiplier > 0f && !float.IsNaN(scaleMultiplier) && !float.IsInfinity(scaleMultiplier)
+                ? scaleMultiplier
+                : 1f;
 
-            playRoutine = StartCoroutine(PlayRoutine(safeDuration, onComplete));
+            playRoutine = StartCoroutine(PlayRoutine(safeDuration, onComplete, safeScale));
         }
 
-        private IEnumerator PlayRoutine(float playDuration, Action<HitEffectPop> onComplete)
+        private IEnumerator PlayRoutine(float playDuration, Action<HitEffectPop> onComplete, float scaleMultiplier)
         {
             Color color = spriteRenderer.color;
             float elapsed = 0f;
@@ -64,7 +68,7 @@ namespace Common
                 elapsed += Time.deltaTime;
                 float t = Mathf.Clamp01(elapsed / playDuration);
 
-                float scale = Mathf.Lerp(startScale, endScale, t);
+                float scale = Mathf.Lerp(startScale, endScale, t) * scaleMultiplier;
                 transform.localScale = new Vector3(scale, scale, 1f);
 
                 color.a = 1f - t;

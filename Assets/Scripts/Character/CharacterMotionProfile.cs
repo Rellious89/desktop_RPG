@@ -48,30 +48,38 @@ namespace Character
         [Serializable]
         public class PreviewSettings
         {
-            [Header("Target")]
-            [Tooltip("평상시 표시할 적 스프라이트")]
+            // targetIdleSprite/targetHitSprite: 몬스터 프로필이 도입되기 전 남은 미사용 레거시 필드.
+            // 지금은 대상(몬스터) 표시를 MonsterMotionProfile이 전담하므로 어디서도 읽지 않는다.
+            // 기존에 값이 들어간 에셋이 있을 수 있어 필드/데이터는 삭제하지 않는다.
             [SerializeField] private Sprite targetIdleSprite;
-            [Tooltip("히트 프레임에서 표시할 적 피격 스프라이트. 비어 있으면 평상시 스프라이트를 유지한다.")]
             [SerializeField] private Sprite targetHitSprite;
 
-            [Header("Placement (world units)")]
+            [Header("Actor Presentation")]
+            [Tooltip("Combat Stage Layout의 Character Slot Position에 더할 이 캐릭터만의 보정 위치(로컬 유닛). " +
+                     "Motion Editor Preview와 런타임(AttackMovement) 양쪽에서 동일하게 쓰인다.")]
             [SerializeField] private Vector2 characterOffset = Vector2.zero;
-            [SerializeField] private Vector2 targetOffset = new Vector2(1.15f, 0f);
             [Tooltip("적 Pivot 기준 실제 피격 지점. 이펙트와 사운드 프레임 트랙도 이 지점을 기준으로 확장한다.")]
             [SerializeField] private Vector2 receivePointOffset = new Vector2(0f, 0.35f);
-
-            [Header("Preview Scale")]
+            [Tooltip("이 캐릭터의 표시 배율. Preview와 런타임(AttackMovement) 양쪽에서 동일하게 적용된다.")]
             [Min(0.05f)]
             [SerializeField] private float characterScale = 1f;
+
+            // targetOffset/targetScale: 예전에는 "캐릭터-몬스터 사이 기본 거리"/"몬스터를 이 배율만큼
+            // 추가로 더 키워서 보여주기"를 캐릭터 프로필이 들고 있었다. 전자는 공용 CombatStageLayout.
+            // MonsterSlotPosition으로, 후자는 몬스터 자신의 Actor Scale로 이전됐다 - 각 액터는 이제 자기
+            // 표시 보정만 관리한다. 기존 데이터 보존을 위해 필드는 남기되 더 이상 계산에 쓰지 않는다.
+            [SerializeField] private Vector2 targetOffset = new Vector2(1.15f, 0f);
             [Min(0.05f)]
             [SerializeField] private float targetScale = 1f;
 
             public Sprite TargetIdleSprite => targetIdleSprite;
             public Sprite TargetHitSprite => targetHitSprite;
-            public Vector2 CharacterOffset => characterOffset;
-            public Vector2 TargetOffset => targetOffset;
+            public Vector2 ActorOffset => characterOffset;
             public Vector2 ReceivePointOffset => receivePointOffset;
-            public float CharacterScale => Mathf.Max(0.05f, characterScale);
+            public float ActorScale => Mathf.Max(0.05f, characterScale);
+            [Obsolete("CombatStageLayout.MonsterSlotPosition으로 대체됨 - 더 이상 배치 계산에 쓰이지 않는다.")]
+            public Vector2 TargetOffset => targetOffset;
+            [Obsolete("몬스터 자신의 MonsterMotionProfile.Preview.ActorScale로 대체됨 - 더 이상 배치 계산에 쓰이지 않는다.")]
             public float TargetScale => Mathf.Max(0.05f, targetScale);
         }
 

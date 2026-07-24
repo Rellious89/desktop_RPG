@@ -1,11 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using Character;
+using Common;
 using Enemy;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEditor.SceneManagement;
 
 namespace CharacterEditor
 {
@@ -20,6 +24,7 @@ namespace CharacterEditor
         private const string MonsterArtRoot = "Assets/Art/Monster";
         private const string LegacyEnemyArtRoot = "Assets/Art/Enemy";
         private const string ProfileDataRoot = "Assets/Data/MotionProfiles";
+        private const string StageLayoutAssetPath = ProfileDataRoot + "/CombatStageLayout.asset";
 
         private const float LeftWorkspaceWidth = 680f;
         private const float LibraryWidth = 245f;
@@ -123,12 +128,22 @@ namespace CharacterEditor
         private SerializedObject frameListOwner;
         private string frameListPropertyPath;
 
+        private CombatStageLayout stageLayout;
+        private SerializedObject stageLayoutObject;
+
+        /// <summary>개발용 진단 토글 - Damage Number Preview가 왜 안 보이는지(조건 미충족 vs 좌표/스타일
+        /// 문제) 바로 구분할 수 있게 활성 상태·elapsed/duration·anchor 좌표를 화면에 함께 표시한다.
+        /// 기본은 꺼짐이고, Zoom 옆의 체크박스로 켤 수 있다.</summary>
+        private bool debugDamageNumberOverlay;
+
         private bool previewPlaying;
         private bool previewLoop = true;
         private int previewFrameIndex;
         private double previewLastStepTime;
         private double previewElapsedTime;
         private float previewZoom = DefaultZoom;
+        private bool previewCastCueFired;
+        private bool previewHitCueFired;
 
         private Vector2 libraryScroll;
         private Vector2 navigationScroll;
@@ -144,11 +159,113 @@ namespace CharacterEditor
         private HistoryAction pendingHistoryAction;
         private GUIStyle hitLabelStyle;
         private GUIStyle hitTagStyle;
+        private GUIStyle castTagStyle;
+        private GUIStyle castHitTagStyle;
+        private GUIStyle damageNumberPreviewStyle;
         private GUIStyle toolbarStatusStyle;
 
         private ResourceEntry SelectedResource => selectedResourceIndex >= 0 && selectedResourceIndex < resources.Count
             ? resources[selectedResourceIndex]
             : null;
+
+        /// <summary>캐릭터/몬스터 프로필 하나가 아니라 프로젝트 전체가 공유하는 단일 배치 에셋이다 -
+        /// 없으면(최초 실행 등) 자동으로 만들어서 항상 non-null을 보장한다.</summary>
+        private CombatStageLayout GetStageLayout()
+        {
+            if (stageLayout != null) return stageLayout;
+
+            stageLayout = AssetDatabase.LoadAssetAtPath<CombatStageLayout>(StageLayoutAssetPath);
+            if (stageLayout == null)
+            {
+                stageLayout = CreateInstance<CombatStageLayout>();
+                AssetDatabase.CreateAsset(stageLayout, StageLayoutAssetPath);
+                AssetDatabase.SaveAssets();
+            }
+            return stageLayout;
+        }
+
+        private SerializedObject GetStageLayoutObject()
+        {
+            GetStageLayout();
+            if (stageLayoutObject == null || stageLayoutObject.targetObject != stageLayout)
+            {
+                stageLayoutObject = new SerializedObject(stageLayout);
+            }
+            return stageLayoutObject;
+        }
+
+        /// <summary>열려 있는 씬(들)에서 PlayerCharacterAnimator/TargetCombatController를 전부 찾아
+        /// (비활성 오브젝트 포함 - RuntimeCharacterSwitcher로 꺼져 있는 캐릭터도 맞춰야 한다) 각자의
+        /// 연결된 Motion Profile + 공용 CombatStageLayout 기준으로 위치/스케일/Flip을 다시 계산해서
+        /// 그 자리에서 Transform에 적용한다. Preview와 완전히 같은 공식(Slot + Actor Offset)을 쓴다.
+        /// Undo에 등록하고 Scene을 Dirty 처리한다 - 자동 실행이 아니라 이 버튼을 눌렀을 때만 동작한다.</summary>
+        private void ApplyPreviewLayoutToOpenStage()
+        {
+            CombatStageLayout layout = GetStageLayout();
+            var characterAnimators = UnityEngine.Object.FindObjectsOfType<PlayerCharacterAnimator>(true);
+            var monsterControllers = UnityEngine.Object.FindObjectsOfType<TargetCombatController>(true);
+
+            if (characterAnimators.Length == 0 && monsterControllers.Length == 0)
+            {
+                EditorUtility.DisplayDialog("Apply Preview Layout",
+                    "열려 있는 씬에서 캐릭터(PlayerCharacterAnimator)나 몬스터(TargetCombatController)를 찾지 못했습니다.",
+                    "확인");
+                return;
+            }
+
+            Undo.SetCurrentGroupName("Apply Preview Layout to Stage");
+            int undoGroup = Undo.GetCurrentGroup();
+            var dirtyScenes = new HashSet<Scene>();
+
+            foreach (PlayerCharacterAnimator animator in characterAnimators)
+            {
+                Transform actorTransform = animator.transform;
+                CharacterMotionProfile profile = animator.MotionProfile;
+                Vector2 offset = profile != null ? profile.Preview.ActorOffset : Vector2.zero;
+                float scale = profile != null ? profile.Preview.ActorScale : 1f;
+                Vector3 localPos = new Vector3(layout.CharacterSlotPosition.x + offset.x, layout.CharacterSlotPosition.y + offset.y, actorTransform.localPosition.z);
+
+                Undo.RecordObject(actorTransform, "Apply Preview Layout to Stage");
+                AttackMovement movement = animator.GetComponent<AttackMovement>();
+                if (movement != null) movement.SetPresentationBasePosition(localPos);
+                else actorTransform.localPosition = localPos;
+                actorTransform.localScale = new Vector3(scale, scale, 1f);
+                EditorUtility.SetDirty(actorTransform);
+
+                dirtyScenes.Add(actorTransform.gameObject.scene);
+            }
+
+            foreach (TargetCombatController combat in monsterControllers)
+            {
+                Transform actorTransform = combat.transform;
+                MonsterMotionProfile profile = combat.MotionProfile;
+                Vector2 offset = profile != null ? profile.Preview.ActorOffset : Vector2.zero;
+                float scale = profile != null ? profile.Preview.ActorScale : 1f;
+                bool flipX = profile != null && profile.SpriteFlipX;
+                Vector3 localPos = new Vector3(layout.MonsterSlotPosition.x + offset.x, layout.MonsterSlotPosition.y + offset.y, actorTransform.localPosition.z);
+
+                Undo.RecordObject(actorTransform, "Apply Preview Layout to Stage");
+                combat.SetPresentationBasePosition(localPos);
+                actorTransform.localScale = new Vector3(scale, scale, 1f);
+                EditorUtility.SetDirty(actorTransform);
+
+                SpriteRenderer spriteRenderer = combat.GetComponent<SpriteRenderer>();
+                if (spriteRenderer != null)
+                {
+                    Undo.RecordObject(spriteRenderer, "Apply Preview Layout to Stage");
+                    spriteRenderer.flipX = flipX;
+                    EditorUtility.SetDirty(spriteRenderer);
+                }
+
+                dirtyScenes.Add(actorTransform.gameObject.scene);
+            }
+
+            Undo.CollapseUndoOperations(undoGroup);
+            foreach (Scene scene in dirtyScenes)
+            {
+                if (scene.IsValid()) EditorSceneManager.MarkSceneDirty(scene);
+            }
+        }
 
         private GUIStyle HitLabelStyle
         {
@@ -179,6 +296,57 @@ namespace CharacterEditor
                     };
                 }
                 return hitTagStyle;
+            }
+        }
+
+        private GUIStyle CastTagStyle
+        {
+            get
+            {
+                if (castTagStyle == null)
+                {
+                    castTagStyle = new GUIStyle(EditorStyles.miniBoldLabel)
+                    {
+                        alignment = TextAnchor.MiddleCenter,
+                        normal = { textColor = new Color(0.35f, 0.65f, 1f) }
+                    };
+                }
+                return castTagStyle;
+            }
+        }
+
+        private GUIStyle CastHitTagStyle
+        {
+            get
+            {
+                if (castHitTagStyle == null)
+                {
+                    castHitTagStyle = new GUIStyle(EditorStyles.miniBoldLabel)
+                    {
+                        alignment = TextAnchor.MiddleCenter,
+                        normal = { textColor = new Color(1f, 0.75f, 0.15f) }
+                    };
+                }
+                return castHitTagStyle;
+            }
+        }
+
+        /// <summary>DamageNumberPopup의 실제 런타임 스타일(중앙 정렬)을 흉내낸다 - TMP가 아니라
+        /// IMGUI라 폰트가 완전히 같지는 않다. 색상/크기는 매 호출마다 Monster Profile 값으로 덮어써야
+        /// 하므로(몬스터마다 다르고, 페이드에 따라 알파도 매 프레임 바뀐다) 여기서는 골격만 한 번
+        /// 만들어두고 캐싱한다.</summary>
+        private GUIStyle DamageNumberPreviewStyle
+        {
+            get
+            {
+                if (damageNumberPreviewStyle == null)
+                {
+                    damageNumberPreviewStyle = new GUIStyle(EditorStyles.boldLabel)
+                    {
+                        alignment = TextAnchor.MiddleCenter
+                    };
+                }
+                return damageNumberPreviewStyle;
             }
         }
 
@@ -334,6 +502,19 @@ namespace CharacterEditor
                 using (new EditorGUI.DisabledScope(SelectedResource == null || !SelectedResource.HasProfile))
                 {
                     if (GUILayout.Button("Sync Frames", EditorStyles.toolbarButton, GUILayout.Width(88f))) SyncActiveFramesFromArt();
+                }
+
+                GUILayout.Space(8f);
+                using (new EditorGUI.DisabledScope(EditorApplication.isPlaying))
+                {
+                    var applyLayoutContent = new GUIContent("Apply Preview Layout",
+                        "현재 저장된 Presentation/Layout 값(Actor Offset/Scale/Flip, Combat Stage Layout)을 열려 있는 " +
+                        "씬의 캐릭터·몬스터 Transform에 즉시 적용합니다(Undo 가능). Play Mode에서는 런타임 초기화가 " +
+                        "같은 규칙을 자동 적용하므로 이 버튼은 에디트 모드에서만 동작합니다.");
+                    if (GUILayout.Button(applyLayoutContent, EditorStyles.toolbarButton, GUILayout.Width(150f)))
+                    {
+                        ApplyPreviewLayoutToOpenStage();
+                    }
                 }
 
                 GUILayout.FlexibleSpace();
@@ -1009,16 +1190,17 @@ namespace CharacterEditor
             {
                 case Workspace.Overview:
                     DrawOverview(activeProfileObject, "Monster Setup");
-                    EditorGUILayout.PropertyField(activeProfileObject.FindProperty("preview"), new GUIContent("Placement & Receive Point"), true);
+                    DrawMonsterPlacement();
                     break;
                 case Workspace.Idle:
                     DrawClipEditor(activeProfileObject.FindProperty("baseIdle"), false, -1, false);
                     break;
                 case Workspace.IdleEvents:
+                    DrawMonsterIdleEventSettings();
                     DrawSelectedIdleEventEditor();
                     break;
                 case Workspace.Hit:
-                    EditorGUILayout.PropertyField(activeProfileObject.FindProperty("hitReaction"), GUIContent.none, true);
+                    DrawMonsterHitReaction();
                     DrawClipEditor(activeProfileObject.FindProperty("hit"), false, -1, true);
                     break;
                 case Workspace.Defeat:
@@ -1026,6 +1208,68 @@ namespace CharacterEditor
                     break;
             }
             if (activeProfileObject.ApplyModifiedProperties()) EditorUtility.SetDirty(entry.MonsterProfile);
+        }
+
+        /// <summary>런타임(TargetCombatController)이 Base Idle 사이에 Idle Event를 자동으로 굴리는
+        /// 주기/확률 - Character Motion Profile의 같은 개념(idleEventCheckInterval/idleEventChance)과
+        /// 동일한 규칙을 쓴다. 프리뷰 수동 선택 목록(아래 DrawSelectedIdleEventEditor)과는 별개로,
+        /// 이 값은 순수하게 런타임 자동 재생에만 쓰인다.</summary>
+        private void DrawMonsterIdleEventSettings()
+        {
+            EditorGUILayout.LabelField("Auto-Play (Runtime)", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(activeProfileObject.FindProperty("idleEventCheckInterval"), new GUIContent("Idle Event Check Interval"));
+            RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+            EditorGUILayout.PropertyField(activeProfileObject.FindProperty("idleEventChance"), new GUIContent("Idle Event Chance"));
+            RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+            EditorGUILayout.Space(6f);
+        }
+
+        /// <summary>hitReaction을 통째로 재귀 PropertyField하지 않고 필드별로 직접 그린다 - Damage
+        /// Number만 접이식으로 따로 빼기 위함이다(통째로 그리면 접기/펼치기를 걸 수 없다). 기존 Hit
+        /// Reaction 필드들의 순서/구성은 그대로 유지한다.</summary>
+        private void DrawMonsterHitReaction()
+        {
+            SerializedProperty reaction = activeProfileObject.FindProperty("hitReaction");
+
+            EditorGUILayout.PropertyField(reaction.FindPropertyRelative("holdFrame"));
+            RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+            EditorGUILayout.PropertyField(reaction.FindPropertyRelative("recoveryFrame"));
+            RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+            EditorGUILayout.PropertyField(reaction.FindPropertyRelative("recoveryDuration"));
+            RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+            EditorGUILayout.PropertyField(reaction.FindPropertyRelative("holdTimeout"));
+            RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+            EditorGUILayout.PropertyField(reaction.FindPropertyRelative("shakeStrength"));
+            RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+            EditorGUILayout.PropertyField(reaction.FindPropertyRelative("shakeFrequency"));
+            RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+            EditorGUILayout.PropertyField(reaction.FindPropertyRelative("shakeDecayDuration"));
+            RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+
+            EditorGUILayout.Space(6f);
+            SerializedProperty damageNumberOffset = reaction.FindPropertyRelative("damageNumberOffset");
+            // isExpanded는 damageNumberOffset 자신의 "자식 펼치기" 용도가 아니라, 이 접이식 섹션 자체의
+            // 열림 상태를 저장하는 용도로 그대로 재사용한다 - SerializedProperty에 붙어 프로필 에셋과
+            // 함께 자동으로 영속화되므로 창을 닫았다 열어도 접힘 상태가 유지된다.
+            damageNumberOffset.isExpanded = EditorGUILayout.Foldout(damageNumberOffset.isExpanded,
+                damageNumberOffset.isExpanded ? "Damage Number ▼" : "Damage Number ▶", true);
+            if (damageNumberOffset.isExpanded)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.PropertyField(damageNumberOffset, new GUIContent("Offset"));
+                EditorGUILayout.PropertyField(reaction.FindPropertyRelative("damageNumberRandomHorizontalJitter"), new GUIContent("Random Horizontal Jitter"));
+                RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+                EditorGUILayout.PropertyField(reaction.FindPropertyRelative("damageNumberRiseDistance"), new GUIContent("Rise Distance"));
+                RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+                EditorGUILayout.PropertyField(reaction.FindPropertyRelative("damageNumberDuration"), new GUIContent("Duration"));
+                RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+                EditorGUILayout.PropertyField(reaction.FindPropertyRelative("damageNumberTextColor"), new GUIContent("Text Color"));
+                EditorGUILayout.PropertyField(reaction.FindPropertyRelative("damageNumberFontSize"), new GUIContent("Font Size"));
+                RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+                EditorGUILayout.PropertyField(reaction.FindPropertyRelative("damageNumberSortingOrder"), new GUIContent("Sorting Order"));
+                RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+                EditorGUI.indentLevel--;
+            }
         }
 
         private static void DrawOverview(SerializedObject profile, string title)
@@ -1041,12 +1285,38 @@ namespace CharacterEditor
         private void DrawCharacterPlacement()
         {
             EditorGUILayout.Space(8f);
-            EditorGUILayout.LabelField("Combat Preview Placement", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Presentation / Placement", EditorStyles.boldLabel);
             SerializedProperty preview = activeProfileObject.FindProperty("preview");
-            EditorGUILayout.PropertyField(preview.FindPropertyRelative("characterOffset"));
-            EditorGUILayout.PropertyField(preview.FindPropertyRelative("targetOffset"));
-            EditorGUILayout.PropertyField(preview.FindPropertyRelative("characterScale"));
-            EditorGUILayout.PropertyField(preview.FindPropertyRelative("targetScale"));
+            EditorGUILayout.PropertyField(preview.FindPropertyRelative("characterOffset"), new GUIContent("Actor Offset"));
+            EditorGUILayout.PropertyField(preview.FindPropertyRelative("characterScale"), new GUIContent("Actor Scale"));
+
+            DrawCombatStageLayoutSection();
+        }
+
+        private void DrawMonsterPlacement()
+        {
+            EditorGUILayout.Space(8f);
+            EditorGUILayout.LabelField("Presentation / Placement", EditorStyles.boldLabel);
+            SerializedProperty preview = activeProfileObject.FindProperty("preview");
+            EditorGUILayout.PropertyField(preview.FindPropertyRelative("actorOffset"), new GUIContent("Actor Offset"));
+            EditorGUILayout.PropertyField(preview.FindPropertyRelative("actorScale"), new GUIContent("Actor Scale"));
+            EditorGUILayout.PropertyField(activeProfileObject.FindProperty("spriteFlipX"), new GUIContent("Sprite Flip X"));
+            EditorGUILayout.PropertyField(preview.FindPropertyRelative("receivePointOffset"), new GUIContent("Receive Point Offset"));
+
+            DrawCombatStageLayoutSection();
+        }
+
+        /// <summary>Character/Monster Overview 양쪽에서 공유하는 무대 배치값 - 같은 CombatStageLayout
+        /// 에셋의 SerializedObject를 그대로 쓰므로, 어느 탭에서 고치든 즉시 서로/Preview에 반영된다.</summary>
+        private void DrawCombatStageLayoutSection()
+        {
+            EditorGUILayout.Space(8f);
+            EditorGUILayout.LabelField("Combat Stage Layout (Shared)", EditorStyles.boldLabel);
+            SerializedObject layoutObject = GetStageLayoutObject();
+            layoutObject.Update();
+            EditorGUILayout.PropertyField(layoutObject.FindProperty("characterSlotPosition"), new GUIContent("Character Slot Position"));
+            EditorGUILayout.PropertyField(layoutObject.FindProperty("monsterSlotPosition"), new GUIContent("Monster Slot Position"));
+            if (layoutObject.ApplyModifiedProperties()) EditorUtility.SetDirty(stageLayout);
         }
 
         private void DrawSelectedIdleEventEditor()
@@ -1087,7 +1357,10 @@ namespace CharacterEditor
             SerializedProperty frames = attackObject.FindProperty("frames");
             SerializedProperty fps = attackObject.FindProperty("animationFps");
             SerializedProperty hit = attackObject.FindProperty("hitFrameIndex");
+            SerializedProperty cast = attackObject.FindProperty("castFrameIndex");
 
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField("Playback", EditorStyles.boldLabel);
             using (new EditorGUILayout.HorizontalScope())
             {
                 EditorGUILayout.PropertyField(fps, new GUIContent("FPS"));
@@ -1104,17 +1377,30 @@ namespace CharacterEditor
             }
 
             EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField("Cast Presentation", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(cast, new GUIContent("Cast Frame"));
+            RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+            EditorGUILayout.PropertyField(attackObject.FindProperty("castEffectPrefab"), new GUIContent("Effect Prefab"));
+            EditorGUILayout.PropertyField(attackObject.FindProperty("castEffectOffset"), new GUIContent("Effect Offset"));
+            EditorGUILayout.PropertyField(attackObject.FindProperty("castEffectScale"), new GUIContent("Effect Scale"));
+            EditorGUILayout.PropertyField(attackObject.FindProperty("castSound"), new GUIContent("Cast Sound"));
+
+            EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField("Hit Presentation", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(attackObject.FindProperty("hitEffectPrefab"), new GUIContent("Effect Prefab"));
             EditorGUILayout.PropertyField(attackObject.FindProperty("hitEffectOffset"), new GUIContent("Effect Offset"));
             EditorGUILayout.PropertyField(attackObject.FindProperty("hitEffectScale"), new GUIContent("Effect Scale"));
             EditorGUILayout.PropertyField(attackObject.FindProperty("hitSound"), new GUIContent("Hit Sound"));
 
-            DrawFrameSection(attackObject, frames, hit);
+            DrawFrameSection(attackObject, frames, hit, cast);
 
             if (frames.arraySize > 0 && (hit.intValue < 0 || hit.intValue >= frames.arraySize))
             {
                 EditorGUILayout.HelpBox($"Hit Frame은 0~{frames.arraySize - 1} 범위여야 합니다.", MessageType.Warning);
+            }
+            if (frames.arraySize > 0 && (cast.intValue < 0 || cast.intValue >= frames.arraySize))
+            {
+                EditorGUILayout.HelpBox($"Cast Frame은 0~{frames.arraySize - 1} 범위여야 합니다.", MessageType.Warning);
             }
             if (attackObject.ApplyModifiedProperties()) EditorUtility.SetDirty(selectedAttack);
         }
@@ -1169,11 +1455,11 @@ namespace CharacterEditor
             EditorGUI.DrawRect(new Rect(rect.xMax - thickness, rect.y, thickness, rect.height), ActiveTextFieldBorder);
         }
 
-        private void DrawFrameSection(SerializedObject owner, SerializedProperty frames, SerializedProperty hitFrame)
+        private void DrawFrameSection(SerializedObject owner, SerializedProperty frames, SerializedProperty hitFrame, SerializedProperty castFrame = null)
         {
             if (frameList == null || frameListOwner != owner || frameListPropertyPath != frames.propertyPath)
             {
-                frameList = BuildFrameList(owner, frames, hitFrame);
+                frameList = BuildFrameList(owner, frames, hitFrame, castFrame);
                 frameListOwner = owner;
                 frameListPropertyPath = frames.propertyPath;
             }
@@ -1181,7 +1467,7 @@ namespace CharacterEditor
             DrawFrameDropZone(frames);
         }
 
-        private ReorderableList BuildFrameList(SerializedObject owner, SerializedProperty frames, SerializedProperty hitFrame)
+        private ReorderableList BuildFrameList(SerializedObject owner, SerializedProperty frames, SerializedProperty hitFrame, SerializedProperty castFrame = null)
         {
             var list = new ReorderableList(owner, frames, true, true, true, true) { elementHeight = 48f };
             list.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Sprite Frames");
@@ -1190,13 +1476,16 @@ namespace CharacterEditor
                 SerializedProperty element = frames.GetArrayElementAtIndex(index);
                 Sprite sprite = element.objectReferenceValue as Sprite;
                 bool isHit = hitFrame != null && hitFrame.intValue == index;
-                if (isHit) EditorGUI.DrawRect(rect, new Color(1f, 0.3f, 0.2f, 0.15f));
+                bool isCast = castFrame != null && castFrame.intValue == index;
+                if (isHit || isCast) EditorGUI.DrawRect(rect, new Color(1f, 0.3f, 0.2f, 0.15f));
                 Rect thumb = new Rect(rect.x + 2f, rect.y + 4f, 40f, 40f);
-                Rect field = new Rect(rect.x + 48f, rect.y + 14f, rect.width - 108f, EditorGUIUtility.singleLineHeight);
-                Rect tag = new Rect(rect.xMax - 54f, rect.y + 14f, 52f, EditorGUIUtility.singleLineHeight);
+                Rect field = new Rect(rect.x + 48f, rect.y + 14f, rect.width - 140f, EditorGUIUtility.singleLineHeight);
+                Rect tag = new Rect(rect.xMax - 86f, rect.y + 14f, 84f, EditorGUIUtility.singleLineHeight);
                 DrawThumbnail(thumb, sprite);
                 EditorGUI.ObjectField(field, element, typeof(Sprite), GUIContent.none);
-                EditorGUI.LabelField(tag, isHit ? "HIT" : "#" + index, isHit ? HitTagStyle : EditorStyles.miniLabel);
+                string tagText = isCast && isHit ? "CAST · HIT" : isHit ? "HIT" : isCast ? "CAST" : "#" + index;
+                GUIStyle tagStyle = isCast && isHit ? CastHitTagStyle : isHit ? HitTagStyle : isCast ? CastTagStyle : EditorStyles.miniLabel;
+                EditorGUI.LabelField(tag, tagText, tagStyle);
             };
             list.onSelectCallback = l =>
             {
@@ -1281,6 +1570,9 @@ namespace CharacterEditor
                     EditorGUILayout.LabelField("Zoom", GUILayout.Width(38f));
                     previewZoom = EditorGUILayout.Slider(previewZoom, ZoomMin, ZoomMax);
                     if (GUILayout.Button("Fit", GUILayout.Width(48f))) previewZoom = ComputeActiveFitZoom();
+                    debugDamageNumberOverlay = GUILayout.Toggle(debugDamageNumberOverlay,
+                        new GUIContent("DMG Debug", "Damage Number Preview의 활성 상태/elapsed/duration/anchor 좌표를 화면에 표시합니다(개발용)."),
+                        EditorStyles.miniButton, GUILayout.Width(74f));
                 }
 
                 DrawPairedStage(main, opponent);
@@ -1376,6 +1668,10 @@ namespace CharacterEditor
             float time = (float)previewElapsedTime;
             float hitTime = attack != null ? Mathf.Clamp(attack.HitFrame, 0, Mathf.Max(0, attack.Frames.Length - 1)) / Mathf.Max(0.01f, attack.Fps) : float.MaxValue;
             bool hitStarted = synchronizedHit && time >= hitTime;
+            // Attack과 짝지어진 상태면 Hit Frame 도달 시점부터, 몬스터 Hit 모션 자체를 단독으로 보고
+            // 있으면(짝 없이 Hit 탭만 재생) 그 클립 재생 시작(0)부터를 "피격 반응 중"으로 본다.
+            bool monsterInHitReaction = hitStarted || (!synchronizedHit && monsterMotion != null && monsterMotion.Kind == PreviewMotionKind.Hit);
+            float shakeStartTime = synchronizedHit ? hitTime : 0f;
 
             Sprite characterSprite = GetFrame(characterMotion, time, characterMotion != null && characterMotion.Kind == PreviewMotionKind.Idle);
             Sprite monsterSprite;
@@ -1398,10 +1694,8 @@ namespace CharacterEditor
             float ppu = characterSprite != null ? characterSprite.pixelsPerUnit : 100f;
             float worldToScreen = ppu * previewZoom;
 
-            Vector2 characterOffset = Vector2.zero;
-            Vector2 targetOffset = new Vector2(1.15f, 0f);
+            Vector2 characterActorOffset = Vector2.zero;
             float characterScale = 1f;
-            float targetScale = 1f;
             float moveDistance = 0f;
             float moveOut = 0.14f;
             float moveBack = 0.05f;
@@ -1409,10 +1703,8 @@ namespace CharacterEditor
             if (character?.CharacterProfile != null)
             {
                 CharacterMotionProfile.PreviewSettings preview = character.CharacterProfile.Preview;
-                characterOffset = preview.CharacterOffset;
-                targetOffset = preview.TargetOffset;
-                characterScale = preview.CharacterScale;
-                targetScale = preview.TargetScale;
+                characterActorOffset = preview.ActorOffset;
+                characterScale = preview.ActorScale;
                 CharacterMotionProfile.AttackMovementSettings movement = character.CharacterProfile.AttackMovement;
                 if (movement.OverrideComponentValues)
                 {
@@ -1422,21 +1714,50 @@ namespace CharacterEditor
                 }
             }
 
-            float moveX = attack != null ? EvaluateMovement(time, moveDistance, moveOut, moveBack) : 0f;
-            Vector2 characterAnchor = baseAnchor + WorldToScreen(characterOffset + new Vector2(moveX, 0f), worldToScreen);
-            Vector2 targetAnchor = baseAnchor + WorldToScreen(targetOffset, worldToScreen);
-
             Vector2 receiveOffset = new Vector2(0f, 0.35f);
+            Vector2 monsterActorOffset = Vector2.zero;
             float monsterScale = 1f;
+            bool monsterFlipX = false;
+            float shakeOffsetX = 0f;
             if (monster?.MonsterProfile != null)
             {
                 receiveOffset = monster.MonsterProfile.Preview.ReceivePointOffset;
+                monsterActorOffset = monster.MonsterProfile.Preview.ActorOffset;
                 monsterScale = monster.MonsterProfile.Preview.ActorScale;
+                monsterFlipX = monster.MonsterProfile.SpriteFlipX;
+                shakeOffsetX = EvaluateHitShake(monster.MonsterProfile.HitReaction, time, shakeStartTime, monsterInHitReaction);
             }
+
+            // 런타임(AttackMovement/TargetCombatController)과 같은 공식:
+            //   characterPosition = characterSlot + characterProfile.ActorOffset + attackMovementOffset
+            //   monsterPosition   = monsterSlot   + monsterProfile.ActorOffset   + hitShakeOffset
+            CombatStageLayout layout = GetStageLayout();
+            Vector2 characterSlot = layout.CharacterSlotPosition;
+            Vector2 monsterSlot = layout.MonsterSlotPosition;
+
+            float moveX = attack != null ? EvaluateMovement(time, moveDistance, moveOut, moveBack) : 0f;
+            Vector2 characterAnchor = baseAnchor + WorldToScreen(characterSlot + characterActorOffset + new Vector2(moveX, 0f), worldToScreen);
+            // Shake는 targetAnchor 하나에만 더한다 - Receive Point/Hit Effect/Marker가 모두 targetAnchor를
+            // 기준으로 계산되므로(아래), 스프라이트를 포함해 전부 함께 흔들린 뒤의 위치로 그려진다.
+            Vector2 targetAnchor = baseAnchor + WorldToScreen(monsterSlot + monsterActorOffset + new Vector2(shakeOffsetX, 0f), worldToScreen);
             Vector2 receivePoint = targetAnchor + WorldToScreen(receiveOffset, worldToScreen);
 
-            if (monsterSprite != null) DrawSprite(monsterSprite, previewZoom * targetScale * monsterScale, targetAnchor, hitStarted ? new Color(1f, 0.68f, 0.68f) : Color.white);
+            if (monsterSprite != null) DrawSprite(monsterSprite, previewZoom * monsterScale, targetAnchor, hitStarted ? new Color(1f, 0.68f, 0.68f) : Color.white, monsterFlipX);
             if (characterSprite != null) DrawSprite(characterSprite, previewZoom * characterScale, characterAnchor, Color.white);
+
+            bool exactCast = attack != null && attack.Attack != null
+                && GetFrameIndex(attack, time, false) == Mathf.Clamp(attack.Attack.CastFrameIndex, 0, attack.Frames.Length - 1);
+            if (exactCast)
+            {
+                GameObject castPrefab = attack.Attack.CastEffectPrefab;
+                Sprite castEffectSprite = castPrefab != null ? castPrefab.GetComponentInChildren<SpriteRenderer>()?.sprite : null;
+                if (castEffectSprite != null)
+                {
+                    Vector2 castEffectOffset = attack.Attack.CastEffectOffset;
+                    float castEffectScale = attack.Attack.CastEffectScale;
+                    DrawSprite(castEffectSprite, previewZoom * Mathf.Max(0.01f, castEffectScale), characterAnchor + WorldToScreen(castEffectOffset, worldToScreen), Color.white);
+                }
+            }
 
             bool exactHit = attack != null && GetFrameIndex(attack, time, false) == Mathf.Clamp(attack.HitFrame, 0, attack.Frames.Length - 1);
             if (exactHit && attack.Attack != null)
@@ -1449,6 +1770,65 @@ namespace CharacterEditor
                     float effectScale = attack.Attack.HitEffectScale;
                     DrawSprite(effectSprite, previewZoom * Mathf.Max(0.01f, effectScale), receivePoint + WorldToScreen(effectOffset, worldToScreen), Color.white);
                 }
+            }
+
+            // "타격 순간" 시점은 Hit Shake와 완전히 같은 규칙(shakeStartTime)을 그대로 재사용한다 -
+            // Character+Monster 동기화면 attack의 Hit Frame, Monster Hit 탭 단독 프리뷰면 그 클립
+            // 0번 프레임. hasHitContext는 monsterMotion이 애초에 Hit 모션을 보여주고 있는지만 본다
+            // (attack 유무와 무관 - 짝지어져 있든 아니든 monsterMotion.Kind==Hit이면 참) - 순수 Idle 등
+            // 히트와 무관한 프리뷰에서 우연히 time이 [0,Duration) 구간에 들어와도 뜨지 않게 막아준다.
+            bool hasHitContext = monsterMotion != null && monsterMotion.Kind == PreviewMotionKind.Hit;
+            bool damageNumberProfileAvailable = monster?.MonsterProfile != null;
+            bool damageNumberActive = false;
+            float damageNumberElapsedDebug = 0f;
+            float damageNumberDurationDebug = 0f;
+            Vector2 damageNumberAnchorDebug = Vector2.zero;
+
+            if (hasHitContext && damageNumberProfileAvailable)
+            {
+                MonsterMotionProfile.HitReactionSettings reaction = monster.MonsterProfile.HitReaction;
+                float damageNumberElapsed = time - shakeStartTime;
+                float damageNumberDuration = reaction.DamageNumberDuration;
+                damageNumberElapsedDebug = damageNumberElapsed;
+                damageNumberDurationDebug = damageNumberDuration;
+
+                if (damageNumberElapsed >= 0f && damageNumberElapsed < damageNumberDuration)
+                {
+                    damageNumberActive = true;
+
+                    // 시작 위치는 "타격 순간"에 고정해서 스냅샷을 뜬다 - 실제 DamageNumberPopup도 Spawn
+                    // 시점의 transform.position만 한 번 잡고 그 뒤로는 몬스터의 Shake를 더 이상 따라가지
+                    // 않는다(RiseAndFade가 자기만의 start/end 사이를 보간할 뿐이다). 타격 순간의 Shake
+                    // Offset은 사인 함수가 0에서 시작하므로 항상 0이지만, 공식을 그대로 재사용해 계산의
+                    // 의미를 분명히 하고 나중에 Shake 수식이 바뀌어도 깨지지 않게 한다. Jitter는 매
+                    // 프레임 달라지면 안 되므로(결정론적 요구사항) Preview에서는 항상 0을 쓴다.
+                    float shakeOffsetAtHit = EvaluateHitShake(reaction, shakeStartTime, shakeStartTime, true);
+                    Vector2 startAnchor = baseAnchor + WorldToScreen(
+                        monsterSlot + monsterActorOffset + new Vector2(shakeOffsetAtHit, 0f) + reaction.DamageNumberOffset,
+                        worldToScreen);
+
+                    float t = Mathf.Clamp01(damageNumberElapsed / damageNumberDuration);
+                    Vector2 riseOffset = WorldToScreen(new Vector2(0f, reaction.DamageNumberRiseDistance * t), worldToScreen);
+                    Vector2 damageNumberAnchor = startAnchor + riseOffset;
+                    damageNumberAnchorDebug = damageNumberAnchor;
+
+                    Color color = reaction.DamageNumberTextColor;
+                    color.a = 1f - t; // 실제 DamageNumberPopup.RiseAndFade()와 동일한 페이드 규칙
+
+                    // 버그의 실제 원인: reaction.DamageNumberFontSize는 TMP(월드 스페이스) 폰트 크기
+                    // 단위다(예: Scarecrow는 씬 값을 그대로 옮겨서 3) - 이 값을 IMGUI GUIStyle.fontSize에
+                    // 그대로 넣으면 "3픽셀 글자"가 되어 사실상 안 보인다(렌더링 조건은 맞았지만 크기가
+                    // 문제였다). previewZoom을 곱해 확대/축소에 자연스럽게 반응하게 하되, 항상 최소
+                    // 가독 크기(10px)를 보장하고 너무 커지지 않게(48px) 막는다.
+                    float pixelFontSize = Mathf.Clamp(reaction.DamageNumberFontSize * previewZoom * 2f, 10f, 48f);
+                    DrawDamageNumberPreview(damageNumberAnchor, color, pixelFontSize);
+                }
+            }
+
+            if (debugDamageNumberOverlay)
+            {
+                DrawDamageNumberDebugOverlay(stage, hasHitContext, damageNumberProfileAvailable, damageNumberActive,
+                    damageNumberElapsedDebug, damageNumberDurationDebug, damageNumberAnchorDebug);
             }
 
             DrawMarker(characterAnchor, new Color(1f, 0.9f, 0.1f));
@@ -1546,6 +1926,17 @@ namespace CharacterEditor
                 Frames = rawIdlePreviewFrames.ToArray(),
                 Fps = 6f
             };
+        }
+
+        /// <summary>DrawPairedStage의 캐릭터 측 공격 모션 판정과 동일한 규칙(actorKind에 따라 main/opponent
+        /// 중 캐릭터 쪽을 고르고, Kind가 Attack일 때만 반환)으로 "지금 재생 중인 공격"을 찾는다 - 오디오
+        /// Cue 판정(OnEditorUpdate/TogglePreviewPlayback)이 그리기 코드와 다른 판정을 하지 않도록 공유한다.</summary>
+        private PreviewMotion GetActivePreviewAttackMotion()
+        {
+            PreviewMotion main = GetMainPreviewMotion();
+            PreviewMotion opponent = GetOpponentPreviewMotion();
+            PreviewMotion characterMotion = actorKind == ActorKind.Character ? main : opponent;
+            return characterMotion != null && characterMotion.Kind == PreviewMotionKind.Attack ? characterMotion : null;
         }
 
         private PreviewMotion GetOpponentPreviewMotion()
@@ -1821,6 +2212,8 @@ namespace CharacterEditor
             PreviewMotion motion = GetMainPreviewMotion();
             previewElapsedTime = 0d;
             previewFrameIndex = 0;
+            previewCastCueFired = false;
+            previewHitCueFired = false;
             previewLoop = motion != null && motion.Kind == PreviewMotionKind.Idle;
             previewPlaying = motion != null && motion.Frames.Length > 0;
             previewLastStepTime = EditorApplication.timeSinceStartup;
@@ -1839,6 +2232,27 @@ namespace CharacterEditor
             if (previewElapsedTime >= duration) previewElapsedTime = 0d;
             previewPlaying = true;
             previewLastStepTime = EditorApplication.timeSinceStartup;
+            SeedPreviewAudioCueFlags();
+        }
+
+        /// <summary>Play를 누른 시점의 previewElapsedTime을 기준으로 Cast/Hit Cue가 "이미 지나간
+        /// 상태"인지 미리 판정해둔다 - 정방향 재생 중 그 지점을 실제로 통과할 때만 한 번 재생되게
+        /// 하기 위함이다(이미 지난 지점에서 시작하면 이번 재생에서는 다시 울리지 않는다). Cue
+        /// 시각과 정확히 같은 지점에서 시작하면 "아직 안 지남"으로 두어 이번 재생에서 정상적으로 한 번 울린다.</summary>
+        private void SeedPreviewAudioCueFlags()
+        {
+            PreviewMotion attack = GetActivePreviewAttackMotion();
+            if (attack?.Attack == null || attack.Frames.Length == 0)
+            {
+                previewCastCueFired = true;
+                previewHitCueFired = true;
+                return;
+            }
+            float fps = Mathf.Max(0.01f, attack.Fps);
+            float castTime = Mathf.Clamp(attack.Attack.CastFrameIndex, 0, attack.Frames.Length - 1) / fps;
+            float hitTime = Mathf.Clamp(attack.HitFrame, 0, attack.Frames.Length - 1) / fps;
+            previewCastCueFired = previewElapsedTime > castTime;
+            previewHitCueFired = previewElapsedTime > hitTime;
         }
 
         private void StopPreview()
@@ -1876,11 +2290,63 @@ namespace CharacterEditor
             return 0f;
         }
 
+        /// <summary>TargetCombatController.UpdateShake()와 동일한 수식 - 항상 time(=현재 프레임 시각)만
+        /// 놓고 새로 계산하는 순수 함수라 재생 여부/이전 프레임과 무관하게 결정론적이다(누적 오차 없음,
+        /// 타임라인을 아무 지점으로 드래그해도 그 지점 기준으로 바로 정확한 값이 나온다).</summary>
+        private static float EvaluateHitShake(MonsterMotionProfile.HitReactionSettings reaction, float time, float hitStartTime, bool active)
+        {
+            if (!active || reaction == null) return 0f;
+            if (reaction.ShakeStrength <= 0f || reaction.ShakeDecayDuration <= 0f) return 0f;
+
+            float elapsed = time - hitStartTime;
+            if (elapsed < 0f || elapsed >= reaction.ShakeDecayDuration) return 0f;
+
+            float remaining = 1f - elapsed / reaction.ShakeDecayDuration;
+            return Mathf.Sin(elapsed * reaction.ShakeFrequency * Mathf.PI * 2f) * reaction.ShakeStrength * remaining;
+        }
+
         private static void DrawMarker(Vector2 anchor, Color color)
         {
             const float size = 5f;
             EditorGUI.DrawRect(new Rect(anchor.x - size, anchor.y - 1f, size * 2f, 2f), color);
             EditorGUI.DrawRect(new Rect(anchor.x - 1f, anchor.y - size, 2f, size * 2f), color);
+        }
+
+        /// <summary>고정 문자열 "1"을 Monster Profile의 색상/크기·현재 페이드 알파로 표시한다 - 호출부가
+        /// time만으로 계산한 anchor/color를 그대로 그리기만 하므로, 재생 상태나 이전 프레임과 무관하게
+        /// 같은 시각(같은 스크럽 위치)에서는 항상 같은 위치·색·투명도로 결정론적으로 나타난다.</summary>
+        private void DrawDamageNumberPreview(Vector2 anchor, Color color, float fontSize)
+        {
+            const float width = 40f;
+            const float height = 24f;
+            GUIStyle style = DamageNumberPreviewStyle;
+            style.fontSize = Mathf.Max(1, Mathf.RoundToInt(fontSize));
+            style.normal.textColor = color;
+            EditorGUI.LabelField(new Rect(anchor.x - width * 0.5f, anchor.y - height * 0.5f, width, height), "1", style);
+        }
+
+        /// <summary>개발용 진단 오버레이 - "조건이 안 맞아서 안 그려짐"과 "그려지긴 하는데 안 보임"을
+        /// 구분하기 위한 것이다. active가 false인데 profile은 있다면 elapsed/duration 관계를 보고
+        /// 타이밍 문제인지 알 수 있고, active가 true인데 화면에 숫자가 안 보인다면 anchor 좌표가
+        /// Stage Rect(0~stage.width, 0~stage.height) 밖인지, 혹은 렌더링/스타일 쪽 문제인지로 좁혀진다.</summary>
+        private void DrawDamageNumberDebugOverlay(Rect stage, bool hasHitContext, bool profileAvailable, bool active,
+            float elapsed, float duration, Vector2 anchor)
+        {
+            string status = !hasHitContext ? "inactive (no Hit context)"
+                : !profileAvailable ? "inactive (no Monster Profile)"
+                : active ? "active" : "inactive (outside elapsed window)";
+
+            string text = $"Damage Preview: {status}\nelapsed {elapsed:0.###} / duration {duration:0.###}\nanchor ({anchor.x:0.#}, {anchor.y:0.#}) / stage {stage.width:0}x{stage.height:0}";
+
+            // 좌하단은 DrawInlineTargetSelector의 "대상: 이름" 버튼이 이미 쓰고 있으므로 우하단에 둔다.
+            Rect box = new Rect(stage.width - 266f, stage.height - 54f, 260f, 48f);
+            EditorGUI.DrawRect(box, new Color(0f, 0f, 0f, 0.65f));
+            GUI.Label(new Rect(box.x + 4f, box.y + 2f, box.width - 8f, box.height - 4f), text, EditorStyles.whiteMiniLabel);
+
+            if (active)
+            {
+                EditorGUI.DrawRect(new Rect(anchor.x - 3f, anchor.y - 3f, 6f, 6f), Color.yellow);
+            }
         }
 
         private static void DrawReceivePoint(Vector2 point, bool isHit)
@@ -1892,7 +2358,7 @@ namespace CharacterEditor
             GUI.Label(new Rect(point.x + 6f, point.y - 17f, 90f, 18f), "Receive Point", EditorStyles.miniLabel);
         }
 
-        private static void DrawSprite(Sprite sprite, float zoom, Vector2 anchor, Color tint)
+        private static void DrawSprite(Sprite sprite, float zoom, Vector2 anchor, Color tint, bool flipX = false)
         {
             Texture2D texture = sprite.texture;
             if (texture == null) return;
@@ -1906,12 +2372,20 @@ namespace CharacterEditor
             float height = rect.height * zoom;
             float px = rect.width > 0f ? pivot.x / rect.width : 0.5f;
             float py = rect.height > 0f ? pivot.y / rect.height : 0f;
-            Rect drawRect = new Rect(anchor.x - px * width, anchor.y - height * (1f - py), width, height);
+            // 좌우 반전 시에도 Pivot이 anchor에 그대로 고정되도록, 반전된 이미지 안에서의 pivot 위치(1-px)를
+            // 기준으로 왼쪽 모서리를 다시 계산한다 - SpriteRenderer.flipX와 같은 방식(프레임 자체는 그대로).
+            float drawX = flipX ? anchor.x - (1f - px) * width : anchor.x - px * width;
+            Rect drawRect = new Rect(drawX, anchor.y - height * (1f - py), width, height);
             Rect uv = rect;
             uv.x /= texture.width;
             uv.width /= texture.width;
             uv.y /= texture.height;
             uv.height /= texture.height;
+            if (flipX)
+            {
+                uv.x += uv.width;
+                uv.width = -uv.width;
+            }
             GUI.DrawTextureWithTexCoords(drawRect, texture, uv);
             GUI.color = oldColor;
             texture.filterMode = oldFilter;
@@ -2323,16 +2797,74 @@ namespace CharacterEditor
             previewElapsedTime += delta;
             if (previewElapsedTime >= duration)
             {
-                if (previewLoop) previewElapsedTime %= duration;
+                if (previewLoop)
+                {
+                    previewElapsedTime %= duration;
+                    // 새 루프 구간 시작 - 이번 패스에서 다시 정방향으로 통과하므로 Cue를 다시 재생할 수 있게 한다.
+                    previewCastCueFired = false;
+                    previewHitCueFired = false;
+                }
                 else
                 {
                     previewElapsedTime = duration;
                     previewPlaying = false;
                 }
             }
+
+            EvaluatePreviewAudioCues();
+
             PreviewMotion main = GetMainPreviewMotion();
             previewFrameIndex = GetFrameIndex(main, (float)previewElapsedTime, previewLoop);
             Repaint();
+        }
+
+        /// <summary>재생 중(autoplay) 프레임마다 호출된다 - 프레임 드래그/스크럽은 previewPlaying을
+        /// false로 만들기 때문에 이 메서드 자체를 타지 않는다(스크럽 중 반복 재생 방지는 그래서 별도
+        /// 처리 없이 이 게이트만으로 충분하다). Cast/Hit 각각 공격당(또는 루프 패스당) 정확히 한 번만,
+        /// 그 Cue 시각을 정방향으로 지나가는 순간에 재생한다.</summary>
+        private void EvaluatePreviewAudioCues()
+        {
+            PreviewMotion attack = GetActivePreviewAttackMotion();
+            if (attack?.Attack == null || attack.Frames.Length == 0) return;
+
+            float fps = Mathf.Max(0.01f, attack.Fps);
+            float castTime = Mathf.Clamp(attack.Attack.CastFrameIndex, 0, attack.Frames.Length - 1) / fps;
+            float hitTime = Mathf.Clamp(attack.HitFrame, 0, attack.Frames.Length - 1) / fps;
+
+            if (!previewCastCueFired && previewElapsedTime >= castTime)
+            {
+                previewCastCueFired = true;
+                PlayPreviewClip(attack.Attack.CastSound);
+            }
+            if (!previewHitCueFired && previewElapsedTime >= hitTime)
+            {
+                previewHitCueFired = true;
+                PlayPreviewClip(attack.Attack.HitSound);
+            }
+        }
+
+        /// <summary>UnityEditor.AudioUtil은 internal이라 리플렉션으로 호출한다 - Unity 버전에 따라
+        /// PlayPreviewClip(최신) 또는 PlayClip(구버전) 중 있는 쪽을 쓴다. 둘 다 없거나 clip이 비어
+        /// 있으면 조용히 무시한다(기본 Cast/Hit 사운드는 없다는 규칙과 동일하게).</summary>
+        private static void PlayPreviewClip(AudioClip clip)
+        {
+            if (clip == null) return;
+
+            Type audioUtilType = typeof(AudioImporter).Assembly.GetType("UnityEditor.AudioUtil");
+            if (audioUtilType == null) return;
+
+            MethodInfo method = audioUtilType.GetMethod(
+                "PlayPreviewClip",
+                BindingFlags.Static | BindingFlags.Public,
+                null, new[] { typeof(AudioClip), typeof(int), typeof(bool) }, null);
+            if (method != null)
+            {
+                method.Invoke(null, new object[] { clip, 0, false });
+                return;
+            }
+
+            method = audioUtilType.GetMethod("PlayClip", BindingFlags.Static | BindingFlags.Public, null, new[] { typeof(AudioClip) }, null);
+            method?.Invoke(null, new object[] { clip });
         }
 
         private SerializedProperty GetActiveFrames()

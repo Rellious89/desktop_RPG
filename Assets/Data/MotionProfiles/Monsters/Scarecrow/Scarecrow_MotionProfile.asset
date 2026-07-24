@@ -14,23 +14,29 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   displayName: Scarecrow
   resourceFolderPath: Assets/Art/Enemy/Scarecrow
+  spriteFlipX: 1
   baseIdle:
     displayName: Base Idle
+    editorDescription: 
     frames:
-    - {fileID: 21300000, guid: e604348805ed4bfca390f5710d90e771, type: 3}
-    - {fileID: 21300000, guid: d401c16d0ca94215bd670e9d94791577, type: 3}
-    - {fileID: 21300000, guid: d4d33c4bccfb4579ad701ec9c98ddceb, type: 3}
-    - {fileID: 21300000, guid: 6d371dd427724d60a29b6bd81ce9be3d, type: 3}
+    - {fileID: 21300000, guid: 14e6e0c605b9949279f21bcdf6ba87c7, type: 3}
+    - {fileID: 21300000, guid: c0955fb87045046439996349e43f8472, type: 3}
+    - {fileID: 21300000, guid: 55d8eb9e4464f41de89ad7f48d92324c, type: 3}
+    - {fileID: 21300000, guid: c7be73287bb1d47f3bf27b459cbe18a2, type: 3}
     animationFps: 6
   idleEvents: []
+  idleEventCheckInterval: 4
+  idleEventChance: 0.5
   hit:
     displayName: Hit
+    editorDescription: 
     frames:
-    - {fileID: 21300000, guid: 2d1030e06585412c90742c9e7eb67dd5, type: 3}
-    - {fileID: 21300000, guid: b2af80d361ff473a9f3076c9f2846db1, type: 3}
+    - {fileID: 21300000, guid: a43ce97e8b1f942c780a21ce34bbe810, type: 3}
+    - {fileID: 21300000, guid: e8077dc8617d4459d884f17621685c1f, type: 3}
     animationFps: 6
   defeat:
     displayName: Defeat
+    editorDescription: 
     frames: []
     animationFps: 6
   hitReaction:
@@ -41,7 +47,14 @@ MonoBehaviour:
     shakeStrength: 0.04
     shakeFrequency: 35
     shakeDecayDuration: 0.15
+    damageNumberOffset: {x: 0.15, y: 1.4}
+    damageNumberRandomHorizontalJitter: 0.2
+    damageNumberRiseDistance: 0.4
+    damageNumberDuration: 0.6
+    damageNumberTextColor: {r: 1, g: 0, b: 0, a: 1}
+    damageNumberFontSize: 3
+    damageNumberSortingOrder: 10
   preview:
-    actorOffset: {x: 0, y: 0}
+    actorOffset: {x: 0.3, y: 0}
     receivePointOffset: {x: 0, y: 0.35}
     actorScale: 1

@@ -16,6 +16,7 @@ MonoBehaviour:
   resourceFolderPath: Assets/Art/Character/CatKnight
   baseIdle:
     displayName: Base Idle
+    editorDescription: 
     frames:
     - {fileID: 21300000, guid: f4122e8ab5ef4aec98b110a9a1a65540, type: 3}
     - {fileID: 21300000, guid: 6d135dd7c6eb4f6f9b2d30aa95e88bb8, type: 3}
@@ -24,6 +25,7 @@ MonoBehaviour:
     animationFps: 6
   idleEvents:
   - displayName: idle a
+    editorDescription: 
     frames:
     - {fileID: 21300000, guid: ba100b5afc1c4cf7856f7a797263d4de, type: 3}
     - {fileID: 21300000, guid: 190bddd8503b4a8ab644d684b7785d3b, type: 3}
@@ -31,12 +33,14 @@ MonoBehaviour:
     - {fileID: 21300000, guid: ad2a566ede094ddc9a5bb8ec8a831ff5, type: 3}
     animationFps: 6
   - displayName: idle b
+    editorDescription: 
     frames:
     - {fileID: 21300000, guid: df619cc01e1f4ab7a8027acc2eb3192d, type: 3}
     - {fileID: 21300000, guid: bb3933c57c234c49afae6b811d30fcf9, type: 3}
     - {fileID: 21300000, guid: b4ca52ad8f3e458894fdec32a2b49230, type: 3}
     animationFps: 6
   - displayName: idle c
+    editorDescription: 
     frames:
     - {fileID: 21300000, guid: 4324f7f22d444ac487112e01df69a349, type: 3}
     - {fileID: 21300000, guid: a5b571142f784fb186791b670f69772a, type: 3}
@@ -52,14 +56,14 @@ MonoBehaviour:
   tier3Pool: {fileID: 0}
   attackMovement:
     overrideComponentValues: 1
-    moveDistance: 0.2
-    moveOutDuration: 0.14
+    moveDistance: 0.9
+    moveOutDuration: 0.08
     moveBackDuration: 0.05
   preview:
     targetIdleSprite: {fileID: 0}
     targetHitSprite: {fileID: 0}
     characterOffset: {x: 0, y: 0}
-    targetOffset: {x: 1.15, y: 0}
     receivePointOffset: {x: 0, y: 0.35}
     characterScale: 1
+    targetOffset: {x: 1.15, y: 0}
     targetScale: 1

@@ -36,6 +36,24 @@ namespace Character
                  "진행 중인 재생만 마친 뒤 복귀한다. 0.15~0.25 권장")]
         [SerializeField] private float queueExpireTimeout = 0.15f;
 
+        [Header("Cast Presentation")]
+        [Tooltip("이 프레임(0부터)에 도달하면 Cast Presentation(이펙트/사운드)이 한 번 실행된다. " +
+                 "Hit Frame Index와 같아도 되고 달라도 된다.")]
+        [Min(0)]
+        [SerializeField] private int castFrameIndex;
+
+        [Tooltip("시전 시 사용할 이펙트 프리팹(시전자 기준). 비어 있으면 이펙트 없음.")]
+        [SerializeField] private GameObject castEffectPrefab;
+
+        [Tooltip("시전자 Actor Origin 기준으로 더할 이펙트 위치(월드 유닛)")]
+        [SerializeField] private Vector2 castEffectOffset;
+
+        [Min(0.01f)]
+        [SerializeField] private float castEffectScale = 1f;
+
+        [Tooltip("Cast Frame에서 한 번 재생할 사운드. 비어 있으면 시전 사운드 없음.")]
+        [SerializeField] private AudioClip castSound;
+
         [Header("Hit Presentation")]
         [Tooltip("이 공격의 Hit Frame에서 사용할 이펙트 프리팹. 런타임 연결 전에도 Motion Editor에서 배치 기준으로 사용한다.")]
         [SerializeField] private GameObject hitEffectPrefab;
@@ -46,7 +64,7 @@ namespace Character
         [Min(0.01f)]
         [SerializeField] private float hitEffectScale = 1f;
 
-        [Tooltip("이 공격의 Hit Frame에서 사용할 사운드. 런타임 프레임 Cue 연결은 후속 단계에서 적용한다.")]
+        [Tooltip("이 공격의 Hit Frame에서 사용할 사운드. 비어 있으면 씬 기본 Hit SFX(AudioManager.hitClip)로 대체된다.")]
         [SerializeField] private AudioClip hitSound;
 
         public Sprite[] Frames => frames ?? Array.Empty<Sprite>();
@@ -54,6 +72,13 @@ namespace Character
         public int HitFrameIndex => hitFrameIndex;
         public float EndFrameDuration => endFrameDuration;
         public float QueueExpireTimeout => queueExpireTimeout;
+
+        public int CastFrameIndex => castFrameIndex;
+        public GameObject CastEffectPrefab => castEffectPrefab;
+        public Vector2 CastEffectOffset => castEffectOffset;
+        public float CastEffectScale => Mathf.Max(0.01f, castEffectScale);
+        public AudioClip CastSound => castSound;
+
         public GameObject HitEffectPrefab => hitEffectPrefab;
         public Vector2 HitEffectOffset => hitEffectOffset;
         public float HitEffectScale => Mathf.Max(0.01f, hitEffectScale);

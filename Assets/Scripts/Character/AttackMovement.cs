@@ -20,6 +20,12 @@ namespace Character
         [SerializeField] private float moveOutDuration = 0.05f;
         [SerializeField] private float moveBackDuration = 0.12f;
 
+        [Header("Combat Stage Layout (optional)")]
+        [Tooltip("연결하면 시작 위치를 Character Slot Position + 이 캐릭터 프로필의 Actor Offset으로 계산하고, " +
+                 "Actor Scale도 함께 적용한다(Motion Editor Preview와 동일한 공식). 비어 있으면 기존처럼 씬에 " +
+                 "배치된 현재 Transform 위치/스케일을 그대로 쓴다.")]
+        [SerializeField] private CombatStageLayout stageLayout;
+
         private Vector3 basePosition;
         private float timer;
         private bool isMoving;
@@ -31,9 +37,44 @@ namespace Character
 
         private void Awake()
         {
-            basePosition = transform.localPosition;
             characterAnimator = GetComponent<PlayerCharacterAnimator>();
+            basePosition = ResolveInitialBasePosition();
+            transform.localPosition = basePosition;
+            ApplyActorScale();
             ResolveActiveSettings();
+        }
+
+        /// <summary>Preview(DrawPairedStage)와 같은 공식: Slot + Actor Offset. stageLayout이 없는
+        /// 캐릭터(기존 프리팹/씬)는 지금 Transform 위치를 그대로 기준점으로 쓴다 - 아무것도 깨지지 않는다.</summary>
+        private Vector3 ResolveInitialBasePosition()
+        {
+            if (stageLayout == null) return transform.localPosition;
+
+            CharacterMotionProfile profile = characterAnimator != null ? characterAnimator.MotionProfile : null;
+            Vector2 offset = profile != null ? profile.Preview.ActorOffset : Vector2.zero;
+            Vector2 slot = stageLayout.CharacterSlotPosition;
+            return new Vector3(slot.x + offset.x, slot.y + offset.y, transform.localPosition.z);
+        }
+
+        private void ApplyActorScale()
+        {
+            if (stageLayout == null) return;
+
+            CharacterMotionProfile profile = characterAnimator != null ? characterAnimator.MotionProfile : null;
+            float scale = profile != null ? profile.Preview.ActorScale : 1f;
+            transform.localScale = new Vector3(scale, scale, 1f);
+        }
+
+        /// <summary>Motion Editor의 "Apply Preview Layout to Open Stage"나 향후 런타임 배치 갱신이
+        /// 호출하는 진입점 - basePosition과 실제 Transform 위치를 함께 새 기준점으로 맞추고, 진행 중이던
+        /// 이동은 안전하게 취소한다(그대로 두면 다음 프레임에 옛 basePosition 기준으로 튈 수 있다).
+        /// 공격/이동이 진행 중이 아닐 때(선택/교체/초기화 시점)만 호출해야 한다.</summary>
+        public void SetPresentationBasePosition(Vector3 localPosition)
+        {
+            basePosition = localPosition;
+            transform.localPosition = localPosition;
+            isMoving = false;
+            returning = false;
         }
 
         private void Update()

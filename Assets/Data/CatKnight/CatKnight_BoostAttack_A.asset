@@ -11,7 +11,8 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2308662e2ef446ad90232e6be015a1ca, type: 3}
   m_Name: CatKnight_BoostAttack_A
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
+  editorDescription: 
   frames:
   - {fileID: 21300000, guid: 5ecf45081ed7048a392b151da133510e, type: 3}
   - {fileID: 21300000, guid: 8d06084f68d8d4063b7ae44359be880d, type: 3}
@@ -20,3 +21,12 @@ MonoBehaviour:
   hitFrameIndex: 1
   endFrameDuration: 0.12
   queueExpireTimeout: 0.15
+  castFrameIndex: 0
+  castEffectPrefab: {fileID: 0}
+  castEffectOffset: {x: 0, y: 0}
+  castEffectScale: 1
+  castSound: {fileID: 8300000, guid: 2b21ef916f6943c439b71a7c74568878, type: 3}
+  hitEffectPrefab: {fileID: 1000000, guid: 45a18ea5b786491d8064f8ef5b7e6dc0, type: 3}
+  hitEffectOffset: {x: -0.05, y: 0.18}
+  hitEffectScale: 1
+  hitSound: {fileID: 8300000, guid: 8b23b175a78d6b5458322e3a6c9905d0, type: 3}

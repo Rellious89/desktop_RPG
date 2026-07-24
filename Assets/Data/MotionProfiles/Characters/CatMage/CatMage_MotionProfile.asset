@@ -47,14 +47,14 @@ MonoBehaviour:
   tier3Pool: {fileID: 0}
   attackMovement:
     overrideComponentValues: 1
-    moveDistance: -0.66
-    moveOutDuration: 0.001
-    moveBackDuration: 0.001
+    moveDistance: -0.65
+    moveOutDuration: 0.02
+    moveBackDuration: 0.3
   preview:
     targetIdleSprite: {fileID: 0}
     targetHitSprite: {fileID: 0}
     characterOffset: {x: 0, y: 0}
-    targetOffset: {x: 1.15, y: 0}
     receivePointOffset: {x: 0, y: 0.35}
     characterScale: 1
+    targetOffset: {x: 1.15, y: 0}
     targetScale: 1

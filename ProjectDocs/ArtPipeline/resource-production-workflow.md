@@ -6,7 +6,8 @@
 
 최종 Unity 납품 규격은
 `ProjectDocs/DesignRules/character-sprite-and-animator-rules.md`, 공격 동작 규칙은
-`ProjectDocs/DesignRules/attack-animation-rules.md`를 우선한다. 이 문서와 충돌하면 두 규칙 문서가 정답이다.
+`ProjectDocs/DesignRules/attack-animation-rules.md`를 우선한다. 캐릭터·몬스터의 출신 세계와 역할은
+`ProjectDocs/DesignRules/world-setting-rules.md`를 먼저 따른다. 이 문서와 충돌하면 세 규칙 문서가 정답이다.
 
 ## 0. 이번 채널에서 확정할 것
 
@@ -47,6 +48,13 @@ PerfectPixel 참조 이미지이며, 최종 프레임은 PerfectPixel 이후 개
 ```text
 ID / 표시 이름:
 Role: Player | Enemy
+출신 세계 ID:
+세계 유형: Animal/Fantasy | Human/Fantasy | Modern | SciFi | Alien | 기타
+종족:
+직업 / 이세계 용병단 역할:
+출신 세계를 설명하는 한 문장:
+데스크탑에 넘어온 상태 또는 계기 한 문장:
+디지털 변환 후에도 유지할 출신 세계의 시각 요소 3개:
 게임 안의 기능:
 성격 키워드 3개:
 한 문장 콘셉트:
@@ -54,6 +62,9 @@ Role: Player | Enemy
 기본 화면 진행 방향:
 시각 언어 후보: `Low Companion v1` (변경은 별도 프로토타입 승인 후에만 가능)
 CatKnight 대비 키 비율:
+체형 등급 및 승인 등신 비율:
+실제 스케일:
+논리 실루엣 높이(3×3 기준, 머리끝~접지점): 일반 70px 내외 / 승인 예외값:
 머리:몸 비율:
 실루엣 핵심 3개:
 주 장비와 정확한 크기 비율:
@@ -68,6 +79,9 @@ CatKnight 대비 키 비율:
 
 ### 승인 조건
 
+- 출신 세계와 데스크탑에 존재하는 이유를 한 문장씩 설명할 수 있다.
+- 출신 세계의 특징을 그대로 다른 화풍으로 가져오지 않고 KeyBuddy 시각 언어로 번역했다.
+- 체형 비율과 실제 스케일을 별도 값으로 정했다.
 - 축소된 실루엣만으로 역할을 구분할 수 있다.
 - 무기와 장비의 길이·두께를 신장 대비 비율로 설명할 수 있다.
 - CatKnight 대비 체격 비율이 정해져 있다.
@@ -103,6 +117,7 @@ Character top Y:
 Forward foot contact X/Y:
 Calculated pivot X/Y normalized:
 Occupied width/height:
+Logical silhouette height (dominant 3×3 pixel block 기준):
 Weapon width/length:
 Palette colors:
 Outline width/color:
@@ -235,10 +250,20 @@ PerfectPixel에서는 애니메이션 단위로 여러 프레임을 생성한다
   새 Actor는 이 파일과 같은 게임 안에 나란히 놓였을 때 다른 해상도·다른 게임처럼 보이면 Reject한다.
 - 방향은 화면 오른쪽의 친근한 3/4 전신. 체형은 약 2~2.5등신의 작은 데스크톱 컴패니언 비율이며,
   직업을 읽게 하는 장비는 한두 개의 큰 덩어리로 단순화한다.
+- 일반 Actor의 논리 실루엣 높이는 **70px 내외(65~75px)**다. 이는 최종 3×3 픽셀 덩어리를 한 칸으로 보고
+  머리끝부터 발 또는 말뚝의 지면 접촉점까지 센 값이다. 바바리안은 근육질 대형 Actor로 승인된 **79px 예외**,
+  BlackCatMage는 모자 포함 **86px 예외**다. 허수아비는 말뚝 전체를 포함해 일반보다 작은 90% 크기인
+  **63px 내외**를 사용한다.
+- **Master 치수 검수는 PerfectPixel 투입 전 필수다.** Character Brief의 목표 높이와 Master의 실제 논리
+  실루엣 높이가 일치하는지 측정한다. PerfectPixel은 Master의 논리 픽셀 수를 새로 정하지 않으므로, 이 단계에서
+  107px인 Master를 넣으면 출력도 그에 상응하는 큰 Actor가 된다. 프롬프트에 수치만 적고 측정을 생략하면 안 된다.
 - 최종 게임 표시에서 보이는 픽셀 덩어리는 바바리안과 같은 **굵은 저밀도(후가공 기준 약 3×3)**를 목표로 한다.
   이는 소스 논리 해상도 강제가 아니라, PerfectPixel 출력과 FireAlpaca 후보정 뒤의 납품 품질 기준이다.
-- 외곽선은 진한 거의 검정색의 굵은 계단형 외곽선, 색은 적은 수의 명확한 색면과 소수의 하이라이트로 끝낸다.
-  부드러운 그라데이션, 미세한 질감, 2×2 이하의 과도하게 촘촘한 디테일은 생산용 Master에서 사용하지 않는다.
+- 3×3 블록 크기와 논리 실루엣 높이는 **크기 규격**이다. 이를 맞춘다는 이유로 얼굴, 의상, 재질의 읽기
+  쉬운 디테일을 제거하지 않는다. 승인된 BlackCatMage와 나란히 두었을 때 표현 품질이
+  낮아 보이면 Reject한다.
+- 외곽선은 진한 거의 검정색의 굵은 계단형 외곽선을 유지한다. 색면·하이라이트·봉제선 등은 실제 70px
+  화면에서 역할을 읽게 하는 범위까지 사용한다. 의미 없는 미세 노이즈와 부드러운 안티앨리어싱만 금지한다.
 - `class-lineup-03`과 LOW-B/LOW-C 시트는 직업·의상·실루엣 발상 참고용이다. 더 이상 캐릭터군의
   해상도·얼굴 묘사·마감 밀도를 결정하는 상위 기준이 아니다.
 - 고밀도 Master 및 Unity `VisualRoot Scale 0.35` 적용은 비교 실험으로는 합격이었지만, 프레임 수작업

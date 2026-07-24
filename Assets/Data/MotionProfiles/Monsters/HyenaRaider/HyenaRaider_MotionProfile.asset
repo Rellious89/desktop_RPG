@@ -1,0 +1,76 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a793bf2a4d96489da376ed10ce30d0c1, type: 3}
+  m_Name: HyenaRaider_MotionProfile
+  m_EditorClassIdentifier: 
+  displayName: HyenaRaider
+  resourceFolderPath: Assets/Art/Enemy/HyenaRaider
+  spriteFlipX: 1
+  baseIdle:
+    displayName: Base Idle
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: aaa8311a833cf419583a81abb0c43a49, type: 3}
+    - {fileID: 21300000, guid: 32b59663a77f54bd6a0b6b158dd8af8b, type: 3}
+    - {fileID: 21300000, guid: 50a698f23d872465bbf4ba153fef0947, type: 3}
+    - {fileID: 21300000, guid: 466ac670bb7754dbd8c24b7ca30f0a3f, type: 3}
+    animationFps: 6
+  idleEvents:
+  - displayName: idle a
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 6ebfff81d02cd470f82b6729ee3d7fbe, type: 3}
+    - {fileID: 21300000, guid: aab10471d27b946a9bc3e857ed670bfe, type: 3}
+    - {fileID: 21300000, guid: 1716c8f7621dd40c880721c77fce4d58, type: 3}
+    - {fileID: 21300000, guid: 9aa0df2acc03d4cdfb9b087383de5b5e, type: 3}
+    animationFps: 6
+  - displayName: idle b
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: cb182e61340114880a084b6d9759be98, type: 3}
+    - {fileID: 21300000, guid: 4d4258792ac3c445ab83cc1cb3ea43a9, type: 3}
+    - {fileID: 21300000, guid: 3607b27c404b34d259cd17063d91420e, type: 3}
+    - {fileID: 21300000, guid: 96ab092737e5a495981feddc72e74772, type: 3}
+    animationFps: 6
+  idleEventCheckInterval: 4
+  idleEventChance: 0.5
+  hit:
+    displayName: Hit
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 6aeb59302c9b14df9b56a0291a38d78b, type: 3}
+    - {fileID: 21300000, guid: d70ee8dc6d4434ed79a8da2f4f2f37df, type: 3}
+    animationFps: 6
+  defeat:
+    displayName: Defeat
+    editorDescription: 
+    frames: []
+    animationFps: 6
+  hitReaction:
+    holdFrame: 0
+    recoveryFrame: 1
+    recoveryDuration: 0.12
+    holdTimeout: 0.2
+    shakeStrength: 0.04
+    shakeFrequency: 35
+    shakeDecayDuration: 0.15
+    damageNumberOffset: {x: 0.09, y: 1.48}
+    damageNumberRandomHorizontalJitter: 0.1
+    damageNumberRiseDistance: 0.4
+    damageNumberDuration: 0.6
+    damageNumberTextColor: {r: 1, g: 0, b: 0, a: 1}
+    damageNumberFontSize: 3
+    damageNumberSortingOrder: 10
+  preview:
+    actorOffset: {x: 0.3, y: 0}
+    receivePointOffset: {x: 0, y: 0.35}
+    actorScale: 0.9

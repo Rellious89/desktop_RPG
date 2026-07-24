@@ -39,13 +39,22 @@ namespace Character
     /// </summary>
     [RequireComponent(typeof(SpriteRenderer))]
     [RequireComponent(typeof(FlashOnCue))]
+    [RequireComponent(typeof(HitEffectSpawner))]
     public class PlayerCharacterAnimator : MonoBehaviour
     {
         /// <summary>공격 세션에 처음 진입하는 순간(Idle -> Attack) 발생.</summary>
         public static event Action AttackStarted;
 
-        /// <summary>공격 재생이 hitFrameIndex에 도달할 때마다 발생. 인자는 이번 타격의 데미지량(basicAttackPower).</summary>
-        public static event Action<int> HitPoint;
+        /// <summary>공격 재생이 hitFrameIndex에 도달할 때마다 발생 - 데미지와 이번 공격의 Hit Presentation
+        /// 값(사운드/이펙트)을 함께 실어 보낸다. 구독자(AudioManager, TargetCombatController)가 각자
+        /// 필요한 값만 꺼내 쓰고, 비어 있는 값은 각자의 기본값으로 fallback한다.</summary>
+        public static event Action<AttackHitCue> HitPoint;
+
+        /// <summary>공격이 Cast Frame에 도달할 때마다 발생(공격 인스턴스당 한 번). 인자는 이번 공격의
+        /// Cast Sound - null이면 재생할 사운드가 없다는 뜻이라 구독자가 그대로 무시하면 된다. Cast
+        /// Effect는 이 이벤트를 거치지 않고 이 컴포넌트가 직접 castEffectSpawner에 생성을 요청한다
+        /// (이펙트는 시전자 자신의 위치가 기준이라 별도 구독자가 필요 없다).</summary>
+        public static event Action<AudioClip> CastSoundCue;
 
         /// <summary>공격이 끝나고 Idle로 돌아가는 순간 발생.</summary>
         public static event Action AttackEnded;
@@ -88,11 +97,35 @@ namespace Character
                      "진행 중인 재생만 마친 뒤 복귀한다. 0.15~0.25 권장")]
             public float queueExpireTimeout = 0.15f;
 
+            [Header("Cast Presentation")]
+            public int castFrameIndex;
+            public GameObject castEffectPrefab;
+            public Vector2 castEffectOffset;
+            [Min(0.01f)] public float castEffectScale = 1f;
+            public AudioClip castSound;
+
+            [Header("Hit Presentation")]
+            public GameObject hitEffectPrefab;
+            public Vector2 hitEffectOffset;
+            [Min(0.01f)] public float hitEffectScale = 1f;
+            public AudioClip hitSound;
+
             public Sprite[] Frames => frames ?? Array.Empty<Sprite>();
             public float AnimationFps => animationFps;
             public int HitFrameIndex => hitFrameIndex;
             public float EndFrameDuration => endFrameDuration;
             public float QueueExpireTimeout => queueExpireTimeout;
+
+            public int CastFrameIndex => castFrameIndex;
+            public GameObject CastEffectPrefab => castEffectPrefab;
+            public Vector2 CastEffectOffset => castEffectOffset;
+            public float CastEffectScale => Mathf.Max(0.01f, castEffectScale);
+            public AudioClip CastSound => castSound;
+
+            public GameObject HitEffectPrefab => hitEffectPrefab;
+            public Vector2 HitEffectOffset => hitEffectOffset;
+            public float HitEffectScale => Mathf.Max(0.01f, hitEffectScale);
+            public AudioClip HitSound => hitSound;
         }
 
         private const int IdleIndex = 0;
@@ -148,6 +181,7 @@ namespace Character
 
         private SpriteRenderer spriteRenderer;
         private FlashOnCue flashOnCue;
+        private HitEffectSpawner castEffectSpawner;
         private RuntimeFrameAnimation[] animations;
         private bool usesProfileIdleEvents;
         private float profileIdleEventChance;
@@ -163,6 +197,7 @@ namespace Character
         private float attackPhaseTimer;
         private int pendingAttacks;
         private float lastInputTime;
+        private bool castCueFired;
 
         // 콤보 티어별로 정리된 재생 가능한 모션 풀(frames가 비어 있는 항목은 제외) - Awake에서 한 번만 만든다.
         private readonly List<IAttackMotion> resolvedTier1 = new List<IAttackMotion>();
@@ -177,12 +212,17 @@ namespace Character
             ? 0
             : Mathf.Clamp(activeMotion.HitFrameIndex, 0, activeMotionFrames.Length - 1);
 
+        private int ActiveCastFrameIndex => activeMotionFrames.Length == 0
+            ? 0
+            : Mathf.Clamp(activeMotion.CastFrameIndex, 0, activeMotionFrames.Length - 1);
+
         public CharacterMotionProfile MotionProfile => motionProfile;
 
         private void Awake()
         {
             spriteRenderer = GetComponent<SpriteRenderer>();
             flashOnCue = GetComponent<FlashOnCue>();
+            castEffectSpawner = GetComponent<HitEffectSpawner>();
             BuildRuntimeConfiguration();
 
             ComboTierAttackPool resolvedTier1Pool = motionProfile != null ? motionProfile.Tier1Pool : tier1Pool;
@@ -355,11 +395,30 @@ namespace Character
             attackPhase = AttackPhase.Windup;
             attackFrame = 0;
             attackPhaseTimer = 0f;
+            castCueFired = false; // 새 공격 인스턴스 - Cast Cue를 다시 한 번만 쏠 수 있게 리셋한다.
             ApplyAttackFrame();
+            TryFireCastCue(); // Cast Frame Index가 0이면 시작하자마자 시전 연출
 
             if (ActiveHitFrameIndex <= 0)
             {
                 Strike(); // hitFrameIndex가 0이면 시작하자마자 타격
+            }
+        }
+
+        /// <summary>attackFrame이 Cast Frame Index에 도달하면 공격 인스턴스당 정확히 한 번만 Cast
+        /// Presentation을 실행한다. Hit 여부와 무관하게(피격 성공 여부와 상관없이) 실행되며, Cast
+        /// Effect는 시전자 자신의 위치가 기준이라 이 컴포넌트가 castEffectSpawner에 직접 생성을
+        /// 요청하고, Cast Sound는 AudioManager 등 다른 구독자가 반응할 수 있게 이벤트로만 알린다.</summary>
+        private void TryFireCastCue()
+        {
+            if (castCueFired) return;
+            if (attackFrame < ActiveCastFrameIndex) return;
+            castCueFired = true;
+
+            if (activeMotion.CastSound != null) CastSoundCue?.Invoke(activeMotion.CastSound);
+            if (castEffectSpawner != null && activeMotion.CastEffectPrefab != null)
+            {
+                castEffectSpawner.Spawn(activeMotion.CastEffectPrefab, offsetOverride: activeMotion.CastEffectOffset, scaleOverride: activeMotion.CastEffectScale);
             }
         }
 
@@ -368,7 +427,7 @@ namespace Character
             if (pendingAttacks > 0) pendingAttacks--; // 이 타격으로 대기열에서 요청 하나를 소비(확정)한다.
 
             flashOnCue.Flash();
-            HitPoint?.Invoke(basicAttackPower); // 이 호출이 처치를 유발하면 Target.HasAttackableTarget이 여기서 이미 false로 바뀌어 있을 수 있다.
+            HitPoint?.Invoke(new AttackHitCue(basicAttackPower, activeMotion.HitSound, activeMotion.HitEffectPrefab, activeMotion.HitEffectOffset, activeMotion.HitEffectScale)); // 이 호출이 처치를 유발하면 Target.HasAttackableTarget이 여기서 이미 false로 바뀌어 있을 수 있다.
 
             // 처치를 유발한 타격이었다면(마지막 남은 Target이었을 경우) 이 시점에 이미 공격 불가 상태다 -
             // 아직 실행하지 않은 예약 공격은 전부 폐기하고 새 Windup을 시작하지 않는다. 지금 재생 중인
@@ -415,6 +474,7 @@ namespace Character
                     {
                         attackFrame++;
                         ApplyAttackFrame();
+                        TryFireCastCue(); // Hit보다 항상 먼저 판정 - 같은 프레임이어도 Cast가 먼저 발생한다.
 
                         if (attackFrame >= ActiveHitFrameIndex)
                         {
@@ -430,6 +490,7 @@ namespace Character
                         {
                             attackFrame++;
                             ApplyAttackFrame();
+                            TryFireCastCue(); // Cast Frame이 Hit Frame보다 뒤(Recovery 구간)에 있을 수도 있다.
 
                             if (attackFrame >= activeMotionFrames.Length - 1)
                             {

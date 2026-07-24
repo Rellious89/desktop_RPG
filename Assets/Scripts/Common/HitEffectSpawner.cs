@@ -111,8 +111,14 @@ namespace Common
         /// 이펙트를 생성한다. prefabOverride/durationOverride를 비워두면(null, 0 이하) 기본값을 쓴다.
         /// prefab이 끝내 없거나 duration이 비정상(0 이하, NaN 등)이어도 예외 없이 안전하게 무시/보정한다.
         /// minSpawnInterval 안에 들어오는 추가 요청은 조용히 무시한다(데미지/피격 반응 등 다른 처리에는 영향 없음).
+        ///
+        /// offsetOverride: impactPoint가 있으면 그 로컬 좌표계 기준(TransformPoint) 추가 오프셋, 없으면
+        /// fallbackOffset에 그대로 더하는 월드 오프셋 - 공격 모션 데이터의 Effect Offset을 그대로 전달한다.
+        /// scaleOverride: 0 이하면 "지정 안 함"으로 보고 prefab 원본 배율을 그대로 쓴다. 0보다 크면
+        /// HitEffectPop이 있는 prefab은 그 재생 애니메이션의 배율에 곱해서 적용하고, 없는 prefab은
+        /// 인스턴스 원본 로컬 스케일에 곱해서 즉시 적용한다(둘 다 풀 반환 시 원본 스케일로 복원된다).
         /// </summary>
-        public void Spawn(GameObject prefabOverride = null, float durationOverride = 0f)
+        public void Spawn(GameObject prefabOverride = null, float durationOverride = 0f, Vector2 offsetOverride = default, float scaleOverride = 0f)
         {
             if (Time.time - lastSpawnTime < minSpawnInterval) return;
 
@@ -127,22 +133,23 @@ namespace Common
                 duration = FallbackDuration; // 비정상 duration은 안전한 기본값으로 보정한다.
             }
 
+            Vector3 baseOffset = new Vector3(offsetOverride.x, offsetOverride.y, 0f);
             Vector3 spawnPosition;
             if (impactPoint != null)
             {
                 // 지터는 impactPoint의 로컬 좌표로 잡고 TransformPoint로 변환한다 - impactPoint의
                 // 현재 스케일/위치가 그대로 반영되므로, Stage 배율이 바뀌거나 StageVisualRoot가
                 // 이동해도 지터 범위가 피격체 크기/위치에 비례해서 자연스럽게 따라간다(화면/월드
-                // 고정 오프셋이 아니다).
+                // 고정 오프셋이 아니다). offsetOverride도 같은 로컬 좌표계에서 더해진다.
                 Vector3 localJitter = new Vector3(
                     Random.Range(-spawnJitterX, spawnJitterX),
                     Random.Range(-spawnJitterY, spawnJitterY),
                     0f);
-                spawnPosition = impactPoint.TransformPoint(localJitter);
+                spawnPosition = impactPoint.TransformPoint(baseOffset + localJitter);
             }
             else
             {
-                spawnPosition = transform.position + (Vector3)fallbackOffset;
+                spawnPosition = transform.position + (Vector3)fallbackOffset + baseOffset;
             }
 
             Queue<GameObject> pool = GetOrCreatePool(prefabToSpawn);
@@ -166,16 +173,21 @@ namespace Common
             }
             instance.SetActive(true);
 
+            float effectiveScale = scaleOverride > 0f ? scaleOverride : 1f;
             var pop = instance.GetComponent<HitEffectPop>();
             if (pop != null)
             {
                 // Play()가 SetActive(true) 직후 OnEnable이 시작한 기본(Destroy 모드) 재생을 즉시
                 // 취소하고 풀 반환 모드로 바꿔치기한다.
-                pop.Play(duration, ReturnToPool);
+                pop.Play(duration, ReturnToPool, effectiveScale);
             }
             else
             {
                 // HitEffectPop이 없는 prefab은 재생 종료를 스스로 알릴 방법이 없으니 스포너가 직접 타이머로 회수한다.
+                if (originalLocalScaleByInstance.TryGetValue(instance, out Vector3 baseScale))
+                {
+                    instanceTransform.localScale = baseScale * effectiveScale;
+                }
                 StartCoroutine(ReturnToPoolAfterDelay(instance, duration));
             }
         }
