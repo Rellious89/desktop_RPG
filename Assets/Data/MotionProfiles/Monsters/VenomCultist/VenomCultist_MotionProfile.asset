@@ -1,0 +1,80 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a793bf2a4d96489da376ed10ce30d0c1, type: 3}
+  m_Name: VenomCultist_MotionProfile
+  m_EditorClassIdentifier: 
+  displayName: VenomCultist
+  resourceFolderPath: Assets/Art/Enemy/VenomCultist
+  spriteFlipX: 1
+  baseIdle:
+    displayName: Base Idle
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 8044ce61dc1bf45ab8147ce9d5e410cf, type: 3}
+    - {fileID: 21300000, guid: 4a2e563be6cb84f7ea484579ba6ff587, type: 3}
+    - {fileID: 21300000, guid: f586ae073ad1846869f0611c13c3ca25, type: 3}
+    - {fileID: 21300000, guid: cc350f80915844388a75a09b9d5fb568, type: 3}
+    animationFps: 6
+  idleEvents:
+  - displayName: idle a
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 6a0eb298f3db64122bb192b08802151c, type: 3}
+    - {fileID: 21300000, guid: 01a1dff73d3b14680b2df37382a8a2ea, type: 3}
+    - {fileID: 21300000, guid: ee1e58823ddc844ebb54f166d90c69ca, type: 3}
+    - {fileID: 21300000, guid: 2a7e1bab4c257400ba1dc7e0c2a78b62, type: 3}
+    - {fileID: 21300000, guid: f5e38f92a17a74b7c97e31d0be547e4a, type: 3}
+    - {fileID: 21300000, guid: 2b532136977f94286a610ac8589f8a71, type: 3}
+    animationFps: 6
+  - displayName: idle b
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 8e495fb8a9fc44da189dd015ae648a4e, type: 3}
+    - {fileID: 21300000, guid: 9560eb5cbae2d441babd35d72184f79c, type: 3}
+    - {fileID: 21300000, guid: 83d63bba73a31475eb04f97742a27ebf, type: 3}
+    - {fileID: 21300000, guid: 165183b0469454d3ab65353c81db4cb2, type: 3}
+    - {fileID: 21300000, guid: 2b4c1b210557b496b980099a878ecbcf, type: 3}
+    - {fileID: 21300000, guid: d07ca811769d64017b2d1c5a0c616f27, type: 3}
+    animationFps: 6
+  idleEventCheckInterval: 4
+  idleEventChance: 0.5
+  hit:
+    displayName: Hit
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: c0b068181470a4b7cbcf8f5f5ea32276, type: 3}
+    - {fileID: 21300000, guid: 32b041589dc314a11ba82219afc3128f, type: 3}
+    animationFps: 6
+  defeat:
+    displayName: Defeat
+    editorDescription: 
+    frames: []
+    animationFps: 6
+  hitReaction:
+    holdFrame: 0
+    recoveryFrame: 1
+    recoveryDuration: 0.12
+    holdTimeout: 0.2
+    shakeStrength: 0.04
+    shakeFrequency: 35
+    shakeDecayDuration: 0.15
+    damageNumberOffset: {x: 0.09, y: 1.06}
+    damageNumberRandomHorizontalJitter: 0.1
+    damageNumberRiseDistance: 0.4
+    damageNumberDuration: 0.6
+    damageNumberTextColor: {r: 1, g: 0, b: 0, a: 1}
+    damageNumberFontSize: 3
+    damageNumberSortingOrder: 10
+  preview:
+    actorOffset: {x: 0.3, y: 0.02}
+    receivePointOffset: {x: 0, y: 0.35}
+    actorScale: 1

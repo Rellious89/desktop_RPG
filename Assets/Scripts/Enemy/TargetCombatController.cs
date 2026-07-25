@@ -111,6 +111,16 @@ namespace Enemy
                  "배치된 현재 Transform 위치/스케일을 그대로 쓴다.")]
         [SerializeField] private CombatStageLayout stageLayout;
 
+        [Header("Random Respawn Profile Test")]
+        [Tooltip("켜면 리젠이 시작될 때 respawnProfilePool 중 현재 motionProfile을 제외한 다른 프로필로 " +
+                 "동일 확률 랜덤 교체한다. 정식 몬스터 테이블/리젠 시스템이 생기기 전까지의 테스트용 기능이라 " +
+                 "꺼져 있으면 기존처럼 항상 같은 프로필로 리젠한다.")]
+        [SerializeField] private bool randomizeProfileOnRespawn;
+
+        [Tooltip("랜덤 리젠 후보 프로필 목록(테스트용). 배열 순서는 확률에 영향을 주지 않는다 - null, " +
+                 "중복, 현재 프로필, Base Idle 첫 프레임이 없는 프로필은 자동으로 후보에서 제외된다.")]
+        [SerializeField] private MonsterMotionProfile[] respawnProfilePool;
+
         [Header("Base Idle (계속 루프)")]
         [SerializeField] private FrameAnimation idle;
 
@@ -154,6 +164,12 @@ namespace Enemy
         // 플래그. "이번 타격이 처치를 유발했는지"를 hitPhase 스냅샷 비교 없이 확실하게 판정하기 위해 쓴다 -
         // ApplyDamage는 이 컴포넌트의 Target에 대해 OnHitPoint에서만 호출되므로 안전하다.
         private bool defeatedByCurrentHit;
+
+        // TrySwitchToRandomRespawnProfile()이 이번 리젠에서 실제로 프로필을 바꿨을 때만 켜진다.
+        // HandleRespawned()가 이 플래그를 보고 Hit Recovery 대신 Base Idle을 유지하도록 분기한다 -
+        // 새 프로필로 교체된 몬스터가 Fade-in 직후 이전 몬스터의 Hit Recovery 프레임을 잠깐 보여주는
+        // 것을 막기 위함이다.
+        private bool profileChangedForCurrentRespawn;
 
         private Vector3 basePosition;
         private bool shaking;
@@ -301,6 +317,66 @@ namespace Enemy
             }
         }
 
+#if UNITY_EDITOR
+        /// <summary>Edit Mode에서 motionProfile을 바꾸면 SpriteRenderer 미리보기(Sprite/Flip X)와
+        /// stageLayout이 연결된 몬스터의 Transform Scale(Actor Scale)을 갱신한다. OnValidate 안에서
+        /// 바로 Undo.RecordObject/SetDirty를 부르면 Unity의 Undo 처리 재진입 오류가 날 수 있어
+        /// delayCall로 한 틱 미룬다 - 그 사이 오브젝트가 파괴되거나 Play Mode로 들어갔을 수 있어
+        /// 실행 시점에 다시 확인한다.</summary>
+        private void OnValidate()
+        {
+            UnityEditor.EditorApplication.delayCall += RefreshEditorPreviewPresentation;
+        }
+
+        private void RefreshEditorPreviewPresentation()
+        {
+            if (this == null || Application.isPlaying) return;
+            if (motionProfile == null) return; // 프로필이 없으면 Sprite/Flip X/Scale 전부 기존 값 유지
+
+            RefreshEditorPreviewSpriteAndFlip();
+            RefreshEditorPreviewScale();
+        }
+
+        /// <summary>Sprite와 Flip X는 서로 독립적으로 판정한다 - Base Idle 첫 프레임이 비어 있거나
+        /// null이어도 Flip X는 프로필 값 그대로 적용한다(Flip X는 BaseIdle 프레임 유무와 무관한
+        /// 프로필 설정이다). Sprite는 유효한 첫 프레임이 있을 때만 갱신하고, 없으면 기존 SpriteRenderer
+        /// 값을 그대로 둔다.</summary>
+        private void RefreshEditorPreviewSpriteAndFlip()
+        {
+            SpriteRenderer editorRenderer = GetComponent<SpriteRenderer>();
+            if (editorRenderer == null) return;
+
+            MonsterMotionProfile.FrameClip baseIdle = motionProfile.BaseIdle;
+            Sprite previewSprite = baseIdle != null && baseIdle.Frames.Length > 0 ? baseIdle.Frames[0] : null;
+            bool previewFlipX = motionProfile.SpriteFlipX;
+
+            bool spriteChanged = previewSprite != null && editorRenderer.sprite != previewSprite;
+            bool flipChanged = editorRenderer.flipX != previewFlipX;
+            if (!spriteChanged && !flipChanged) return;
+
+            UnityEditor.Undo.RecordObject(editorRenderer, "Update Monster Motion Preview");
+            if (spriteChanged) editorRenderer.sprite = previewSprite;
+            if (flipChanged) editorRenderer.flipX = previewFlipX;
+            UnityEditor.EditorUtility.SetDirty(editorRenderer);
+        }
+
+        /// <summary>런타임 ApplyActorScale()과 동일한 공식 - stageLayout이 연결된 몬스터에서만 프로필
+        /// Actor Scale을 Edit Mode Transform에 반영한다. stageLayout이 없는 기존 몬스터는 수동으로
+        /// 설정한 Transform Scale을 그대로 둔다(런타임 규칙과 동일).</summary>
+        private void RefreshEditorPreviewScale()
+        {
+            if (stageLayout == null) return;
+
+            float actorScale = motionProfile.Preview.ActorScale;
+            Vector3 previewScale = new Vector3(actorScale, actorScale, 1f);
+            if (transform.localScale == previewScale) return;
+
+            UnityEditor.Undo.RecordObject(transform, "Update Monster Motion Preview");
+            transform.localScale = previewScale;
+            UnityEditor.EditorUtility.SetDirty(transform);
+        }
+#endif
+
         private void OnEnable()
         {
             PlayerCharacterAnimator.HitPoint += OnHitPoint;
@@ -415,17 +491,85 @@ namespace Enemy
         }
 
         /// <summary>Target의 WaitingForRespawn이 끝나 Fade-in이 시작될 때 호출된다. 아직 Alive는
-        /// 아니다(OnRespawned는 별도로 온다) - 이전 Hit/Defeated 프레임이 Fade-in 동안 노출되지 않게
-        /// 먼저 Idle 기준 자세로 정리한 뒤 알파를 원래 값으로 페이드한다.</summary>
+        /// 아니다(OnRespawned는 별도로 온다) - 이전 몬스터가 완전히 투명해진 시점이므로 이때 랜덤 프로필
+        /// 교체를 시도한 뒤(randomizeProfileOnRespawn이 꺼져 있거나 후보가 없으면 아무 일도 하지 않는다),
+        /// 이전 Hit/Defeated 프레임이 Fade-in 동안 노출되지 않게 먼저 Idle 기준 자세로 정리하고 알파를
+        /// 원래 값으로 페이드한다.</summary>
         private void HandleRespawnStarted(string targetId)
         {
+            TrySwitchToRandomRespawnProfile();
+
             ExitToIdle();
             StartFade(toOriginal: true, duration: target.RespawnFadeDuration);
         }
 
         private void HandleRespawned(string targetId)
         {
+            if (profileChangedForCurrentRespawn)
+            {
+                // 새 프로필로 교체된 리젠: Base Idle 초기화는 이미 HandleRespawnStarted()의
+                // ExitToIdle()에서 끝났고, Fade-in 동안 계속 재생되고 있었다 - 여기서 다시 ExitToIdle()을
+                // 부르면 진행 중이던 Idle이 0번 프레임으로 튀며 끊겨 보이므로 플래그만 해제하고
+                // 지금 재생 중인 Idle 상태를 그대로 둔다. Hit Recovery는 재생하지 않는다.
+                profileChangedForCurrentRespawn = false;
+                return;
+            }
+
             EnterRecovery(); // 기존 복귀 흐름(Recovery -> Idle)을 그대로 재사용한다.
+        }
+
+        /// <summary>randomizeProfileOnRespawn이 켜져 있고 respawnProfilePool에 현재 motionProfile을
+        /// 제외한 유효한 후보(null 아님/중복 제거/Base Idle 첫 프레임 존재)가 있으면 그중 하나를 동일
+        /// 확률로 골라 ApplyRuntimeMotionProfile()로 교체한다. 유효한 후보가 없으면(옵션이 꺼져 있거나,
+        /// 풀이 비어 있거나, 남은 후보가 전부 현재 프로필/null/불완전 프로필이면) 아무것도 바꾸지 않고
+        /// false를 반환한다 - 기존 고정 프로필 리젠 동작이 그대로 유지된다.</summary>
+        private bool TrySwitchToRandomRespawnProfile()
+        {
+            if (!randomizeProfileOnRespawn) return false;
+            if (respawnProfilePool == null || respawnProfilePool.Length == 0) return false;
+
+            var candidates = new List<MonsterMotionProfile>();
+            foreach (MonsterMotionProfile candidate in respawnProfilePool)
+            {
+                if (candidate == null) continue;
+                if (candidate == motionProfile) continue; // 연속 등장 금지: 현재 프로필 제외
+                if (candidates.Contains(candidate)) continue; // 중복 등록은 한 번만 후보로 취급
+
+                MonsterMotionProfile.FrameClip candidateIdle = candidate.BaseIdle;
+                if (candidateIdle == null || candidateIdle.Frames.Length == 0 || candidateIdle.Frames[0] == null) continue;
+
+                candidates.Add(candidate);
+            }
+
+            if (candidates.Count == 0) return false;
+
+            MonsterMotionProfile chosen = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+            ApplyRuntimeMotionProfile(chosen);
+            profileChangedForCurrentRespawn = true;
+            return true;
+        }
+
+        /// <summary>motionProfile을 nextProfile로 바꾸고, Awake에서 한 번만 구성되던 런타임 설정 전체를
+        /// 새 프로필 기준으로 다시 만든다 - Idle/Idle Event/Hit/Hit Reaction/Defeat 프레임은
+        /// BuildRuntimeConfiguration()을 재사용해 중복 계산 없이 갱신하고, stageLayout이 연결된
+        /// 몬스터라면 위치/스케일도 Awake와 동일한 공식(ResolveInitialBasePosition/ApplyActorScale)으로
+        /// 다시 계산한다. 향후 정식 몬스터 리젠 시스템도 이 메서드 하나로 프로필을 교체할 수 있도록
+        /// 만든 단일 진입점이다 - Idle 프레임 적용/애니메이션 상태 리셋(ExitToIdle)은 호출자가 맡는다.</summary>
+        private void ApplyRuntimeMotionProfile(MonsterMotionProfile nextProfile)
+        {
+            motionProfile = nextProfile;
+            BuildRuntimeConfiguration();
+
+            spriteRenderer.flipX = motionProfile.SpriteFlipX;
+
+            if (stageLayout != null)
+            {
+                basePosition = ResolveInitialBasePosition();
+                transform.localPosition = basePosition;
+                ApplyActorScale();
+            }
+
+            shaking = false;
         }
 
         /// <summary>처치/리젠 Fade를 시작한다. 진행 중이던 Fade가 있으면 안전하게 중단하고, 새 Fade는

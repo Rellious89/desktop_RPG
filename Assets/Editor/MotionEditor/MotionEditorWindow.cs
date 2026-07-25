@@ -42,6 +42,9 @@ namespace CharacterEditor
         private const string DescriptionControlName = "MotionEditorDescription";
         private static readonly Color ActiveTextFieldTint = new Color(0.68f, 0.84f, 1f, 0.8f);
         private static readonly Color ActiveTextFieldBorder = new Color(0.32f, 0.68f, 1f, 0.95f);
+        // 되돌리기 어려운 동작(애니메이션 등록 삭제)만 쓰는 색 - 일반 편집 버튼과 눈에 띄게 구분한다.
+        private static readonly Color DangerButtonColor = new Color(1f, 0.44f, 0.38f);
+        private const float DeleteButtonWidth = 46f;
 
         private enum ActorKind { Character, Monster }
         private enum Workspace { Overview, Idle, IdleEvents, Attack, Movement, Hit, Defeat }
@@ -156,6 +159,7 @@ namespace CharacterEditor
         private bool pointerDownInsideTextInput;
         private bool targetDropdownOpen;
         private bool pendingUndoRedoRefresh;
+        private bool pendingMotionDelete;
         private HistoryAction pendingHistoryAction;
         private GUIStyle hitLabelStyle;
         private GUIStyle hitTagStyle;
@@ -757,9 +761,38 @@ namespace CharacterEditor
             activeProfileObject?.Update();
             attackObject?.Update();
             poolObject?.Update();
+            ValidateSelectionAfterHistoryChange();
             RebuildFrameList();
             RestartPreview();
             Repaint();
+        }
+
+        /// <summary>Undo/Redo로 목록 길이나 등록 내용이 달라졌을 수 있으므로 현재 선택을 다시 검증한다 -
+        /// Idle Event 인덱스는 남은 목록 범위로 보정하고(목록이 비면 선택 해제), 선택된 공격이 지금 티어
+        /// 풀에서 빠졌으면(삭제가 Redo로 다시 적용된 경우) 남아 있는 항목으로 선택을 옮긴다. 선택이 없던
+        /// 상태(-1/null)를 임의로 채우지는 않는다.</summary>
+        private void ValidateSelectionAfterHistoryChange()
+        {
+            if (activeProfileObject != null && selectedIdleEventIndex >= 0)
+            {
+                SerializedProperty events = activeProfileObject.FindProperty("idleEvents");
+                if (events != null)
+                {
+                    selectedIdleEventIndex = events.arraySize == 0 ? -1 : Mathf.Min(selectedIdleEventIndex, events.arraySize - 1);
+                }
+            }
+
+            CharacterMotionProfile profile = SelectedResource?.CharacterProfile;
+            if (profile == null || selectedAttack == null) return;
+            ComboTierAttackPool pool = GetPool(profile, activeTier);
+            if (pool == null)
+            {
+                SelectAttack(null);
+                return;
+            }
+            if (IndexOfMotion(pool, selectedAttack) >= 0) return;
+            IReadOnlyList<AttackMotionDefinition> motions = pool.Motions;
+            SelectAttack(motions.Count > 0 ? motions[0] : null);
         }
 
         private void ChangeActorKind(ActorKind kind)
@@ -1114,6 +1147,249 @@ namespace CharacterEditor
             if (motion != null) RestartPreview();
         }
 
+        /// <summary>삭제 방식은 대상이 어디에 등록돼 있느냐로 갈린다: IdleEvent/Attack은 목록에서 항목
+        /// 자체를 제거하고, ClipSlot(Base Idle/Hit/Defeat)은 프로필에 항상 존재해야 하는 고정 슬롯이라
+        /// 항목 대신 내용만 비운다.</summary>
+        private enum MotionDeleteKind { IdleEvent, Attack, ClipSlot }
+
+        /// <summary>Inspector 이름 행의 "삭제" 버튼이 지울 대상 하나. Owner는 실제로 바뀌는 에셋이자
+        /// Undo 기록 대상이다 - Attack은 프로필이 아니라 그 공격을 참조하는 ComboTierAttackPool이
+        /// 바뀐다는 점이 다르다.</summary>
+        private sealed class MotionDeleteTarget
+        {
+            public MotionDeleteKind Kind;
+            public UnityEngine.Object Owner;
+            public string ProfileName;
+            public string AreaLabel;
+            public string AnimationName;
+            public int Index = -1;              // IdleEvent/Attack 목록 인덱스
+            public string ClipPropertyPath;     // ClipSlot 전용
+            public ComboTierAttackPool Pool;    // Attack 전용
+        }
+
+        /// <summary>지금 Inspector에 열려 있는 애니메이션 하나를 삭제 대상으로 해석한다. 선택이 없거나
+        /// 프로필이 아직 만들어지지 않았거나 인덱스가 유효하지 않으면 null이고, 그때 삭제 버튼은
+        /// 비활성화된다. 어느 목록에 속한 항목인지는 workspace 기준으로 판정한다 - GetActiveClip()이
+        /// 프리뷰 대상을 고르는 규칙과 같아서 화면에 보이는 애니메이션과 항상 일치한다.</summary>
+        private MotionDeleteTarget ResolveMotionDeleteTarget()
+        {
+            ResourceEntry entry = SelectedResource;
+            if (entry == null || !entry.HasProfile || activeProfileObject == null) return null;
+            string profileName = entry.ProfileObject != null ? entry.ProfileObject.name : entry.Name;
+
+            if (workspace == Workspace.Attack)
+            {
+                if (entry.CharacterProfile == null || selectedAttack == null) return null;
+                ComboTierAttackPool pool = GetPool(entry.CharacterProfile, activeTier);
+                if (pool == null) return null;
+                int index = IndexOfMotion(pool, selectedAttack);
+                if (index < 0) return null; // 지금 티어 풀에 등록돼 있지 않은 공격은 여기서 지우지 않는다
+                return new MotionDeleteTarget
+                {
+                    Kind = MotionDeleteKind.Attack,
+                    Owner = pool,
+                    Pool = pool,
+                    Index = index,
+                    ProfileName = profileName,
+                    AreaLabel = $"Attack T{activeTier}",
+                    AnimationName = selectedAttack.name,
+                };
+            }
+
+            if (workspace == Workspace.IdleEvents)
+            {
+                SerializedProperty events = activeProfileObject.FindProperty("idleEvents");
+                if (events == null || selectedIdleEventIndex < 0 || selectedIdleEventIndex >= events.arraySize) return null;
+                return new MotionDeleteTarget
+                {
+                    Kind = MotionDeleteKind.IdleEvent,
+                    Owner = entry.ProfileObject,
+                    Index = selectedIdleEventIndex,
+                    ProfileName = profileName,
+                    AreaLabel = $"Idle Event {selectedIdleEventIndex + 1}",
+                    AnimationName = ReadClipDisplayName(events.GetArrayElementAtIndex(selectedIdleEventIndex)),
+                };
+            }
+
+            string slotPath = workspace == Workspace.Idle ? "baseIdle"
+                : workspace == Workspace.Hit ? "hit"
+                : workspace == Workspace.Defeat ? "defeat"
+                : null;
+            if (slotPath == null) return null; // Overview/Movement에는 삭제할 애니메이션이 없다
+            SerializedProperty slot = activeProfileObject.FindProperty(slotPath);
+            if (slot == null) return null;
+            return new MotionDeleteTarget
+            {
+                Kind = MotionDeleteKind.ClipSlot,
+                Owner = entry.ProfileObject,
+                ClipPropertyPath = slotPath,
+                ProfileName = profileName,
+                AreaLabel = workspace == Workspace.Idle ? "Base Idle" : workspace.ToString(),
+                AnimationName = ReadClipDisplayName(slot),
+            };
+        }
+
+        private static string ReadClipDisplayName(SerializedProperty clip)
+        {
+            SerializedProperty name = clip?.FindPropertyRelative("displayName");
+            string value = name != null ? name.stringValue : null;
+            return string.IsNullOrWhiteSpace(value) ? "Motion" : value;
+        }
+
+        private static int IndexOfMotion(ComboTierAttackPool pool, AttackMotionDefinition motion)
+        {
+            IReadOnlyList<AttackMotionDefinition> motions = pool.Motions;
+            for (int i = 0; i < motions.Count; i++)
+            {
+                if (motions[i] == motion) return i;
+            }
+            return -1;
+        }
+
+        private void DrawMotionDeleteButton(Rect rect)
+        {
+            MotionDeleteTarget target = ResolveMotionDeleteTarget();
+            Color previous = GUI.backgroundColor;
+            using (new EditorGUI.DisabledScope(target == null))
+            {
+                if (target != null) GUI.backgroundColor = DangerButtonColor;
+                var content = new GUIContent("삭제", target != null
+                    ? $"'{target.AnimationName}'을(를) {target.AreaLabel}에서 삭제합니다. 확인창이 먼저 뜨고, Undo로 되돌릴 수 있습니다."
+                    : "삭제할 애니메이션을 먼저 선택하세요.");
+                if (GUI.Button(rect, content, EditorStyles.miniButton)) RequestMotionDelete();
+            }
+            GUI.backgroundColor = previous;
+        }
+
+        private void DrawMotionDeleteButtonLayout()
+        {
+            DrawMotionDeleteButton(GUILayoutUtility.GetRect(
+                DeleteButtonWidth, EditorGUIUtility.singleLineHeight, GUILayout.Width(DeleteButtonWidth)));
+        }
+
+        /// <summary>확인창과 실제 삭제를 지금 진행 중인 IMGUI 패스 안에서 처리하지 않는다 - 그리는 중인
+        /// 배열 항목을 그 자리에서 지우면 같은 패스의 남은 필드(Description/FPS/Frame List)가 이미
+        /// 사라진 SerializedProperty를 계속 참조하고, 모달 확인창도 Layout/Repaint 사이에 끼어들어
+        /// 레이아웃 불일치를 낼 수 있다. Undo/Redo와 같은 방식으로 다음 에디터 틱으로 미룬다.</summary>
+        private void RequestMotionDelete()
+        {
+            if (pendingMotionDelete) return;
+            pendingMotionDelete = true;
+            EditorApplication.delayCall += PerformPendingMotionDelete;
+        }
+
+        private void PerformPendingMotionDelete()
+        {
+            pendingMotionDelete = false;
+            if (this == null) return;
+
+            // 한 틱 뒤이므로 대상을 다시 해석해서 검증한다 - 그 사이 선택이 사라졌으면 아무것도 하지 않는다.
+            MotionDeleteTarget target = ResolveMotionDeleteTarget();
+            if (target == null || target.Owner == null) return;
+            if (!EditorUtility.DisplayDialog("애니메이션 삭제", BuildMotionDeleteMessage(target), "삭제", "취소")) return;
+
+            // 확인을 누른 뒤에만 Undo를 기록한다 - 취소하면 Undo 스택에 아무것도 남지 않는다.
+            // RegisterCompleteObjectUndo는 에셋 전체 상태를 스냅샷하므로 되돌릴 때 항목의 원래 위치와
+            // 이름/설명/프레임 배열/FPS까지 그대로 복구된다.
+            Undo.RegisterCompleteObjectUndo(target.Owner, "Delete Motion Animation");
+            switch (target.Kind)
+            {
+                case MotionDeleteKind.Attack:
+                    DeleteAttackFromPool(target);
+                    break;
+                case MotionDeleteKind.IdleEvent:
+                    DeleteIdleEventEntry(target);
+                    break;
+                default:
+                    ClearClipSlot(target);
+                    break;
+            }
+            EditorUtility.SetDirty(target.Owner);
+            Repaint();
+        }
+
+        private static string BuildMotionDeleteMessage(MotionDeleteTarget target)
+        {
+            string scope = target.Kind == MotionDeleteKind.ClipSlot
+                ? "이 슬롯은 프로필에 항상 존재해야 하므로 항목을 없애지 않고 등록된 이름/설명/프레임/FPS를 비웁니다."
+                : "현재 Motion Profile에서 이 애니메이션의 등록만 제거합니다.";
+            return $"Motion Profile: {target.ProfileName}\n" +
+                   $"등록 영역: {target.AreaLabel}\n" +
+                   $"애니메이션: {target.AnimationName}\n\n" +
+                   scope + "\n" +
+                   "원본 Sprite/PNG, 에셋 파일, 다른 프로필이나 다른 티어의 등록은 삭제되지 않습니다.\n\n" +
+                   "이 작업은 Undo(Ctrl/Cmd+Z)로 복구할 수 있습니다.";
+        }
+
+        /// <summary>풀에서 참조만 제거한다 - AttackMotionDefinition 에셋 파일, 그 프레임이 쓰던
+        /// Sprite/PNG, 같은 공격을 참조하는 다른 티어/다른 캐릭터의 등록은 전부 그대로 남는다.</summary>
+        private void DeleteAttackFromPool(MotionDeleteTarget target)
+        {
+            var serializedPool = new SerializedObject(target.Pool);
+            RemoveArrayElement(serializedPool.FindProperty("motions"), target.Index);
+            serializedPool.ApplyModifiedPropertiesWithoutUndo();
+
+            // 오래 살아 있는 poolObject가 나중에 옛 목록을 다시 써버리지 않도록 방금 만든 것으로 교체한다
+            // (CreateAttackAsset이 새 공격을 추가할 때와 같은 처리).
+            activePool = target.Pool;
+            poolObject = serializedPool;
+
+            IReadOnlyList<AttackMotionDefinition> remaining = target.Pool.Motions;
+            int next = ResolveSelectionAfterDelete(target.Index, remaining.Count);
+            SelectAttack(next >= 0 ? remaining[next] : null);
+        }
+
+        private void DeleteIdleEventEntry(MotionDeleteTarget target)
+        {
+            activeProfileObject.Update();
+            RemoveArrayElement(activeProfileObject.FindProperty("idleEvents"), target.Index);
+            activeProfileObject.ApplyModifiedPropertiesWithoutUndo();
+
+            activeProfileObject.Update();
+            int remaining = activeProfileObject.FindProperty("idleEvents").arraySize;
+            selectedIdleEventIndex = ResolveSelectionAfterDelete(target.Index, remaining);
+            descriptionScroll = Vector2.zero;
+            RebuildFrameList();
+            RestartPreview();
+        }
+
+        /// <summary>Base Idle/Hit/Defeat는 프로필이 항상 들고 있어야 하는 고정 슬롯이라 목록처럼 항목을
+        /// 뺄 수 없다 - 대신 새로 만든 FrameClip과 같은 상태(이름 Motion, 설명 없음, 프레임 0개, FPS 6)로
+        /// 비운다. 프레임이 참조하던 Sprite 에셋 자체는 건드리지 않는다.</summary>
+        private void ClearClipSlot(MotionDeleteTarget target)
+        {
+            activeProfileObject.Update();
+            SerializedProperty clip = activeProfileObject.FindProperty(target.ClipPropertyPath);
+            clip.FindPropertyRelative("displayName").stringValue = "Motion";
+            clip.FindPropertyRelative("editorDescription").stringValue = string.Empty;
+            clip.FindPropertyRelative("frames").ClearArray();
+            clip.FindPropertyRelative("animationFps").floatValue = 6f;
+            activeProfileObject.ApplyModifiedPropertiesWithoutUndo();
+
+            descriptionScroll = Vector2.zero;
+            RebuildFrameList();
+            RestartPreview();
+        }
+
+        /// <summary>배열에서 index 항목을 실제로 제거한다. 오브젝트 참조 배열에서는
+        /// DeleteArrayElementAtIndex가 항목을 먼저 null로만 만들고 길이를 줄이지 않는 Unity 레거시
+        /// 동작이 있어, 길이가 그대로면 한 번 더 호출한다. 나머지 항목의 순서는 그대로 유지된다.</summary>
+        private static void RemoveArrayElement(SerializedProperty array, int index)
+        {
+            if (array == null || index < 0 || index >= array.arraySize) return;
+            int size = array.arraySize;
+            array.DeleteArrayElementAtIndex(index);
+            if (array.arraySize == size) array.DeleteArrayElementAtIndex(index);
+        }
+
+        /// <summary>삭제 직후 선택 규칙: 지운 자리로 밀려온 다음 항목 -> 없으면 이전 항목 -> 목록이
+        /// 비면 선택 해제(-1).</summary>
+        private static int ResolveSelectionAfterDelete(int deletedIndex, int remainingCount)
+        {
+            if (remainingCount <= 0) return -1;
+            return deletedIndex < remainingCount ? deletedIndex : remainingCount - 1;
+        }
+
         private void DrawInspector()
         {
             using (new EditorGUILayout.VerticalScope())
@@ -1352,7 +1628,11 @@ namespace CharacterEditor
             }
 
             attackObject.Update();
-            EditorGUILayout.LabelField(selectedAttack.name, EditorStyles.boldLabel);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.LabelField(selectedAttack.name, EditorStyles.boldLabel);
+                DrawMotionDeleteButtonLayout();
+            }
             DrawDescriptionEditor(attackObject.FindProperty("editorDescription"));
             SerializedProperty frames = attackObject.FindProperty("frames");
             SerializedProperty fps = attackObject.FindProperty("animationFps");
@@ -1407,7 +1687,11 @@ namespace CharacterEditor
 
         private void DrawMotionNameEditor(SerializedProperty name)
         {
-            Rect rect = EditorGUILayout.GetControlRect();
+            // 이름 행의 오른쪽 끝을 삭제 버튼 몫으로 떼어낸다 - 행 구성과 높이는 그대로다.
+            Rect row = EditorGUILayout.GetControlRect();
+            Rect rect = new Rect(row.x, row.y, Mathf.Max(120f, row.width - DeleteButtonWidth - 4f), row.height);
+            Rect deleteRect = new Rect(rect.xMax + 4f, row.y, DeleteButtonWidth, row.height);
+            // 텍스트 필드 영역만 포커스 대상으로 등록한다 - 삭제 버튼 클릭이 텍스트 입력으로 취급되면 안 된다.
             RegisterTextInputPointerDown(rect);
             bool focused = IsFocusedControl(MotionNameControlName);
             Color previous = GUI.backgroundColor;
@@ -1418,6 +1702,7 @@ namespace CharacterEditor
             if (EditorGUI.EndChangeCheck()) name.stringValue = value;
             GUI.backgroundColor = previous;
             if (focused) DrawActiveTextFieldBorder(rect);
+            DrawMotionDeleteButton(deleteRect);
         }
 
         private void DrawDescriptionEditor(SerializedProperty description)

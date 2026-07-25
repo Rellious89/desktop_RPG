@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4a8746ce2a8483a8d6a1b3f4ef0c912, type: 3}
+  m_Name: ElfGuardian_MotionProfile
+  m_EditorClassIdentifier: 
+  displayName: ElfGuardian
+  resourceFolderPath: Assets/Art/Character/ElfGuardian
+  baseIdle:
+    displayName: Base Idle
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 66372d3e67f9f41bfbf382f011c3f441, type: 3}
+    - {fileID: 21300000, guid: 9fe77dc2cef7646e2a3d2e8c8509602d, type: 3}
+    - {fileID: 21300000, guid: 76d9525377ac4497bb67f1ecc464348c, type: 3}
+    - {fileID: 21300000, guid: 64723d7aa78e245d8a1065e9b809abac, type: 3}
+    animationFps: 6
+  idleEvents: []
+  idleEventCheckInterval: 4
+  idleEventChance: 0.5
+  tier1Pool: {fileID: 11400000, guid: 88883ad4e6d8b4765b5c145a19c37efd, type: 2}
+  tier2Pool: {fileID: 11400000, guid: 60d0b04bb36da4d168fd71059509bd66, type: 2}
+  tier3Pool: {fileID: 0}
+  attackMovement:
+    overrideComponentValues: 1
+    moveDistance: 0.2
+    moveOutDuration: 0.14
+    moveBackDuration: 0.05
+  preview:
+    targetIdleSprite: {fileID: 0}
+    targetHitSprite: {fileID: 0}
+    characterOffset: {x: 0, y: 0}
+    receivePointOffset: {x: 0, y: 0.35}
+    characterScale: 1
+    targetOffset: {x: 1.15, y: 0}
+    targetScale: 1

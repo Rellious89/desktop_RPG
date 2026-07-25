@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a793bf2a4d96489da376ed10ce30d0c1, type: 3}
+  m_Name: Specter_MotionProfile
+  m_EditorClassIdentifier: 
+  displayName: Specter
+  resourceFolderPath: Assets/Art/Enemy/Specter
+  spriteFlipX: 1
+  baseIdle:
+    displayName: Base Idle
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: daff5af6b853045f786f506d2c71c488, type: 3}
+    - {fileID: 21300000, guid: d6027c613258b40278664afcfdd3d13f, type: 3}
+    - {fileID: 21300000, guid: 4ccb4396b8e124d63af1f2c6b237fbc9, type: 3}
+    - {fileID: 21300000, guid: ca15d08bcf21f4ce5a4f615a95c16f52, type: 3}
+    animationFps: 6
+  idleEvents:
+  - displayName: idle a
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 4a5d8690f87934affb9aaefce738c736, type: 3}
+    - {fileID: 21300000, guid: 3621e577ebfa7451bac7096fb00b22bf, type: 3}
+    - {fileID: 21300000, guid: 6933ab393cbde404f9520645fe8fc4bc, type: 3}
+    - {fileID: 21300000, guid: f524c4ae605784352a5e8801e1a28a41, type: 3}
+    animationFps: 6
+  idleEventCheckInterval: 4
+  idleEventChance: 0.5
+  hit:
+    displayName: Hit
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 7ef29ccd1d8324273ae0abaedf3767b0, type: 3}
+    - {fileID: 21300000, guid: 2a535a67f32744610870a1bf02dfcfbc, type: 3}
+    animationFps: 6
+  defeat:
+    displayName: Defeat
+    editorDescription: 
+    frames: []
+    animationFps: 6
+  hitReaction:
+    holdFrame: 0
+    recoveryFrame: 1
+    recoveryDuration: 0.12
+    holdTimeout: 0.2
+    shakeStrength: 0.04
+    shakeFrequency: 35
+    shakeDecayDuration: 0.15
+    damageNumberOffset: {x: -0.12, y: 1.33}
+    damageNumberRandomHorizontalJitter: 0.1
+    damageNumberRiseDistance: 0.4
+    damageNumberDuration: 0.6
+    damageNumberTextColor: {r: 1, g: 0, b: 0, a: 1}
+    damageNumberFontSize: 3
+    damageNumberSortingOrder: 10
+  preview:
+    actorOffset: {x: 0.3, y: 0}
+    receivePointOffset: {x: 0, y: 0.35}
+    actorScale: 1

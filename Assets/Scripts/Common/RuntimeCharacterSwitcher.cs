@@ -9,8 +9,8 @@ namespace Common
     /// PlayerCharacterAnimator가 Awake에서 캐릭터별 모션/공격 이동값을 독립적으로 초기화하므로,
     /// 켜져 있는 오브젝트만 자연스럽게 자신의 Base Idle부터 새로 시작한다.
     ///
-    /// characters 배열은 순서가 곧 순환 순서다(현재: CatKnight -> Barbarian -> 다시 CatKnight).
-    /// 캐릭터가 2종뿐인 테스트 단계 기능이라 목록/드롭다운/저장은 없다 - 마지막 선택은 저장하지 않고,
+    /// characters 배열은 순서가 곧 순환 순서다(현재: CatKnight -> Barbarian -> CatMage -> 다시 CatKnight).
+    /// 아직 테스트 단계 기능이라 목록/드롭다운/저장은 없다 - 마지막 선택은 저장하지 않고,
     /// 앱을 재시작하면 항상 defaultCharacterIndex로 돌아간다.
     /// </summary>
     [RequireComponent(typeof(Button))]
