@@ -1,0 +1,454 @@
+{
+  "authored": {
+    "actorId": "ElfGuardian",
+    "actorType": "character",
+    "aliases": [
+      "LeafGlaiveElf",
+      "Elfguardian"
+    ],
+    "appearance": {
+      "clothing": [
+        "Light forest cloth",
+        "Leaf decorations"
+      ],
+      "decorations": [
+        "Leaf motifs"
+      ],
+      "hair": "Blond",
+      "materials": [
+        "Cloth",
+        "Wood",
+        "Metal"
+      ],
+      "palette": [
+        {
+          "role": "hair",
+          "value": "golden blond"
+        },
+        {
+          "role": "clothing",
+          "value": "leaf green"
+        }
+      ],
+      "skin": "Light"
+    },
+    "approvedExceptions": [
+      {
+        "active": true,
+        "reason": "Existing ElfGuardian attack frames are approved 1024×1024 observed assets.",
+        "ruleId": "large-motion-canvas-exception"
+      }
+    ],
+    "constraints": {
+      "forbidden": [
+        "Bow",
+        "Shield",
+        "Heavy plate",
+        "Double-ended blade",
+        "Weapon longer than 1.25 body heights"
+      ],
+      "invariants": [
+        "Long exposed pointed ears",
+        "Straight white glaive shaft",
+        "One curved forward blade",
+        "Blunt yellow rear ornament"
+      ]
+    },
+    "displayName": {
+      "en": "Leaf Glaive Elf",
+      "ko": "나뭇잎 글레이브 엘프"
+    },
+    "documentKind": "actor",
+    "equipment": {
+      "allowedWeaponFamilies": [
+        "glaive",
+        "polearm"
+      ],
+      "secondary": [],
+      "weapon": {
+        "count": 1,
+        "direction": "Curved blade screen-right/up",
+        "estimatedOccupancyPercent": 65,
+        "family": "glaive",
+        "lengthToBodyRatio": 1.2,
+        "mainHand": "both",
+        "offHand": "both",
+        "sizeClass": "large",
+        "structure": "One straight shaft, one front blade, blunt rear ornament"
+      }
+    },
+    "evidence": [
+      {
+        "claim": "Design identity, 91px target and glaive constraints",
+        "path": "ProjectDocs/ArtPipeline/Characters/LeafGlaiveElf/01_character-brief.md",
+        "status": "approved"
+      },
+      {
+        "claim": "Legacy actual scale 1.3 is historical production sizing only; it is not species or Unity scale",
+        "path": "ProjectDocs/ArtPipeline/Characters/LeafGlaiveElf/03_master-measurements.md",
+        "status": "historical"
+      },
+      {
+        "claim": "Shipped resource folder and canonical editor ID",
+        "path": "Assets/Art/Character/ElfGuardian",
+        "status": "observed"
+      }
+    ],
+    "identity": {
+      "ageGroup": "adult",
+      "concept": "A blond elf warrior in light forest clothing wielding a straight-shaft leaf glaive.",
+      "role": "Glaive warrior / long-reach melee",
+      "sex": "unknown",
+      "species": "elf",
+      "status": "master"
+    },
+    "overrides": {
+      "anatomy": {
+        "build": "slender",
+        "footSize": "m",
+        "handSize": "m",
+        "headSize": "m",
+        "proportionTemplateId": "humanoid-sd-2.5-head",
+        "speciesScale": 1,
+        "stature": "tall",
+        "targetLogicalHeightPx": 91,
+        "torsoWidth": "normal"
+      },
+      "pixelStyle": {
+        "outline": "One logical pixel, dark brown-green"
+      },
+      "production": {
+        "largeMotionCanvas": {
+          "heightPx": 1024,
+          "policy": "explicit",
+          "widthPx": 1024
+        }
+      }
+    },
+    "physicalTraits": [
+      "Long pointed ears",
+      "Tall slender humanoid stature"
+    ],
+    "resourceFolderPath": "Assets/Art/Character/ElfGuardian",
+    "revision": 1,
+    "schemaVersion": "1.0.0",
+    "updatedAt": "2026-07-25T00:00:00+09:00",
+    "worldRef": {
+      "version": 1,
+      "worldId": "HUMAN-FANTASY-01"
+    }
+  },
+  "calculated": {
+    "heightFromWorldBaselinePercent": 30.000000000000004,
+    "weaponLengthLogicalPx": 109.2,
+    "weaponOccupancyPercent": 65
+  },
+  "comparison": {
+    "diagnostics": [
+      {
+        "blocksExport": false,
+        "exceptionApproved": false,
+        "message": "Estimated weapon occupancy is 65%.",
+        "overridable": true,
+        "path": "equipment.weapon",
+        "ruleId": "large-weapon-canvas",
+        "severity": "warning"
+      },
+      {
+        "blocksExport": false,
+        "exceptionApproved": true,
+        "message": "Large-motion canvas differs from the base 512 policy.",
+        "overridable": true,
+        "path": "production.largeMotionCanvas",
+        "ruleId": "large-motion-canvas-exception",
+        "severity": "warning"
+      }
+    ],
+    "metrics": [
+      {
+        "draft": "tall",
+        "key": "stature",
+        "label": "Stature",
+        "reference": "average"
+      },
+      {
+        "absoluteDelta": 21,
+        "draft": 91,
+        "key": "height",
+        "label": "Logical height",
+        "percentDelta": 30,
+        "reference": 70
+      },
+      {
+        "draft": "slender",
+        "key": "build",
+        "label": "Build",
+        "reference": "normal"
+      },
+      {
+        "draft": "humanoid-sd-2.5-head",
+        "key": "proportion",
+        "label": "Proportion",
+        "reference": "humanoid-sd-2.5-head"
+      },
+      {
+        "draft": "m",
+        "key": "headSize",
+        "label": "headSize",
+        "reference": "m"
+      },
+      {
+        "draft": "m",
+        "key": "handSize",
+        "label": "handSize",
+        "reference": "m"
+      },
+      {
+        "draft": "m",
+        "key": "footSize",
+        "label": "footSize",
+        "reference": "m"
+      },
+      {
+        "draft": "normal",
+        "key": "torsoWidth",
+        "label": "torsoWidth",
+        "reference": "normal"
+      },
+      {
+        "absoluteDelta": 0,
+        "draft": 1,
+        "key": "speciesScale",
+        "label": "Species scale",
+        "percentDelta": 0,
+        "reference": 1
+      },
+      {
+        "absoluteDelta": 30,
+        "draft": 65,
+        "key": "weaponOccupancy",
+        "label": "Weapon occupancy",
+        "percentDelta": 85.71428571428571,
+        "reference": 35
+      },
+      {
+        "draft": "512×512",
+        "key": "baseCanvas",
+        "label": "Base canvas",
+        "reference": "512×512"
+      },
+      {
+        "draft": "1024×1024",
+        "key": "largeMotionCanvas",
+        "label": "Large-motion canvas",
+        "reference": "same-as-base"
+      }
+    ],
+    "referenceActorId": "VenomCultist"
+  },
+  "diagnostics": [
+    {
+      "blocksExport": false,
+      "exceptionApproved": false,
+      "message": "Estimated weapon occupancy is 65%.",
+      "overridable": true,
+      "path": "equipment.weapon",
+      "ruleId": "large-weapon-canvas",
+      "severity": "warning"
+    },
+    {
+      "blocksExport": false,
+      "exceptionApproved": true,
+      "message": "Large-motion canvas differs from the base 512 policy.",
+      "overridable": true,
+      "path": "production.largeMotionCanvas",
+      "ruleId": "large-motion-canvas-exception",
+      "severity": "warning"
+    }
+  ],
+  "documentKind": "actor-export",
+  "fieldOrigins": {
+    "anatomy.build": {
+      "documentId": "ElfGuardian",
+      "source": "actor",
+      "version": 1
+    },
+    "anatomy.footSize": {
+      "documentId": "ElfGuardian",
+      "source": "actor",
+      "version": 1
+    },
+    "anatomy.handSize": {
+      "documentId": "ElfGuardian",
+      "source": "actor",
+      "version": 1
+    },
+    "anatomy.headSize": {
+      "documentId": "ElfGuardian",
+      "source": "actor",
+      "version": 1
+    },
+    "anatomy.isFloatingActor": {
+      "documentId": "HUMAN-FANTASY-01",
+      "source": "world",
+      "version": 1
+    },
+    "anatomy.proportionTemplateId": {
+      "documentId": "ElfGuardian",
+      "source": "actor",
+      "version": 1
+    },
+    "anatomy.speciesScale": {
+      "documentId": "ElfGuardian",
+      "source": "actor",
+      "version": 1
+    },
+    "anatomy.stature": {
+      "documentId": "ElfGuardian",
+      "source": "actor",
+      "version": 1
+    },
+    "anatomy.targetLogicalHeightPx": {
+      "documentId": "ElfGuardian",
+      "source": "actor",
+      "version": 1
+    },
+    "anatomy.torsoWidth": {
+      "documentId": "ElfGuardian",
+      "source": "actor",
+      "version": 1
+    },
+    "pixelStyle.lighting": {
+      "documentId": "HUMAN-FANTASY-01",
+      "source": "world",
+      "version": 1
+    },
+    "pixelStyle.logicalBlockPx.heightPx": {
+      "documentId": "HUMAN-FANTASY-01",
+      "source": "world",
+      "version": 1
+    },
+    "pixelStyle.logicalBlockPx.widthPx": {
+      "documentId": "HUMAN-FANTASY-01",
+      "source": "world",
+      "version": 1
+    },
+    "pixelStyle.outline": {
+      "documentId": "ElfGuardian",
+      "source": "actor",
+      "version": 1
+    },
+    "pixelStyle.styleId": {
+      "documentId": "HUMAN-FANTASY-01",
+      "source": "world",
+      "version": 1
+    },
+    "production.baseCanvas.heightPx": {
+      "documentId": "HUMAN-FANTASY-01",
+      "source": "world",
+      "version": 1
+    },
+    "production.baseCanvas.widthPx": {
+      "documentId": "HUMAN-FANTASY-01",
+      "source": "world",
+      "version": 1
+    },
+    "production.largeMotionCanvas.heightPx": {
+      "documentId": "ElfGuardian",
+      "source": "actor",
+      "version": 1
+    },
+    "production.largeMotionCanvas.policy": {
+      "documentId": "ElfGuardian",
+      "source": "actor",
+      "version": 1
+    },
+    "production.largeMotionCanvas.widthPx": {
+      "documentId": "ElfGuardian",
+      "source": "actor",
+      "version": 1
+    },
+    "production.layers": {
+      "documentId": "HUMAN-FANTASY-01",
+      "source": "world",
+      "version": 1
+    },
+    "production.pivotRule": {
+      "documentId": "HUMAN-FANTASY-01",
+      "source": "world",
+      "version": 1
+    },
+    "production.pixelsPerUnit": {
+      "documentId": "HUMAN-FANTASY-01",
+      "source": "world",
+      "version": 1
+    },
+    "production.unityVisualScale": {
+      "documentId": "HUMAN-FANTASY-01",
+      "source": "world",
+      "version": 1
+    },
+    "view.facing": {
+      "documentId": "HUMAN-FANTASY-01",
+      "source": "world",
+      "version": 1
+    },
+    "view.projection": {
+      "documentId": "HUMAN-FANTASY-01",
+      "source": "world",
+      "version": 1
+    }
+  },
+  "interpretations": [
+    "Species scale is independent of stature and logical height.",
+    "Unity visual scale is a runtime display transform and is normally 1.0.",
+    "Canvas pixels, logical silhouette pixels, and logical pixel block size are distinct measurements."
+  ],
+  "resolved": {
+    "anatomy": {
+      "build": "slender",
+      "footSize": "m",
+      "handSize": "m",
+      "headSize": "m",
+      "isFloatingActor": false,
+      "proportionTemplateId": "humanoid-sd-2.5-head",
+      "speciesScale": 1,
+      "stature": "tall",
+      "targetLogicalHeightPx": 91,
+      "torsoWidth": "normal"
+    },
+    "pixelStyle": {
+      "lighting": "Upper-left",
+      "logicalBlockPx": {
+        "heightPx": 3,
+        "widthPx": 3
+      },
+      "outline": "One logical pixel, dark brown-green",
+      "styleId": "low-companion-v1"
+    },
+    "production": {
+      "baseCanvas": {
+        "heightPx": 512,
+        "widthPx": 512
+      },
+      "largeMotionCanvas": {
+        "heightPx": 1024,
+        "policy": "explicit",
+        "widthPx": 1024
+      },
+      "layers": [
+        "character-or-outfit",
+        "weapon",
+        "effect"
+      ],
+      "pivotRule": "forward-foot-contact",
+      "pixelsPerUnit": 200,
+      "unityVisualScale": 1
+    },
+    "view": {
+      "facing": "screen-right",
+      "projection": "three-quarter"
+    }
+  },
+  "schemaVersion": "1.0.0"
+}

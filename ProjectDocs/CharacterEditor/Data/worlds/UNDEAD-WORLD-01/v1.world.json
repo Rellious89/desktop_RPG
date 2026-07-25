@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1.0.0", "documentKind": "world-template", "revision": 1, "updatedAt": "2026-07-25T00:00:00+09:00",
+  "worldId": "UNDEAD-WORLD-01", "displayName": { "en": "World of the Dead", "ko": "망자들의 세계" }, "status": "active",
+  "description": "Dark fantasy world of undead, spirits, curses, and ancient weapons.",
+  "defaults": { "view": { "projection": "three-quarter", "facing": "screen-right" }, "pixelStyle": { "styleId": "low-companion-v1", "logicalBlockPx": { "widthPx": 3, "heightPx": 3 }, "outline": "Thick stepped near-black outline", "lighting": "Upper-left" }, "anatomy": { "stature": "average", "targetLogicalHeightPx": 70, "build": "normal", "proportionTemplateId": "humanoid-sd-2.5-head", "speciesScale": 1, "headSize": "m", "handSize": "m", "footSize": "m", "torsoWidth": "normal", "isFloatingActor": false }, "production": { "baseCanvas": { "widthPx": 512, "heightPx": 512 }, "largeMotionCanvas": { "policy": "same-as-base" }, "pivotRule": "forward-foot-contact", "pixelsPerUnit": 200, "unityVisualScale": 1, "layers": ["character-or-outfit", "weapon", "effect"] } },
+  "allowedSpecies": ["specter", "skeleton", "zombie", "spirit"], "allowedProportionTemplates": ["humanoid-sd-2.5-head", "anthropomorphic-sd", "floating-spirit"],
+  "evidence": [{ "path": "ProjectDocs/DesignRules/world-setting-rules.md", "claim": "Registered world UNDEAD-WORLD-01", "status": "approved" }]
+}

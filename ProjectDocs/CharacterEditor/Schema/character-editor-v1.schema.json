@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keybuddy.local/schemas/character-editor-v1.schema.json",
+  "title": "KeyBuddy Character Editor Schema v1",
+  "oneOf": [
+    { "$ref": "#/$defs/world" },
+    { "$ref": "#/$defs/actor" }
+  ],
+  "$defs": {
+    "meta": {
+      "type": "object",
+      "required": ["schemaVersion", "documentKind", "revision", "updatedAt"],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "documentKind": { "enum": ["world-template", "actor"] },
+        "revision": { "type": "integer", "minimum": 1 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "world": {
+      "allOf": [{ "$ref": "#/$defs/meta" }],
+      "type": "object",
+      "required": ["worldId", "displayName", "status", "description", "defaults", "evidence"],
+      "properties": {
+        "documentKind": { "const": "world-template" }, "worldId": { "$ref": "#/$defs/id" },
+        "displayName": { "$ref": "#/$defs/name" }, "status": { "enum": ["concept", "active", "hold"] },
+        "description": { "type": "string", "minLength": 1 }, "defaults": { "$ref": "#/$defs/spec" },
+        "allowedSpecies": { "type": "array", "items": { "type": "string" } },
+        "allowedProportionTemplates": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
+      }
+    },
+    "actor": {
+      "allOf": [{ "$ref": "#/$defs/meta" }], "type": "object",
+      "required": ["actorId", "displayName", "aliases", "actorType", "worldRef", "identity", "overrides", "physicalTraits", "appearance", "constraints", "equipment", "approvedExceptions", "evidence"],
+      "properties": {
+        "documentKind": { "const": "actor" }, "actorId": { "$ref": "#/$defs/id" }, "displayName": { "$ref": "#/$defs/name" },
+        "aliases": { "type": "array", "items": { "type": "string", "minLength": 1 } }, "actorType": { "enum": ["character", "monster"] },
+        "worldRef": { "type": "object", "required": ["worldId", "version"], "properties": { "worldId": { "$ref": "#/$defs/id" }, "version": { "type": "integer", "minimum": 1 } } },
+        "identity": { "type": "object" }, "overrides": { "type": "object" }, "physicalTraits": { "type": "array" },
+        "appearance": { "type": "object" }, "constraints": { "type": "object" }, "equipment": { "type": "object" },
+        "approvedExceptions": { "type": "array" }, "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
+      }
+    },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+    "name": { "type": "object", "required": ["en"], "properties": { "en": { "type": "string", "minLength": 1 }, "ko": { "type": "string" } } },
+    "canvas": { "type": "object", "required": ["widthPx", "heightPx"], "properties": { "widthPx": { "type": "integer", "minimum": 1 }, "heightPx": { "type": "integer", "minimum": 1 } } },
+    "evidence": { "type": "object", "required": ["path", "claim", "status"], "properties": { "path": { "type": "string" }, "claim": { "type": "string" }, "status": { "enum": ["approved", "observed", "historical", "conflicting"] } } },
+    "spec": {
+      "type": "object", "required": ["view", "pixelStyle", "anatomy", "production"],
+      "properties": {
+        "view": { "type": "object", "required": ["projection", "facing"] }, "pixelStyle": { "type": "object", "required": ["styleId", "logicalBlockPx", "outline", "lighting"] },
+        "anatomy": { "type": "object", "required": ["stature", "targetLogicalHeightPx", "build", "proportionTemplateId", "speciesScale", "headSize", "handSize", "footSize", "torsoWidth", "isFloatingActor"] },
+        "production": { "type": "object", "required": ["baseCanvas", "largeMotionCanvas", "pivotRule", "pixelsPerUnit", "unityVisualScale", "layers"] }
+      }
+    }
+  }
+}

@@ -1,0 +1,112 @@
+import type { ActorDocumentV1, WorldTemplateV1 } from "../schema";
+import { compareActors } from "../domain/comparison";
+import { resolveActor } from "../domain/resolve";
+import { validateActor } from "../domain/validation";
+import type { ActorExportEnvelope } from "../domain/types";
+import { stableJson } from "./stable";
+
+export function serializeActor(actor: ActorDocumentV1): string { return stableJson(actor); }
+
+export function buildExport(actor: ActorDocumentV1, world: WorldTemplateV1, references: ActorDocumentV1[] = []): ActorExportEnvelope {
+  const { resolved, fieldOrigins } = resolveActor(actor, world);
+  const diagnostics = validateActor(actor, world, references.map((ref) => ({ actor: ref, world })));
+  const weaponRatio = actor.equipment.weapon?.lengthToBodyRatio;
+  return {
+    schemaVersion: "1.0.0", documentKind: "actor-export", authored: actor, resolved, fieldOrigins,
+    calculated: {
+      heightFromWorldBaselinePercent: ((resolved.anatomy.targetLogicalHeightPx / world.defaults.anatomy.targetLogicalHeightPx) - 1) * 100,
+      weaponLengthLogicalPx: weaponRatio ? resolved.anatomy.targetLogicalHeightPx * weaponRatio : null,
+      weaponOccupancyPercent: actor.equipment.weapon?.estimatedOccupancyPercent ?? null,
+    },
+    interpretations: [
+      "Species scale is independent of stature and logical height.",
+      "Unity visual scale is a runtime display transform and is normally 1.0.",
+      "Canvas pixels, logical silhouette pixels, and logical pixel block size are distinct measurements.",
+    ], diagnostics,
+    comparison: references[0] ? compareActors(actor, references[0], world) : undefined,
+  };
+}
+
+export const exportJson = (envelope: ActorExportEnvelope): string => stableJson(envelope);
+
+export function exportMarkdown(e: ActorExportEnvelope): string {
+  const a = e.authored, r = e.resolved, w = a.equipment.weapon;
+  const origin = (path: string) => e.fieldOrigins[path]?.source === "actor" ? "Override" : "World";
+  const rows = e.diagnostics.map((d) => `- **${d.severity.toUpperCase()}** \`${d.ruleId}\`: ${d.message}${d.exceptionApproved ? " — Approved exception" : ""}`).join("\n") || "- None";
+  const exceptions = a.approvedExceptions.filter((x) => x.active).map((x) => `- \`${x.ruleId}\`: ${x.reason}`).join("\n") || "- None";
+  const comparisons = e.comparison?.metrics.map((m) => `| ${m.label} | ${m.draft} | ${m.reference} | ${(m.matches ?? m.draft === m.reference) ? "Match" : "Mismatch"} | ${m.absoluteDelta === undefined ? "—" : `${m.absoluteDelta >= 0 ? "+" : ""}${m.absoluteDelta}${m.percentDelta === undefined ? "" : ` (${m.percentDelta.toFixed(1)}%)`}`} |`).join("\n");
+  return `# ${a.actorId} — Character Sheet
+
+- Display name: ${a.displayName.ko ? `${a.displayName.ko} / ` : ""}${a.displayName.en}
+- Type: ${a.actorType} · World: \`${a.worldRef.worldId}\` v${a.worldRef.version}
+- Aliases: ${a.aliases.length ? a.aliases.join(", ") : "None"}
+- Species: ${a.identity.species} · Role: ${a.identity.role} · Status: ${a.identity.status}
+- Concept: ${a.identity.concept}
+
+## Body & Proportions
+
+| Field | Value | Origin |
+|---|---:|---|
+| Stature | ${r.anatomy.stature} | ${origin("anatomy.stature")} |
+| Target logical height | ${r.anatomy.targetLogicalHeightPx}px | ${origin("anatomy.targetLogicalHeightPx")} |
+| Build | ${r.anatomy.build} | ${origin("anatomy.build")} |
+| Proportion | ${r.anatomy.proportionTemplateId} | ${origin("anatomy.proportionTemplateId")} |
+| Species scale | ${r.anatomy.speciesScale} | ${origin("anatomy.speciesScale")} |
+| Head / hand / foot / torso | ${r.anatomy.headSize} / ${r.anatomy.handSize} / ${r.anatomy.footSize} / ${r.anatomy.torsoWidth} | mixed |
+
+## Look
+
+- Physical traits: ${a.physicalTraits.join("; ") || "None"}
+- Hair / eyes / skin: ${a.appearance.hair ?? "N/A"} / ${a.appearance.eyes ?? "N/A"} / ${a.appearance.skin ?? "N/A"}
+- Clothing: ${a.appearance.clothing.join("; ") || "None"}
+- Materials: ${a.appearance.materials.join("; ") || "None"}
+- Decorations: ${a.appearance.decorations.join("; ") || "None"}
+- Invariants: ${a.constraints.invariants.join("; ") || "None"}
+- Forbidden: ${a.constraints.forbidden.join("; ") || "None"}
+
+## Weapon & Equipment
+
+- Weapon: ${w ? `${w.family}, ${w.sizeClass}, count ${w.count}` : "None"}
+- Hands: ${w ? `${w.mainHand} / ${w.offHand}` : "N/A"}
+- Structure: ${w?.structure ?? "N/A"}
+- Allowed families: ${a.equipment.allowedWeaponFamilies.join(", ") || "None"}
+- Secondary: ${a.equipment.secondary.join(", ") || "None"}
+
+## Production & Canvas
+
+- Base canvas: ${r.production.baseCanvas.widthPx}×${r.production.baseCanvas.heightPx}
+- Large-motion canvas: ${r.production.largeMotionCanvas.policy === "explicit" ? `${r.production.largeMotionCanvas.widthPx}×${r.production.largeMotionCanvas.heightPx}` : "same as base"}
+- Logical block: ${r.pixelStyle.logicalBlockPx.widthPx}×${r.pixelStyle.logicalBlockPx.heightPx}
+- Pivot: ${r.production.pivotRule}${r.production.pivot ? ` (${r.production.pivot.xNormalized}, ${r.production.pivot.yNormalized}; ${r.production.pivot.source})` : ""}
+- PPU: ${r.production.pixelsPerUnit}
+- Unity visual scale: ${r.production.unityVisualScale}
+- Layers: ${r.production.layers.join(" → ")}
+
+## Validation Summary
+
+${rows}
+
+## Approved Exceptions
+
+${exceptions}
+${e.comparison ? `
+## Comparison Snapshot (vs ${e.comparison.referenceActorId})
+
+| Metric | Actor | Reference | Result | Delta |
+|---|---:|---:|:---:|---:|
+${comparisons}
+` : ""}
+## Calculated Values and Interpretations
+
+- Height relative to world baseline: ${Number(e.calculated.heightFromWorldBaselinePercent).toFixed(1)}%
+- Weapon logical length estimate: ${e.calculated.weaponLengthLogicalPx ?? "N/A"}
+${e.interpretations.map((x) => `- ${x}`).join("\n")}
+
+## Schema
+
+- schemaVersion: \`${e.schemaVersion}\`
+- worldTemplateRef: \`${a.worldRef.worldId}\` v${a.worldRef.version}
+`;
+}
+
+export { stableJson } from "./stable";

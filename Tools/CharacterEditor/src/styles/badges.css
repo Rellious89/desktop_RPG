@@ -1,0 +1,50 @@
+.ce-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  padding: 2px var(--ce-space-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ce-badge--inherited {
+  background: var(--ce-inherited-soft);
+  color: var(--ce-inherited);
+}
+
+.ce-badge--override {
+  background: var(--ce-override-soft);
+  color: var(--ce-override);
+}
+
+.ce-badge--locked {
+  background: var(--ce-surface-sunken);
+  color: var(--ce-text-muted);
+}
+
+.ce-badge--error {
+  background: var(--ce-error-soft);
+  color: var(--ce-error);
+}
+
+.ce-badge--warning {
+  background: var(--ce-warning-soft);
+  color: var(--ce-warning);
+}
+
+.ce-badge--info {
+  background: var(--ce-info-soft);
+  color: var(--ce-info);
+}
+
+.ce-badge--success {
+  background: var(--ce-success-soft);
+  color: var(--ce-success);
+}
+
+.ce-badge--neutral {
+  background: var(--ce-surface-sunken);
+  color: var(--ce-text-muted);
+}

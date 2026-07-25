@@ -1,0 +1,59 @@
+.ce-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ce-space-2);
+  border-radius: var(--ce-radius-sm);
+  padding: var(--ce-space-2) var(--ce-space-4);
+  font-size: var(--ce-font-size-base);
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.ce-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ce-btn--primary {
+  background: var(--ce-accent);
+  border-color: var(--ce-accent);
+  color: #fff;
+}
+
+.ce-btn--primary:hover:not(:disabled) {
+  background: var(--ce-accent-strong);
+}
+
+.ce-btn--secondary {
+  background: var(--ce-surface);
+  border-color: var(--ce-border-strong);
+  color: var(--ce-text);
+}
+
+.ce-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ce-accent);
+  padding-left: var(--ce-space-2);
+  padding-right: var(--ce-space-2);
+}
+
+.ce-btn--danger {
+  background: var(--ce-error-soft);
+  border-color: var(--ce-error);
+  color: var(--ce-error);
+}
+
+.ce-btn--sm {
+  padding: var(--ce-space-1) var(--ce-space-3);
+  font-size: var(--ce-font-size-sm);
+}
+
+.ce-btn-group {
+  display: flex;
+  gap: var(--ce-space-2);
+  flex-wrap: wrap;
+}

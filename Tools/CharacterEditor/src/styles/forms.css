@@ -1,0 +1,154 @@
+.ce-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ce-space-1);
+  background: var(--ce-surface);
+  border: 1px solid var(--ce-border);
+  border-radius: var(--ce-radius-md);
+  padding: var(--ce-space-3);
+}
+
+.ce-field--locked {
+  background: var(--ce-surface-sunken);
+}
+
+.ce-field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ce-space-2);
+  flex-wrap: wrap;
+}
+
+.ce-field-label {
+  display: flex;
+  align-items: center;
+  gap: var(--ce-space-1);
+  font-weight: 600;
+  font-size: var(--ce-font-size-sm);
+}
+
+.ce-required-mark {
+  color: var(--ce-error);
+}
+
+.ce-field-badges {
+  display: flex;
+  align-items: center;
+  gap: var(--ce-space-2);
+}
+
+.ce-field input[type="text"],
+.ce-field input[type="number"],
+.ce-field select,
+.ce-field textarea {
+  border: 1px solid var(--ce-border);
+  border-radius: var(--ce-radius-sm);
+  padding: var(--ce-space-2) var(--ce-space-2);
+  background: var(--ce-surface);
+  color: var(--ce-text);
+  font-size: var(--ce-font-size-base);
+  width: 100%;
+}
+
+.ce-field textarea {
+  min-height: 4.5em;
+  resize: vertical;
+}
+
+.ce-field input:disabled,
+.ce-field select:disabled,
+.ce-field textarea:disabled {
+  color: var(--ce-text-muted);
+  cursor: not-allowed;
+}
+
+.ce-field-hint {
+  font-size: var(--ce-font-size-sm);
+  color: var(--ce-text-muted);
+}
+
+.ce-field-baseline {
+  font-size: var(--ce-font-size-sm);
+  color: var(--ce-text-faint);
+}
+
+.ce-tag-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ce-space-1);
+}
+
+.ce-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ce-space-1);
+  background: var(--ce-accent-soft);
+  color: var(--ce-accent-strong);
+  border-radius: 999px;
+  padding: 2px var(--ce-space-2);
+  font-size: var(--ce-font-size-sm);
+}
+
+.ce-tag button {
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.9em;
+  line-height: 1;
+  padding: 0;
+}
+
+.ce-fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.ce-fieldset legend {
+  font-size: var(--ce-font-size-lg);
+  font-weight: 700;
+  margin-bottom: var(--ce-space-3);
+  padding: 0;
+}
+
+.ce-help-trigger {
+  border: 1px solid var(--ce-border-strong);
+  background: var(--ce-surface);
+  color: var(--ce-text-muted);
+  border-radius: 999px;
+  width: 1.25rem;
+  height: 1.25rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.ce-help-popover {
+  position: relative;
+  display: inline-flex;
+}
+
+.ce-help-bubble {
+  position: absolute;
+  z-index: 30;
+  top: 130%;
+  left: 0;
+  width: 260px;
+  background: var(--ce-text);
+  color: var(--ce-surface);
+  border-radius: var(--ce-radius-sm);
+  padding: var(--ce-space-3);
+  font-size: var(--ce-font-size-sm);
+  box-shadow: var(--ce-shadow-md);
+}
+
+.ce-help-bubble strong {
+  display: block;
+  margin-bottom: 4px;
+}

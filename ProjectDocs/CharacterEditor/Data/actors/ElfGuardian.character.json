@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0", "documentKind": "actor", "revision": 1, "updatedAt": "2026-07-25T00:00:00+09:00",
+  "actorId": "ElfGuardian", "displayName": { "en": "Leaf Glaive Elf", "ko": "나뭇잎 글레이브 엘프" }, "aliases": ["LeafGlaiveElf", "Elfguardian"], "actorType": "character",
+  "worldRef": { "worldId": "HUMAN-FANTASY-01", "version": 1 },
+  "identity": { "species": "elf", "sex": "unknown", "ageGroup": "adult", "role": "Glaive warrior / long-reach melee", "concept": "A blond elf warrior in light forest clothing wielding a straight-shaft leaf glaive.", "status": "master" },
+  "overrides": { "anatomy": { "stature": "tall", "targetLogicalHeightPx": 91, "build": "slender", "proportionTemplateId": "humanoid-sd-2.5-head", "speciesScale": 1, "headSize": "m", "handSize": "m", "footSize": "m", "torsoWidth": "normal" }, "pixelStyle": { "outline": "One logical pixel, dark brown-green" }, "production": { "largeMotionCanvas": { "policy": "explicit", "widthPx": 1024, "heightPx": 1024 } } },
+  "physicalTraits": ["Long pointed ears", "Tall slender humanoid stature"],
+  "appearance": { "hair": "Blond", "skin": "Light", "clothing": ["Light forest cloth", "Leaf decorations"], "materials": ["Cloth", "Wood", "Metal"], "palette": [{ "role": "hair", "value": "golden blond" }, { "role": "clothing", "value": "leaf green" }], "decorations": ["Leaf motifs"] },
+  "constraints": { "invariants": ["Long exposed pointed ears", "Straight white glaive shaft", "One curved forward blade", "Blunt yellow rear ornament"], "forbidden": ["Bow", "Shield", "Heavy plate", "Double-ended blade", "Weapon longer than 1.25 body heights"] },
+  "equipment": { "weapon": { "family": "glaive", "sizeClass": "large", "mainHand": "both", "offHand": "both", "direction": "Curved blade screen-right/up", "structure": "One straight shaft, one front blade, blunt rear ornament", "count": 1, "lengthToBodyRatio": 1.2, "estimatedOccupancyPercent": 65 }, "secondary": [], "allowedWeaponFamilies": ["glaive", "polearm"] },
+  "approvedExceptions": [{ "ruleId": "large-motion-canvas-exception", "reason": "Existing ElfGuardian attack frames are approved 1024×1024 observed assets.", "active": true }],
+  "evidence": [{ "path": "ProjectDocs/ArtPipeline/Characters/LeafGlaiveElf/01_character-brief.md", "claim": "Design identity, 91px target and glaive constraints", "status": "approved" }, { "path": "ProjectDocs/ArtPipeline/Characters/LeafGlaiveElf/03_master-measurements.md", "claim": "Legacy actual scale 1.3 is historical production sizing only; it is not species or Unity scale", "status": "historical" }, { "path": "Assets/Art/Character/ElfGuardian", "claim": "Shipped resource folder and canonical editor ID", "status": "observed" }],
+  "resourceFolderPath": "Assets/Art/Character/ElfGuardian"
+}

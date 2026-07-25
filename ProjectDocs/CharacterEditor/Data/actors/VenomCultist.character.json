@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0", "documentKind": "actor", "revision": 1, "updatedAt": "2026-07-25T00:00:00+09:00",
+  "actorId": "VenomCultist", "displayName": { "en": "Venom Cultist", "ko": "독단검 이교도" }, "aliases": [], "actorType": "monster",
+  "worldRef": { "worldId": "HUMAN-FANTASY-01", "version": 1 },
+  "identity": { "species": "human", "sex": "unknown", "ageGroup": "adult", "role": "Poison-dagger cultist", "concept": "A living human cultist hidden in a dark-purple hood, carrying one poisoned dagger.", "status": "active" },
+  "overrides": { "anatomy": { "stature": "average", "targetLogicalHeightPx": 70, "build": "normal", "proportionTemplateId": "humanoid-sd-2.5-head", "speciesScale": 1, "headSize": "m", "handSize": "m", "footSize": "m", "torsoWidth": "normal" }, "production": { "pivot": { "xNormalized": 0.5234375, "yNormalized": 0.2578125, "source": "measured" } }, "pixelStyle": { "outline": "One logical pixel, near-black purple" } },
+  "physicalTraits": ["Living human", "Face almost fully hidden in hood shadow"],
+  "appearance": { "eyes": "Hidden", "skin": "Mostly hidden", "clothing": ["Deep dark-purple hooded robe"], "materials": ["Cloth", "Bone", "Metal", "Poison"], "palette": [{ "role": "robe", "value": "dark purple" }, { "role": "poison", "value": "green" }], "decorations": ["Large bone-white skull pendant"] },
+  "constraints": { "invariants": ["Hood shadow hides face", "One centered skull pendant", "Exactly one short poisoned dagger"], "forbidden": ["Undead body", "Second weapon", "Staff", "Shield", "Heavy armor"] },
+  "equipment": { "weapon": { "family": "dagger", "sizeClass": "small", "mainHand": "anatomical-right", "offHand": "none", "direction": "Held forward", "structure": "One short poison-coated dagger", "count": 1, "estimatedOccupancyPercent": 35 }, "secondary": ["Skull pendant"], "allowedWeaponFamilies": ["dagger"] },
+  "approvedExceptions": [],
+  "evidence": [{ "path": "ProjectDocs/ArtPipeline/Enemies/VenomCultist/01_monster-brief.md", "claim": "Identity, 70px, 512 canvas, scale 1.0", "status": "approved" }, { "path": "ProjectDocs/ArtPipeline/Enemies/VenomCultist/03_master-measurements.md", "claim": "Measured pivot 0.5234375 / 0.2578125", "status": "approved" }],
+  "resourceFolderPath": "Assets/Art/Enemy/VenomCultist"
+}
