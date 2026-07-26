@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a793bf2a4d96489da376ed10ce30d0c1, type: 3}
+  m_Name: MoleMiner_MotionProfile
+  m_EditorClassIdentifier: 
+  displayName: MoleMiner
+  resourceFolderPath: Assets/Art/Enemy/MoleMiner
+  spriteFlipX: 1
+  baseIdle:
+    displayName: Base Idle
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 9bdeacd364be24b1db58a287bc8b2713, type: 3}
+    - {fileID: 21300000, guid: 3aa323152bc0f4e0c9ec4e08d376a045, type: 3}
+    - {fileID: 21300000, guid: 70a0a47f84a23416b942097ba1e85b1b, type: 3}
+    - {fileID: 21300000, guid: 2aa564ece3f0c4bc0be63151f73d7e20, type: 3}
+    animationFps: 6
+  idleEvents:
+  - displayName: idle a
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: e86f62d86a4b745ad88d0b3cc1d47e0c, type: 3}
+    - {fileID: 21300000, guid: 97282c1220fb94ef492cbc0e4b96a99f, type: 3}
+    - {fileID: 21300000, guid: b0fb96b0884ea4cad85d92fcefda9816, type: 3}
+    - {fileID: 21300000, guid: 1de9171f6ba54413e8ffce18b1931444, type: 3}
+    - {fileID: 21300000, guid: 80d2fff42146f4571939e6bceddd5b02, type: 3}
+    - {fileID: 21300000, guid: 5b548fc0f95c64fefbd0de1310f70cbe, type: 3}
+    animationFps: 6
+  idleEventCheckInterval: 4
+  idleEventChance: 0.5
+  hit:
+    displayName: Hit
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 36f3aa3282e2f4a56a3b36db4f3e63f5, type: 3}
+    - {fileID: 21300000, guid: ec39be6279ae849f58cd0e91c864e5a8, type: 3}
+    animationFps: 6
+  defeat:
+    displayName: Defeat
+    editorDescription: 
+    frames: []
+    animationFps: 6
+  hitReaction:
+    holdFrame: 0
+    recoveryFrame: 1
+    recoveryDuration: 0.12
+    holdTimeout: 0.2
+    shakeStrength: 0.04
+    shakeFrequency: 35
+    shakeDecayDuration: 0.15
+    damageNumberOffset: {x: 0.09, y: 1.36}
+    damageNumberRandomHorizontalJitter: 0.1
+    damageNumberRiseDistance: 0.4
+    damageNumberDuration: 0.6
+    damageNumberTextColor: {r: 1, g: 0, b: 0, a: 1}
+    damageNumberFontSize: 3
+    damageNumberSortingOrder: 10
+  preview:
+    actorOffset: {x: 0.3, y: 0}
+    receivePointOffset: {x: 0, y: 0.35}
+    actorScale: 1

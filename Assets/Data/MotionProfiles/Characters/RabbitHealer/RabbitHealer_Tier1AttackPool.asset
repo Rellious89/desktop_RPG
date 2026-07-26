@@ -9,8 +9,8 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 774fdafcfdd64179a65c99125ab38364, type: 3}
-  m_Name: CombatStageLayout
+  m_Script: {fileID: 11500000, guid: f016b2a4220d444bb663543fb24b5ff1, type: 3}
+  m_Name: RabbitHealer_Tier1AttackPool
   m_EditorClassIdentifier: 
-  characterSlotPosition: {x: -0.7, y: 0}
-  monsterSlotPosition: {x: 0.4, y: 0}
+  motions:
+  - {fileID: 11400000, guid: 229fc50320a6a46aeb87c400d24b2108, type: 2}

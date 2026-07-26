@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4a8746ce2a8483a8d6a1b3f4ef0c912, type: 3}
+  m_Name: RabbitHealer_MotionProfile
+  m_EditorClassIdentifier: 
+  displayName: RabbitHealer
+  resourceFolderPath: Assets/Art/Character/RabbitHealer
+  baseIdle:
+    displayName: Base Idle
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 048c40db585074957a31620c91788701, type: 3}
+    - {fileID: 21300000, guid: 89cbb8ae569974c1381412828837a424, type: 3}
+    - {fileID: 21300000, guid: 02f519495cd8a4dfe8bbd5c3881a5431, type: 3}
+    - {fileID: 21300000, guid: d407775d199ec4d9dbac3e6a2cb2180a, type: 3}
+    animationFps: 6
+  idleEvents:
+  - displayName: idle a
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 1d91ea475f83441c3964781934e0c95b, type: 3}
+    - {fileID: 21300000, guid: 9f341348c6c2e464397f5c343fefe846, type: 3}
+    - {fileID: 21300000, guid: 47d5f23200594489b8946e40bb40bd6a, type: 3}
+    - {fileID: 21300000, guid: b04b6d0b3fc4345219f17d5064833c8d, type: 3}
+    - {fileID: 21300000, guid: 7f9a1d10ce6e8432e823736c2394be1f, type: 3}
+    animationFps: 6
+  - displayName: idle b
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: cca0c7f8d33be4efdabe106f6927b76c, type: 3}
+    - {fileID: 21300000, guid: a8dd507161b1541059a15b372ae5f919, type: 3}
+    - {fileID: 21300000, guid: afaacc6b063d144ff810acf76ebacbff, type: 3}
+    - {fileID: 21300000, guid: b7a951a4441aa4e6685d3d8481f01c13, type: 3}
+    - {fileID: 21300000, guid: 42e305d0c4fad4ae7bbba3f3dc10667a, type: 3}
+    - {fileID: 21300000, guid: 87fbdcfa2dab7461bb898c2f7a135fff, type: 3}
+    animationFps: 6
+  idleEventCheckInterval: 4
+  idleEventChance: 0.5
+  tier1Pool: {fileID: 11400000, guid: b91f4d60af9634afc9101a92559b851b, type: 2}
+  tier2Pool: {fileID: 0}
+  tier3Pool: {fileID: 0}
+  attackMovement:
+    overrideComponentValues: 1
+    moveDistance: 0.1
+    moveOutDuration: 0.14
+    moveBackDuration: 0.05
+  preview:
+    targetIdleSprite: {fileID: 0}
+    targetHitSprite: {fileID: 0}
+    characterOffset: {x: 0, y: 0}
+    receivePointOffset: {x: 0, y: 0.35}
+    characterScale: 1
+    targetOffset: {x: 1.15, y: 0}
+    targetScale: 1
