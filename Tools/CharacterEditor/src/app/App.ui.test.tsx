@@ -45,7 +45,10 @@ describe("App", () => {
 
     expect(await screen.findByDisplayValue("ElfGuardian")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Body & Proportions" }));
-    expect(screen.getByDisplayValue("91")).toBeInTheDocument();
+    // 91 logical px at the world's 3x3 density is authored as 273 physical px;
+    // the logical height is shown as a derived read-only value.
+    expect(screen.getByDisplayValue("273")).toBeInTheDocument();
+    expect(screen.getByText("273 ÷ 3 = 91 logical px")).toBeInTheDocument();
     const speciesField = screen.getByText("Species Scale").closest(".ce-field");
     expect(speciesField?.querySelector("input")).toHaveValue(1);
 
@@ -53,6 +56,9 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText(/비교 대상/), { target: { value: "VenomCultist" } });
     expect(await screen.findByText("Logical height")).toBeInTheDocument();
     expect(screen.getByText("+21 (+30.0%)")).toBeInTheDocument();
+    // Same 30% size gap expressed in physical px, the density-independent metric.
+    expect(screen.getByText("Physical height")).toBeInTheDocument();
+    expect(screen.getByText("+63 (+30.0%)")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "돌아가기" }));
 
     fireEvent.click(screen.getByRole("button", { name: /Export 미리보기/ }));

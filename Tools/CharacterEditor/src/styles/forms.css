@@ -152,3 +152,15 @@
   display: block;
   margin-bottom: 4px;
 }
+
+/* Read-only display for values the editor computes rather than accepts, so a
+   derived field is visibly not an input. */
+.ce-derived-value {
+  display: block;
+  padding: var(--ce-space-2) var(--ce-space-3);
+  border: 1px dashed var(--ce-border-strong);
+  border-radius: var(--ce-radius-sm);
+  background: var(--ce-surface-sunken);
+  color: var(--ce-text-muted);
+  font-variant-numeric: tabular-nums;
+}

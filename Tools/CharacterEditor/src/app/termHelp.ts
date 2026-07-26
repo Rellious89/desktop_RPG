@@ -20,13 +20,29 @@ export const TERM_HELP: Record<string, TermHelpEntry> = {
     helpEn:
       "The size class of the body only — kept separate from Species Scale, which represents a uniformly larger species/individual.",
   },
-  targetLogicalHeightPx: {
-    termKo: "목표 논리 높이(px)",
-    termEn: "Target logical height (px)",
+  targetPhysicalHeightPx: {
+    termKo: "목표 물리 높이(px)",
+    termEn: "Target physical height (px)",
     helpKo:
-      "머리끝부터 접지점(또는 부유형은 바닥 투영점)까지의 논리 픽셀 높이입니다. 일반 액터는 65~75px 권장, 벗어나면 승인된 예외가 필요합니다.",
+      "머리끝부터 접지점(부유형은 바닥 투영점)까지의 실제 이미지 픽셀 높이입니다. 캐릭터가 '얼마나 큰가'를 정하는 정본 값이며 픽셀 밀도와 무관합니다. 3×3 기준 195px가 논리 65px에 해당합니다.",
     helpEn:
-      "Logical pixel height from head to ground/floor-projection contact. General actors target 65-75px; values outside that range need an approved exception.",
+      "Body height in real image pixels, head to ground/floor-projection contact. This is the authoritative size and does not change with pixel density; 195px equals 65 logical px at 3×3.",
+  },
+  densityPreset: {
+    termKo: "픽셀 밀도",
+    termEn: "Pixel density",
+    helpKo:
+      "논리 픽셀 하나를 몇 이미지 픽셀로 그릴지입니다. 3×3 Standard가 KeyBuddy 기본, 2×2 Detail은 같은 크기에서 더 촘촘한 픽셀을 씁니다. 밀도를 바꿔도 목표 물리 높이는 그대로이고 논리 높이만 다시 계산됩니다.",
+    helpEn:
+      "Image pixels per logical pixel. 3x3 Standard is the KeyBuddy default; 2x2 Detail packs finer pixels into the same body size. Changing density keeps the target physical height and recomputes logical height.",
+  },
+  targetLogicalHeightPx: {
+    termKo: "목표 논리 높이(px) — 자동 계산",
+    termEn: "Target logical height (px) — derived",
+    helpKo:
+      "목표 물리 높이 ÷ 픽셀 밀도 블록으로 자동 계산됩니다. 직접 입력하지 않습니다. 3×3에서 일반 액터는 65~75px 권장이며, 벗어나면 승인된 예외가 필요합니다.",
+    helpEn:
+      "Derived as target physical height divided by the density block; not entered directly. At 3x3 general actors target 65-75px, and values outside that range need an approved exception.",
   },
   buildClass: {
     termKo: "Build 등급",

@@ -4,8 +4,9 @@ import { DomainApiContext, type DomainApi } from "./domainApi";
 import { loadRealDomainApi } from "./realDomainApi";
 import { loadRealPersistenceApi, type PersistenceApi } from "./realPersistenceApi";
 import { loadSampleLibrary } from "./sampleLibrary";
-import { createBlankActor, removeApprovedException, upsertApprovedException } from "./actorDraft";
+import { createBlankActor, removeApprovedException, setBodyScale, upsertApprovedException } from "./actorDraft";
 import { createBlankWorld, draftNextRevisionOf } from "./worldDraft";
+import { DENSITY_PRESETS, logicalHeightAt, resolveScale, type DensityPresetId } from "./scale";
 
 import { AppShell, type Breadcrumb } from "../components/layout/AppShell";
 import { StatusBanner } from "../components/common/StatusBanner";
@@ -207,8 +208,25 @@ export function App() {
     setView({ kind: "new-actor-pick-world" });
   }
 
-  function pickWorldForNewActor(world: WorldTemplate, actorType: ActorDocument["actorType"]) {
-    const actor = createBlankActor({ worldId: world.worldId, version: world.revision }, actorType);
+  function pickWorldForNewActor(
+    world: WorldTemplate,
+    actorType: ActorDocument["actorType"],
+    densityPreset: DensityPresetId,
+  ) {
+    const blank = createBlankActor({ worldId: world.worldId, version: world.revision }, actorType);
+    const worldScale = resolveScale(world.defaults.anatomy, world.defaults.pixelStyle);
+    // A density other than the world's is stored as an override that pins the
+    // world's physical height, so the new actor is the same size as its peers
+    // and only its pixel grid differs.
+    const actor =
+      densityPreset === "custom" || densityPreset === worldScale.densityPreset
+        ? blank
+        : setBodyScale(blank, {
+            targetPhysicalHeightPx: worldScale.targetPhysicalHeightPx,
+            targetLogicalHeightPx: logicalHeightAt(worldScale.targetPhysicalHeightPx, DENSITY_PRESETS[densityPreset]),
+            densityPreset,
+            blockPx: DENSITY_PRESETS[densityPreset],
+          });
     setDraftSavedAt(null);
     setView({ kind: "actor-editor", actor });
   }

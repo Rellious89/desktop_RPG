@@ -1,6 +1,10 @@
 import type { ActorDocument, InheritableSpec, WorldTemplate } from "../../app/types";
-import { resetAnatomyOverride, setAnatomyOverride, setPhysicalTraits } from "../../app/actorDraft";
-import { anatomyOrigin } from "../../app/fieldOrigin";
+import {
+  resetAnatomyOverride, resetBodyHeightOverride, resetDensityOverride, setAnatomyOverride,
+  setBodyScale, setPhysicalTraits,
+} from "../../app/actorDraft";
+import { anatomyOrigin, bodyHeightOrigin, densityOrigin } from "../../app/fieldOrigin";
+import { DENSITY_OPTIONS, DENSITY_PRESETS, logicalHeightAt, resolveScale } from "../../app/scale";
 import { FieldRow } from "../common/FieldRow";
 import { TagListEditor } from "../common/TagListEditor";
 
@@ -21,9 +25,14 @@ export interface BodySectionProps {
 export function BodySection({ actor, world, resolved, onChangeActor }: BodySectionProps) {
   const anatomy = resolved.anatomy;
   const worldDefaults = world.defaults.anatomy;
+  // Physical height is the authored size; logical height is what it becomes on
+  // this actor's pixel grid. Compare sizes in physical px so the ratio does not
+  // move when an actor picks a different density than its world.
+  const scale = resolveScale(anatomy, resolved.pixelStyle);
+  const worldScale = resolveScale(world.defaults.anatomy, world.defaults.pixelStyle);
 
   const impliedScale =
-    worldDefaults.targetLogicalHeightPx > 0 ? anatomy.targetLogicalHeightPx / worldDefaults.targetLogicalHeightPx : null;
+    worldScale.targetPhysicalHeightPx > 0 ? scale.targetPhysicalHeightPx / worldScale.targetPhysicalHeightPx : null;
   const scaleDeltaPercent =
     impliedScale !== null && anatomy.speciesScale > 0
       ? Math.round(((impliedScale - anatomy.speciesScale) / anatomy.speciesScale) * 1000) / 10
@@ -61,27 +70,87 @@ export function BodySection({ actor, world, resolved, onChangeActor }: BodySecti
         </FieldRow>
 
         <FieldRow
-          label="목표 논리 높이(px)"
+          label="목표 물리 높이(px)"
           required
-          termKey="targetLogicalHeightPx"
-          origin={anatomyOrigin(actor, "targetLogicalHeightPx")}
-          baselineLabel={`World 기본값: ${worldDefaults.targetLogicalHeightPx}px (권장 65~75px)`}
-          onReset={() => onChangeActor((current) => resetAnatomyOverride(current, "targetLogicalHeightPx"))}
+          termKey="targetPhysicalHeightPx"
+          origin={bodyHeightOrigin(actor)}
+          baselineLabel={`World 기본값: ${worldScale.targetPhysicalHeightPx}px (${worldScale.targetLogicalHeightPx} logical @ ${worldScale.blockPx}×${worldScale.blockPx})`}
+          onReset={() => onChangeActor((current) => resetBodyHeightOverride(current))}
           hint={
-            anatomy.targetLogicalHeightPx < 65 || anatomy.targetLogicalHeightPx > 75
-              ? "권장 범위(65~75px)를 벗어났습니다 — Validation 패널에서 승인된 예외를 등록하세요."
+            scale.roundingResidualPx !== 0
+              ? `${scale.blockPx}px 블록의 배수가 아닙니다 — 실제로는 ${scale.effectivePhysicalHeightPx}px로 제작됩니다.`
               : undefined
           }
         >
           <input
             type="number"
-            value={anatomy.targetLogicalHeightPx}
-            onChange={(event) =>
+            value={scale.targetPhysicalHeightPx}
+            onChange={(event) => {
+              const targetPhysicalHeightPx = Number(event.target.value);
               onChangeActor((current) =>
-                setAnatomyOverride(current, "targetLogicalHeightPx", Number(event.target.value)),
-              )
-            }
+                setBodyScale(current, {
+                  targetPhysicalHeightPx,
+                  targetLogicalHeightPx: logicalHeightAt(targetPhysicalHeightPx, scale.blockPx),
+                }),
+              );
+            }}
           />
+        </FieldRow>
+
+        <FieldRow
+          label="픽셀 밀도"
+          required
+          termKey="densityPreset"
+          origin={densityOrigin(actor)}
+          baselineLabel={`World 기본값: ${worldScale.blockPx}×${worldScale.blockPx}`}
+          onReset={() =>
+            onChangeActor((current) =>
+              resetDensityOverride(current, logicalHeightAt(scale.targetPhysicalHeightPx, worldScale.blockPx)),
+            )
+          }
+          hint={`이 밀도에서 목표 논리 높이는 ${scale.targetLogicalHeightPx}px입니다. 밀도를 바꿔도 물리 높이 ${scale.targetPhysicalHeightPx}px는 유지됩니다.`}
+        >
+          <select
+            aria-label="픽셀 밀도"
+            value={scale.densityPreset}
+            onChange={(event) => {
+              const preset = event.target.value as keyof typeof DENSITY_PRESETS;
+              const blockPx = DENSITY_PRESETS[preset];
+              onChangeActor((current) =>
+                setBodyScale(current, {
+                  targetPhysicalHeightPx: scale.targetPhysicalHeightPx,
+                  targetLogicalHeightPx: logicalHeightAt(scale.targetPhysicalHeightPx, blockPx),
+                  densityPreset: preset,
+                  blockPx,
+                }),
+              );
+            }}
+          >
+            {DENSITY_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label} ({option.note}) → {logicalHeightAt(scale.targetPhysicalHeightPx, DENSITY_PRESETS[option.id])} logical px
+              </option>
+            ))}
+            {scale.densityPreset === "custom" && (
+              <option value="custom">
+                custom {resolved.pixelStyle.logicalBlockPx.widthPx}×{resolved.pixelStyle.logicalBlockPx.heightPx}
+              </option>
+            )}
+          </select>
+        </FieldRow>
+
+        <FieldRow
+          label="목표 논리 높이(px) — 자동 계산"
+          termKey="targetLogicalHeightPx"
+          hint={
+            scale.targetLogicalHeightPx < 65 || scale.targetLogicalHeightPx > 75
+              ? "3×3 기준 권장 범위(65~75px)를 벗어났습니다 — 다른 밀도를 쓰는 중이라면 물리 높이로 판단하세요."
+              : undefined
+          }
+        >
+          <output className="ce-derived-value">
+            {scale.targetPhysicalHeightPx} ÷ {scale.blockPx} = {scale.targetLogicalHeightPx} logical px
+          </output>
         </FieldRow>
 
         <FieldRow

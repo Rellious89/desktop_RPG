@@ -1,6 +1,7 @@
 import type { ActorDocumentV1, WorldTemplateV1 } from "../schema";
 import { compareActors } from "../domain/comparison";
 import { resolveActor } from "../domain/resolve";
+import { resolveScale } from "../domain/scale";
 import { validateActor } from "../domain/validation";
 import type { ActorExportEnvelope } from "../domain/types";
 import { stableJson } from "./stable";
@@ -11,17 +12,30 @@ export function buildExport(actor: ActorDocumentV1, world: WorldTemplateV1, refe
   const { resolved, fieldOrigins } = resolveActor(actor, world);
   const diagnostics = validateActor(actor, world, references.map((ref) => ({ actor: ref, world })));
   const weaponRatio = actor.equipment.weapon?.lengthToBodyRatio;
+  const scale = resolveScale(resolved.anatomy, resolved.pixelStyle);
+  const worldScale = resolveScale(world.defaults.anatomy, world.defaults.pixelStyle);
   return {
     schemaVersion: "1.0.0", documentKind: "actor-export", authored: actor, resolved, fieldOrigins,
     calculated: {
-      heightFromWorldBaselinePercent: ((resolved.anatomy.targetLogicalHeightPx / world.defaults.anatomy.targetLogicalHeightPx) - 1) * 100,
-      weaponLengthLogicalPx: weaponRatio ? resolved.anatomy.targetLogicalHeightPx * weaponRatio : null,
+      // Compared in physical pixels so the figure does not move when pixel
+      // density changes.
+      heightFromWorldBaselinePercent: ((scale.targetPhysicalHeightPx / worldScale.targetPhysicalHeightPx) - 1) * 100,
+      targetPhysicalHeightPx: scale.targetPhysicalHeightPx,
+      targetLogicalHeightPx: scale.targetLogicalHeightPx,
+      logicalPixelBlockPx: scale.blockPx,
+      densityPreset: scale.densityPreset,
+      effectivePhysicalHeightPx: scale.effectivePhysicalHeightPx,
+      physicalHeightResidualPx: scale.roundingResidualPx,
+      weaponLengthLogicalPx: weaponRatio ? scale.targetLogicalHeightPx * weaponRatio : null,
+      weaponLengthPhysicalPx: weaponRatio ? scale.targetPhysicalHeightPx * weaponRatio : null,
       weaponOccupancyPercent: actor.equipment.weapon?.estimatedOccupancyPercent ?? null,
     },
     interpretations: [
       "Species scale is independent of stature and logical height.",
       "Unity visual scale is a runtime display transform and is normally 1.0.",
       "Canvas pixels, logical silhouette pixels, and logical pixel block size are distinct measurements.",
+      "Target physical height is the authoritative body size; logical height is derived as physical height divided by the pixel density block.",
+      "Changing pixel density changes detail, not how large the character is.",
     ], diagnostics,
     comparison: references[0] ? compareActors(actor, references[0], world) : undefined,
   };
@@ -48,7 +62,9 @@ export function exportMarkdown(e: ActorExportEnvelope): string {
 | Field | Value | Origin |
 |---|---:|---|
 | Stature | ${r.anatomy.stature} | ${origin("anatomy.stature")} |
-| Target logical height | ${r.anatomy.targetLogicalHeightPx}px | ${origin("anatomy.targetLogicalHeightPx")} |
+| Target physical height | ${e.calculated.targetPhysicalHeightPx}px | ${origin("anatomy.targetPhysicalHeightPx")} |
+| Pixel density | ${e.calculated.densityPreset} (${e.calculated.logicalPixelBlockPx}×${e.calculated.logicalPixelBlockPx}) | ${origin("pixelStyle.densityPreset")} |
+| Target logical height | ${r.anatomy.targetLogicalHeightPx}px | Derived |
 | Build | ${r.anatomy.build} | ${origin("anatomy.build")} |
 | Proportion | ${r.anatomy.proportionTemplateId} | ${origin("anatomy.proportionTemplateId")} |
 | Species scale | ${r.anatomy.speciesScale} | ${origin("anatomy.speciesScale")} |
@@ -76,7 +92,8 @@ export function exportMarkdown(e: ActorExportEnvelope): string {
 
 - Base canvas: ${r.production.baseCanvas.widthPx}×${r.production.baseCanvas.heightPx}
 - Large-motion canvas: ${r.production.largeMotionCanvas.policy === "explicit" ? `${r.production.largeMotionCanvas.widthPx}×${r.production.largeMotionCanvas.heightPx}` : "same as base"}
-- Logical block: ${r.pixelStyle.logicalBlockPx.widthPx}×${r.pixelStyle.logicalBlockPx.heightPx}
+- Logical block: ${r.pixelStyle.logicalBlockPx.widthPx}×${r.pixelStyle.logicalBlockPx.heightPx} (${e.calculated.densityPreset})
+- Body height: ${e.calculated.targetPhysicalHeightPx}px physical → ${e.calculated.targetLogicalHeightPx} logical px${e.calculated.physicalHeightResidualPx ? ` (lands on ${e.calculated.effectivePhysicalHeightPx}px)` : ""}
 - Pivot: ${r.production.pivotRule}${r.production.pivot ? ` (${r.production.pivot.xNormalized}, ${r.production.pivot.yNormalized}; ${r.production.pivot.source})` : ""}
 - PPU: ${r.production.pixelsPerUnit}
 - Unity visual scale: ${r.production.unityVisualScale}

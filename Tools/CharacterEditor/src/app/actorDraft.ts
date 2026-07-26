@@ -125,6 +125,79 @@ export function setPixelStyleOverride<K extends keyof PixelStyle>(
   });
 }
 
+/**
+ * Body size and pixel density move together, so they are written together.
+ *
+ * `targetPhysicalHeightPx` is the authored size; `targetLogicalHeightPx` is its
+ * mirror at the current density, written so readers that predate the split (and
+ * the schema's required field) still see the right number. The caller computes
+ * both from domain/scale — this helper only assigns them.
+ *
+ * Pinning the physical height matters most when the density is changed on an
+ * actor that never authored one: without the pin, the document would be
+ * re-read at the new block on the next resolve and the character would shrink.
+ */
+export function setBodyScale(
+  actor: ActorDocument,
+  scale: {
+    targetPhysicalHeightPx: number;
+    targetLogicalHeightPx: number;
+    densityPreset?: NonNullable<PixelStyle["densityPreset"]>;
+    blockPx?: number;
+  },
+): ActorDocument {
+  const pixelStyle: Partial<PixelStyle> = { ...actor.overrides.pixelStyle };
+  if (scale.densityPreset && scale.blockPx) {
+    pixelStyle.densityPreset = scale.densityPreset;
+    pixelStyle.logicalBlockPx = { widthPx: scale.blockPx, heightPx: scale.blockPx };
+  }
+  return touch({
+    ...actor,
+    overrides: {
+      ...actor.overrides,
+      pixelStyle: Object.keys(pixelStyle).length > 0 ? (pixelStyle as PixelStyle) : undefined,
+      anatomy: {
+        ...actor.overrides.anatomy,
+        targetPhysicalHeightPx: scale.targetPhysicalHeightPx,
+        targetLogicalHeightPx: scale.targetLogicalHeightPx,
+      },
+    },
+  });
+}
+
+/** Drops the height override and inherits the world's body size again. Both
+ * heights go together — a lone logical override would contradict the world's
+ * physical height at the next density change. */
+export function resetBodyHeightOverride(actor: ActorDocument): ActorDocument {
+  const next: Partial<Anatomy> = { ...(actor.overrides.anatomy ?? {}) };
+  delete next.targetPhysicalHeightPx;
+  delete next.targetLogicalHeightPx;
+  const hasRemaining = Object.keys(next).length > 0;
+  return touch({ ...actor, overrides: { ...actor.overrides, anatomy: hasRemaining ? (next as Anatomy) : undefined } });
+}
+
+/**
+ * Returns to the world's pixel density. Any pinned physical height is kept —
+ * the body must not resize — so the caller supplies the logical mirror
+ * recomputed at the world's block.
+ */
+export function resetDensityOverride(actor: ActorDocument, worldLogicalHeightPx: number): ActorDocument {
+  const pixelStyle: Partial<PixelStyle> = { ...(actor.overrides.pixelStyle ?? {}) };
+  delete pixelStyle.densityPreset;
+  delete pixelStyle.logicalBlockPx;
+  const anatomy = actor.overrides.anatomy;
+  return touch({
+    ...actor,
+    overrides: {
+      ...actor.overrides,
+      pixelStyle: Object.keys(pixelStyle).length > 0 ? (pixelStyle as PixelStyle) : undefined,
+      anatomy: anatomy?.targetPhysicalHeightPx === undefined
+        ? anatomy
+        : { ...anatomy, targetLogicalHeightPx: worldLogicalHeightPx },
+    },
+  });
+}
+
 export function resetPixelStyleOverride(actor: ActorDocument, key: keyof PixelStyle): ActorDocument {
   const next: Partial<PixelStyle> = { ...(actor.overrides.pixelStyle ?? {}) };
   delete next[key];

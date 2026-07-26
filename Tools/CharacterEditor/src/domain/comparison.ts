@@ -1,5 +1,6 @@
 import type { ActorDocumentV1, WorldTemplateV1 } from "../schema";
 import { resolveActor } from "./resolve";
+import { resolveScale } from "./scale";
 import { validateActor } from "./validation";
 import type { ActorComparison, ComparisonMetric } from "./types";
 
@@ -13,8 +14,13 @@ export function compareActors(draft: ActorDocumentV1, reference: ActorDocumentV1
   if (draft.worldRef.worldId !== reference.worldRef.worldId) throw new Error("Comparison requires actors from the same world");
   const d = resolveActor(draft, world).resolved, r = resolveActor(reference, world).resolved;
   const dc = d.production.largeMotionCanvas, rc = r.production.largeMotionCanvas;
+  // Physical height is the size comparison that holds across densities; logical
+  // height is reported alongside it but only comparable at equal density.
+  const ds = resolveScale(d.anatomy, d.pixelStyle), rs = resolveScale(r.anatomy, r.pixelStyle);
   const metrics = [
     metric("stature", "Stature", d.anatomy.stature, r.anatomy.stature),
+    metric("physicalHeight", "Physical height", ds.targetPhysicalHeightPx, rs.targetPhysicalHeightPx),
+    metric("density", "Pixel density", `${ds.blockPx}×${ds.blockPx}`, `${rs.blockPx}×${rs.blockPx}`),
     metric("height", "Logical height", d.anatomy.targetLogicalHeightPx, r.anatomy.targetLogicalHeightPx),
     metric("build", "Build", d.anatomy.build, r.anatomy.build),
     metric("proportion", "Proportion", d.anatomy.proportionTemplateId, r.anatomy.proportionTemplateId),

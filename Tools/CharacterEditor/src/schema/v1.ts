@@ -22,13 +22,30 @@ export const viewSchema = z.object({
   facing: z.enum(["screen-left", "screen-right"]),
 });
 
+/** Pixel density presets. The block size is the number of image pixels per
+ * logical pixel; it controls detail, not how physically large the character
+ * is. Target physical height stays the same across presets. */
+export const DENSITY_PRESETS = { "standard-3x3": 3, "detail-2x2": 2 } as const;
+export type DensityPresetId = keyof typeof DENSITY_PRESETS | "custom";
+export const densityPresetSchema = z.enum(["standard-3x3", "detail-2x2", "custom"]);
+
 export const pixelStyleSchema = z.object({
   styleId: id, logicalBlockPx: canvas,
+  /** Selector for logicalBlockPx. Absent on pre-density documents; derived
+   * from logicalBlockPx when read. */
+  densityPreset: densityPresetSchema.optional(),
   outline: z.string().min(1), lighting: z.string().min(1),
 });
 
 export const anatomySchema = z.object({
   stature: z.enum(["tiny", "short", "average", "tall", "very-tall"]),
+  /** Authoritative body size: the character's height in image pixels of the
+   * production base, independent of pixel density. Absent on pre-density
+   * documents, where it is back-calculated as
+   * `targetLogicalHeightPx × logicalBlockPx.widthPx`. */
+  targetPhysicalHeightPx: z.number().positive().optional(),
+  /** Height in logical pixels. Derived from targetPhysicalHeightPx and the
+   * density block, and written back so older readers keep working. */
   targetLogicalHeightPx: z.number().positive(),
   build: z.enum(["slender", "normal", "broad", "muscular", "massive", "non-humanoid"]),
   proportionTemplateId: id,

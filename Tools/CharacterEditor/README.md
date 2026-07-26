@@ -60,10 +60,32 @@ Browser downloads do not write into those repository folders automatically. Move
 
 Important ElfGuardian semantics:
 
-- Target logical height: `91px`
+- Target physical height: `273px` (the authoritative body size)
+- Target logical height: `91px` — derived as `273 ÷ 3` at 3×3 Standard density
 - Species scale: `1.0`
 - Unity visual scale: `1.0`
 - Legacy `1.3`: historical production-sizing evidence only
+
+## Body size and pixel density
+
+Body size and pixel density are separate settings.
+
+- **Target physical height** is how tall the character is, in image pixels of the
+  production base. This is what you author.
+- **Pixel density** is how many image pixels make up one logical pixel:
+  `3×3 Standard` (KeyBuddy default) or `2×2 Detail`.
+- **Target logical height** is derived — `physical ÷ block` — and is shown
+  read-only. A 195px character is 65 logical px at 3×3 and 98 at 2×2. It is the
+  same size on screen either way; only the pixel grid gets finer.
+
+New actors pick a density on the **+ 새 액터** screen. Choosing one other than
+the world default records an override that pins the world's physical height, so
+the new actor matches its peers in size.
+
+Existing documents carry only a logical height. They are back-calculated as
+`logical × block`, which round-trips exactly, so no existing resource changes
+size. Both heights are written on save, so tools that read only
+`targetLogicalHeightPx` keep working.
 
 ## Test
 

@@ -1,5 +1,6 @@
 import type { ActorDocumentV1, ApprovedException, WorldTemplateV1 } from "../schema";
 import { resolveActor } from "./resolve";
+import { resolveScale } from "./scale";
 import type { ActorReference, Diagnostic } from "./types";
 
 export const RULE_IDS = {
@@ -8,6 +9,8 @@ export const RULE_IDS = {
   canvas: "large-weapon-canvas", unity: "unity-scale-not-one", weapon: "weapon-family-not-allowed",
   extremity: "extremity-size-delta", largeMotion: "large-motion-canvas-exception", ppu: "ppu-not-200",
   floating: "floating-pivot-mismatch", constraints: "missing-design-constraints", alias: "actor-id-alias-conflict",
+  densityBlock: "non-square-density-block", densityResidual: "physical-height-not-block-multiple",
+  densityBackCalc: "density-override-without-physical-height",
 } as const;
 
 const activeException = (exceptions: ApprovedException[], ruleId: string) =>
@@ -28,8 +31,25 @@ export function validateActor(actor: ActorDocumentV1, world: WorldTemplateV1, re
   const a = resolved.anatomy, p = resolved.production;
   if (!actor.actorId || !actor.identity.species || !actor.identity.role || !actor.identity.concept)
     d.push(diagnostic(actor, RULE_IDS.required, "error", "One or more required identity fields are missing.", false));
-  if (Math.abs(a.speciesScale - 1) > 0.05 && Math.abs(a.targetLogicalHeightPx / 70 - a.speciesScale) < 0.1)
+  // Compare physical heights, not logical ones: logical height moves with pixel
+  // density, so a density change must not make this heuristic fire or stop firing.
+  const scale = resolveScale(a, resolved.pixelStyle);
+  const worldScale = resolveScale(world.defaults.anatomy, world.defaults.pixelStyle);
+  const heightRatio = worldScale.targetPhysicalHeightPx > 0
+    ? scale.targetPhysicalHeightPx / worldScale.targetPhysicalHeightPx : 0;
+  if (Math.abs(a.speciesScale - 1) > 0.05 && Math.abs(heightRatio - a.speciesScale) < 0.1)
     d.push(diagnostic(actor, RULE_IDS.conflation, "warning", "Species scale appears derived from actor height; confirm species-wide evidence.", true, "anatomy.speciesScale"));
+  if (!scale.squareBlock)
+    d.push(diagnostic(actor, RULE_IDS.densityBlock, "error", `Logical block is ${resolved.pixelStyle.logicalBlockPx.widthPx}×${resolved.pixelStyle.logicalBlockPx.heightPx}; production requires a square block.`, false, "pixelStyle.logicalBlockPx"));
+  if (scale.roundingResidualPx !== 0)
+    d.push(diagnostic(actor, RULE_IDS.densityResidual, "warning", `Target physical height ${scale.targetPhysicalHeightPx}px is not a multiple of the ${scale.blockPx}px block; production will land on ${scale.effectivePhysicalHeightPx}px (${scale.targetLogicalHeightPx} logical px).`, true, "anatomy.targetPhysicalHeightPx"));
+  // `resolved` always carries a physical height, so ask the source documents
+  // whether anyone actually authored one.
+  const authoredPhysical = actor.overrides.anatomy?.targetPhysicalHeightPx !== undefined
+    || world.defaults.anatomy.targetPhysicalHeightPx !== undefined;
+  const densityOverridden = actor.overrides.pixelStyle?.logicalBlockPx !== undefined || actor.overrides.pixelStyle?.densityPreset !== undefined;
+  if (densityOverridden && !authoredPhysical)
+    d.push(diagnostic(actor, RULE_IDS.densityBackCalc, "warning", `Pixel density is overridden but no target physical height is recorded; height was back-calculated as ${scale.targetPhysicalHeightPx}px from the logical height at ${scale.blockPx}px per logical pixel. Set the physical height to pin the body size.`, true, "anatomy.targetPhysicalHeightPx"));
   if (a.build === "normal" && ["broad", "very-broad"].includes(a.torsoWidth))
     d.push(diagnostic(actor, RULE_IDS.torso, "warning", "Normal build conflicts with a broad torso width.", true, "anatomy.torsoWidth"));
   if (actor.equipment.weapon?.estimatedOccupancyPercent && actor.equipment.weapon.estimatedOccupancyPercent > 60)

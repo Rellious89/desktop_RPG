@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { InheritableSpec, WorldTemplate } from "../../app/types";
+import { DENSITY_OPTIONS, DENSITY_PRESETS, logicalHeightAt, resolveScale } from "../../app/scale";
 import { FieldRow } from "../common/FieldRow";
 import { TagListEditor } from "../common/TagListEditor";
 
@@ -71,6 +72,19 @@ export function WorldTemplateForm({
   const view = world.defaults.view;
   const pixelStyle = world.defaults.pixelStyle;
   const production = world.defaults.production;
+  // Fills in the physical height for templates authored before the split, so
+  // the form always edits a real number rather than an empty field.
+  const worldScale = resolveScale(anatomy, pixelStyle);
+
+  /** Body size is authored in physical px; the logical height is its mirror at
+   * the current density and is written alongside it so the saved template never
+   * carries two disagreeing heights. */
+  function patchBodyHeight(targetPhysicalHeightPx: number, blockPx: number) {
+    patchAnatomy({
+      targetPhysicalHeightPx,
+      targetLogicalHeightPx: logicalHeightAt(targetPhysicalHeightPx, blockPx),
+    });
+  }
 
   return (
     <div className="ce-stack">
@@ -197,29 +211,39 @@ export function WorldTemplateForm({
                 onChange={(event) => patchPixelStyle({ styleId: event.target.value })}
               />
             </FieldRow>
-            <FieldRow label="논리 픽셀 블록 크기(px)" required>
-              <div className="ce-row">
-                <input
-                  type="number"
-                  aria-label="블록 너비"
-                  value={pixelStyle.logicalBlockPx.widthPx}
-                  onChange={(event) =>
-                    patchPixelStyle({
-                      logicalBlockPx: { ...pixelStyle.logicalBlockPx, widthPx: Number(event.target.value) },
-                    })
-                  }
-                />
-                <input
-                  type="number"
-                  aria-label="블록 높이"
-                  value={pixelStyle.logicalBlockPx.heightPx}
-                  onChange={(event) =>
-                    patchPixelStyle({
-                      logicalBlockPx: { ...pixelStyle.logicalBlockPx, heightPx: Number(event.target.value) },
-                    })
-                  }
-                />
-              </div>
+            <FieldRow
+              label="기본 픽셀 밀도"
+              required
+              termKey="densityPreset"
+              htmlFor="world-density"
+              hint={`이 밀도에서 기본 논리 높이는 ${worldScale.targetLogicalHeightPx}px입니다. 밀도를 바꿔도 기본 물리 높이 ${worldScale.targetPhysicalHeightPx}px는 유지됩니다.`}
+            >
+              <select
+                id="world-density"
+                value={worldScale.densityPreset}
+                onChange={(event) => {
+                  const preset = event.target.value as keyof typeof DENSITY_PRESETS;
+                  const blockPx = DENSITY_PRESETS[preset];
+                  // Pin the physical height so a density change never resizes
+                  // the world's baseline body.
+                  patchPixelStyle({
+                    densityPreset: preset,
+                    logicalBlockPx: { widthPx: blockPx, heightPx: blockPx },
+                  });
+                  patchBodyHeight(worldScale.targetPhysicalHeightPx, blockPx);
+                }}
+              >
+                {DENSITY_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label} ({option.note}) → {logicalHeightAt(worldScale.targetPhysicalHeightPx, DENSITY_PRESETS[option.id])} logical px
+                  </option>
+                ))}
+                {worldScale.densityPreset === "custom" && (
+                  <option value="custom">
+                    custom {pixelStyle.logicalBlockPx.widthPx}×{pixelStyle.logicalBlockPx.heightPx}
+                  </option>
+                )}
+              </select>
             </FieldRow>
             <FieldRow label="외곽선 규칙" required htmlFor="world-outline">
               <input
@@ -261,18 +285,27 @@ export function WorldTemplateForm({
               </select>
             </FieldRow>
             <FieldRow
-              label="기본 논리 높이(px)"
+              label="기본 물리 높이(px)"
               required
-              termKey="targetLogicalHeightPx"
+              termKey="targetPhysicalHeightPx"
               htmlFor="world-height"
-              hint="권장 범위 65~75px"
+              hint={
+                worldScale.roundingResidualPx !== 0
+                  ? `${worldScale.blockPx}px 블록의 배수가 아닙니다 — 실제로는 ${worldScale.effectivePhysicalHeightPx}px로 제작됩니다.`
+                  : `3×3 기준 권장 범위 195~225px (논리 65~75px)`
+              }
             >
               <input
                 id="world-height"
                 type="number"
-                value={anatomy.targetLogicalHeightPx}
-                onChange={(event) => patchAnatomy({ targetLogicalHeightPx: Number(event.target.value) })}
+                value={worldScale.targetPhysicalHeightPx}
+                onChange={(event) => patchBodyHeight(Number(event.target.value), worldScale.blockPx)}
               />
+            </FieldRow>
+            <FieldRow label="기본 논리 높이(px) — 자동 계산" termKey="targetLogicalHeightPx">
+              <output className="ce-derived-value">
+                {worldScale.targetPhysicalHeightPx} ÷ {worldScale.blockPx} = {worldScale.targetLogicalHeightPx} logical px
+              </output>
             </FieldRow>
             <FieldRow label="기본 Build 등급" required termKey="buildClass" htmlFor="world-build">
               <select

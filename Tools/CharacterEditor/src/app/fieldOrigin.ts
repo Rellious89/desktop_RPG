@@ -29,3 +29,22 @@ export function viewOrigin(actor: ActorDocument, key: keyof View): FieldOriginDi
 export function pixelStyleOrigin(actor: ActorDocument, key: keyof PixelStyle): FieldOriginDisplay {
   return actor.overrides.pixelStyle?.[key] !== undefined ? "override" : "inherited";
 }
+
+/** Body size is one field spread over two keys: the authored physical height
+ * and its logical mirror. Documents written before the split carry only the
+ * mirror, so either key means the actor overrode its size. */
+export function bodyHeightOrigin(actor: ActorDocument): FieldOriginDisplay {
+  const anatomy = actor.overrides.anatomy;
+  return anatomy?.targetPhysicalHeightPx !== undefined || anatomy?.targetLogicalHeightPx !== undefined
+    ? "override"
+    : "inherited";
+}
+
+/** Likewise for density: the preset and the block size are set together, but a
+ * hand-authored document may carry only the block. */
+export function densityOrigin(actor: ActorDocument): FieldOriginDisplay {
+  const pixelStyle = actor.overrides.pixelStyle;
+  return pixelStyle?.logicalBlockPx !== undefined || pixelStyle?.densityPreset !== undefined
+    ? "override"
+    : "inherited";
+}
