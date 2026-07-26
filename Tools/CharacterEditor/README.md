@@ -87,6 +87,50 @@ Existing documents carry only a logical height. They are back-calculated as
 size. Both heights are written on save, so tools that read only
 `targetLogicalHeightPx` keep working.
 
+## Species scale and body height
+
+The two are one size seen two ways, linked through the world's baseline body:
+
+```text
+목표 물리 높이 = round(월드 기준 신체 높이 × Species Scale)
+Species Scale  = 목표 물리 높이 ÷ 월드 기준 신체 높이
+```
+
+Editing either recomputes the other, so they can never describe two different
+sizes. `anatomy.sizeAuthority` records which one the user authored
+(`species-scale` or `physical-height`); the other is derived from it.
+
+**Species scale is height only.** It does not change build, proportion
+template, torso width, sex, or head/hand/foot class — those stay separate
+design data and are never touched by a scale edit.
+
+Rounding: the physical height is stored as a whole pixel because it is the
+production output. The species scale keeps full float precision in the
+document and is only rounded to three decimals for display, so editing back
+and forth never walks the height (`290 → 289 → 290`).
+
+When the world baseline changes, `sizeAuthority` decides what is preserved:
+
+| sizeAuthority | 유지되는 값 | 다시 계산되는 값 |
+|---|---|---|
+| `species-scale` | 배율 | 목표 물리 높이 |
+| `physical-height` | 목표 물리 높이 | 배율 |
+
+Documents with no `sizeAuthority` are read in this order:
+
+1. a physical height exists → it wins, the scale is back-calculated
+2. only a scale exists → the physical height is computed from it
+3. neither → the world baseline at scale 1.0
+4. both exist but disagree → the physical height wins, and
+   `species-scale-height-conflict` reports what was replaced
+
+Nothing is rewritten on load; the corrected pair is stored the next time the
+actor is saved or exported.
+
+Downstream: `targetPhysicalHeightPx` already includes the species scale.
+PerfectPixel sizes from that field alone and never multiplies by the scale
+again.
+
 ## View and direction
 
 Every first-generation KeyBuddy master is drawn the same way:

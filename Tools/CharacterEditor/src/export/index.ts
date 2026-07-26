@@ -2,6 +2,7 @@ import type { ActorDocumentV1, InheritableSpec, WorldTemplateV1 } from "../schem
 import { compareActors } from "../domain/comparison";
 import { resolveActor } from "../domain/resolve";
 import { resolveScale } from "../domain/scale";
+import { displaySpeciesScale, resolveSize, sizeRelationText, worldBasePhysicalHeightPx } from "../domain/size";
 import { validateActor } from "../domain/validation";
 import { VIEW_ORIGIN_LABELS, masterImageDirectionPrompt, resolveView } from "../domain/view";
 import type { ActorExportEnvelope, FieldOrigins } from "../domain/types";
@@ -15,6 +16,7 @@ export function buildExport(actor: ActorDocumentV1, world: WorldTemplateV1, refe
   const weaponRatio = actor.equipment.weapon?.lengthToBodyRatio;
   const scale = resolveScale(resolved.anatomy, resolved.pixelStyle);
   const worldScale = resolveScale(world.defaults.anatomy, world.defaults.pixelStyle);
+  const size = resolveSize(resolved.anatomy, scale.blockPx, worldBasePhysicalHeightPx(world.defaults));
   return {
     schemaVersion: "1.0.0", documentKind: "actor-export", authored: actor, resolved, fieldOrigins,
     calculated: {
@@ -30,6 +32,15 @@ export function buildExport(actor: ActorDocumentV1, world: WorldTemplateV1, refe
       weaponLengthLogicalPx: weaponRatio ? scale.targetLogicalHeightPx * weaponRatio : null,
       weaponLengthPhysicalPx: weaponRatio ? scale.targetPhysicalHeightPx * weaponRatio : null,
       weaponOccupancyPercent: actor.equipment.weapon?.estimatedOccupancyPercent ?? null,
+      // Body size, stated once as both a ratio and an absolute, with the field
+      // the user actually authored. PerfectPixel sizes from
+      // targetPhysicalHeightPx alone — speciesScale is already baked into it and
+      // must not be applied a second time.
+      speciesScale: size.speciesScale,
+      speciesScaleDisplay: displaySpeciesScale(size.speciesScale),
+      sizeAuthority: size.sizeAuthority,
+      worldBasePhysicalHeightPx: size.worldBasePhysicalHeightPx,
+      sizeRelation: sizeRelationText(size),
       // The direction the design master must be drawn in. Duplicated out of
       // `resolved.view` + `fieldOrigins` into one flat block so downstream
       // tools (PerfectPixel) read a single canonical value with its origin
@@ -37,7 +48,9 @@ export function buildExport(actor: ActorDocumentV1, world: WorldTemplateV1, refe
       canonicalView: canonicalView(resolved.view, fieldOrigins),
     },
     interpretations: [
-      "Species scale is independent of stature and logical height.",
+      "Species scale is height relative to the world baseline body and nothing else: it does not change build, proportion template, torso width, or head/hand/foot size.",
+      "Species scale and target physical height are two views of one size — physical = round(world baseline x species scale). The sizeAuthority field names the one the user authored.",
+      "Target physical height already includes species scale. Do not multiply by species scale again downstream.",
       "Unity visual scale is a runtime display transform and is normally 1.0.",
       "Canvas pixels, logical silhouette pixels, and logical pixel block size are distinct measurements.",
       "Target physical height is the authoritative body size; logical height is derived as physical height divided by the pixel density block.",
@@ -100,7 +113,8 @@ ${view.masterImageDirection}
 | Target logical height | ${r.anatomy.targetLogicalHeightPx}px | Derived |
 | Build | ${r.anatomy.build} | ${origin("anatomy.build")} |
 | Proportion | ${r.anatomy.proportionTemplateId} | ${origin("anatomy.proportionTemplateId")} |
-| Species scale | ${r.anatomy.speciesScale} | ${origin("anatomy.speciesScale")} |
+| Species scale | ${e.calculated.speciesScaleDisplay} | ${origin("anatomy.speciesScale")} |
+| Size relation | ${e.calculated.sizeRelation} | ${e.calculated.sizeAuthority === "species-scale" ? "Scale authored" : "Height authored"} |
 | Head / hand / foot / torso | ${r.anatomy.headSize} / ${r.anatomy.handSize} / ${r.anatomy.footSize} / ${r.anatomy.torsoWidth} | mixed |
 
 ## Look
@@ -149,6 +163,7 @@ ${comparisons}
 ## Calculated Values and Interpretations
 
 - Height relative to world baseline: ${Number(e.calculated.heightFromWorldBaselinePercent).toFixed(1)}%
+- Body size: ${e.calculated.sizeRelation} (authored as ${e.calculated.sizeAuthority === "species-scale" ? "species scale" : "target physical height"})
 - Weapon logical length estimate: ${e.calculated.weaponLengthLogicalPx ?? "N/A"}
 ${e.interpretations.map((x) => `- ${x}`).join("\n")}
 

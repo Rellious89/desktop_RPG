@@ -1,10 +1,14 @@
 import type { ActorDocument, InheritableSpec, WorldTemplate } from "../../app/types";
 import {
-  resetAnatomyOverride, resetBodyHeightOverride, resetDensityOverride, setAnatomyOverride,
+  resetAnatomyOverride, resetBodySizeOverride, resetDensityOverride, setAnatomyOverride,
   setBodyScale, setPhysicalTraits,
 } from "../../app/actorDraft";
 import { anatomyOrigin, bodyHeightOrigin, densityOrigin } from "../../app/fieldOrigin";
-import { DENSITY_OPTIONS, DENSITY_PRESETS, logicalHeightAt, resolveScale } from "../../app/scale";
+import {
+  DENSITY_OPTIONS, DENSITY_PRESETS, displaySpeciesScale, logicalHeightAt, physicalHeightFromScale,
+  resolveScale, resolveSize, sizeRelationText, speciesScaleFromHeight, worldBasePhysicalHeightPx,
+} from "../../app/scale";
+import { CommittedNumberInput } from "../common/CommittedNumberInput";
 import { FieldRow } from "../common/FieldRow";
 import { TagListEditor } from "../common/TagListEditor";
 
@@ -31,12 +35,22 @@ export function BodySection({ actor, world, resolved, onChangeActor }: BodySecti
   const scale = resolveScale(anatomy, resolved.pixelStyle);
   const worldScale = resolveScale(world.defaults.anatomy, world.defaults.pixelStyle);
 
-  const impliedScale =
-    worldScale.targetPhysicalHeightPx > 0 ? scale.targetPhysicalHeightPx / worldScale.targetPhysicalHeightPx : null;
-  const scaleDeltaPercent =
-    impliedScale !== null && anatomy.speciesScale > 0
-      ? Math.round(((impliedScale - anatomy.speciesScale) / anatomy.speciesScale) * 1000) / 10
-      : null;
+  // Species scale and physical height describe one size. Whichever the user
+  // edits is written together with the other, so the pair can never drift apart.
+  const worldBasePx = worldBasePhysicalHeightPx(world.defaults);
+  const size = resolveSize(anatomy, scale.blockPx, worldBasePx);
+
+  /** Commits a new body size from either direction, keeping the density fixed —
+   * density changes detail, never size. */
+  const commitSize = (targetPhysicalHeightPx: number, speciesScale: number, sizeAuthority: "species-scale" | "physical-height") =>
+    onChangeActor((current) =>
+      setBodyScale(current, {
+        targetPhysicalHeightPx,
+        targetLogicalHeightPx: logicalHeightAt(targetPhysicalHeightPx, scale.blockPx),
+        speciesScale,
+        sizeAuthority,
+      }),
+    );
 
   return (
     <div className="ce-card">
@@ -75,26 +89,32 @@ export function BodySection({ actor, world, resolved, onChangeActor }: BodySecti
           termKey="targetPhysicalHeightPx"
           origin={bodyHeightOrigin(actor)}
           baselineLabel={`World 기본값: ${worldScale.targetPhysicalHeightPx}px (${worldScale.targetLogicalHeightPx} logical @ ${worldScale.blockPx}×${worldScale.blockPx})`}
-          onReset={() => onChangeActor((current) => resetBodyHeightOverride(current))}
+          onReset={() => onChangeActor((current) => resetBodySizeOverride(current))}
           hint={
-            scale.roundingResidualPx !== 0
-              ? `${scale.blockPx}px 블록의 배수가 아니라 논리 높이가 ${scale.targetLogicalHeightPx}로 반올림됩니다 — 논리 높이만 읽는 도구는 ${scale.effectivePhysicalHeightPx}px로 해석합니다.`
-              : undefined
+            "게임에서 캐릭터 신체가 차지할 실제 픽셀 높이입니다. 값을 수정하면 Species Scale이 자동 역산됩니다." +
+            (scale.roundingResidualPx !== 0
+              ? ` ${scale.blockPx}px 블록의 배수가 아니라 논리 높이가 ${scale.targetLogicalHeightPx}로 반올림됩니다 — 논리 높이만 읽는 도구는 ${scale.effectivePhysicalHeightPx}px로 해석합니다.`
+              : "")
           }
         >
-          <input
-            type="number"
-            value={scale.targetPhysicalHeightPx}
-            onChange={(event) => {
-              const targetPhysicalHeightPx = Number(event.target.value);
-              onChangeActor((current) =>
-                setBodyScale(current, {
-                  targetPhysicalHeightPx,
-                  targetLogicalHeightPx: logicalHeightAt(targetPhysicalHeightPx, scale.blockPx),
-                }),
-              );
-            }}
+          <CommittedNumberInput
+            aria-label="목표 물리 높이(px)"
+            min={1}
+            value={size.targetPhysicalHeightPx}
+            onCommit={(targetPhysicalHeightPx) =>
+              commitSize(
+                Math.round(targetPhysicalHeightPx),
+                // Full precision: the displayed 3-decimal value is never what
+                // gets stored, so re-editing cannot walk the height off by a px.
+                speciesScaleFromHeight(worldBasePx, Math.round(targetPhysicalHeightPx)),
+                "physical-height",
+              )
+            }
           />
+        </FieldRow>
+
+        <FieldRow label="크기 관계 — 자동 계산" termKey="speciesScale">
+          <output className="ce-derived-value">{sizeRelationText(size)}</output>
         </FieldRow>
 
         <FieldRow
@@ -203,22 +223,16 @@ export function BodySection({ actor, world, resolved, onChangeActor }: BodySecti
           termKey="speciesScale"
           origin={anatomyOrigin(actor, "speciesScale")}
           baselineLabel={`World 기본값: ${worldDefaults.speciesScale}`}
-          onReset={() => onChangeActor((current) => resetAnatomyOverride(current, "speciesScale"))}
-          hint={
-            scaleDeltaPercent !== null && Math.abs(scaleDeltaPercent) > 10
-              ? `참고: 목표 높이로 역산한 배율은 ${impliedScale?.toFixed(2)}이며 Species Scale과 ${scaleDeltaPercent}% 차이가 납니다. 저장 시 자동 검증됩니다.`
-              : impliedScale !== null
-                ? `참고: 목표 높이로 역산한 배율 ${impliedScale.toFixed(2)} — Species Scale과 정합적입니다.`
-                : undefined
-          }
+          onReset={() => onChangeActor((current) => resetBodySizeOverride(current))}
+          hint={`월드 기준 신체 높이(${worldBasePx}px)에 대한 상대 신장입니다. 값을 수정하면 목표 물리 높이가 자동 계산됩니다. 체형과 등신은 변경하지 않습니다.`}
         >
-          <input
-            type="number"
-            step="0.05"
-            min="0.05"
-            value={anatomy.speciesScale}
-            onChange={(event) =>
-              onChangeActor((current) => setAnatomyOverride(current, "speciesScale", Number(event.target.value)))
+          <CommittedNumberInput
+            aria-label="Species Scale"
+            step={0.05}
+            min={0.05}
+            value={displaySpeciesScale(size.speciesScale)}
+            onCommit={(speciesScale) =>
+              commitSize(physicalHeightFromScale(worldBasePx, speciesScale), speciesScale, "species-scale")
             }
           />
         </FieldRow>

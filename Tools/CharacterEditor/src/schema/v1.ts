@@ -54,6 +54,11 @@ export const pixelStyleSchema = z.object({
   outline: z.string().min(1), lighting: z.string().min(1),
 });
 
+/** Which of the two linked size fields the user last authored. The other one is
+ * recomputed from it, so the pair can never describe two different sizes. */
+export const SIZE_AUTHORITY_VALUES = ["species-scale", "physical-height"] as const;
+export const sizeAuthoritySchema = z.enum(SIZE_AUTHORITY_VALUES);
+
 export const anatomySchema = z.object({
   stature: z.enum(["tiny", "short", "average", "tall", "very-tall"]),
   /** Authoritative body size: the character's height in image pixels of the
@@ -66,7 +71,14 @@ export const anatomySchema = z.object({
   targetLogicalHeightPx: z.number().positive(),
   build: z.enum(["slender", "normal", "broad", "muscular", "massive", "non-humanoid"]),
   proportionTemplateId: id,
+  /** Height relative to the world's baseline body, and nothing else: it never
+   * changes build, proportion template, torso width, or head/hand/foot class.
+   * Linked to targetPhysicalHeightPx through the world baseline — see
+   * src/domain/size.ts. */
   speciesScale: z.number().positive(),
+  /** Which of speciesScale / targetPhysicalHeightPx the user last authored.
+   * Absent on documents written before the two were linked; inferred on read. */
+  sizeAuthority: sizeAuthoritySchema.optional(),
   headSize: sizeClass, handSize: sizeClass, footSize: sizeClass,
   torsoWidth: z.enum(["narrow", "normal", "broad", "very-broad"]),
   isFloatingActor: z.boolean().default(false),
@@ -148,6 +160,7 @@ export const actorSchema = z.object({
   resourceFolderPath: z.string().optional(),
 });
 
+export type SizeAuthority = (typeof SIZE_AUTHORITY_VALUES)[number];
 export type Projection = (typeof PROJECTION_VALUES)[number];
 export type Facing = (typeof FACING_VALUES)[number];
 export type LightDirection = (typeof LIGHT_DIRECTION_VALUES)[number];

@@ -60,9 +60,9 @@ export const TERM_HELP: Record<string, TermHelpEntry> = {
     termKo: "Species Scale",
     termEn: "Species Scale",
     helpKo:
-      "이 개체/종족이 표준 개체 대비 전신을 균일하게 얼마나 키우는지 나타내는 배율입니다. 단순히 키 목표치를 바꾼 것과 혼동하면 경고가 뜹니다(Stature-Species Scale 충돌 규칙).",
+      "동일한 체형, 등신, 성별, 체격 및 종족 특징을 유지한 상태에서 게임 화면에 표시될 전체 신장만 결정하는 상대 크기 값입니다. 월드 기준 신체 높이에 대한 배율이며, 값을 수정하면 목표 물리 높이가 자동 계산됩니다(반대 방향도 동일). Build 등급·비율 템플릿·몸통 너비·머리/손/발 크기는 이 값으로 바뀌지 않습니다.",
     helpEn:
-      "Whole-body multiplier for a genuinely larger species/individual. Conflating this with a simple height-target change triggers the stature/species-scale-conflation warning.",
+      "Relative overall height against the world's baseline body, and nothing else: it never changes build, proportion template, torso width, sex, or head/hand/foot size. Editing it recomputes the target physical height, and editing that recomputes this.",
   },
   headSize: {
     termKo: "머리 크기 등급",

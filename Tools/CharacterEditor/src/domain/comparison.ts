@@ -1,6 +1,7 @@
 import type { ActorDocumentV1, WorldTemplateV1 } from "../schema";
 import { resolveActor } from "./resolve";
 import { resolveScale } from "./scale";
+import { displaySpeciesScale } from "./size";
 import { validateActor } from "./validation";
 import type { ActorComparison, ComparisonMetric } from "./types";
 
@@ -25,7 +26,9 @@ export function compareActors(draft: ActorDocumentV1, reference: ActorDocumentV1
     metric("build", "Build", d.anatomy.build, r.anatomy.build),
     metric("proportion", "Proportion", d.anatomy.proportionTemplateId, r.anatomy.proportionTemplateId),
     ...(["headSize", "handSize", "footSize", "torsoWidth"] as const).map((k) => metric(k, k, d.anatomy[k], r.anatomy[k])),
-    metric("speciesScale", "Species scale", d.anatomy.speciesScale, r.anatomy.speciesScale),
+    // Compared at display precision: a derived scale carries float noise
+    // (273/210 = 1.3000000000000003) that would show up as a bogus delta.
+    metric("speciesScale", "Species scale", displaySpeciesScale(d.anatomy.speciesScale), displaySpeciesScale(r.anatomy.speciesScale)),
     metric("weaponOccupancy", "Weapon occupancy", draft.equipment.weapon?.estimatedOccupancyPercent ?? 0, reference.equipment.weapon?.estimatedOccupancyPercent ?? 0),
     metric("baseCanvas", "Base canvas", `${d.production.baseCanvas.widthPx}×${d.production.baseCanvas.heightPx}`, `${r.production.baseCanvas.widthPx}×${r.production.baseCanvas.heightPx}`),
     metric("largeMotionCanvas", "Large-motion canvas", dc.policy === "explicit" ? `${dc.widthPx}×${dc.heightPx}` : "same-as-base", rc.policy === "explicit" ? `${rc.widthPx}×${rc.heightPx}` : "same-as-base"),

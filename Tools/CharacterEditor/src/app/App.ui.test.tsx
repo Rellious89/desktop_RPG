@@ -49,8 +49,10 @@ describe("App", () => {
     // the logical height is shown as a derived read-only value.
     expect(screen.getByDisplayValue("273")).toBeInTheDocument();
     expect(screen.getByText("273 ÷ 3 = 91 logical px")).toBeInTheDocument();
+    // 273px against Fantasia's 210px baseline, so the linked scale reads 1.3.
     const speciesField = screen.getByText("Species Scale").closest(".ce-field");
-    expect(speciesField?.querySelector("input")).toHaveValue(1);
+    expect(speciesField?.querySelector("input")).toHaveValue(1.3);
+    expect(screen.getByText("210px × 1.3 = 273px")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "같은 세계 액터와 비교" }));
     fireEvent.change(screen.getByLabelText(/비교 대상/), { target: { value: "VenomCultist" } });

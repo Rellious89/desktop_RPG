@@ -14,10 +14,13 @@ describe("Schema v1 parsing", () => {
 });
 
 describe("resolution and origins", () => {
-  it("keeps height separate from both scales", () => {
+  it("keeps height separate from Unity scale and links it to species scale", () => {
     const result = resolveActor(elfGuardian, fantasia);
     expect(result.resolved.anatomy.targetLogicalHeightPx).toBe(91);
-    expect(result.resolved.anatomy.speciesScale).toBe(1);
+    // 273px against Fantasia's 210px baseline. The document says 1.0, which is
+    // the old independent-scale reading; the height wins and the scale follows.
+    expect(result.resolved.anatomy.speciesScale).toBeCloseTo(1.3, 10);
+    expect(result.resolved.anatomy.sizeAuthority).toBe("physical-height");
     expect(result.resolved.production.unityVisualScale).toBe(1);
     expect(result.fieldOrigins["anatomy.targetLogicalHeightPx"].source).toBe("actor");
     expect(result.fieldOrigins["production.pixelsPerUnit"].source).toBe("world");
@@ -32,13 +35,16 @@ describe("resolution and origins", () => {
 
 describe("stable validations", () => {
   const ids = (actor = elfGuardian, refs = [venomCultist]) => validateActor(actor, fantasia, refs.map((ref) => ({ actor: ref, world: fantasia }))).map((d) => d.ruleId);
-  it("recognizes sample exceptions and does not invent a species delta", () => {
+  it("recognizes sample exceptions and reports the legacy size disagreement", () => {
     const diagnostics = validateActor(elfGuardian, fantasia);
     expect(diagnostics.find((d) => d.ruleId === RULE_IDS.largeMotion)?.exceptionApproved).toBe(true);
-    expect(diagnostics.some((d) => d.ruleId === RULE_IDS.conflation)).toBe(false);
+    // 273px vs. a recorded scale of 1.0 — a migration to report, not to block.
+    expect(diagnostics.find((d) => d.ruleId === RULE_IDS.sizeConflict)?.severity).toBe("warning");
     expect(canExport(diagnostics)).toBe(true);
   });
-  it("detects conflation", () => expect(ids({ ...elfGuardian, overrides: { ...elfGuardian.overrides, anatomy: { ...elfGuardian.overrides.anatomy, speciesScale: 1.3 } } })).toContain(RULE_IDS.conflation));
+  it("stops warning once the recorded scale matches the height", () =>
+    expect(ids({ ...elfGuardian, overrides: { ...elfGuardian.overrides, anatomy: { ...elfGuardian.overrides.anatomy, speciesScale: 1.3 } } }))
+      .not.toContain(RULE_IDS.sizeConflict));
   it("detects normal/wide torso", () => expect(ids({ ...venomCultist, overrides: { ...venomCultist.overrides, anatomy: { ...venomCultist.overrides.anatomy, torsoWidth: "very-broad" } } }, [])).toContain(RULE_IDS.torso));
   it("blocks a non-1 Unity scale unless excepted", () => {
     const bad = { ...venomCultist, overrides: { ...venomCultist.overrides, production: { ...venomCultist.overrides.production, unityVisualScale: 0.9 } } };
@@ -78,7 +84,8 @@ describe("comparison", () => {
     const comparison = compareActors(elfGuardian, venomCultist, fantasia);
     expect(comparison.metrics.find((m) => m.key === "height")?.absoluteDelta).toBe(21);
     expect(comparison.metrics.find((m) => m.key === "height")?.percentDelta).toBe(30);
-    expect(comparison.metrics.find((m) => m.key === "speciesScale")?.absoluteDelta).toBe(0);
+    // ElfGuardian is 1.3× Fantasia's baseline, VenomCultist is exactly 1.0×.
+    expect(comparison.metrics.find((m) => m.key === "speciesScale")?.absoluteDelta).toBeCloseTo(0.3, 10);
     expect(comparison.metrics.map((m) => m.key)).toEqual(expect.arrayContaining(["stature", "build", "headSize", "weaponOccupancy", "baseCanvas", "largeMotionCanvas"]));
   });
 });

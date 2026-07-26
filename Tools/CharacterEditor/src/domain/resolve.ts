@@ -1,6 +1,7 @@
 import type { ActorDocumentV1, InheritableSpec, WorldTemplateV1 } from "../schema";
 import type { FieldOrigins, ResolvedActor } from "./types";
 import { applyResolvedScale } from "./scale";
+import { applyResolvedSize, worldBasePhysicalHeightPx } from "./size";
 import { PROJECT_DEFAULT_DOCUMENT_ID, VIEW_KEYS, applyResolvedView, isAllowedViewValue } from "./view";
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
@@ -23,13 +24,34 @@ function leafPaths(value: unknown, prefix = ""): string[] {
 export function resolveActor(actor: ActorDocumentV1, world: WorldTemplateV1): ResolvedActor {
   if (actor.worldRef.worldId !== world.worldId || actor.worldRef.version !== world.revision)
     throw new Error(`Actor pins ${actor.worldRef.worldId} v${actor.worldRef.version}, not ${world.worldId} v${world.revision}`);
-  const resolved = applyResolvedView(applyResolvedScale(merge<InheritableSpec>(world.defaults, actor.overrides)));
+  // Size first: species scale and physical height are two views of one number,
+  // and which one wins can change the physical height. Scale resolution then
+  // derives the logical height from whatever physical height survived.
+  const merged = merge<InheritableSpec>(world.defaults, actor.overrides);
+  const resolved = applyResolvedView(
+    applyResolvedScale(applyResolvedSize(merged, worldBasePhysicalHeightPx(world.defaults))),
+  );
   const origins: FieldOrigins = {};
   for (const path of leafPaths(world.defaults)) origins[path] = { source: "world", documentId: world.worldId, version: world.revision };
   for (const path of leafPaths(actor.overrides)) origins[path] = { source: "actor", documentId: actor.actorId, version: actor.revision };
   attachDerivedScaleOrigins(origins);
+  attachDerivedSizeOrigins(origins, resolved);
   attachViewOrigins(origins, actor, world);
   return { ...actor, resolved, fieldOrigins: origins };
+}
+
+/** Whichever of the two size fields was derived points at the document that
+ * supplied the one it was derived from, so the UI does not badge a computed
+ * value as if someone had typed it. */
+function attachDerivedSizeOrigins(origins: FieldOrigins, resolved: InheritableSpec): void {
+  const authority = resolved.anatomy.sizeAuthority;
+  const from = authority === "species-scale" ? "anatomy.speciesScale" : "anatomy.targetPhysicalHeightPx";
+  const derived = authority === "species-scale" ? "anatomy.targetPhysicalHeightPx" : "anatomy.speciesScale";
+  if (origins[from]) {
+    origins[derived] = origins[from];
+    origins["anatomy.targetLogicalHeightPx"] = origins[from];
+  }
+  if (!origins["anatomy.sizeAuthority"] && origins[from]) origins["anatomy.sizeAuthority"] = origins[from];
 }
 
 /** applyResolvedView guarantees a value for every view field, so every field

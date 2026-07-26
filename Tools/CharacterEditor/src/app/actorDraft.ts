@@ -144,6 +144,10 @@ export function setBodyScale(
     targetLogicalHeightPx: number;
     densityPreset?: NonNullable<PixelStyle["densityPreset"]>;
     blockPx?: number;
+    /** Written together with the heights so the document never states two
+     * different sizes. Omitted by density edits, which change neither. */
+    speciesScale?: number;
+    sizeAuthority?: NonNullable<Anatomy["sizeAuthority"]>;
   },
 ): ActorDocument {
   const pixelStyle: Partial<PixelStyle> = { ...actor.overrides.pixelStyle };
@@ -160,9 +164,24 @@ export function setBodyScale(
         ...actor.overrides.anatomy,
         targetPhysicalHeightPx: scale.targetPhysicalHeightPx,
         targetLogicalHeightPx: scale.targetLogicalHeightPx,
+        ...(scale.speciesScale !== undefined ? { speciesScale: scale.speciesScale } : {}),
+        ...(scale.sizeAuthority !== undefined ? { sizeAuthority: scale.sizeAuthority } : {}),
       },
     },
   });
+}
+
+/** Drops the linked size override — height, its logical mirror, the species
+ * scale derived from it, and the authority marker — and inherits the world's
+ * body size again. They were written as one edit, so they are cleared as one. */
+export function resetBodySizeOverride(actor: ActorDocument): ActorDocument {
+  const next: Partial<Anatomy> = { ...(actor.overrides.anatomy ?? {}) };
+  delete next.targetPhysicalHeightPx;
+  delete next.targetLogicalHeightPx;
+  delete next.speciesScale;
+  delete next.sizeAuthority;
+  const hasRemaining = Object.keys(next).length > 0;
+  return touch({ ...actor, overrides: { ...actor.overrides, anatomy: hasRemaining ? (next as Anatomy) : undefined } });
 }
 
 /** Drops the height override and inherits the world's body size again. Both

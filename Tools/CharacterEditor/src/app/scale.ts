@@ -12,6 +12,12 @@
  */
 export { blockForPreset, logicalHeightAt, presetForBlock, resolveScale } from "../domain/scale";
 export type { ScaleResolution } from "../domain/scale";
+export {
+  displaySpeciesScale, physicalHeightFromScale, resolveSize, sizeRelationText,
+  speciesScaleFromHeight, worldBasePhysicalHeightPx,
+} from "../domain/size";
+export type { SizeResolution } from "../domain/size";
+export type { SizeAuthority } from "../schema";
 export { DENSITY_PRESETS } from "../schema";
 export type { DensityPresetId } from "../schema";
 

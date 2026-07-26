@@ -1,6 +1,7 @@
 import type { ActorDocumentV1, ApprovedException, InheritableSpec, WorldTemplateV1 } from "../schema";
 import { resolveActor } from "./resolve";
 import { resolveScale } from "./scale";
+import { displaySpeciesScale, resolveSize, worldBasePhysicalHeightPx } from "./size";
 import type { ActorReference, Diagnostic, FieldOrigins } from "./types";
 import {
   PROJECT_DEFAULT_VIEW,
@@ -13,7 +14,7 @@ import {
 } from "./view";
 
 export const RULE_IDS = {
-  required: "required-field", conflation: "stature-species-scale-conflation",
+  required: "required-field", sizeConflict: "species-scale-height-conflict",
   torso: "normal-build-wide-torso", proportion: "proportion-mismatch",
   canvas: "large-weapon-canvas", unity: "unity-scale-not-one", weapon: "weapon-family-not-allowed",
   extremity: "extremity-size-delta", largeMotion: "large-motion-canvas-exception", ppu: "ppu-not-200",
@@ -57,11 +58,12 @@ export function validateActor(actor: ActorDocumentV1, world: WorldTemplateV1, re
   // Compare physical heights, not logical ones: logical height moves with pixel
   // density, so a density change must not make this heuristic fire or stop firing.
   const scale = resolveScale(a, resolved.pixelStyle);
-  const worldScale = resolveScale(world.defaults.anatomy, world.defaults.pixelStyle);
-  const heightRatio = worldScale.targetPhysicalHeightPx > 0
-    ? scale.targetPhysicalHeightPx / worldScale.targetPhysicalHeightPx : 0;
-  if (Math.abs(a.speciesScale - 1) > 0.05 && Math.abs(heightRatio - a.speciesScale) < 0.1)
-    d.push(diagnostic(actor, RULE_IDS.conflation, "warning", "Species scale appears derived from actor height; confirm species-wide evidence.", true, "anatomy.speciesScale"));
+  // Species scale and physical height are now two views of one number, so the
+  // only thing left to report is a document that authored both and disagreed.
+  // The physical height won; say so rather than migrating in silence.
+  const size = resolveSize({ ...world.defaults.anatomy, ...actor.overrides.anatomy }, scale.blockPx, worldBasePhysicalHeightPx(world.defaults));
+  if (size.conflict)
+    d.push(diagnostic(actor, RULE_IDS.sizeConflict, "warning", `Document records species scale ${size.conflict.documentSpeciesScale} but a target physical height of ${size.targetPhysicalHeightPx}px against a ${size.worldBasePhysicalHeightPx}px world baseline, which is scale ${displaySpeciesScale(size.conflict.resolvedSpeciesScale)}. The physical height was kept and the scale recomputed; re-save the actor to record the corrected value.`, true, "anatomy.speciesScale"));
   if (!scale.squareBlock)
     d.push(diagnostic(actor, RULE_IDS.densityBlock, "error", `Logical block is ${resolved.pixelStyle.logicalBlockPx.widthPx}×${resolved.pixelStyle.logicalBlockPx.heightPx}; production requires a square block.`, false, "pixelStyle.logicalBlockPx"));
   if (scale.roundingResidualPx !== 0)

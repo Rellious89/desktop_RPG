@@ -43,9 +43,13 @@ describe("BodySection", () => {
     // Inherits 70 logical px at 3x3 -> 210 physical px in the authored field.
     const heightInput = screen.getByDisplayValue("210") as HTMLInputElement;
     fireEvent.change(heightInput, { target: { value: "273" } });
+    // The size fields commit on blur, not per keystroke — see CommittedNumberInput.
+    fireEvent.blur(heightInput);
 
     expect(latestActor.overrides.anatomy?.targetPhysicalHeightPx).toBe(273);
     expect(latestActor.overrides.anatomy?.targetLogicalHeightPx).toBe(91);
+    expect(latestActor.overrides.anatomy?.speciesScale).toBeCloseTo(1.3, 10);
+    expect(latestActor.overrides.anatomy?.sizeAuthority).toBe("physical-height");
   });
 
   it("keeps the physical height and recomputes the logical height when the density changes", () => {
@@ -66,6 +70,92 @@ describe("BodySection", () => {
     expect(latestActor.overrides.anatomy?.targetLogicalHeightPx).toBe(105);
     expect(latestActor.overrides.pixelStyle?.logicalBlockPx).toEqual({ widthPx: 2, heightPx: 2 });
     expect(latestActor.overrides.pixelStyle?.densityPreset).toBe("detail-2x2");
+  });
+
+  /** The world fixture is 70 logical px at 3×3 — a 210px baseline body. */
+  function renderBody() {
+    const world = makeWorld();
+    const actor = makeActor({ overrides: {} });
+    let latestActor: ActorDocument = actor;
+    const onChangeActor = vi.fn((updater: (a: ActorDocument) => ActorDocument) => {
+      latestActor = updater(latestActor);
+    });
+    render(
+      <BodySection
+        actor={actor}
+        world={world}
+        resolved={resolvedFromWorldAndOverrides(world, actor)}
+        onChangeActor={onChangeActor}
+      />,
+    );
+    return { get latestActor() { return latestActor; } };
+  }
+
+  it("recomputes the physical height when the species scale is edited", () => {
+    const ctx = renderBody();
+
+    const scaleInput = screen.getByLabelText("Species Scale");
+    fireEvent.change(scaleInput, { target: { value: "1.38" } });
+    fireEvent.blur(scaleInput);
+
+    const anatomy = ctx.latestActor.overrides.anatomy;
+    expect(anatomy?.targetPhysicalHeightPx).toBe(290); // round(210 × 1.38)
+    expect(anatomy?.targetLogicalHeightPx).toBe(97);
+    expect(anatomy?.speciesScale).toBe(1.38);
+    expect(anatomy?.sizeAuthority).toBe("species-scale");
+  });
+
+  it("recomputes the species scale when the physical height is edited", () => {
+    const ctx = renderBody();
+
+    const heightInput = screen.getByLabelText("목표 물리 높이(px)");
+    fireEvent.change(heightInput, { target: { value: "290" } });
+    fireEvent.blur(heightInput);
+
+    const anatomy = ctx.latestActor.overrides.anatomy;
+    expect(anatomy?.speciesScale).toBeCloseTo(290 / 210, 12);
+    expect(anatomy?.targetPhysicalHeightPx).toBe(290);
+    expect(anatomy?.sizeAuthority).toBe("physical-height");
+  });
+
+  it("shows the relation between the two fields", () => {
+    const world = makeWorld();
+    const actor = makeActor(); // 91 logical px at 3×3 = 273 physical px
+    render(
+      <BodySection
+        actor={actor}
+        world={world}
+        resolved={resolvedFromWorldAndOverrides(world, actor)}
+        onChangeActor={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("210px × 1.3 = 273px")).toBeInTheDocument();
+  });
+
+  it("does not write a half-typed number over the paired field", () => {
+    const ctx = renderBody();
+
+    const heightInput = screen.getByLabelText("목표 물리 높이(px)");
+    // Clearing the field to retype it must not commit an empty or partial size.
+    fireEvent.change(heightInput, { target: { value: "" } });
+    fireEvent.change(heightInput, { target: { value: "2" } });
+    fireEvent.change(heightInput, { target: { value: "29" } });
+    expect(ctx.latestActor.overrides.anatomy).toBeUndefined();
+
+    fireEvent.change(heightInput, { target: { value: "290" } });
+    fireEvent.blur(heightInput);
+    expect(ctx.latestActor.overrides.anatomy?.targetPhysicalHeightPx).toBe(290);
+  });
+
+  it("restores the canonical value when the field is left unusable", () => {
+    const ctx = renderBody();
+
+    const scaleInput = screen.getByLabelText("Species Scale") as HTMLInputElement;
+    fireEvent.change(scaleInput, { target: { value: "" } });
+    fireEvent.blur(scaleInput);
+
+    expect(ctx.latestActor.overrides.anatomy).toBeUndefined();
+    expect(scaleInput.value).toBe("1");
   });
 
   it("adds a physical trait tag", () => {
