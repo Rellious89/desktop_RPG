@@ -26,10 +26,14 @@ export type ScaleResolution = {
   targetPhysicalHeightPx: number;
   /** Derived: round(targetPhysicalHeightPx / blockPx). */
   targetLogicalHeightPx: number;
-  /** Height actually reachable on the block grid: targetLogicalHeightPx × blockPx. */
+  /** What a reader that only knows targetLogicalHeightPx computes:
+   * targetLogicalHeightPx × blockPx. Production scales the body to
+   * targetPhysicalHeightPx, not to this — the two differ only because the
+   * logical height is rounded. */
   effectivePhysicalHeightPx: number;
   /** effectivePhysicalHeightPx − targetPhysicalHeightPx. Non-zero when the
-   * requested height is not a multiple of the block. */
+   * requested height is not a multiple of the block, i.e. when the logical
+   * height had to be rounded. */
   roundingResidualPx: number;
   /** Whether the document authored a physical height or it was back-calculated. */
   authoredFrom: "physical" | "logical";

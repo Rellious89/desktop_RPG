@@ -42,7 +42,7 @@ export function validateActor(actor: ActorDocumentV1, world: WorldTemplateV1, re
   if (!scale.squareBlock)
     d.push(diagnostic(actor, RULE_IDS.densityBlock, "error", `Logical block is ${resolved.pixelStyle.logicalBlockPx.widthPx}×${resolved.pixelStyle.logicalBlockPx.heightPx}; production requires a square block.`, false, "pixelStyle.logicalBlockPx"));
   if (scale.roundingResidualPx !== 0)
-    d.push(diagnostic(actor, RULE_IDS.densityResidual, "warning", `Target physical height ${scale.targetPhysicalHeightPx}px is not a multiple of the ${scale.blockPx}px block; production will land on ${scale.effectivePhysicalHeightPx}px (${scale.targetLogicalHeightPx} logical px).`, true, "anatomy.targetPhysicalHeightPx"));
+    d.push(diagnostic(actor, RULE_IDS.densityResidual, "warning", `Target physical height ${scale.targetPhysicalHeightPx}px is not a multiple of the ${scale.blockPx}px block, so the logical height rounds to ${scale.targetLogicalHeightPx}. Production still builds the body at ${scale.targetPhysicalHeightPx}px, but tools that read only the logical height will compute ${scale.effectivePhysicalHeightPx}px.`, true, "anatomy.targetPhysicalHeightPx"));
   // `resolved` always carries a physical height, so ask the source documents
   // whether anyone actually authored one.
   const authoredPhysical = actor.overrides.anatomy?.targetPhysicalHeightPx !== undefined

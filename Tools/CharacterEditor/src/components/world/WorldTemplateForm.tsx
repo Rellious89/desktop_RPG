@@ -291,7 +291,7 @@ export function WorldTemplateForm({
               htmlFor="world-height"
               hint={
                 worldScale.roundingResidualPx !== 0
-                  ? `${worldScale.blockPx}px 블록의 배수가 아닙니다 — 실제로는 ${worldScale.effectivePhysicalHeightPx}px로 제작됩니다.`
+                  ? `${worldScale.blockPx}px 블록의 배수가 아니라 논리 높이가 ${worldScale.targetLogicalHeightPx}로 반올림됩니다 — 논리 높이만 읽는 도구는 ${worldScale.effectivePhysicalHeightPx}px로 해석합니다.`
                   : `3×3 기준 권장 범위 195~225px (논리 65~75px)`
               }
             >

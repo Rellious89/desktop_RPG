@@ -78,7 +78,7 @@ export function BodySection({ actor, world, resolved, onChangeActor }: BodySecti
           onReset={() => onChangeActor((current) => resetBodyHeightOverride(current))}
           hint={
             scale.roundingResidualPx !== 0
-              ? `${scale.blockPx}px 블록의 배수가 아닙니다 — 실제로는 ${scale.effectivePhysicalHeightPx}px로 제작됩니다.`
+              ? `${scale.blockPx}px 블록의 배수가 아니라 논리 높이가 ${scale.targetLogicalHeightPx}로 반올림됩니다 — 논리 높이만 읽는 도구는 ${scale.effectivePhysicalHeightPx}px로 해석합니다.`
               : undefined
           }
         >
