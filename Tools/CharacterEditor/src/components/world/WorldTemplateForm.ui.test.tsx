@@ -66,4 +66,43 @@ describe("WorldTemplateForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "JSON 다운로드" }));
     expect(onDownload).toHaveBeenCalledWith(expect.objectContaining({ revision: 2 }));
   });
+
+  it("edits the light direction alongside facing and saves both", () => {
+    const onSave = vi.fn();
+    render(
+      <WorldTemplateForm
+        mode="edit"
+        initialWorld={makeWorld()}
+        onSave={onSave}
+        onDownload={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText(/기본 화면 진행 방향/)).toHaveValue("screen-right");
+    expect(screen.getByLabelText(/기본 광원 방향/)).toHaveValue("upper-left");
+    fireEvent.change(screen.getByLabelText(/기본 광원 방향/), { target: { value: "upper-right" } });
+    fireEvent.click(screen.getByRole("button", { name: /^저장/ }));
+    expect(onSave.mock.calls[0][0].defaults.view).toEqual({
+      projection: "three-quarter", facing: "screen-right", lightDirection: "upper-right",
+    });
+  });
+
+  it("shows the master direction sentence a template's actors will inherit", () => {
+    const world = makeWorld();
+    // A template saved before the light-direction field existed.
+    world.defaults.view = { projection: "three-quarter", facing: "screen-left" };
+    render(
+      <WorldTemplateForm
+        mode="edit"
+        initialWorld={world}
+        onSave={vi.fn()}
+        onDownload={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText(/기본 광원 방향/)).toHaveValue("upper-left");
+    expect(screen.getByText(
+      "front-biased three-quarter full-body view, facing screen-left, with lighting from the upper-left.",
+    )).toBeInTheDocument();
+  });
 });

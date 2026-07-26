@@ -61,4 +61,22 @@ describe("ExportPreview", () => {
     fireEvent.click(screen.getByRole("button", { name: "Markdown 다운로드" }));
     expect(onDownloadMarkdown).toHaveBeenCalledTimes(1);
   });
+
+  it("shows the effective direction being exported, and its origin", () => {
+    const envelope = makeEnvelope([]);
+    envelope.fieldOrigins = { "view.facing": { source: "world", documentId: "HUMAN-FANTASY-01", version: 1 } };
+    render(
+      <ExportPreview
+        envelope={envelope}
+        jsonText="{}"
+        markdownText="# ElfGuardian"
+        onDownloadJson={vi.fn()}
+        onDownloadMarkdown={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    );
+    expect(screen.getByDisplayValue("screen-right")).toBeDisabled();
+    expect(screen.getByDisplayValue("upper-left")).toBeDisabled();
+    expect(screen.getByDisplayValue("World Template")).toBeInTheDocument();
+  });
 });

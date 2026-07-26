@@ -17,9 +17,26 @@ export const approvedExceptionSchema = z.object({
   approvedBy: z.string().optional(), approvedAt: timestamp.optional(), active: z.boolean().default(true),
 });
 
+export const PROJECTION_VALUES = ["side", "three-quarter", "front"] as const;
+export const FACING_VALUES = ["screen-left", "screen-right"] as const;
+export const LIGHT_DIRECTION_VALUES = ["upper-left", "upper-right", "upper-center"] as const;
+
+/** How a design master is framed and lit.
+ *
+ * Every field is optional in the document because worlds authored before the
+ * light-direction field existed carry only two of the three, and a legacy
+ * import may carry none. Reading is always done through
+ * `resolveView()` (src/domain/view.ts), which fills gaps from the world and
+ * then from the project defaults and reports which one supplied each value.
+ * The same pattern as `anatomy.targetPhysicalHeightPx`: optional to author,
+ * guaranteed once resolved. */
 export const viewSchema = z.object({
-  projection: z.enum(["side", "three-quarter", "front"]),
-  facing: z.enum(["screen-left", "screen-right"]),
+  projection: z.enum(PROJECTION_VALUES).optional(),
+  facing: z.enum(FACING_VALUES).optional(),
+  /** Key-light direction of the master, kept next to facing because the two
+   * are read together when a master image is generated. `pixelStyle.lighting`
+   * stays as the free-text rendering note. */
+  lightDirection: z.enum(LIGHT_DIRECTION_VALUES).optional(),
 });
 
 /** Pixel density presets. The block size is the number of image pixels per
@@ -131,6 +148,9 @@ export const actorSchema = z.object({
   resourceFolderPath: z.string().optional(),
 });
 
+export type Projection = (typeof PROJECTION_VALUES)[number];
+export type Facing = (typeof FACING_VALUES)[number];
+export type LightDirection = (typeof LIGHT_DIRECTION_VALUES)[number];
 export type WorldTemplateV1 = z.infer<typeof worldSchema>;
 export type ActorDocumentV1 = z.infer<typeof actorSchema>;
 export type InheritableSpec = z.infer<typeof inheritableSpecSchema>;

@@ -2,7 +2,7 @@ import type { ActorDocumentV1, WorldTemplateV1 } from "../schema";
 
 const updatedAt = "2026-07-25T00:00:00+09:00";
 const commonDefaults: WorldTemplateV1["defaults"] = {
-  view: { projection: "three-quarter", facing: "screen-right" },
+  view: { projection: "three-quarter", facing: "screen-right", lightDirection: "upper-left" },
   pixelStyle: { styleId: "low-companion-v1", logicalBlockPx: { widthPx: 3, heightPx: 3 }, outline: "Thick stepped near-black outline", lighting: "Upper-left" },
   anatomy: { stature: "average", targetLogicalHeightPx: 70, build: "normal", proportionTemplateId: "humanoid-sd-2.5-head", speciesScale: 1, headSize: "m", handSize: "m", footSize: "m", torsoWidth: "normal", isFloatingActor: false },
   production: { baseCanvas: { widthPx: 512, heightPx: 512 }, largeMotionCanvas: { policy: "same-as-base" }, pivotRule: "forward-foot-contact", pixelsPerUnit: 200, unityVisualScale: 1, layers: ["character-or-outfit", "weapon", "effect"] },

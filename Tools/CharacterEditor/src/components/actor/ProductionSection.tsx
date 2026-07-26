@@ -1,7 +1,9 @@
 import type { ActorDocument, InheritableSpec, WorldTemplate } from "../../app/types";
 import { resetProductionOverride, setProductionOverride } from "../../app/actorDraft";
 import { productionOrigin } from "../../app/fieldOrigin";
+import { viewOriginOf } from "../../app/view";
 import { FieldRow } from "../common/FieldRow";
+import { ViewDirectionPanel } from "../common/ViewDirectionPanel";
 
 type Production = InheritableSpec["production"];
 
@@ -25,6 +27,9 @@ export function ProductionSection({ actor, world, resolved, onChangeActor }: Pro
   const isExplicitLargeMotion = production.largeMotionCanvas.policy === "explicit";
 
   return (
+    <div className="ce-stack">
+      <ViewDirectionPanel resolved={resolved} origin={viewOriginOf(actor, world)} />
+
     <div className="ce-card">
       <h3 className="ce-card-title">Production &amp; Canvas</h3>
       <p className="ce-card-subtitle">
@@ -231,6 +236,7 @@ export function ProductionSection({ actor, world, resolved, onChangeActor }: Pro
           {production.layers.join(" → ")}
         </p>
       </FieldRow>
+    </div>
     </div>
   );
 }

@@ -1,7 +1,16 @@
-import type { ActorDocumentV1, ApprovedException, WorldTemplateV1 } from "../schema";
+import type { ActorDocumentV1, ApprovedException, InheritableSpec, WorldTemplateV1 } from "../schema";
 import { resolveActor } from "./resolve";
 import { resolveScale } from "./scale";
-import type { ActorReference, Diagnostic } from "./types";
+import type { ActorReference, Diagnostic, FieldOrigins } from "./types";
+import {
+  PROJECT_DEFAULT_VIEW,
+  VIEW_KEYS,
+  VIEW_ORIGIN_LABELS,
+  isAllowedViewValue,
+  masterImageDirectionPrompt,
+  resolveView,
+  type ViewKey,
+} from "./view";
 
 export const RULE_IDS = {
   required: "required-field", conflation: "stature-species-scale-conflation",
@@ -11,7 +20,19 @@ export const RULE_IDS = {
   floating: "floating-pivot-mismatch", constraints: "missing-design-constraints", alias: "actor-id-alias-conflict",
   densityBlock: "non-square-density-block", densityResidual: "physical-height-not-block-multiple",
   densityBackCalc: "density-override-without-physical-height",
+  viewMissing: "view-direction-missing",
+  viewInvalid: "view-direction-invalid-value",
+  viewFallback: "view-direction-fallback-used",
+  viewOpposesRule: "view-facing-opposes-master-rule",
+  viewWorldOffRule: "world-view-differs-from-master-rule",
+  viewInherited: "view-direction-inherited",
 } as const;
+
+const VIEW_LABELS: Record<ViewKey, string> = {
+  projection: "Projection",
+  facing: "Screen facing",
+  lightDirection: "Light direction",
+};
 
 const activeException = (exceptions: ApprovedException[], ruleId: string) =>
   exceptions.some((e) => e.active && e.ruleId === ruleId && e.reason.trim().length >= 10);
@@ -24,13 +45,15 @@ function diagnostic(actor: ActorDocumentV1, ruleId: string, severity: Diagnostic
 const ranks: Record<string, number> = { xs: 0, s: 1, m: 2, l: 3, xl: 4 };
 
 export function validateActor(actor: ActorDocumentV1, world: WorldTemplateV1, references: ActorReference[] = []): Diagnostic[] {
-  let resolved;
-  try { resolved = resolveActor(actor, world).resolved; }
+  let resolution;
+  try { resolution = resolveActor(actor, world); }
   catch (error) { return [diagnostic(actor, RULE_IDS.required, "error", (error as Error).message, false, "worldRef")]; }
+  const resolved = resolution.resolved;
   const d: Diagnostic[] = [];
   const a = resolved.anatomy, p = resolved.production;
   if (!actor.actorId || !actor.identity.species || !actor.identity.role || !actor.identity.concept)
     d.push(diagnostic(actor, RULE_IDS.required, "error", "One or more required identity fields are missing.", false));
+  d.push(...viewDiagnostics(actor, world, resolved, resolution.fieldOrigins));
   // Compare physical heights, not logical ones: logical height moves with pixel
   // density, so a density change must not make this heuristic fire or stop firing.
   const scale = resolveScale(a, resolved.pixelStyle);
@@ -82,6 +105,67 @@ export function validateActor(actor: ActorDocumentV1, world: WorldTemplateV1, re
   }
   return d;
 }
+
+/**
+ * View direction rules. The design master is generated from the exported
+ * character sheet, so a direction that is absent, unusable, or silently
+ * different from the project master rule is a production defect, not a
+ * stylistic note — every message here says what to draw, not just what is
+ * wrong.
+ */
+function viewDiagnostics(actor: ActorDocumentV1, world: WorldTemplateV1, resolved: InheritableSpec, origins: FieldOrigins): Diagnostic[] {
+  const d: Diagnostic[] = [];
+  const view = resolveView(resolved.view).view;
+  // `resolved` has already been through applyResolvedView, so the gaps are
+  // only visible in the origins: `default` means no document authored it.
+  const fellBackToDefault = VIEW_KEYS.filter((key) => origins[`view.${key}`]?.source === "default");
+  const inherited = VIEW_ORIGIN_LABELS[origins["view.facing"]?.source ?? "default"];
+
+  for (const key of VIEW_KEYS) {
+    // A value the document authored but the schema does not allow. Reachable
+    // from hand-edited or externally produced JSON; the fallback already
+    // replaced it, but silently substituting would hide a real disagreement.
+    for (const [label, authored] of [["actor", actor.overrides.view?.[key]], ["world template", world.defaults.view?.[key]]] as const) {
+      if (authored !== undefined && !isAllowedViewValue(key, authored))
+        d.push(diagnostic(actor, RULE_IDS.viewInvalid, "error",
+          `${VIEW_LABELS[key]} on the ${label} is ${JSON.stringify(authored)}, which is not an allowed value. Allowed: ${ALLOWED_TEXT[key]}.`,
+          false, `view.${key}`));
+    }
+    if (!isAllowedViewValue(key, view[key]))
+      d.push(diagnostic(actor, RULE_IDS.viewMissing, "error",
+        `${VIEW_LABELS[key]} could not be resolved for this actor. Set it on the ${world.worldId} world template before exporting.`,
+        false, `view.${key}`));
+  }
+
+  if (fellBackToDefault.length)
+    d.push(diagnostic(actor, RULE_IDS.viewFallback, "warning",
+      `${fellBackToDefault.map((k) => VIEW_LABELS[k]).join(", ")} is not recorded on ${actor.actorId} or on the ${world.worldId} world template, so the KeyBuddy project default was used (${fellBackToDefault.map((k) => `${k} ${PROJECT_DEFAULT_VIEW[k]}`).join(", ")}). Set it on the world template to make it explicit.`,
+      true, `view.${fellBackToDefault[0]}`));
+
+  if (view.facing !== PROJECT_DEFAULT_VIEW.facing)
+    d.push(diagnostic(actor, RULE_IDS.viewOpposesRule, "warning",
+      `${actor.actorId} resolves to facing ${view.facing} (from ${inherited}), but the KeyBuddy master production rule is ${PROJECT_DEFAULT_VIEW.facing}. Generate the design master facing ${view.facing} only if this reversal is intended; do not mix directions inside one animation set.`,
+      true, "view.facing"));
+
+  const worldOffRule = VIEW_KEYS.filter((key) =>
+    isAllowedViewValue(key, world.defaults.view?.[key]) && world.defaults.view?.[key] !== PROJECT_DEFAULT_VIEW[key]);
+  if (worldOffRule.length)
+    d.push(diagnostic(actor, RULE_IDS.viewWorldOffRule, "warning",
+      `World template ${world.worldId} sets ${worldOffRule.map((k) => `${k} ${world.defaults.view?.[k]}`).join(", ")}, which differs from the KeyBuddy master production rule (${VIEW_KEYS.map((k) => `${k} ${PROJECT_DEFAULT_VIEW[k]}`).join(", ")}). Every actor in this world inherits the world value.`,
+      true, "view"));
+
+  if (!d.some((x) => x.blocksExport))
+    d.push(diagnostic(actor, RULE_IDS.viewInherited, "info",
+      `Design master direction, inherited from ${inherited}: ${masterImageDirectionPrompt(view)}`,
+      false, "view.facing"));
+  return d;
+}
+
+const ALLOWED_TEXT: Record<ViewKey, string> = {
+  projection: "side, three-quarter, front",
+  facing: "screen-left, screen-right",
+  lightDirection: "upper-left, upper-right, upper-center",
+};
 
 export const canExport = (diagnostics: Diagnostic[]) => !diagnostics.some((d) => d.blocksExport);
 

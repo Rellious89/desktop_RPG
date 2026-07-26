@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ExportEnvelope } from "../../app/types";
 import { Badge } from "../common/Badge";
+import { ViewDirectionPanel } from "../common/ViewDirectionPanel";
 
 export interface ExportPreviewProps {
   envelope: ExportEnvelope;
@@ -26,6 +27,9 @@ export function ExportPreview({
   const blockingCount = envelope.diagnostics.filter((d) => d.blocksExport).length;
   const warningCount = envelope.diagnostics.filter((d) => d.severity === "warning").length;
   const exceptionCount = envelope.diagnostics.filter((d) => d.exceptionApproved).length;
+  // The direction is the one exported value a reviewer cannot recover from the
+  // rendered image later, so it is shown before the raw payload, not buried in it.
+  const viewOrigin = envelope.fieldOrigins["view.facing"]?.source ?? "default";
 
   return (
     <div className="ce-stack">
@@ -78,6 +82,8 @@ export function ExportPreview({
 
         <pre className="ce-code-block">{tab === "markdown" ? markdownText : jsonText}</pre>
       </div>
+
+      <ViewDirectionPanel resolved={envelope.resolved} origin={viewOrigin} />
     </div>
   );
 }

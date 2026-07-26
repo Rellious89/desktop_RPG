@@ -16,7 +16,7 @@ export function createBlankWorld(): WorldTemplate {
     status: "concept",
     description: "",
     defaults: {
-      view: { projection: "three-quarter", facing: "screen-right" },
+      view: { projection: "three-quarter", facing: "screen-right", lightDirection: "upper-left" },
       pixelStyle: {
         styleId: "low-companion-v1",
         logicalBlockPx: { widthPx: 3, heightPx: 3 },

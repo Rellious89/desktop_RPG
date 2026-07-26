@@ -1,6 +1,14 @@
 import { useState } from "react";
 import type { InheritableSpec, WorldTemplate } from "../../app/types";
 import { DENSITY_OPTIONS, DENSITY_PRESETS, logicalHeightAt, resolveScale } from "../../app/scale";
+import {
+  FACING_OPTIONS,
+  LIGHT_DIRECTION_OPTIONS,
+  PROJECTION_OPTIONS,
+  PROJECT_DEFAULT_VIEW,
+  masterImageDirectionPrompt,
+  resolveView,
+} from "../../app/view";
 import { FieldRow } from "../common/FieldRow";
 import { TagListEditor } from "../common/TagListEditor";
 
@@ -9,8 +17,6 @@ type ViewSpec = InheritableSpec["view"];
 type Production = InheritableSpec["production"];
 
 const STATUS_OPTIONS: WorldTemplate["status"][] = ["concept", "active", "hold"];
-const PROJECTION_OPTIONS: ViewSpec["projection"][] = ["side", "three-quarter", "front"];
-const FACING_OPTIONS: ViewSpec["facing"][] = ["screen-right", "screen-left"];
 const STATURE_OPTIONS: Anatomy["stature"][] = ["tiny", "short", "average", "tall", "very-tall"];
 const BUILD_OPTIONS: Anatomy["build"][] = ["slender", "normal", "broad", "muscular", "massive", "non-humanoid"];
 const SIZE_OPTIONS: Anatomy["headSize"][] = ["xs", "s", "m", "l", "xl"];
@@ -69,12 +75,14 @@ export function WorldTemplateForm({
   }
 
   const anatomy = world.defaults.anatomy;
-  const view = world.defaults.view;
   const pixelStyle = world.defaults.pixelStyle;
   const production = world.defaults.production;
   // Fills in the physical height for templates authored before the split, so
   // the form always edits a real number rather than an empty field.
   const worldScale = resolveScale(anatomy, pixelStyle);
+  // Likewise for direction: templates authored before the light-direction
+  // field carry no value, and a select with no matching option renders blank.
+  const resolvedView = resolveView(world.defaults.view).view;
 
   /** Body size is authored in physical px; the logical height is its mirror at
    * the current density and is written alongside it so the saved template never
@@ -176,11 +184,14 @@ export function WorldTemplateForm({
 
         <fieldset className="ce-fieldset ce-panel-section">
           <legend>승인 시점 &amp; 픽셀 스타일</legend>
+          <p className="ce-card-subtitle">
+            이 세계 액터의 디자인 마스터 제작 지시문: <code>{masterImageDirectionPrompt(resolvedView)}</code>
+          </p>
           <div className="ce-form-grid">
             <FieldRow label="승인 시점(투영)" required htmlFor="world-view-projection">
               <select
                 id="world-view-projection"
-                value={view.projection}
+                value={resolvedView.projection}
                 onChange={(event) => patchView({ projection: event.target.value as ViewSpec["projection"] })}
               >
                 {PROJECTION_OPTIONS.map((option) => (
@@ -190,15 +201,38 @@ export function WorldTemplateForm({
                 ))}
               </select>
             </FieldRow>
-            <FieldRow label="기본 화면 진행 방향" required htmlFor="world-facing">
+            <FieldRow
+              label="기본 화면 진행 방향"
+              required
+              htmlFor="world-facing"
+              hint={`이 세계의 모든 액터가 상속합니다. KeyBuddy 1차 마스터 규칙은 ${PROJECT_DEFAULT_VIEW.facing}입니다.`}
+            >
               <select
                 id="world-facing"
-                value={view.facing}
+                value={resolvedView.facing}
                 onChange={(event) => patchView({ facing: event.target.value as ViewSpec["facing"] })}
               >
                 {FACING_OPTIONS.map((facing) => (
                   <option key={facing} value={facing}>
                     {facing}
+                  </option>
+                ))}
+              </select>
+            </FieldRow>
+            <FieldRow
+              label="기본 광원 방향"
+              required
+              htmlFor="world-light-direction"
+              hint="디자인 마스터의 주 광원 방향입니다. 아래 '외곽선/셰이딩 메모'와 달리 규격값이며 Export에 그대로 기록됩니다."
+            >
+              <select
+                id="world-light-direction"
+                value={resolvedView.lightDirection}
+                onChange={(event) => patchView({ lightDirection: event.target.value as ViewSpec["lightDirection"] })}
+              >
+                {LIGHT_DIRECTION_OPTIONS.map((direction) => (
+                  <option key={direction} value={direction}>
+                    {direction}
                   </option>
                 ))}
               </select>

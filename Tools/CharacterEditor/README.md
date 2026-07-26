@@ -87,6 +87,35 @@ Existing documents carry only a logical height. They are back-calculated as
 size. Both heights are written on save, so tools that read only
 `targetLogicalHeightPx` keep working.
 
+## View and direction
+
+Every first-generation KeyBuddy master is drawn the same way:
+
+```text
+Projection:      three-quarter (front-biased)
+Facing:          screen-right
+Light direction: upper-left
+```
+
+The World Template owns those three values under **승인 시점 & 픽셀 스타일**, and
+every actor in the world inherits them; there is no per-actor direction control.
+Actors show the inherited values read-only in the **Production** section and in
+**Export 미리보기**.
+
+Exports record the resolved direction so the design master can be generated from
+the character sheet alone:
+
+- JSON — `resolved.view` carries all three values, `fieldOrigins["view.*"]`
+  names the document each came from, and `calculated.canonicalView` repeats them
+  flat with an `origin` for downstream tools (PerfectPixel).
+- Markdown — a `## View & Direction` section with the three values, the origin,
+  and a `Master image direction:` sentence to paste into an image prompt.
+
+A document authored before these fields existed inherits from its world and then
+from the project default above; the fallback is recorded as
+`origin: "default"` and raised as a warning, never exported as `unknown`.
+Loading an old document does not rewrite it — the values appear when you export.
+
 ## Test
 
 ```bash

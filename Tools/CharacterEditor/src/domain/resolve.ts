@@ -1,6 +1,7 @@
 import type { ActorDocumentV1, InheritableSpec, WorldTemplateV1 } from "../schema";
 import type { FieldOrigins, ResolvedActor } from "./types";
 import { applyResolvedScale } from "./scale";
+import { PROJECT_DEFAULT_DOCUMENT_ID, VIEW_KEYS, applyResolvedView, isAllowedViewValue } from "./view";
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
@@ -22,12 +23,29 @@ function leafPaths(value: unknown, prefix = ""): string[] {
 export function resolveActor(actor: ActorDocumentV1, world: WorldTemplateV1): ResolvedActor {
   if (actor.worldRef.worldId !== world.worldId || actor.worldRef.version !== world.revision)
     throw new Error(`Actor pins ${actor.worldRef.worldId} v${actor.worldRef.version}, not ${world.worldId} v${world.revision}`);
-  const resolved = applyResolvedScale(merge<InheritableSpec>(world.defaults, actor.overrides));
+  const resolved = applyResolvedView(applyResolvedScale(merge<InheritableSpec>(world.defaults, actor.overrides)));
   const origins: FieldOrigins = {};
   for (const path of leafPaths(world.defaults)) origins[path] = { source: "world", documentId: world.worldId, version: world.revision };
   for (const path of leafPaths(actor.overrides)) origins[path] = { source: "actor", documentId: actor.actorId, version: actor.revision };
   attachDerivedScaleOrigins(origins);
+  attachViewOrigins(origins, actor, world);
   return { ...actor, resolved, fieldOrigins: origins };
+}
+
+/** applyResolvedView guarantees a value for every view field, so every field
+ * also gets an origin — including `default` for the ones the project fallback
+ * supplied. Computed from the source documents rather than from leafPaths so a
+ * value the schema rejects is attributed to the fallback that replaced it, not
+ * to the document that wrote it. */
+function attachViewOrigins(origins: FieldOrigins, actor: ActorDocumentV1, world: WorldTemplateV1): void {
+  for (const key of VIEW_KEYS) {
+    const path = `view.${key}`;
+    if (isAllowedViewValue(key, actor.overrides.view?.[key]))
+      origins[path] = { source: "actor", documentId: actor.actorId, version: actor.revision };
+    else if (isAllowedViewValue(key, world.defaults.view?.[key]))
+      origins[path] = { source: "world", documentId: world.worldId, version: world.revision };
+    else origins[path] = { source: "default", documentId: PROJECT_DEFAULT_DOCUMENT_ID, version: 0 };
+  }
 }
 
 /** applyResolvedScale fills in fields no document may have authored, and makes

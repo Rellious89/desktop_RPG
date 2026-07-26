@@ -1,9 +1,10 @@
-import type { ActorDocumentV1, WorldTemplateV1 } from "../schema";
+import type { ActorDocumentV1, InheritableSpec, WorldTemplateV1 } from "../schema";
 import { compareActors } from "../domain/comparison";
 import { resolveActor } from "../domain/resolve";
 import { resolveScale } from "../domain/scale";
 import { validateActor } from "../domain/validation";
-import type { ActorExportEnvelope } from "../domain/types";
+import { VIEW_ORIGIN_LABELS, masterImageDirectionPrompt, resolveView } from "../domain/view";
+import type { ActorExportEnvelope, FieldOrigins } from "../domain/types";
 import { stableJson } from "./stable";
 
 export function serializeActor(actor: ActorDocumentV1): string { return stableJson(actor); }
@@ -29,6 +30,11 @@ export function buildExport(actor: ActorDocumentV1, world: WorldTemplateV1, refe
       weaponLengthLogicalPx: weaponRatio ? scale.targetLogicalHeightPx * weaponRatio : null,
       weaponLengthPhysicalPx: weaponRatio ? scale.targetPhysicalHeightPx * weaponRatio : null,
       weaponOccupancyPercent: actor.equipment.weapon?.estimatedOccupancyPercent ?? null,
+      // The direction the design master must be drawn in. Duplicated out of
+      // `resolved.view` + `fieldOrigins` into one flat block so downstream
+      // tools (PerfectPixel) read a single canonical value with its origin
+      // rather than re-deriving the inheritance chain.
+      canonicalView: canonicalView(resolved.view, fieldOrigins),
     },
     interpretations: [
       "Species scale is independent of stature and logical height.",
@@ -41,11 +47,28 @@ export function buildExport(actor: ActorDocumentV1, world: WorldTemplateV1, refe
   };
 }
 
+export type CanonicalView = {
+  projection: string; facing: string; lightDirection: string;
+  /** Which document supplied the values: the strongest origin among the three
+   * (actor override beats world, world beats project fallback). */
+  origin: "world" | "actor" | "default";
+  originLabel: string;
+  masterImageDirection: string;
+};
+
+function canonicalView(view: InheritableSpec["view"], fieldOrigins: FieldOrigins): CanonicalView {
+  const resolved = resolveView(view).view;
+  const sources = (["projection", "facing", "lightDirection"] as const).map((k) => fieldOrigins[`view.${k}`]?.source ?? "default");
+  const origin = sources.includes("actor") ? "actor" : sources.includes("world") ? "world" : "default";
+  return { ...resolved, origin, originLabel: VIEW_ORIGIN_LABELS[origin], masterImageDirection: masterImageDirectionPrompt(resolved) };
+}
+
 export const exportJson = (envelope: ActorExportEnvelope): string => stableJson(envelope);
 
 export function exportMarkdown(e: ActorExportEnvelope): string {
   const a = e.authored, r = e.resolved, w = a.equipment.weapon;
   const origin = (path: string) => e.fieldOrigins[path]?.source === "actor" ? "Override" : "World";
+  const view = e.calculated.canonicalView as CanonicalView;
   const rows = e.diagnostics.map((d) => `- **${d.severity.toUpperCase()}** \`${d.ruleId}\`: ${d.message}${d.exceptionApproved ? " — Approved exception" : ""}`).join("\n") || "- None";
   const exceptions = a.approvedExceptions.filter((x) => x.active).map((x) => `- \`${x.ruleId}\`: ${x.reason}`).join("\n") || "- None";
   const comparisons = e.comparison?.metrics.map((m) => `| ${m.label} | ${m.draft} | ${m.reference} | ${(m.matches ?? m.draft === m.reference) ? "Match" : "Mismatch"} | ${m.absoluteDelta === undefined ? "—" : `${m.absoluteDelta >= 0 ? "+" : ""}${m.absoluteDelta}${m.percentDelta === undefined ? "" : ` (${m.percentDelta.toFixed(1)}%)`}`} |`).join("\n");
@@ -56,6 +79,16 @@ export function exportMarkdown(e: ActorExportEnvelope): string {
 - Aliases: ${a.aliases.length ? a.aliases.join(", ") : "None"}
 - Species: ${a.identity.species} · Role: ${a.identity.role} · Status: ${a.identity.status}
 - Concept: ${a.identity.concept}
+
+## View & Direction
+
+- Projection: ${view.projection}
+- Facing: ${view.facing}
+- Light direction: ${view.lightDirection}
+- Origin: ${view.originLabel}
+
+Master image direction:
+${view.masterImageDirection}
 
 ## Body & Proportions
 

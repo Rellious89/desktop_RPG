@@ -1,6 +1,9 @@
 import type { ActorDocumentV1, InheritableSpec, WorldTemplateV1 } from "../schema";
 
-export type FieldOrigin = { source: "world" | "actor"; documentId: string; version: number };
+/** `default` means no document authored the value and the project-wide
+ * fallback supplied it (see src/domain/view.ts). Its documentId is
+ * PROJECT_DEFAULT_DOCUMENT_ID and its version is 0. */
+export type FieldOrigin = { source: "world" | "actor" | "default"; documentId: string; version: number };
 export type FieldOrigins = Record<string, FieldOrigin>;
 export type ResolvedActor = ActorDocumentV1 & { resolved: InheritableSpec; fieldOrigins: FieldOrigins };
 export type Severity = "error" | "warning" | "info";
