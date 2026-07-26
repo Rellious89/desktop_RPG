@@ -4762,12 +4762,7 @@ MonoBehaviour:
   stageLayout: {fileID: 11400000, guid: a11674de15554c8586ea98384fdb2df5, type: 2}
   randomizeProfileOnRespawn: 1
   respawnProfilePool:
-  - {fileID: 11400000, guid: 0c56874ce0645415eb7ca1b96e321be0, type: 2}
-  - {fileID: 11400000, guid: d0fb5ba6f3c4443f79f4fe5befc54d4f, type: 2}
-  - {fileID: 11400000, guid: a22d25df0b21c47fe90e7f6c48b64e1c, type: 2}
-  - {fileID: 11400000, guid: 75385727eeaea49959fd9576bb3196d5, type: 2}
-  - {fileID: 11400000, guid: eca2326ede91343878ef2dd36059bf82, type: 2}
-  - {fileID: 11400000, guid: 357fc874410294914a3a95033c0191af, type: 2}
+  - {fileID: 11400000, guid: aabf2c16b4e254a458cb00040946838e, type: 2}
   idle:
     frames:
     - {fileID: 21300000, guid: e604348805ed4bfca390f5710d90e771, type: 3}

@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a793bf2a4d96489da376ed10ce30d0c1, type: 3}
+  m_Name: RockGolem_MotionProfile
+  m_EditorClassIdentifier: 
+  displayName: RockGolem
+  resourceFolderPath: Assets/Art/Enemy/RockGolem
+  spriteFlipX: 1
+  baseIdle:
+    displayName: Base Idle
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 70f41e9f6f9ff4b8cb1aa083aaf623ff, type: 3}
+    - {fileID: 21300000, guid: 71556b33a8ce14468b8d6e3cda8e885b, type: 3}
+    - {fileID: 21300000, guid: c76f447300f304ddaabe1eaf3de48a60, type: 3}
+    - {fileID: 21300000, guid: 8099731572da34116895a0a9e9012254, type: 3}
+    animationFps: 6
+  idleEvents: []
+  idleEventCheckInterval: 4
+  idleEventChance: 0.5
+  hit:
+    displayName: Hit
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: a855e68d9c8fd46659cdcb31dd056195, type: 3}
+    - {fileID: 21300000, guid: 0603dc004f5054ef99e0d474d1c37cf3, type: 3}
+    animationFps: 6
+  defeat:
+    displayName: Defeat
+    editorDescription: 
+    frames: []
+    animationFps: 6
+  hitReaction:
+    holdFrame: 0
+    recoveryFrame: 1
+    recoveryDuration: 0.12
+    holdTimeout: 0.2
+    shakeStrength: 0.04
+    shakeFrequency: 35
+    shakeDecayDuration: 0.15
+    damageNumberOffset: {x: 0.12, y: 1.47}
+    damageNumberRandomHorizontalJitter: 0.1
+    damageNumberRiseDistance: 0.4
+    damageNumberDuration: 0.6
+    damageNumberTextColor: {r: 1, g: 0, b: 0, a: 1}
+    damageNumberFontSize: 3
+    damageNumberSortingOrder: 10
+  preview:
+    actorOffset: {x: 0.6, y: 0}
+    receivePointOffset: {x: 0, y: 0.35}
+    actorScale: 1.6
