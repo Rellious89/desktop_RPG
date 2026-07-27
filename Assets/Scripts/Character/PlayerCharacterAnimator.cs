@@ -590,8 +590,14 @@ namespace Character
                     overlayObject.transform.SetParent(transform, false);
                     overlayTransform = overlayObject.transform;
                 }
-                attackFrameOverlayRenderer = overlayTransform.GetComponent<SpriteRenderer>()
-                                             ?? overlayTransform.gameObject.AddComponent<SpriteRenderer>();
+                // UnityEngine.Object의 null은 일반 C# null과 다르다. 컴포넌트가 없는 경우에도
+                // null 병합 연산자(??)가 Unity의 커스텀 null 판정을 건너뛸 수 있으므로 명시적으로
+                // 검사한다. 이미 이름만 같은 자식이 존재하는 씬/프리팹도 여기서 자동 복구한다.
+                attackFrameOverlayRenderer = overlayTransform.GetComponent<SpriteRenderer>();
+                if (attackFrameOverlayRenderer == null)
+                {
+                    attackFrameOverlayRenderer = overlayTransform.gameObject.AddComponent<SpriteRenderer>();
+                }
             }
 
             Transform overlay = attackFrameOverlayRenderer.transform;
