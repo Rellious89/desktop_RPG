@@ -18,6 +18,10 @@ namespace Character
         [Tooltip("프레임 낱장 Sprite 배열(아틀라스 런타임 슬라이싱 아님). 프레임 수는 이 배열 길이 그대로다.")]
         [SerializeField] private Sprite[] frames;
 
+        [Header("Frame-synced Overlay")]
+        [Tooltip("공격 본체 frames와 같은 인덱스를 사용하는 오버레이 스프라이트. 비어 있거나 해당 요소가 null이면 그 프레임에는 오버레이가 없다.")]
+        [SerializeField] private Sprite[] overlayFrames = Array.Empty<Sprite>();
+
         [Header("Playback")]
         [Tooltip("Windup/Recovery 프레임 재생 속도(초당 프레임 전환 횟수)")]
         [SerializeField] private float animationFps = 18f;
@@ -68,6 +72,7 @@ namespace Character
         [SerializeField] private AudioClip hitSound;
 
         public Sprite[] Frames => frames ?? Array.Empty<Sprite>();
+        public Sprite[] OverlayFrames => overlayFrames ?? Array.Empty<Sprite>();
         public float AnimationFps => animationFps;
         public int HitFrameIndex => hitFrameIndex;
         public float EndFrameDuration => endFrameDuration;

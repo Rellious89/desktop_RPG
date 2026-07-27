@@ -99,6 +99,7 @@ namespace CharacterEditor
             public float Fps;
             public int HitFrame;
             public Sprite[] Frames;
+            public Sprite[] OverlayFrames;
         }
 
         [MenuItem("Tools/KeyBuddy/Motion Editor")]
@@ -121,6 +122,10 @@ namespace CharacterEditor
         private int selectedPreviewTargetIndex;
         private int selectedOpponentMotionIndex;
         private int activeTier = 1;
+
+        /// <summary>오버레이 Drop Zone의 동작. 기본은 Replace(드롭한 스프라이트로 배열 통째 교체)이고,
+        /// 켜면 기존 배열 뒤에 덧붙인다.</summary>
+        private bool overlayDropAppends;
 
         private SerializedObject activeProfileObject;
         private AttackMotionDefinition selectedAttack;
@@ -645,7 +650,8 @@ namespace CharacterEditor
                 Description = serialized.FindProperty("editorDescription").stringValue,
                 Fps = serialized.FindProperty("animationFps").floatValue,
                 HitFrame = serialized.FindProperty("hitFrameIndex").intValue,
-                Frames = ReadSpriteArray(serialized.FindProperty("frames"))
+                Frames = ReadSpriteArray(serialized.FindProperty("frames")),
+                OverlayFrames = ReadSpriteArray(serialized.FindProperty("overlayFrames"))
             };
         }
 
@@ -711,21 +717,25 @@ namespace CharacterEditor
             if (before.Description != after.Description) { changes.Add($"{slot}: 설명 변경"); changed = true; }
             if (!Mathf.Approximately(before.Fps, after.Fps)) { changes.Add($"{slot}: FPS 변경"); changed = true; }
             if (before.HitFrame != after.HitFrame) { changes.Add($"{slot}: 히트 프레임 변경"); changed = true; }
-            return AppendFrameChanges(changes, slot, before.Frames, after.Frames) || changed;
+            // 두 배열을 모두 검사해야 한다 - 오버레이만 고친 뒤 리소스/탭을 옮겨도 경고가 떠야 하므로
+            // 본체 프레임 변경 여부로 단축 평가하지 않는다.
+            changed |= AppendFrameChanges(changes, slot, before.Frames, after.Frames);
+            changed |= AppendFrameChanges(changes, slot, before.OverlayFrames, after.OverlayFrames, "오버레이");
+            return changed;
         }
 
-        private static bool AppendFrameChanges(List<string> changes, string slot, Sprite[] before, Sprite[] after)
+        private static bool AppendFrameChanges(List<string> changes, string slot, Sprite[] before, Sprite[] after, string frameLabel = "프레임")
         {
             if (before.Length != after.Length)
             {
-                changes.Add($"{slot}: 프레임 수 변경 ({before.Length} → {after.Length})");
+                changes.Add($"{slot}: {frameLabel} 수 변경 ({before.Length} → {after.Length})");
                 return true;
             }
             bool changed = false;
             for (int i = 0; i < before.Length; i++)
             {
                 if (before[i] == after[i]) continue;
-                changes.Add($"{slot}: {i + 1}번 프레임 스프라이트 변경");
+                changes.Add($"{slot}: {i + 1}번 {frameLabel} 스프라이트 변경");
                 changed = true;
             }
             return changed;
@@ -1635,6 +1645,7 @@ namespace CharacterEditor
             }
             DrawDescriptionEditor(attackObject.FindProperty("editorDescription"));
             SerializedProperty frames = attackObject.FindProperty("frames");
+            SerializedProperty overlayFrames = attackObject.FindProperty("overlayFrames");
             SerializedProperty fps = attackObject.FindProperty("animationFps");
             SerializedProperty hit = attackObject.FindProperty("hitFrameIndex");
             SerializedProperty cast = attackObject.FindProperty("castFrameIndex");
@@ -1672,7 +1683,7 @@ namespace CharacterEditor
             EditorGUILayout.PropertyField(attackObject.FindProperty("hitEffectScale"), new GUIContent("Effect Scale"));
             EditorGUILayout.PropertyField(attackObject.FindProperty("hitSound"), new GUIContent("Hit Sound"));
 
-            DrawFrameSection(attackObject, frames, hit, cast);
+            DrawFrameSection(attackObject, frames, hit, cast, overlayFrames);
 
             if (frames.arraySize > 0 && (hit.intValue < 0 || hit.intValue >= frames.arraySize))
             {
@@ -1740,22 +1751,80 @@ namespace CharacterEditor
             EditorGUI.DrawRect(new Rect(rect.xMax - thickness, rect.y, thickness, rect.height), ActiveTextFieldBorder);
         }
 
-        private void DrawFrameSection(SerializedObject owner, SerializedProperty frames, SerializedProperty hitFrame, SerializedProperty castFrame = null)
+        private void DrawFrameSection(SerializedObject owner, SerializedProperty frames, SerializedProperty hitFrame, SerializedProperty castFrame = null, SerializedProperty overlayFrames = null)
         {
             if (frameList == null || frameListOwner != owner || frameListPropertyPath != frames.propertyPath)
             {
-                frameList = BuildFrameList(owner, frames, hitFrame, castFrame);
+                frameList = BuildFrameList(owner, frames, hitFrame, castFrame, overlayFrames);
                 frameListOwner = owner;
                 frameListPropertyPath = frames.propertyPath;
             }
             frameList.DoLayoutList();
-            DrawFrameDropZone(frames);
+            DrawActorFrameDropZone(frames, overlayFrames);
+            if (overlayFrames != null) DrawOverlayFrameControls(frames, overlayFrames);
         }
 
-        private ReorderableList BuildFrameList(SerializedObject owner, SerializedProperty frames, SerializedProperty hitFrame, SerializedProperty castFrame = null)
+        /// <summary>본체 프레임 Drop Zone. 여기서 추가한 만큼 - 오버레이 배열이 활성 상태(비어 있지 않음)
+        /// 라면 - 오버레이에도 같은 수의 null 슬롯을 덧붙여 인덱스 쌍이 어긋나지 않게 한다.</summary>
+        private static void DrawActorFrameDropZone(SerializedProperty frames, SerializedProperty overlayFrames)
         {
+            List<Sprite> dropped = DrawSpriteDropZone("Drop Sprites Here");
+            if (dropped == null || dropped.Count == 0) return;
+            for (int i = 0; i < dropped.Count; i++) AppendObjectReference(frames, dropped[i]);
+            if (overlayFrames == null || overlayFrames.arraySize == 0) return;
+            for (int i = 0; i < dropped.Count; i++) AppendObjectReference(overlayFrames, null);
+        }
+
+        /// <summary>오버레이 전용 Drop Zone과 길이 맞춤 버튼. 오버레이는 본체 frames와 인덱스만 공유하므로
+        /// 여기에 FPS/시작 프레임 같은 재생 필드는 만들지 않는다. 드롭 기본 동작은 Replace다 - 오버레이는
+        /// 본체 프레임과 1:1로 다시 굽는 일이 잦아서, 이미 들어있는 배열 뒤에 붙으면 인덱스가 통째로 밀린다.</summary>
+        private void DrawOverlayFrameControls(SerializedProperty frames, SerializedProperty overlayFrames)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                string mode = overlayDropAppends ? "Append" : "Replace";
+                List<Sprite> dropped = DrawSpriteDropZone($"Drop Overlay Sprites Here ({mode})");
+                if (dropped != null && dropped.Count > 0)
+                {
+                    if (!overlayDropAppends) overlayFrames.ClearArray();
+                    for (int i = 0; i < dropped.Count; i++) AppendObjectReference(overlayFrames, dropped[i]);
+                }
+
+                var appendContent = new GUIContent("Append",
+                    "끄면(기본) 드롭한 스프라이트로 오버레이 배열을 통째로 교체한다. 켜면 기존 배열 뒤에 순서대로 덧붙인다.");
+                overlayDropAppends = GUILayout.Toggle(overlayDropAppends, appendContent, EditorStyles.miniButton,
+                    GUILayout.Width(64f), GUILayout.Height(34f));
+
+                var matchContent = new GUIContent("Match Overlay Length",
+                    "오버레이 배열 길이를 본체 프레임 수에 맞춘다. 늘어난 요소는 null(그 프레임에는 오버레이 없음)이고, 줄어들면 뒤쪽 요소가 사라진다.");
+                if (GUILayout.Button(matchContent, GUILayout.Width(150f), GUILayout.Height(34f)))
+                {
+                    while (overlayFrames.arraySize > frames.arraySize) RemoveArrayElementAt(overlayFrames, overlayFrames.arraySize - 1);
+                    PadArrayWithNulls(overlayFrames, frames.arraySize);
+                }
+            }
+            if (overlayFrames.arraySize > 0 && overlayFrames.arraySize != frames.arraySize)
+            {
+                EditorGUILayout.HelpBox(
+                    $"Overlay 프레임 수({overlayFrames.arraySize})가 본체 프레임 수({frames.arraySize})와 다릅니다. " +
+                    "런타임과 Preview는 범위 밖 인덱스를 '오버레이 없음'으로 처리합니다. Match Overlay Length로 맞출 수 있습니다.",
+                    MessageType.Warning);
+            }
+        }
+
+        private ReorderableList BuildFrameList(SerializedObject owner, SerializedProperty frames, SerializedProperty hitFrame, SerializedProperty castFrame = null, SerializedProperty overlayFrames = null)
+        {
+            bool hasOverlayColumn = overlayFrames != null;
             var list = new ReorderableList(owner, frames, true, true, true, true) { elementHeight = 48f };
-            list.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Sprite Frames");
+            list.drawHeaderCallback = rect =>
+            {
+                EditorGUI.LabelField(rect, "Sprite Frames");
+                if (!hasOverlayColumn) return;
+                // 헤더 rect는 행 rect와 좌우 여백이 달라 열 위치를 정확히 맞출 수 없다 - 각 행이 왼쪽
+                // Actor, 오른쪽 Overlay 순서라는 것만 알려주는 힌트로 둔다.
+                EditorGUI.LabelField(new Rect(rect.xMax - 168f, rect.y, 166f, rect.height),
+                    "Actor  |  Frame Overlay", EditorStyles.miniLabel);
+            };
             list.drawElementCallback = (rect, index, active, focused) =>
             {
                 SerializedProperty element = frames.GetArrayElementAtIndex(index);
@@ -1763,15 +1832,59 @@ namespace CharacterEditor
                 bool isHit = hitFrame != null && hitFrame.intValue == index;
                 bool isCast = castFrame != null && castFrame.intValue == index;
                 if (isHit || isCast) EditorGUI.DrawRect(rect, new Color(1f, 0.3f, 0.2f, 0.15f));
-                Rect thumb = new Rect(rect.x + 2f, rect.y + 4f, 40f, 40f);
-                Rect field = new Rect(rect.x + 48f, rect.y + 14f, rect.width - 140f, EditorGUIUtility.singleLineHeight);
-                Rect tag = new Rect(rect.xMax - 86f, rect.y + 14f, 84f, EditorGUIUtility.singleLineHeight);
-                DrawThumbnail(thumb, sprite);
-                EditorGUI.ObjectField(field, element, typeof(Sprite), GUIContent.none);
+                FrameRow row = LayoutFrameRow(rect, hasOverlayColumn);
+                DrawThumbnail(row.ActorThumb, sprite);
+                EditorGUI.ObjectField(row.ActorField, element, typeof(Sprite), GUIContent.none);
+                if (hasOverlayColumn)
+                {
+                    // 같은 인덱스가 곧 오버레이 쌍이다. 오버레이 배열이 짧아 인덱스가 없으면 그 자리는
+                    // "오버레이 없음"이라 비활성 슬롯으로 보여준다(본체 프레임은 그대로 유지된다).
+                    if (index < overlayFrames.arraySize)
+                    {
+                        SerializedProperty overlayElement = overlayFrames.GetArrayElementAtIndex(index);
+                        DrawThumbnail(row.OverlayThumb, overlayElement.objectReferenceValue as Sprite);
+                        EditorGUI.ObjectField(row.OverlayField, overlayElement, typeof(Sprite), GUIContent.none);
+                    }
+                    else
+                    {
+                        DrawThumbnail(row.OverlayThumb, null);
+                        using (new EditorGUI.DisabledScope(true))
+                            EditorGUI.LabelField(row.OverlayField, "—", EditorStyles.miniLabel);
+                    }
+                }
                 string tagText = isCast && isHit ? "CAST · HIT" : isHit ? "HIT" : isCast ? "CAST" : "#" + index;
                 GUIStyle tagStyle = isCast && isHit ? CastHitTagStyle : isHit ? HitTagStyle : isCast ? CastTagStyle : EditorStyles.miniLabel;
-                EditorGUI.LabelField(tag, tagText, tagStyle);
+                EditorGUI.LabelField(row.Tag, tagText, tagStyle);
             };
+            if (hasOverlayColumn)
+            {
+                // 평행 배열이므로 인덱스 정합성은 에디터가 책임진다 - 본체에 가한 추가/삭제/재정렬을
+                // 오버레이 배열에도 같은 인덱스로 그대로 적용한다. 단 오버레이가 아예 비어 있으면
+                // ("이 공격에는 오버레이 없음") 본체 편집만으로 길이가 생기지 않도록 그대로 둔다.
+                list.onAddCallback = l =>
+                {
+                    AppendObjectReference(frames, null);
+                    if (overlayFrames.arraySize > 0) AppendObjectReference(overlayFrames, null);
+                };
+                list.onRemoveCallback = l =>
+                {
+                    int index = l.index >= 0 && l.index < frames.arraySize ? l.index : frames.arraySize - 1;
+                    if (index < 0) return;
+                    RemoveArrayElementAt(frames, index);
+                    RemoveArrayElementAt(overlayFrames, index);
+                    l.index = Mathf.Clamp(index, 0, frames.arraySize - 1);
+                };
+                list.onReorderCallbackWithDetails = (l, oldIndex, newIndex) =>
+                {
+                    if (overlayFrames.arraySize == 0) return;
+                    // 길이가 어긋나 있으면 옮길 인덱스가 아예 없을 수 있다 - 먼저 본체 길이까지 null로
+                    // 늘려서 모든 인덱스에 짝을 만들어 두고, 그 다음 본체와 같은 이동을 그대로 적용한다.
+                    // 이렇게 해야 길이가 다른 상태에서 재정렬해도 기존 대응 관계가 깨지지 않는다.
+                    PadArrayWithNulls(overlayFrames, frames.arraySize);
+                    if (oldIndex >= overlayFrames.arraySize || newIndex >= overlayFrames.arraySize) return;
+                    overlayFrames.MoveArrayElement(oldIndex, newIndex);
+                };
+            }
             list.onSelectCallback = l =>
             {
                 previewPlaying = false;
@@ -1779,6 +1892,54 @@ namespace CharacterEditor
                 previewElapsedTime = previewFrameIndex / Mathf.Max(0.01f, GetPreviewFps());
             };
             return list;
+        }
+
+        /// <summary>Sprite Frames 한 행의 열 배치. 헤더 라벨과 각 행이 항상 같은 x/width를 쓰도록 한 곳에서
+        /// 계산한다. 오버레이 열이 없으면 본체 필드가 그 공간을 그대로 차지한다.</summary>
+        private struct FrameRow
+        {
+            public Rect ActorThumb;
+            public Rect ActorField;
+            public Rect OverlayThumb;
+            public Rect OverlayField;
+            public Rect Tag;
+        }
+
+        private static FrameRow LayoutFrameRow(Rect rect, bool hasOverlay)
+        {
+            const float thumbSize = 40f;
+            const float tagWidth = 84f;
+            float line = EditorGUIUtility.singleLineHeight;
+            var row = new FrameRow
+            {
+                ActorThumb = new Rect(rect.x + 2f, rect.y + 4f, thumbSize, thumbSize),
+                Tag = new Rect(rect.xMax - tagWidth - 2f, rect.y + 14f, tagWidth, line)
+            };
+
+            float fieldsLeft = rect.x + 2f + thumbSize + 6f;
+            float fieldsWidth = Mathf.Max(60f, row.Tag.x - 6f - fieldsLeft);
+            if (!hasOverlay)
+            {
+                row.ActorField = new Rect(fieldsLeft, rect.y + 14f, fieldsWidth, line);
+                return row;
+            }
+
+            // 남은 폭을 [본체 필드][간격][오버레이 썸네일][간격][오버레이 필드]로 나눈다.
+            float fieldWidth = Mathf.Max(40f, (fieldsWidth - thumbSize - 12f) * 0.5f);
+            row.ActorField = new Rect(fieldsLeft, rect.y + 14f, fieldWidth, line);
+            row.OverlayThumb = new Rect(row.ActorField.xMax + 6f, rect.y + 4f, thumbSize, thumbSize);
+            row.OverlayField = new Rect(row.OverlayThumb.xMax + 6f, rect.y + 14f, fieldWidth, line);
+            return row;
+        }
+
+        /// <summary>오브젝트 참조 배열에서 index를 실제로 한 칸 제거한다. SerializedProperty는 참조가 남아
+        /// 있으면 DeleteArrayElementAtIndex가 값만 null로 만들고 길이를 줄이지 않으므로 먼저 비운다.</summary>
+        private static void RemoveArrayElementAt(SerializedProperty array, int index)
+        {
+            if (array == null || index < 0 || index >= array.arraySize) return;
+            SerializedProperty element = array.GetArrayElementAtIndex(index);
+            if (element.propertyType == SerializedPropertyType.ObjectReference) element.objectReferenceValue = null;
+            array.DeleteArrayElementAtIndex(index);
         }
 
         private static void DrawThumbnail(Rect rect, Sprite sprite)
@@ -1792,30 +1953,42 @@ namespace CharacterEditor
             if (preview != null) GUI.DrawTexture(rect, preview, ScaleMode.ScaleToFit);
         }
 
-        private static void DrawFrameDropZone(SerializedProperty frames)
+        /// <summary>Drop Zone 하나를 그리고, 이번 이벤트에서 드롭이 완료됐다면 드롭된 Sprite를 드롭 순서대로
+        /// 돌려준다(그 외에는 null). 배열에 어떻게 반영할지는 - append냐 replace냐, 짝 배열도 함께 늘릴지 -
+        /// 호출한 쪽이 정한다.</summary>
+        private static List<Sprite> DrawSpriteDropZone(string label)
         {
             Rect rect = GUILayoutUtility.GetRect(0f, 34f, GUILayout.ExpandWidth(true));
-            GUI.Box(rect, "Drop Sprites Here", EditorStyles.helpBox);
+            GUI.Box(rect, label, EditorStyles.helpBox);
             Event evt = Event.current;
-            if (!rect.Contains(evt.mousePosition) || (evt.type != EventType.DragUpdated && evt.type != EventType.DragPerform)) return;
+            if (!rect.Contains(evt.mousePosition) || (evt.type != EventType.DragUpdated && evt.type != EventType.DragPerform)) return null;
             DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+            List<Sprite> dropped = null;
             if (evt.type == EventType.DragPerform)
             {
                 DragAndDrop.AcceptDrag();
+                dropped = new List<Sprite>();
                 foreach (UnityEngine.Object item in DragAndDrop.objectReferences)
                 {
-                    if (item is Sprite sprite) AppendObjectReference(frames, sprite);
+                    if (item is Sprite sprite) dropped.Add(sprite);
                     else
                     {
                         string path = AssetDatabase.GetAssetPath(item);
                         foreach (UnityEngine.Object asset in AssetDatabase.LoadAllAssetsAtPath(path))
                         {
-                            if (asset is Sprite subSprite) AppendObjectReference(frames, subSprite);
+                            if (asset is Sprite subSprite) dropped.Add(subSprite);
                         }
                     }
                 }
             }
             evt.Use();
+            return dropped;
+        }
+
+        /// <summary>배열 길이가 length에 못 미치면 그만큼 null 요소를 덧붙인다(이미 길면 자르지 않는다).</summary>
+        private static void PadArrayWithNulls(SerializedProperty array, int length)
+        {
+            while (array.arraySize < length) AppendObjectReference(array, null);
         }
 
         private static void AppendObjectReference(SerializedProperty array, UnityEngine.Object value)
@@ -2029,6 +2202,14 @@ namespace CharacterEditor
 
             if (monsterSprite != null) DrawSprite(monsterSprite, previewZoom * monsterScale, targetAnchor, hitStarted ? new Color(1f, 0.68f, 0.68f) : Color.white, monsterFlipX);
             if (characterSprite != null) DrawSprite(characterSprite, previewZoom * characterScale, characterAnchor, Color.white);
+
+            // Frame-synced Overlay: 별도 시간 계산 없이 공격 본체가 지금 보여주는 프레임 인덱스를 그대로
+            // 써서 오버레이 프레임을 고른다(스크럽/한 프레임 이동/Play 모두 같은 인덱스를 쓴다). 오버레이는
+            // 본체와 같은 캔버스/Pivot/PPU로 제작하는 것이 전제라 캐릭터와 완전히 같은 anchor/zoom/scale로
+            // 겹치고 별도 Offset/Scale을 주지 않는다. 그리기 순서는 Monster → Character → Frame Overlay →
+            // Cast/Hit Presentation이다.
+            Sprite overlaySprite = GetAttackOverlayFrame(attack, time);
+            if (overlaySprite != null) DrawSprite(overlaySprite, previewZoom * characterScale, characterAnchor, Color.white);
 
             bool exactCast = attack != null && attack.Attack != null
                 && GetFrameIndex(attack, time, false) == Mathf.Clamp(attack.Attack.CastFrameIndex, 0, attack.Frames.Length - 1);
@@ -2327,6 +2508,7 @@ namespace CharacterEditor
 
         private static Sprite[] ReadSpriteArray(SerializedProperty frames)
         {
+            if (frames == null) return Array.Empty<Sprite>();
             var sprites = new Sprite[frames.arraySize];
             for (int i = 0; i < frames.arraySize; i++) sprites[i] = frames.GetArrayElementAtIndex(i).objectReferenceValue as Sprite;
             return sprites;
@@ -2468,6 +2650,17 @@ namespace CharacterEditor
         {
             if (motion == null || motion.Frames.Length == 0) return null;
             return motion.Frames[GetFrameIndex(motion, time, loop)];
+        }
+
+        /// <summary>런타임 PlayerCharacterAnimator.ApplyAttackOverlayFrame과 같은 규칙 - 본체 프레임
+        /// 인덱스를 그대로 쓰고, 오버레이 배열이 짧아 인덱스가 범위 밖이거나 그 요소가 null이면 오버레이가
+        /// 없는 프레임으로 본다.</summary>
+        private static Sprite GetAttackOverlayFrame(PreviewMotion attack, float time)
+        {
+            if (attack?.Attack == null) return null;
+            Sprite[] overlayFrames = attack.Attack.OverlayFrames;
+            int index = GetFrameIndex(attack, time, false);
+            return index >= 0 && index < overlayFrames.Length ? overlayFrames[index] : null;
         }
 
         private static int GetFrameIndex(PreviewMotion motion, float time, bool loop)
@@ -2963,18 +3156,21 @@ namespace CharacterEditor
             if (entry == null || !entry.HasProfile) return;
             if (!EditorUtility.DisplayDialog(
                     "Sync Frames from Art",
-                    "아트 하위 폴더의 현재 Sprite 목록으로 프레임 배열만 갱신합니다. FPS, Hit Frame, Movement, Effect 설정은 유지됩니다.",
+                    "아트 하위 폴더의 현재 Sprite 목록으로 프레임 배열만 갱신합니다. FPS, Hit Frame, Movement, Effect 설정은 유지됩니다.\n\n" +
+                    "Overlay 프레임은 자동으로 자르거나 늘리지 않고 그대로 보존합니다. Sync 결과 본체 프레임 수가 달라지면 " +
+                    "어긋난 공격 모션을 따로 알려드립니다.",
                     "Sync",
                     "Cancel")) return;
 
             activeProfileObject.Update();
+            var overlayMismatches = new List<string>();
             SetObjectArray(activeProfileObject.FindProperty("baseIdle").FindPropertyRelative("frames"),
                 LoadSprites(FindMotionFolder(entry.FolderPath, "idle")));
             SyncIdleEventFrames(activeProfileObject.FindProperty("idleEvents"), entry.FolderPath);
 
             if (entry.Kind == ActorKind.Character)
             {
-                SyncAttackFrames(entry);
+                SyncAttackFrames(entry, overlayMismatches);
             }
             else
             {
@@ -2988,6 +3184,16 @@ namespace CharacterEditor
             EditorUtility.SetDirty(entry.ProfileObject);
             RebuildFrameList();
             RestartPreview();
+
+            // Overlay는 손대지 않으므로(작업물을 조용히 잘라내지 않는다) Sync로 본체 프레임 수가 바뀌면
+            // 쌍이 어긋난 채로 남는다 - 어떤 모션이 어떻게 어긋났는지 여기서 분명히 알린다.
+            if (overlayMismatches.Count == 0) return;
+            EditorUtility.DisplayDialog(
+                "Overlay 길이 확인 필요",
+                "Sync로 본체 프레임 수가 바뀌었지만 Overlay 배열은 보존했습니다. 아래 공격 모션은 지금 쌍이 어긋나 있습니다.\n\n" +
+                string.Join("\n", overlayMismatches) +
+                "\n\n각 공격의 Sprite Frames 아래 Match Overlay Length 버튼으로 맞추거나, Overlay 슬롯을 직접 다시 배치하세요.",
+                "확인");
         }
 
         private static void SyncIdleEventFrames(SerializedProperty events, string actorFolder)
@@ -3019,7 +3225,11 @@ namespace CharacterEditor
             }
         }
 
-        private static void SyncAttackFrames(ResourceEntry entry)
+        /// <summary>아트 폴더의 현재 Sprite 목록으로 각 공격의 본체 frames만 다시 채운다. overlayFrames는
+        /// 건드리지 않는다 - Sync는 인덱스를 통째로 다시 매기는 작업이라 여기서 함께 잘라내면 이미 배치해둔
+        /// 오버레이가 조용히 사라진다. 대신 길이가 어긋나게 된 모션을 overlayMismatches에 모아 호출한 쪽이
+        /// 경고할 수 있게 한다.</summary>
+        private static void SyncAttackFrames(ResourceEntry entry, List<string> overlayMismatches)
         {
             var foldersByTier = new Dictionary<int, List<string>>
             {
@@ -3047,9 +3257,16 @@ namespace CharacterEditor
                     AttackMotionDefinition motion = pool.Motions[i];
                     if (motion == null) continue;
                     var serializedMotion = new SerializedObject(motion);
-                    SetObjectArray(serializedMotion.FindProperty("frames"), LoadSprites(foldersByTier[tier][i]));
+                    SerializedProperty motionFrames = serializedMotion.FindProperty("frames");
+                    int overlayCount = serializedMotion.FindProperty("overlayFrames").arraySize;
+                    int beforeCount = motionFrames.arraySize;
+                    SetObjectArray(motionFrames, LoadSprites(foldersByTier[tier][i]));
                     serializedMotion.ApplyModifiedProperties();
                     EditorUtility.SetDirty(motion);
+                    if (overlayCount > 0 && motionFrames.arraySize != beforeCount)
+                    {
+                        overlayMismatches.Add($"• {motion.name}: 본체 {beforeCount} → {motionFrames.arraySize} 프레임, Overlay {overlayCount}개 유지");
+                    }
                 }
             }
         }

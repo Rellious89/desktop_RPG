@@ -11,6 +11,12 @@ namespace Character
     public interface IAttackMotion
     {
         Sprite[] Frames { get; }
+
+        /// <summary>Frames와 같은 인덱스를 공유하는 프레임 동기화 오버레이 스프라이트. 별도 FPS/재생
+        /// 상태가 없고, 본체가 Frame N을 보여줄 때 OverlayFrames[N]을 그대로 겹쳐 그린다. 배열이
+        /// 비어 있거나(길이 0) 해당 인덱스가 범위 밖/null이면 그 프레임에는 오버레이가 없다.</summary>
+        Sprite[] OverlayFrames { get; }
+
         float AnimationFps { get; }
         int HitFrameIndex { get; }
         float EndFrameDuration { get; }
