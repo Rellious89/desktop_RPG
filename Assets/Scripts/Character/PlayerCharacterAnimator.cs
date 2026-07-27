@@ -79,6 +79,10 @@ namespace Character
         {
             public Sprite[] frames;
 
+            [Header("Frame-synced Overlay")]
+            [Tooltip("공격 본체 frames와 같은 인덱스를 사용하는 오버레이 스프라이트. 비어 있거나 해당 요소가 null이면 그 프레임에는 오버레이가 없다.")]
+            public Sprite[] overlayFrames = Array.Empty<Sprite>();
+
             [Header("Playback")]
             [Tooltip("Windup/Recovery 프레임 재생 속도(초당 프레임 전환 횟수)")]
             public float animationFps = 18f;
@@ -111,6 +115,7 @@ namespace Character
             public AudioClip hitSound;
 
             public Sprite[] Frames => frames ?? Array.Empty<Sprite>();
+            public Sprite[] OverlayFrames => overlayFrames ?? Array.Empty<Sprite>();
             public float AnimationFps => animationFps;
             public int HitFrameIndex => hitFrameIndex;
             public float EndFrameDuration => endFrameDuration;
@@ -129,6 +134,9 @@ namespace Character
         }
 
         private const int IdleIndex = 0;
+
+        /// <summary>attackFrameOverlayRenderer가 비어 있을 때 Awake에서 만들어 붙이는 자식 오브젝트 이름.</summary>
+        private const string AttackFrameOverlayName = "AttackFrameOverlay";
 
         private sealed class RuntimeFrameAnimation
         {
@@ -172,6 +180,11 @@ namespace Character
         [Tooltip("Tier 3(Fever)에서 사용할 공격 모션 풀 에셋. 비어 있으면 Tier 2 -> Tier 1 순으로 폴백한다.")]
         [SerializeField] private ComboTierAttackPool tier3Pool;
 
+        [Header("Frame-synced Overlay")]
+        [Tooltip("공격 프레임과 같은 인덱스의 오버레이 스프라이트를 그릴 자식 SpriteRenderer. 비워두면 Awake에서 " +
+                 "AttackFrameOverlay 자식 오브젝트를 한 번만 만들어 재사용한다(공격마다 생성/파괴하지 않는다).")]
+        [SerializeField] private SpriteRenderer attackFrameOverlayRenderer;
+
         [Header("Combat")]
         [Tooltip("기본 공격 1회(타격 1번)당 적용할 데미지량. 강공격/치명타 등 추가 계산식은 아직 없다.")]
         [SerializeField] private int basicAttackPower = 5;
@@ -208,6 +221,10 @@ namespace Character
         private IAttackMotion activeMotion;
         private Sprite[] activeMotionFrames = Array.Empty<Sprite>();
 
+        // 본체 frames와 인덱스를 공유하는 오버레이 배열. 길이가 본체와 달라도 되고(범위 밖은 오버레이
+        // 없음), 비어 있으면 이 공격에는 오버레이가 전혀 없다는 뜻이다.
+        private Sprite[] activeMotionOverlayFrames = Array.Empty<Sprite>();
+
         private int ActiveHitFrameIndex => activeMotionFrames.Length == 0
             ? 0
             : Mathf.Clamp(activeMotion.HitFrameIndex, 0, activeMotionFrames.Length - 1);
@@ -223,6 +240,7 @@ namespace Character
             spriteRenderer = GetComponent<SpriteRenderer>();
             flashOnCue = GetComponent<FlashOnCue>();
             castEffectSpawner = GetComponent<HitEffectSpawner>();
+            EnsureAttackFrameOverlay();
             BuildRuntimeConfiguration();
 
             ComboTierAttackPool resolvedTier1Pool = motionProfile != null ? motionProfile.Tier1Pool : tier1Pool;
@@ -391,6 +409,8 @@ namespace Character
             // 재생 중인 공격을 끊지 않고 "다음 공격 시작부터" 새 티어가 반영되도록 하기 위함이다.
             activeMotion = SelectMotion(GetPoolForTier(ComboManager.CurrentTier));
             activeMotionFrames = activeMotion.Frames;
+            // 콤보로 새 모션을 뽑았으면 오버레이도 그 모션 것으로 즉시 교체된다(직전 모션 것을 이어 쓰지 않는다).
+            activeMotionOverlayFrames = activeMotion.OverlayFrames;
 
             attackPhase = AttackPhase.Windup;
             attackFrame = 0;
@@ -525,8 +545,73 @@ namespace Character
 
         private void ApplyAttackFrame()
         {
-            if (attackFrame < 0 || attackFrame >= activeMotionFrames.Length) return;
+            if (attackFrame < 0 || attackFrame >= activeMotionFrames.Length)
+            {
+                // 본체 프레임을 못 그리는 상황이면 오버레이도 남겨두지 않는다.
+                SetOverlaySprite(null);
+                return;
+            }
             spriteRenderer.sprite = activeMotionFrames[attackFrame];
+            ApplyAttackOverlayFrame();
+        }
+
+        /// <summary>본체가 방금 적용한 attackFrame과 "같은 인덱스"의 오버레이를 그대로 적용한다 - 오버레이는
+        /// 자체 FPS나 재생 상태를 갖지 않으므로 여기서 시간 계산을 하지 않는다. 배열이 짧아 인덱스가 범위를
+        /// 벗어나거나 그 요소가 null이면 그 프레임에는 오버레이가 없다는 뜻이라 sprite를 비운다.</summary>
+        private void ApplyAttackOverlayFrame()
+        {
+            Sprite overlay = attackFrame >= 0 && attackFrame < activeMotionOverlayFrames.Length
+                ? activeMotionOverlayFrames[attackFrame]
+                : null;
+            SetOverlaySprite(overlay);
+        }
+
+        /// <summary>공격마다 Instantiate/Destroy하지 않고 재사용하는 오버레이 renderer 하나에 sprite만 갈아
+        /// 끼운다. 같은 sprite면 아무것도 하지 않아서 연타 중에도 추가 할당이 생기지 않는다.</summary>
+        private void SetOverlaySprite(Sprite sprite)
+        {
+            if (attackFrameOverlayRenderer == null) return;
+            if (ReferenceEquals(attackFrameOverlayRenderer.sprite, sprite)) return;
+            attackFrameOverlayRenderer.sprite = sprite;
+        }
+
+        /// <summary>씬에 수동 배치가 없어도 동작하도록, 직렬화 참조가 비어 있으면 AttackFrameOverlay 자식
+        /// 오브젝트와 SpriteRenderer를 여기서 한 번만 만든다. 오버레이는 본체와 같은 캔버스/Pivot/PPU로
+        /// 제작하는 것이 전제라 로컬 Transform은 항등(zero/identity/one)으로 두고 코드 Offset을 주지 않는다.
+        /// 정렬만 본체 기준으로 맞춘다 - 같은 Sorting Layer, Order는 본체보다 1 높게.</summary>
+        private void EnsureAttackFrameOverlay()
+        {
+            if (attackFrameOverlayRenderer == null)
+            {
+                Transform overlayTransform = transform.Find(AttackFrameOverlayName);
+                if (overlayTransform == null)
+                {
+                    var overlayObject = new GameObject(AttackFrameOverlayName);
+                    overlayObject.transform.SetParent(transform, false);
+                    overlayTransform = overlayObject.transform;
+                }
+                attackFrameOverlayRenderer = overlayTransform.GetComponent<SpriteRenderer>()
+                                             ?? overlayTransform.gameObject.AddComponent<SpriteRenderer>();
+            }
+
+            Transform overlay = attackFrameOverlayRenderer.transform;
+            overlay.localPosition = Vector3.zero;
+            overlay.localRotation = Quaternion.identity;
+            overlay.localScale = Vector3.one;
+
+            // material/flip은 런타임에 바뀌지 않으므로(FlashOnCue는 color만 건드린다) 여기서 한 번만 복사한다.
+            attackFrameOverlayRenderer.sharedMaterial = spriteRenderer.sharedMaterial;
+            attackFrameOverlayRenderer.sortingLayerID = spriteRenderer.sortingLayerID;
+            attackFrameOverlayRenderer.sortingOrder = spriteRenderer.sortingOrder + 1;
+            attackFrameOverlayRenderer.flipX = spriteRenderer.flipX;
+            attackFrameOverlayRenderer.flipY = spriteRenderer.flipY;
+            attackFrameOverlayRenderer.sprite = null;
+        }
+
+        /// <summary>공격 중 캐릭터가 비활성화되면(교체/파괴 직전 포함) 마지막 오버레이가 화면에 남지 않게 지운다.</summary>
+        private void OnDisable()
+        {
+            SetOverlaySprite(null);
         }
 
         // ---- Idle / Idle 변형 ----
@@ -586,6 +671,8 @@ namespace Character
 
         private void ApplyFrame()
         {
+            // Idle 계열은 오버레이를 쓰지 않는다 - 공격이 끝나 여기로 돌아온 순간 이전 오버레이가 남지 않게 지운다.
+            SetOverlaySprite(null);
             Sprite[] frames = animations[activeAnimIndex].Frames;
             if (frames.Length == 0) return;
             spriteRenderer.sprite = frames[Mathf.Clamp(currentFrame, 0, frames.Length - 1)];
