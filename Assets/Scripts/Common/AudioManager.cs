@@ -11,6 +11,11 @@ namespace Common
     /// RewardToast와 같은 구독 패턴). AudioSource도 이 컴포넌트 하나만 갖고 있고, 다른 스크립트는
     /// AudioSource를 직접 만들거나 제어하지 않는다.
     ///
+    /// 이 매니저는 <b>재생·볼륨·쿨다운·SFX On/Off만</b> 담당한다. 모션에 딸린 사운드(공격별 Hit
+    /// Sound/Cast Sound)의 단일 원천은 AttackMotionDefinition이고 여기에는 그 값을 대신할 기본 클립이
+    /// 없다 - clip이 null이면 "그 모션에는 소리가 없다"는 뜻이다. 반대로 Defeat/LevelUp은 특정 모션이
+    /// 아니라 게임 상태 변화에 붙는 전역 사운드라 여기서 계속 소유한다.
+    ///
     /// keybuddy는 업무 중 상시 실행되는 데스크탑 컴패니언이라 사운드가 방해되면 안 된다 - sfxEnabled
     /// 기본값은 꺼짐(false)이고, sfxVolume이 0이어도 완전히 무음이다. Defeat/LevelUp 클립은 아직
     /// 연결하지 않아도 되며, 비어 있으면 조용히 무시한다(콘솔 경고도 남기지 않는다).
@@ -38,9 +43,7 @@ namespace Common
         [Range(0f, 1f)]
         [SerializeField] private float sfxVolume = 0.3f;
 
-        [Header("Hit SFX (기본 공격 타격마다)")]
-        [SerializeField] private AudioClip hitClip;
-
+        [Header("Hit SFX (클립은 각 공격 모션이 소유 - 여기서는 연타 제한만 관리)")]
         [Tooltip("이 시간(초) 안에 들어오는 추가 Hit SFX 요청은 무시한다. 빠른 연타로 소리가 겹쳐 시끄러워지는 것을 막는다.")]
         [SerializeField] private float hitSfxCooldown = 0.08f;
 
@@ -112,14 +115,20 @@ namespace Common
             RequestLevelUpSfx();
         }
 
-        /// <summary>hitSfxCooldown 안에 들어오는 추가 요청은 무시한다 - 시각/데미지 처리는 그대로 매 타격마다 일어나고, 소리만 압축한다.
-        /// overrideClip이 있으면(공격별 Hit Sound) 그 클립만 재생하고 씬 기본 hitClip은 재생하지 않는다 -
-        /// 어떤 클립을 재생할지는 여기서만 결정되므로 한 타격에 두 소리가 겹칠 일이 없다.</summary>
-        public void RequestHitSfx(AudioClip overrideClip = null)
+        /// <summary>hitSfxCooldown 안에 들어오는 추가 요청은 무시한다 - 시각/데미지 처리는 그대로 매
+        /// 타격마다 일어나고, 소리만 압축한다. 어떤 클립을 재생할지는 전적으로 공격 모션
+        /// (AttackMotionDefinition.HitSound)이 정한다 - 여기에는 대신 재생할 기본 Hit 클립이 없고,
+        /// clip이 null이면 "이 공격에는 타격음이 없다"는 뜻이라 조용히 아무것도 재생하지 않는다.
+        ///
+        /// null 검사를 쿨다운 검사보다 <b>먼저</b> 한다: 소리 없는 공격은 쿨다운을 소비하지도, 갱신하지도
+        /// 않는 완전한 no-op이어야 한다. 그렇지 않으면 무음 공격 하나가 바로 뒤따르는 유음 공격의
+        /// 타격음을 잡아먹는다(예: Tier 풀에 무음 모션과 유음 모션이 섞여 있는 연타).</summary>
+        public void RequestHitSfx(AudioClip clip)
         {
+            if (clip == null) return;
             if (Time.time - lastHitSfxTime < hitSfxCooldown) return;
             lastHitSfxTime = Time.time;
-            PlayOneShot(overrideClip != null ? overrideClip : hitClip);
+            PlayOneShot(clip);
         }
 
         /// <summary>공격 모션의 Cast Sound를 재생한다. 기본 Cast 사운드 개념은 없으므로 clip이 비어

@@ -31,6 +31,12 @@ namespace Enemy
     /// Target이 OnRespawned를 보내오면 그때 기존 복귀 흐름(Recovery -> Idle)을 재사용해 돌아간다.
     /// 알파 Fade는 스케일/위치/회전과 완전히 분리된 별도 코루틴(fadeRoutine)이 SpriteRenderer의
     /// color.a만 건드리며, hitPhase 기반의 자세 전환 로직과는 서로 간섭하지 않는다.
+    ///
+    /// <b>모션 제작 데이터의 원천은 MonsterMotionProfile 하나뿐이다.</b> Base Idle/Idle Event/Hit/
+    /// Defeat 프레임, Hit Reaction 수치, Damage Number 연출값이 전부 프로필 에셋에 있고, 이 컴포넌트는
+    /// 그 값을 읽어 재생만 한다 - 같은 값을 씬 Inspector에 다시 직렬화해두는 fallback 경로는 없다.
+    /// 프로필이 비어 있거나 Base Idle/Hit 프레임이 없으면 조용히 빈 상태로 서 있는 대신 오류를 남기고
+    /// 스스로 비활성화된다(랜덤 리젠 후보도 같은 기준으로 걸러낸다).
     /// </summary>
     [RequireComponent(typeof(SpriteRenderer))]
     [RequireComponent(typeof(FlashOnCue))]
@@ -41,48 +47,6 @@ namespace Enemy
     {
         /// <summary>HitPoint를 받아 실제로 반응할 때마다 발생(연타 중에는 매 타격마다).</summary>
         public event Action ReceiveImpact;
-
-        [System.Serializable]
-        public class FrameAnimation
-        {
-            public Sprite[] frames;
-
-            [Tooltip("이 애니메이션의 프레임 재생 속도(초당 프레임 전환 횟수)")]
-            public float animationFps = 3f;
-        }
-
-        /// <summary>
-        /// 피격 애니메이션 데이터. 프레임 낱장 Sprite를 배열로 직접 받는다(아틀라스 슬라이싱 아님).
-        /// holdFrame을 연타 중 계속 유지하고, recoveryFrame은 종료 시 한 번만 보여준다 - 둘 다 실제
-        /// 프레임 수(frames.Length) 범위로 자동 보정된다.
-        /// </summary>
-        [System.Serializable]
-        public class HitAnimation
-        {
-            public Sprite[] frames;
-
-            [Tooltip("피격 중 유지할 프레임 인덱스(0부터). 연타 동안 이 프레임을 계속 유지한다.")]
-            public int holdFrame = 0;
-
-            [Tooltip("피격이 끝난 뒤 보여줄 복귀 프레임 인덱스")]
-            public int recoveryFrame = 1;
-
-            [Tooltip("복귀 프레임을 보여주는 시간(초)")]
-            public float recoveryDuration = 0.12f;
-
-            [Tooltip("마지막 HitPoint 이후 이 시간(초)이 지나면 복귀를 시작한다. 0.15~0.25 권장")]
-            public float holdTimeout = 0.2f;
-
-            [Header("Hit Shake (피격 시 좌우로 떠는 연출)")]
-            [Tooltip("타격 강도 - 좌우로 흔들리는 최대 폭(월드 유닛). 0이면 흔들리지 않는다.")]
-            public float shakeStrength = 0.04f;
-
-            [Tooltip("초당 좌우 진동 횟수. 높을수록 빠르게 떤다.")]
-            public float shakeFrequency = 35f;
-
-            [Tooltip("한 번의 흔들림이 잦아드는 데 걸리는 시간(초). 연타 중에는 타격마다 갱신되어 계속 이어진다.")]
-            public float shakeDecayDuration = 0.15f;
-        }
 
         private enum HitPhase { None, Reacting, Recovery, Defeated }
 
@@ -100,15 +64,16 @@ namespace Enemy
 
         private const int BaseIdleAnimIndex = 0;
 
-        [Header("Monster Motion Profile (optional)")]
-        [Tooltip("연결하면 Idle/Hit Reaction/Defeat 프레임과 Hit Reaction 제작값을 몬스터별 프로필에서 가져온다. " +
-                 "비어 있으면(또는 프로필에 해당 모션이 비어 있으면) 아래 기존 Inspector 값을 그대로 사용한다.")]
+        [Header("Monster Motion Profile (필수)")]
+        [Tooltip("이 몬스터의 Idle/Idle Event/Hit/Defeat 프레임과 Hit Reaction/Damage Number 제작값을 담은 " +
+                 "프로필 에셋 - 모션 데이터의 유일한 원천이다. 비어 있으면 이 몬스터는 오류를 남기고 비활성화된다.")]
         [SerializeField] private MonsterMotionProfile motionProfile;
 
-        [Header("Combat Stage Layout (optional)")]
-        [Tooltip("연결하면 시작 위치를 Monster Slot Position + 이 몬스터 프로필의 Actor Offset으로 계산하고, " +
-                 "Actor Scale도 함께 적용한다(Motion Editor Preview와 동일한 공식). 비어 있으면 기존처럼 씬에 " +
-                 "배치된 현재 Transform 위치/스케일을 그대로 쓴다.")]
+        [Header("Combat Stage Layout")]
+        [Tooltip("시작 위치를 Monster Slot Position + 이 몬스터 프로필의 Actor Offset으로 계산하고, " +
+                 "Actor Scale도 함께 적용한다(Motion Editor Preview와 동일한 공식). 비어 있으면 씬에 " +
+                 "배치된 현재 Transform 위치/스케일을 그대로 쓴다 - 프로필이 랜덤 리젠으로 바뀌면 배치가 " +
+                 "어긋나므로 연결하는 것을 권장한다.")]
         [SerializeField] private CombatStageLayout stageLayout;
 
         [Header("Random Respawn Profile Test")]
@@ -118,14 +83,8 @@ namespace Enemy
         [SerializeField] private bool randomizeProfileOnRespawn;
 
         [Tooltip("랜덤 리젠 후보 프로필 목록(테스트용). 배열 순서는 확률에 영향을 주지 않는다 - null, " +
-                 "중복, 현재 프로필, Base Idle 첫 프레임이 없는 프로필은 자동으로 후보에서 제외된다.")]
+                 "중복, 현재 프로필, Base Idle/Hit 프레임이 비어 있는 프로필은 자동으로 후보에서 제외된다.")]
         [SerializeField] private MonsterMotionProfile[] respawnProfilePool;
-
-        [Header("Base Idle (계속 루프)")]
-        [SerializeField] private FrameAnimation idle;
-
-        [Header("Hit (연속 타격에 맞춰 유지/갱신)")]
-        [SerializeField] private HitAnimation hit;
 
         private SpriteRenderer spriteRenderer;
         private FlashOnCue flashOnCue;
@@ -134,8 +93,7 @@ namespace Enemy
         private HitEffectSpawner hitEffectSpawner;
 
         // [0] = Base Idle(항상 존재), [1..] = Motion Profile의 Idle Events - PlayerCharacterAnimator의
-        // animations 배열과 같은 구조. 몬스터에는 캐릭터의 idleA/b/c 같은 레거시 인라인 변형 슬롯이
-        // 없었으므로 Idle Event는 전적으로 프로필 데이터로만 채워진다(직접 설정 fallback 없음).
+        // animations 배열과 같은 구조. 전부 프로필 데이터로만 채워진다(씬 직접 설정 fallback 없음).
         private RuntimeFrameAnimation[] idleAnimations;
         private int idleAnimIndex;
         private bool playingIdleEvent;
@@ -192,13 +150,35 @@ namespace Enemy
             damageNumberSpawner = GetComponent<DamageNumberSpawner>();
             hitEffectSpawner = GetComponent<HitEffectSpawner>();
 
+            if (!IsProfilePlayable(motionProfile))
+            {
+                // 프로필이 이 몬스터의 유일한 모션 데이터 원천이다 - 없으면 조용히 빈 애니메이션으로
+                // 서 있는 대신 오류를 남기고 스스로 꺼진다(OnEnable에서 HitPoint를 구독하지 않으므로
+                // 피격 반응/데미지 숫자/이펙트가 전혀 실행되지 않는다).
+                //
+                // 이때 Target까지 함께 끄는 것이 중요하다. Target은 이 컴포넌트와 독립적으로 내구도와
+                // 정적 aliveCount를 관리하므로, 그대로 두면 Target.HasAttackableTarget이 계속 true라
+                // 플레이어가 "아무 반응도 없는 몬스터"를 계속 때리고 처치/리젠까지 눈에 보이지 않게
+                // 진행된다. Awake 단계에서 끄면 Target.OnEnable이 아예 호출되지 않아 activeTargets에
+                // 등록조차 되지 않고, 이미 등록된 뒤라면 OnDisable이 aliveCount를 정확히 되돌린다.
+                Debug.LogError($"[TargetCombatController] '{name}': Monster Motion Profile이 없거나 Base Idle/Hit " +
+                               "프레임이 비어 있습니다. 이 몬스터와 Target을 비활성화합니다(공격 대상에서 제외) - " +
+                               "Inspector의 Motion Profile을 확인하세요.", this);
+                if (target != null) target.enabled = false;
+                enabled = false;
+                return;
+            }
+            if (stageLayout == null)
+            {
+                Debug.LogWarning($"[TargetCombatController] '{name}': Combat Stage Layout이 비어 있어 씬에 배치된 현재 " +
+                                 "Transform 위치/스케일을 그대로 사용합니다(랜덤 리젠으로 프로필이 바뀌어도 갱신되지 않습니다).", this);
+            }
+
             basePosition = ResolveInitialBasePosition();
             transform.localPosition = basePosition;
             ApplyActorScale();
 
-            // 프로필이 없으면 SpriteRenderer에 이미 authored된 flipX 값(기존 수동 설정)을 그대로 둔다 -
-            // 프로필이 연결됐을 때만 그 값으로 넘겨받는다.
-            if (motionProfile != null) spriteRenderer.flipX = motionProfile.SpriteFlipX;
+            spriteRenderer.flipX = motionProfile.SpriteFlipX;
 
             BuildRuntimeConfiguration();
 
@@ -213,13 +193,23 @@ namespace Enemy
             }
         }
 
-        /// <summary>Preview(DrawPairedStage)와 같은 공식: Slot + Actor Offset. stageLayout이 없는
-        /// 몬스터(기존 프리팹/씬)는 지금 Transform 위치를 그대로 기준점으로 쓴다 - 아무것도 깨지지 않는다.</summary>
+        /// <summary>프로필이 이 몬스터에 필요한 최소 조건을 갖췄는지 - Base Idle과 Hit 양쪽에 재생
+        /// 가능한 프레임이 있어야 한다. Defeat는 비어 있어도 정상이다(프레임 없이 페이드아웃만 한다).
+        /// 랜덤 리젠 후보를 고를 때도 같은 기준을 쓴다.</summary>
+        private static bool IsProfilePlayable(MonsterMotionProfile profile)
+        {
+            return profile != null
+                   && profile.BaseIdle != null && profile.BaseIdle.Frames.Length > 0
+                   && profile.Hit != null && profile.Hit.Frames.Length > 0;
+        }
+
+        /// <summary>Preview(DrawPairedStage)와 같은 공식: Slot + Actor Offset. stageLayout이 없으면
+        /// 지금 Transform 위치를 그대로 기준점으로 쓴다(Awake에서 경고를 남긴 뒤의 안전한 동작).</summary>
         private Vector3 ResolveInitialBasePosition()
         {
             if (stageLayout == null) return transform.localPosition;
 
-            Vector2 offset = motionProfile != null ? motionProfile.Preview.ActorOffset : Vector2.zero;
+            Vector2 offset = motionProfile.Preview.ActorOffset;
             Vector2 slot = stageLayout.MonsterSlotPosition;
             return new Vector3(slot.x + offset.x, slot.y + offset.y, transform.localPosition.z);
         }
@@ -228,7 +218,7 @@ namespace Enemy
         {
             if (stageLayout == null) return;
 
-            float scale = motionProfile != null ? motionProfile.Preview.ActorScale : 1f;
+            float scale = motionProfile.Preview.ActorScale;
             transform.localScale = new Vector3(scale, scale, 1f);
         }
 
@@ -243,78 +233,41 @@ namespace Enemy
             shaking = false;
         }
 
-        /// <summary>Idle/Hit은 motionProfile에 프레임이 있으면 그 값(및 Hit Reaction 제작값)을 쓰고,
-        /// 없으면 기존처럼 이 컴포넌트에 직접 설정한 idle/hit 필드로 fallback한다 - 프로필이 없는
-        /// 기존 프리팹이 그대로 동작해야 하기 때문이다. Defeat는 기존에 직접 설정하는 필드 자체가
-        /// 없었던 완전히 새로운 값이라 프로필에만 있으면 쓰고, 없으면 조용히 빈 배열이다(경고 없음 -
-        /// Defeat 프레임 없이 페이드아웃만 하는 것은 지금까지의 정상 동작이다).</summary>
+        /// <summary>Idle/Idle Event/Hit/Hit Reaction/Defeat를 전부 motionProfile에서만 가져온다 -
+        /// 씬 컴포넌트에 같은 값을 다시 직렬화해둔 fallback 경로는 없다(호출 전에 Awake/
+        /// ApplyRuntimeMotionProfile이 IsProfilePlayable로 이미 검증한다). Defeat만 비어 있어도
+        /// 정상이라 조용히 빈 배열이 된다 - Defeat 프레임 없이 페이드아웃만 하는 것은 정상 동작이다.</summary>
         private void BuildRuntimeConfiguration()
         {
-            MonsterMotionProfile.FrameClip profileIdle = motionProfile != null ? motionProfile.BaseIdle : null;
-            if (profileIdle != null && profileIdle.Frames.Length > 0)
+            MonsterMotionProfile.FrameClip profileIdle = motionProfile.BaseIdle;
+            var runtimeIdleAnimations = new List<RuntimeFrameAnimation>
             {
-                var runtimeIdleAnimations = new List<RuntimeFrameAnimation>
-                {
-                    new RuntimeFrameAnimation(profileIdle.Frames, profileIdle.AnimationFps)
-                };
+                new RuntimeFrameAnimation(profileIdle.Frames, profileIdle.AnimationFps)
+            };
 
-                IReadOnlyList<MonsterMotionProfile.FrameClip> idleEvents = motionProfile.IdleEvents;
-                for (int i = 0; i < idleEvents.Count; i++)
-                {
-                    MonsterMotionProfile.FrameClip clip = idleEvents[i];
-                    if (clip == null || clip.Frames.Length == 0) continue;
-                    runtimeIdleAnimations.Add(new RuntimeFrameAnimation(clip.Frames, clip.AnimationFps));
-                }
-
-                idleAnimations = runtimeIdleAnimations.ToArray();
-                idleEventCheckInterval = motionProfile.IdleEventCheckInterval;
-                idleEventChance = motionProfile.IdleEventChance;
-            }
-            else
+            IReadOnlyList<MonsterMotionProfile.FrameClip> idleEvents = motionProfile.IdleEvents;
+            for (int i = 0; i < idleEvents.Count; i++)
             {
-                idleAnimations = new[]
-                {
-                    new RuntimeFrameAnimation(idle?.frames ?? Array.Empty<Sprite>(), idle != null ? idle.animationFps : 3f)
-                };
-                idleEventCheckInterval = 4f;
-                idleEventChance = 0.5f;
+                MonsterMotionProfile.FrameClip clip = idleEvents[i];
+                if (clip == null || clip.Frames.Length == 0) continue;
+                runtimeIdleAnimations.Add(new RuntimeFrameAnimation(clip.Frames, clip.AnimationFps));
             }
 
-            MonsterMotionProfile.FrameClip profileHit = motionProfile != null ? motionProfile.Hit : null;
-            if (profileHit != null && profileHit.Frames.Length > 0)
-            {
-                hitFrames = profileHit.Frames;
-                MonsterMotionProfile.HitReactionSettings reaction = motionProfile.HitReaction;
-                hitHoldFrame = reaction.HoldFrame;
-                hitRecoveryFrame = reaction.RecoveryFrame;
-                hitRecoveryDuration = reaction.RecoveryDuration;
-                hitHoldTimeout = reaction.HoldTimeout;
-                hitShakeStrength = reaction.ShakeStrength;
-                hitShakeFrequency = reaction.ShakeFrequency;
-                hitShakeDecayDuration = reaction.ShakeDecayDuration;
-            }
-            else
-            {
-                hitFrames = hit?.frames ?? Array.Empty<Sprite>();
-                hitHoldFrame = hit != null ? hit.holdFrame : 0;
-                hitRecoveryFrame = hit != null ? hit.recoveryFrame : 1;
-                hitRecoveryDuration = hit != null ? hit.recoveryDuration : 0.12f;
-                hitHoldTimeout = hit != null ? hit.holdTimeout : 0.2f;
-                hitShakeStrength = hit != null ? hit.shakeStrength : 0.04f;
-                hitShakeFrequency = hit != null ? hit.shakeFrequency : 35f;
-                hitShakeDecayDuration = hit != null ? hit.shakeDecayDuration : 0.15f;
-            }
+            idleAnimations = runtimeIdleAnimations.ToArray();
+            idleEventCheckInterval = motionProfile.IdleEventCheckInterval;
+            idleEventChance = motionProfile.IdleEventChance;
 
-            defeatFrames = motionProfile != null && motionProfile.Defeat != null ? motionProfile.Defeat.Frames : Array.Empty<Sprite>();
+            hitFrames = motionProfile.Hit.Frames;
+            MonsterMotionProfile.HitReactionSettings reaction = motionProfile.HitReaction;
+            hitHoldFrame = reaction.HoldFrame;
+            hitRecoveryFrame = reaction.RecoveryFrame;
+            hitRecoveryDuration = reaction.RecoveryDuration;
+            hitHoldTimeout = reaction.HoldTimeout;
+            hitShakeStrength = reaction.ShakeStrength;
+            hitShakeFrequency = reaction.ShakeFrequency;
+            hitShakeDecayDuration = reaction.ShakeDecayDuration;
 
-            if (idleAnimations[BaseIdleAnimIndex].Frames.Length == 0)
-            {
-                Debug.LogWarning($"[TargetCombatController] '{name}': Idle 프레임이 없습니다(프로필 또는 직접 설정 확인).", this);
-            }
-            if (hitFrames.Length == 0)
-            {
-                Debug.LogWarning($"[TargetCombatController] '{name}': Hit 프레임이 없습니다(프로필 또는 직접 설정 확인).", this);
-            }
+            defeatFrames = motionProfile.Defeat != null ? motionProfile.Defeat.Frames : Array.Empty<Sprite>();
         }
 
 #if UNITY_EDITOR
@@ -331,7 +284,18 @@ namespace Enemy
         private void RefreshEditorPreviewPresentation()
         {
             if (this == null || Application.isPlaying) return;
-            if (motionProfile == null) return; // 프로필이 없으면 Sprite/Flip X/Scale 전부 기존 값 유지
+
+            if (stageLayout == null)
+            {
+                Debug.LogWarning($"[TargetCombatController] '{name}': Combat Stage Layout이 비어 있습니다 - " +
+                                 "Motion Editor Preview와 배치가 어긋날 수 있습니다.", this);
+            }
+            if (!IsProfilePlayable(motionProfile))
+            {
+                Debug.LogWarning($"[TargetCombatController] '{name}': Monster Motion Profile이 없거나 Base Idle/Hit " +
+                                 "프레임이 비어 있습니다 - Play Mode에서 이 몬스터는 비활성화됩니다.", this);
+                return; // 프로필이 불완전하면 Sprite/Flip X/Scale 전부 기존 값 유지
+            }
 
             RefreshEditorPreviewSpriteAndFlip();
             RefreshEditorPreviewScale();
@@ -438,31 +402,24 @@ namespace Enemy
 
             TriggerShake();
 
-            // Motion Profile이 연결돼 있으면 그 Damage Number Offset을 타격 시점의 최종 위치(현재
-            // transform - CombatStageLayout/Actor Offset이 이미 반영된 값) 기준으로 변환해서 쓴다.
-            // Shake는 이 시점에는 아직 시작 전(TriggerShake는 방금 shaking 플래그만 켰을 뿐 위치는
-            // 다음 프레임 UpdateShake부터 움직인다)이라 "타격 시점의" 위치가 곧 흔들리기 직전의 기준
-            // 위치와 같다 - Hit Effect/Receive Point와 동일한 타이밍 규칙이다. 프로필이 없으면 null을
-            // 넘겨 DamageNumberSpawner가 기존 anchor 기준으로 그대로 동작하게 둔다.
-            Vector3? damageNumberCenter = motionProfile != null
-                ? transform.TransformPoint(motionProfile.HitReaction.DamageNumberOffset)
-                : (Vector3?)null;
-            // 위치뿐 아니라 Jitter/Rise Distance/Duration/색상/폰트 크기/Sorting Order도 프로필이
-            // 있으면 그 값을 우선 쓴다(연결 안 됐으면 null - DamageNumberSpawner가 기존 Inspector
-            // 값 그대로 동작).
-            DamageNumberPresentation? damageNumberPresentation = motionProfile != null
-                ? new DamageNumberPresentation(
-                    motionProfile.HitReaction.DamageNumberRandomHorizontalJitter,
-                    motionProfile.HitReaction.DamageNumberRiseDistance,
-                    motionProfile.HitReaction.DamageNumberDuration,
-                    motionProfile.HitReaction.DamageNumberTextColor,
-                    motionProfile.HitReaction.DamageNumberFontSize,
-                    motionProfile.HitReaction.DamageNumberSortingOrder)
-                : (DamageNumberPresentation?)null;
+            // Damage Number Offset은 타격 시점의 최종 위치(현재 transform - CombatStageLayout/Actor
+            // Offset이 이미 반영된 값) 기준으로 변환해서 쓴다. Shake는 이 시점에는 아직 시작 전
+            // (TriggerShake는 방금 shaking 플래그만 켰을 뿐 위치는 다음 프레임 UpdateShake부터 움직인다)
+            // 이라 "타격 시점의" 위치가 곧 흔들리기 직전의 기준 위치와 같다 - Hit Effect/Receive Point와
+            // 동일한 타이밍 규칙이다. 위치뿐 아니라 Jitter/Rise Distance/Duration/색상/폰트 크기/
+            // Sorting Order까지 전부 몬스터 프로필이 소유한다(DamageNumberSpawner에는 같은 값이 없다).
+            MonsterMotionProfile.HitReactionSettings hitReaction = motionProfile.HitReaction;
+            Vector3 damageNumberCenter = transform.TransformPoint(hitReaction.DamageNumberOffset);
+            var damageNumberPresentation = new DamageNumberPresentation(
+                hitReaction.DamageNumberRandomHorizontalJitter,
+                hitReaction.DamageNumberRiseDistance,
+                hitReaction.DamageNumberDuration,
+                hitReaction.DamageNumberTextColor,
+                hitReaction.DamageNumberFontSize,
+                hitReaction.DamageNumberSortingOrder);
             damageNumberSpawner.Spawn(cue.Damage, damageNumberCenter, damageNumberPresentation);
-            // 공격별 Hit Effect(cue.EffectPrefab)가 비어 있으면 hitEffectSpawner의 defaultEffectPrefab으로
-            // 자동 fallback한다(Spawn() 자체 로직) - Offset/Scale은 프리팹 오버라이드 여부와 무관하게
-            // 공격 모션 값을 그대로 적용한다.
+            // Hit Effect는 공격 모션(AttackMotionDefinition)이 단독으로 소유한다 - prefab이 비어 있으면
+            // "이 공격에는 타격 이펙트가 없다"는 뜻이고, 스포너가 대신 채워 넣는 기본 이펙트는 없다.
             hitEffectSpawner.Spawn(cue.EffectPrefab, offsetOverride: cue.EffectOffset, scaleOverride: cue.EffectScale);
 
             ReceiveImpact?.Invoke();
@@ -520,9 +477,10 @@ namespace Enemy
 
         /// <summary>randomizeProfileOnRespawn이 켜져 있고 respawnProfilePool에 현재 motionProfile을
         /// 제외한 유효한 후보(null 아님/중복 제거/Base Idle 첫 프레임 존재)가 있으면 그중 하나를 동일
-        /// 확률로 골라 ApplyRuntimeMotionProfile()로 교체한다. 유효한 후보가 없으면(옵션이 꺼져 있거나,
-        /// 풀이 비어 있거나, 남은 후보가 전부 현재 프로필/null/불완전 프로필이면) 아무것도 바꾸지 않고
-        /// false를 반환한다 - 기존 고정 프로필 리젠 동작이 그대로 유지된다.</summary>
+        /// 확률로 골라 ApplyRuntimeMotionProfile()로 교체한다. 후보 유효성 기준은 Awake와 동일하다
+        /// (IsProfilePlayable - Base Idle과 Hit 프레임이 모두 있어야 한다). 유효한 후보가 없으면(옵션이
+        /// 꺼져 있거나, 풀이 비어 있거나, 남은 후보가 전부 현재 프로필/null/불완전 프로필이면) 아무것도
+        /// 바꾸지 않고 false를 반환한다 - 기존 고정 프로필 리젠 동작이 그대로 유지된다.</summary>
         private bool TrySwitchToRandomRespawnProfile()
         {
             if (!randomizeProfileOnRespawn) return false;
@@ -535,8 +493,9 @@ namespace Enemy
                 if (candidate == motionProfile) continue; // 연속 등장 금지: 현재 프로필 제외
                 if (candidates.Contains(candidate)) continue; // 중복 등록은 한 번만 후보로 취급
 
-                MonsterMotionProfile.FrameClip candidateIdle = candidate.BaseIdle;
-                if (candidateIdle == null || candidateIdle.Frames.Length == 0 || candidateIdle.Frames[0] == null) continue;
+                // Awake와 완전히 같은 유효성 기준을 쓴다 - 리젠으로 갈아끼운 뒤에야 "재생할 프레임이
+                // 없다"를 발견하는 일이 없도록 후보 단계에서 걸러낸다.
+                if (!IsProfilePlayable(candidate) || candidate.BaseIdle.Frames[0] == null) continue;
 
                 candidates.Add(candidate);
             }

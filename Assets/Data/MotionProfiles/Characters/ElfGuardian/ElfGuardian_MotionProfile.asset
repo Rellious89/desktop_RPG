@@ -30,15 +30,10 @@ MonoBehaviour:
   tier2Pool: {fileID: 11400000, guid: 60d0b04bb36da4d168fd71059509bd66, type: 2}
   tier3Pool: {fileID: 0}
   attackMovement:
-    overrideComponentValues: 1
     moveDistance: 0.2
     moveOutDuration: 0.14
     moveBackDuration: 0.05
   preview:
-    targetIdleSprite: {fileID: 0}
-    targetHitSprite: {fileID: 0}
     characterOffset: {x: 0, y: 0}
     receivePointOffset: {x: 0, y: 0.35}
     characterScale: 1
-    targetOffset: {x: 1.15, y: 0}
-    targetScale: 1

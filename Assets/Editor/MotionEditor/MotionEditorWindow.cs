@@ -2197,12 +2197,9 @@ namespace CharacterEditor
                 characterActorOffset = preview.ActorOffset;
                 characterScale = preview.ActorScale;
                 CharacterMotionProfile.AttackMovementSettings movement = character.CharacterProfile.AttackMovement;
-                if (movement.OverrideComponentValues)
-                {
-                    moveDistance = movement.MoveDistance;
-                    moveOut = movement.MoveOutDuration;
-                    moveBack = movement.MoveBackDuration;
-                }
+                moveDistance = movement.MoveDistance;
+                moveOut = movement.MoveOutDuration;
+                moveBack = movement.MoveBackDuration;
             }
 
             Vector2 receiveOffset = new Vector2(0f, 0.35f);

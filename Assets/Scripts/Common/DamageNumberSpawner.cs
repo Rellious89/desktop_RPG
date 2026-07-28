@@ -7,13 +7,18 @@ namespace Common
     /// <summary>
     /// HUD UI가 아니라 HitEffectSpawner와 같은 "월드 스페이스 전투 연출"로 취급한다. 화면 고정 좌표나
     /// 월드 스페이스 고정 오프셋을 쓰지 않고, 피격체가 지정한 anchor Transform(보통 그 자식인
-    /// DamageAnchor)의 위치를 그대로 스폰 기준점으로 쓴다 - anchor가 StageVisualRoot 하위 계층에
-    /// 있으므로 위치/배율 변화가 Transform 계층을 통해 자동으로, 정확히 한 번만 반영된다(이 스크립트가
-    /// 별도로 스케일을 곱하지 않는다).
+    /// DamageAnchor)의 스케일/회전을 빌려 Jitter와 Rise Distance를 계산한다 - anchor가 StageVisualRoot
+    /// 하위 계층에 있으므로 배율 변화가 Transform 계층을 통해 자동으로, 정확히 한 번만 반영된다(이
+    /// 스크립트가 별도로 스케일을 곱하지 않는다).
+    ///
+    /// <b>연출값(Jitter/Rise Distance/Duration/색상/폰트 크기/Sorting Order)은 이 컴포넌트가 소유하지
+    /// 않는다.</b> 전부 몬스터별 MonsterMotionProfile.HitReaction이 갖고 Spawn() 인자로 들어온다 -
+    /// 여기 남은 Inspector 값은 Anchor/Font Asset/Material Preset/Min Spawn Interval/Pool Size뿐이다.
+    /// 앞의 둘은 몬스터별 연출이 아니라 모든 데미지 숫자가 공유하는 렌더링 스타일이고, 뒤의 둘은
+    /// 스포너 자신의 생성 기준·성능 안전장치다.
     ///
     /// anchor를 Inspector에서 비워두면 이름이 "DamageAnchor"인 자식을 찾고, 그것도 없으면 이 오브젝트
-    /// 자신(기존에 스폰 기준으로 쓰던 "ReceivePoint" 역할)을 그대로 쓴다 - DamageAnchor가 없는 기존
-    /// Target도 예전과 동일하게 동작한다. Target과 마찬가지로 어떤 대상에도 붙여 재사용할 수 있다.
+    /// 자신을 그대로 쓴다. Target과 마찬가지로 어떤 대상에도 붙여 재사용할 수 있다.
     ///
     /// 인스턴스를 풀링한다 - 예전에는 Spawn()마다 new GameObject + AddComponent&lt;TextMeshPro&gt;를
     /// 새로 만들었는데, 연타 중 이 호출이 반복되면(초당 최대 1/minSpawnInterval회) GC 압박이 쌓여
@@ -23,21 +28,18 @@ namespace Common
     /// </summary>
     public class DamageNumberSpawner : MonoBehaviour
     {
-        [Header("생성 위치")]
-        [Tooltip("데미지 숫자의 기본 출력 위치. 비워두면 자식 중 이름이 \"DamageAnchor\"인 Transform을 찾고, 그것도 없으면 이 오브젝트 자신을 쓴다.")]
+        [Header("생성 위치 기준")]
+        [Tooltip("Jitter 폭/방향과 Rise Distance의 기준이 되는 Transform. 비워두면 자식 중 이름이 " +
+                 "\"DamageAnchor\"인 Transform을 찾고, 그것도 없으면 이 오브젝트 자신을 쓴다.")]
         [SerializeField] private Transform anchor;
-        [Tooltip("anchor의 로컬 좌표 기준 좌우 랜덤 폭(anchor의 스케일이 그대로 반영되므로 화면 고정 픽셀/월드 오프셋이 아니다).")]
-        [SerializeField] private float randomHorizontalJitter = 0.1f;
 
-        [Header("움직임")]
-        [SerializeField] private float riseDistance = 0.4f;
-        [SerializeField] private float duration = 0.6f;
+        [Header("텍스트 스타일 (몬스터별 연출값이 아니라 공통 렌더링 스타일)")]
+        [Tooltip("데미지 숫자에 사용할 TMP 폰트 에셋. 비워두면 TMP 기본 폰트(TMP Settings의 Default Font Asset)를 그대로 쓴다.")]
+        [SerializeField] private TMP_FontAsset fontAsset;
 
-        [Header("모양")]
-        [SerializeField] private Color textColor = Color.red;
-        [Tooltip("TMP 폰트 크기. 값을 올리면 그대로 직접 커진다.")]
-        [SerializeField] private float fontSize = 15f;
-        [SerializeField] private int sortingOrder = 10;
+        [Tooltip("위 폰트의 Material Preset(외곽선/그림자 등). 비워두면 폰트 에셋의 기본 Material을 쓴다. " +
+                 "반드시 위 Font Asset에서 파생된 preset이어야 한다 - 다른 폰트의 Material을 넣으면 글자가 깨져 보인다.")]
+        [SerializeField] private Material fontMaterialPreset;
 
         [Header("연타 제한")]
         [Tooltip("이 시간(초)보다 짧은 간격으로는 새 숫자를 생성하지 않는다. 빠른 연타 시 과도하게 겹치는 것을 막는다.")]
@@ -72,8 +74,12 @@ namespace Common
             var go = new GameObject("DamageNumber(Pooled)");
             go.transform.SetParent(transform, false);
 
-            go.AddComponent<TextMeshPro>();
-            go.GetComponent<MeshRenderer>().sortingOrder = sortingOrder;
+            var text = go.AddComponent<TextMeshPro>();
+            // 폰트/Material은 몬스터마다 달라지는 연출값이 아니라 전 데미지 숫자가 공유하는 렌더링
+            // 스타일이라 풀 생성 시점에 한 번만 적용한다(색상/크기/Sorting Order는 몬스터 프로필이
+            // 소유하므로 Spawn()이 매번 적용한다). 비어 있으면 손대지 않고 TMP 기본값을 그대로 둔다.
+            if (fontAsset != null) text.font = fontAsset;
+            if (fontMaterialPreset != null) text.fontSharedMaterial = fontMaterialPreset;
 
             var popup = go.AddComponent<DamageNumberPopup>();
             go.SetActive(false);
@@ -81,18 +87,16 @@ namespace Common
         }
 
         /// <summary>
-        /// centerOverride가 있으면(예: Monster Motion Profile의 Damage Number Offset으로 호출부가 이미
-        /// 계산해둔 최종 월드 위치) anchor Transform 대신 그 지점을 기준점으로 쓴다 - anchor는 이 경우
-        /// 완전히 무시되고, jitter 폭/방향만 anchor의 회전·스케일을 빌려 계산한다(스케일이 바뀌어도
-        /// 지터 폭이 캐릭터 크기에 비례해서 따라가는 기존 동작을 유지하기 위함). null이면(기본값)
-        /// 기존처럼 anchor Transform 자체를 기준점으로 쓴다 - Profile이 없는 몬스터는 완전히 기존 동작 그대로다.
+        /// center는 호출부(TargetCombatController)가 Monster Motion Profile의 Damage Number Offset을
+        /// 그 몬스터의 최종 위치에 적용해 이미 계산해둔 월드 위치다 - anchor Transform은 위치 기준으로
+        /// 쓰이지 않고, jitter 폭/방향과 Rise Distance 배율만 anchor의 회전·스케일을 빌려 계산한다
+        /// (Stage 배율이 바뀌어도 지터/상승 폭이 캐릭터 크기에 비례해서 따라가게 하기 위함).
         ///
-        /// presentationOverride가 있으면(Monster Motion Profile의 Damage Number 연출값) Jitter/Rise
-        /// Distance/Duration/Text Color/Font Size/Sorting Order를 이 컴포넌트의 Inspector 값 대신 쓴다.
-        /// Min Spawn Interval/Pool Size는 몬스터별 연출값이 아니라 이 스포너의 성능 안전장치라 override
-        /// 대상이 아니다 - 항상 이 컴포넌트 자신의 값을 쓴다.
+        /// presentation(Jitter/Rise Distance/Duration/Text Color/Font Size/Sorting Order)의 단일 원천은
+        /// MonsterMotionProfile.HitReaction이다 - 이 컴포넌트에는 같은 값이 없다. Min Spawn Interval/
+        /// Pool Size/Anchor만 몬스터별 연출값이 아닌 스포너 쪽 성능·생성 설정이라 여기 남아 있다.
         /// </summary>
-        public void Spawn(int amount, Vector3? centerOverride = null, DamageNumberPresentation? presentationOverride = null)
+        public void Spawn(int amount, Vector3 center, DamageNumberPresentation presentation)
         {
             if (Time.time - lastSpawnTime < minSpawnInterval) return;
             lastSpawnTime = Time.time;
@@ -101,12 +105,12 @@ namespace Common
             // 정상적인 연타 빈도에서는 poolSize만으로 충분해서 이 경로를 거의 타지 않는다.
             DamageNumberPopup popup = pool.Count > 0 ? pool.Dequeue() : CreatePooledInstance();
 
-            float activeJitter = presentationOverride?.RandomHorizontalJitter ?? randomHorizontalJitter;
-            float activeRiseDistance = presentationOverride?.RiseDistance ?? riseDistance;
-            float activeDuration = presentationOverride?.Duration ?? duration;
-            Color activeTextColor = presentationOverride?.TextColor ?? textColor;
-            float activeFontSize = presentationOverride?.FontSize ?? fontSize;
-            int activeSortingOrder = presentationOverride?.SortingOrder ?? sortingOrder;
+            float activeJitter = presentation.RandomHorizontalJitter;
+            float activeRiseDistance = presentation.RiseDistance;
+            float activeDuration = presentation.Duration;
+            Color activeTextColor = presentation.TextColor;
+            float activeFontSize = presentation.FontSize;
+            int activeSortingOrder = presentation.SortingOrder;
 
             Transform t = popup.transform;
             t.SetParent(null, true);
@@ -115,13 +119,10 @@ namespace Common
             // 현재 스케일이 그대로 반영되므로, StageVisualRoot 배율이 바뀌어도 지터 폭이 캐릭터 크기에
             // 비례해서 따라간다(화면/월드 고정 오프셋이 아니다).
             Vector3 localJitter = new Vector3(Random.Range(-activeJitter, activeJitter), 0f, 0f);
-            t.position = centerOverride.HasValue
-                ? centerOverride.Value + anchor.TransformVector(localJitter)
-                : anchor.TransformPoint(localJitter);
+            t.position = center + anchor.TransformVector(localJitter);
 
             popup.gameObject.SetActive(true);
-            // sortingOrder는 풀 생성 시점에 한 번만 굳어 있던 값이었는데, 몬스터마다 다른 값을 override로
-            // 받을 수 있게 됐으니 Spawn 시점에 실제 Renderer에 매번 다시 적용한다.
+            // 몬스터마다 다른 값을 받으므로 Spawn 시점에 실제 Renderer에 매번 다시 적용한다.
             popup.GetComponent<MeshRenderer>().sortingOrder = activeSortingOrder;
             // riseDistance도 anchor의 스케일만큼 함께 줄어들어야 캐릭터가 작을 때 숫자만 과하게 크게
             // 떠오르는 어색함이 없다 - anchor가 StageVisualRoot 하위 계층이라 lossyScale에 이미 그

@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Common
 {
@@ -8,8 +9,11 @@ namespace Common
     /// 피격 지점에 이펙트 prefab을 생성하는 재사용 가능한 컴포넌트. Target/DamageNumberSpawner와
     /// 마찬가지로 피격받는 어떤 오브젝트에도 붙여 쓴다.
     ///
-    /// 지금은 기본 타격 이펙트(defaultEffectPrefab) 하나만 쓰지만, 강공격/콤보 티어/치명타처럼
-    /// 앞으로 늘어날 이펙트는 <see cref="Spawn(GameObject, float)"/>에 prefab을 직접 넘겨서 재사용한다.
+    /// <b>어떤 이펙트를 쓸지는 이 컴포넌트가 정하지 않는다.</b> 호출자가 <see cref="Spawn"/>에 prefab을
+    /// 직접 넘기고(공격별 Hit Effect는 AttackMotionDefinition이, Cast Effect도 마찬가지다), prefab이
+    /// null이면 "이 연출에는 이펙트가 없다"는 뜻이라 조용히 아무것도 만들지 않는다 - 대신 채워 넣는
+    /// 기본 이펙트는 없다. 이 컴포넌트가 담당하는 것은 위치 계산·스케일 적용·풀링·수명 관리뿐이다.
+    /// prewarmEffectPrefab은 "무엇을 재생할지"가 아니라 "무엇을 미리 만들어둘지"만 정한다.
     ///
     /// 생성된 인스턴스는 StageVisualRootController.CombatFxRoot(StageVisualRoot의 자식) 아래에
     /// 만든다 - 그래야 Transform 계층을 통해 StageVisualRoot의 위치/배율을 정확히 한 번만, 자동으로
@@ -30,9 +34,13 @@ namespace Common
     /// </summary>
     public class HitEffectSpawner : MonoBehaviour
     {
-        [Header("기본 이펙트")]
-        [Tooltip("impactPoint/durationOverride를 지정하지 않고 Spawn()을 호출했을 때 쓸 기본 타격 이펙트 prefab.")]
-        [SerializeField] private GameObject defaultEffectPrefab;
+        [Header("Prewarm (재생 대상이 아니라 미리 만들어둘 prefab)")]
+        [Tooltip("Awake에서 Pool Size만큼 미리 Instantiate해둘 이펙트 prefab. 이 대상에게 실제로 가장 " +
+                 "자주 날아오는 이펙트(보통 공격 모션들이 공유하는 기본 타격 이펙트)를 넣어두면 첫 타격에 " +
+                 "생성 비용이 몰리지 않는다. 비어 있어도 동작에는 지장이 없고(필요할 때 그 자리에서 만든다) " +
+                 "Spawn()이 이 prefab을 대신 재생하는 일은 절대 없다.")]
+        [FormerlySerializedAs("defaultEffectPrefab")]
+        [SerializeField] private GameObject prewarmEffectPrefab;
 
         [Header("생성 위치")]
         [Tooltip("이펙트가 생성될 실제 지점. 비워두면 이 오브젝트의 Transform 기준 fallbackOffset 위치를 대신 쓴다.")]
@@ -55,7 +63,7 @@ namespace Common
         [SerializeField] private float minSpawnInterval = 0.05f;
 
         [Header("풀")]
-        [Tooltip("defaultEffectPrefab 기준으로 미리 만들어두고 재사용할 이펙트 인스턴스 개수. 연타 중 동시에 재생 중일 수 있는 최대 개수보다 넉넉하게 잡는다.")]
+        [Tooltip("prewarmEffectPrefab 기준으로 미리 만들어두고 재사용할 이펙트 인스턴스 개수. 연타 중 동시에 재생 중일 수 있는 최대 개수보다 넉넉하게 잡는다.")]
         [SerializeField] private int poolSize = 8;
 
         private const float FallbackDuration = 0.15f;
@@ -66,8 +74,8 @@ namespace Common
         // 인스턴스(몬스터마다 하나씩)가 같은 컨테이너를 공유하므로 별도 Inspector 와이어링이 필요 없다.
         private Transform combatFxRoot;
 
-        // prefab별로 별도 풀을 둔다 - Spawn(prefabOverride)로 defaultEffectPrefab이 아닌 다른 prefab이
-        // 들어올 수 있어서다(강공격/콤보 티어 이펙트 등, 아직 실사용처는 없지만 API가 이미 열려 있다).
+        // prefab별로 별도 풀을 둔다 - 공격 모션마다 다른 Hit Effect prefab이 들어올 수 있어서다.
+        // prewarm하지 않은 prefab도 첫 요청 때 풀이 자동으로 만들어진다.
         private readonly Dictionary<GameObject, Queue<GameObject>> poolsByPrefab = new Dictionary<GameObject, Queue<GameObject>>();
         private readonly Dictionary<GameObject, GameObject> prefabByInstance = new Dictionary<GameObject, GameObject>();
 
@@ -79,12 +87,12 @@ namespace Common
         {
             combatFxRoot = StageVisualRootController.Instance != null ? StageVisualRootController.Instance.CombatFxRoot : null;
 
-            if (defaultEffectPrefab == null) return;
+            if (prewarmEffectPrefab == null) return;
 
-            Queue<GameObject> pool = GetOrCreatePool(defaultEffectPrefab);
+            Queue<GameObject> pool = GetOrCreatePool(prewarmEffectPrefab);
             for (int i = 0; i < poolSize; i++)
             {
-                pool.Enqueue(CreatePooledInstance(defaultEffectPrefab));
+                pool.Enqueue(CreatePooledInstance(prewarmEffectPrefab));
             }
         }
 
@@ -108,9 +116,10 @@ namespace Common
         }
 
         /// <summary>
-        /// 이펙트를 생성한다. prefabOverride/durationOverride를 비워두면(null, 0 이하) 기본값을 쓴다.
-        /// prefab이 끝내 없거나 duration이 비정상(0 이하, NaN 등)이어도 예외 없이 안전하게 무시/보정한다.
-        /// minSpawnInterval 안에 들어오는 추가 요청은 조용히 무시한다(데미지/피격 반응 등 다른 처리에는 영향 없음).
+        /// prefab이 지정한 이펙트를 생성한다. prefab이 null이면 "이 연출에는 이펙트가 없다"는 뜻이라
+        /// 조용히 아무것도 하지 않는다 - 대신 재생할 기본 이펙트는 없다. duration이 비정상(0 이하,
+        /// NaN 등)이어도 예외 없이 안전하게 보정한다. minSpawnInterval 안에 들어오는 추가 요청은
+        /// 조용히 무시한다(데미지/피격 반응 등 다른 처리에는 영향 없음).
         ///
         /// offsetOverride: impactPoint가 있으면 그 로컬 좌표계 기준(TransformPoint) 추가 오프셋, 없으면
         /// fallbackOffset에 그대로 더하는 월드 오프셋 - 공격 모션 데이터의 Effect Offset을 그대로 전달한다.
@@ -118,12 +127,10 @@ namespace Common
         /// HitEffectPop이 있는 prefab은 그 재생 애니메이션의 배율에 곱해서 적용하고, 없는 prefab은
         /// 인스턴스 원본 로컬 스케일에 곱해서 즉시 적용한다(둘 다 풀 반환 시 원본 스케일로 복원된다).
         /// </summary>
-        public void Spawn(GameObject prefabOverride = null, float durationOverride = 0f, Vector2 offsetOverride = default, float scaleOverride = 0f)
+        public void Spawn(GameObject prefab, float durationOverride = 0f, Vector2 offsetOverride = default, float scaleOverride = 0f)
         {
+            if (prefab == null) return; // 이 연출에는 이펙트가 없다 - 쿨다운도 소모하지 않는다.
             if (Time.time - lastSpawnTime < minSpawnInterval) return;
-
-            GameObject prefabToSpawn = prefabOverride != null ? prefabOverride : defaultEffectPrefab;
-            if (prefabToSpawn == null) return; // 연결된 prefab이 없으면 조용히 아무 것도 하지 않는다.
 
             lastSpawnTime = Time.time;
 
@@ -152,10 +159,11 @@ namespace Common
                 spawnPosition = transform.position + (Vector3)fallbackOffset + baseOffset;
             }
 
-            Queue<GameObject> pool = GetOrCreatePool(prefabToSpawn);
-            // 풀이 비어 있으면(동시에 재생 중인 개수가 poolSize를 넘어서면) 그때만 예외적으로 새로 만든다 -
-            // 정상적인 연타 빈도에서는 poolSize만으로 충분해서 이 경로를 거의 타지 않는다.
-            GameObject instance = pool.Count > 0 ? pool.Dequeue() : CreatePooledInstance(prefabToSpawn);
+            Queue<GameObject> pool = GetOrCreatePool(prefab);
+            // 풀이 비어 있으면(동시에 재생 중인 개수가 poolSize를 넘어서거나, prewarm하지 않은 prefab의
+            // 첫 요청이면) 그때만 예외적으로 새로 만든다 - prewarm된 prefab은 정상적인 연타 빈도에서
+            // poolSize만으로 충분해서 이 경로를 거의 타지 않는다.
+            GameObject instance = pool.Count > 0 ? pool.Dequeue() : CreatePooledInstance(prefab);
 
             // anchor(impactPoint)의 월드 위치를 CombatFxRoot 기준 로컬 좌표로 한 번만 변환한다 -
             // instance가 CombatFxRoot의 자식이므로 그 이후 렌더링 시 StageVisualRoot의 위치/배율이

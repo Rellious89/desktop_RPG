@@ -4,9 +4,8 @@ namespace Character
 {
     /// <summary>
     /// PlayerCharacterAnimator의 공격 재생 루프(Windup/Strike/Recovery)가 실제로 필요로 하는 값만 뽑은
-    /// 인터페이스. 레거시 단일 슬롯인 AttackAnimation(일반 클래스)과 ScriptableObject 에셋인
-    /// AttackMotionDefinition을 재생 루프 입장에서 동일하게 다루기 위해 존재한다 - 재생 루프는 이 값들을
-    /// 어디서 가져왔는지 신경 쓰지 않는다.
+    /// 인터페이스. 재생 루프를 데이터 소유자(현재는 AttackMotionDefinition 에셋 하나)와 분리해서,
+    /// 루프가 "이 값들을 어디서 가져왔는지" 신경 쓰지 않게 하기 위해 존재한다.
     /// </summary>
     public interface IAttackMotion
     {

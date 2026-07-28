@@ -503,7 +503,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 450d6ff224ad40e79f52f37c8be75379, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  defaultEffectPrefab: {fileID: 0}
+  prewarmEffectPrefab: {fileID: 0}
   impactPoint: {fileID: 0}
   spawnJitterX: 0
   spawnJitterY: 0
@@ -537,9 +537,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a53d75aa9ab74fefbad60a7f5cf781bf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveDistance: 0.2
-  moveOutDuration: 0.14
-  moveBackDuration: 0.05
   stageLayout: {fileID: 11400000, guid: a11674de15554c8586ea98384fdb2df5, type: 2}
 --- !u!114 &274441215
 MonoBehaviour:
@@ -554,63 +551,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   motionProfile: {fileID: 11400000, guid: 73ad72f60c266498e821b7d0e8ea4842, type: 2}
-  idle:
-    frames:
-    - {fileID: 21300000, guid: c8ae0dd55fb214ef29a471dd240549e0, type: 3}
-    - {fileID: 21300000, guid: 96f279382258341e2b2430d48307f5ed, type: 3}
-    - {fileID: 21300000, guid: 20bfb3517764c4a8695ebfd227ca168d, type: 3}
-    - {fileID: 21300000, guid: aa35fd65e2ad9459bbecbd6cf095f175, type: 3}
-    animationFps: 6
-  idleA:
-    frames:
-    - {fileID: 21300000, guid: 796297ca0e12d41b2bc180244803081d, type: 3}
-    - {fileID: 21300000, guid: e63b3b0f27c434d60a7494695c5bec3a, type: 3}
-    - {fileID: 21300000, guid: cd2cf8fe83f8744f1af7f391199f028b, type: 3}
-    - {fileID: 21300000, guid: 8372c8e9bceb849e5a849357db8ca01e, type: 3}
-    animationFps: 6
-  idleB:
-    frames:
-    - {fileID: 21300000, guid: e354f737ab4764402b5da4e1298e3746, type: 3}
-    - {fileID: 21300000, guid: 93440b7ebab3345b8a651dd481430c35, type: 3}
-    - {fileID: 21300000, guid: d6e2dc719f90a49c384e694b0253e83e, type: 3}
-    - {fileID: 21300000, guid: 2660f68a267bb4620888688907fc8f7b, type: 3}
-    animationFps: 6
-  idleC:
-    frames:
-    - {fileID: 21300000, guid: c8ae0dd55fb214ef29a471dd240549e0, type: 3}
-    - {fileID: 21300000, guid: 96f279382258341e2b2430d48307f5ed, type: 3}
-    - {fileID: 21300000, guid: 20bfb3517764c4a8695ebfd227ca168d, type: 3}
-    - {fileID: 21300000, guid: aa35fd65e2ad9459bbecbd6cf095f175, type: 3}
-    animationFps: 6
-  attack:
-    frames:
-    - {fileID: 21300000, guid: e5950061ab53a44eb941258701ecf317, type: 3}
-    - {fileID: 21300000, guid: 4c1bc6667634a481ba3d0ba65b63f01e, type: 3}
-    - {fileID: 21300000, guid: bab3f95e814b64aa3a697479b6f86d2a, type: 3}
-    overlayFrames: []
-    animationFps: 18
-    hitFrameIndex: 1
-    endFrameDuration: 0.12
-    queueExpireTimeout: 0.15
-    castFrameIndex: 0
-    castEffectPrefab: {fileID: 0}
-    castEffectOffset: {x: 0, y: 0}
-    castEffectScale: 1
-    castSound: {fileID: 0}
-    hitEffectPrefab: {fileID: 0}
-    hitEffectOffset: {x: 0, y: 0}
-    hitEffectScale: 1
-    hitSound: {fileID: 0}
-    projectilePrefab: {fileID: 0}
-    projectileLaunchOffset: {x: 0, y: 0}
-    projectileScale: 1
-  tier1Pool: {fileID: 0}
-  tier2Pool: {fileID: 0}
-  tier3Pool: {fileID: 0}
   attackFrameOverlayRenderer: {fileID: 0}
   attackOverlayMaterial: {fileID: 0}
   basicAttackPower: 3
-  variantCheckInterval: 4
 --- !u!212 &274441216
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -1153,10 +1096,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a53d75aa9ab74fefbad60a7f5cf781bf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveDistance: 0.2
-  moveOutDuration: 0.14
-  moveBackDuration: 0.05
-  stageLayout: {fileID: 0}
+  stageLayout: {fileID: 11400000, guid: a11674de15554c8586ea98384fdb2df5, type: 2}
 --- !u!114 &390770567
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1170,63 +1110,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   motionProfile: {fileID: 11400000, guid: 8adc502fe0c9542309b63d7e9bfa0944, type: 2}
-  idle:
-    frames:
-    - {fileID: 21300000, guid: c8ae0dd55fb214ef29a471dd240549e0, type: 3}
-    - {fileID: 21300000, guid: 96f279382258341e2b2430d48307f5ed, type: 3}
-    - {fileID: 21300000, guid: 20bfb3517764c4a8695ebfd227ca168d, type: 3}
-    - {fileID: 21300000, guid: aa35fd65e2ad9459bbecbd6cf095f175, type: 3}
-    animationFps: 6
-  idleA:
-    frames:
-    - {fileID: 21300000, guid: 796297ca0e12d41b2bc180244803081d, type: 3}
-    - {fileID: 21300000, guid: e63b3b0f27c434d60a7494695c5bec3a, type: 3}
-    - {fileID: 21300000, guid: cd2cf8fe83f8744f1af7f391199f028b, type: 3}
-    - {fileID: 21300000, guid: 8372c8e9bceb849e5a849357db8ca01e, type: 3}
-    animationFps: 6
-  idleB:
-    frames:
-    - {fileID: 21300000, guid: e354f737ab4764402b5da4e1298e3746, type: 3}
-    - {fileID: 21300000, guid: 93440b7ebab3345b8a651dd481430c35, type: 3}
-    - {fileID: 21300000, guid: d6e2dc719f90a49c384e694b0253e83e, type: 3}
-    - {fileID: 21300000, guid: 2660f68a267bb4620888688907fc8f7b, type: 3}
-    animationFps: 6
-  idleC:
-    frames:
-    - {fileID: 21300000, guid: c8ae0dd55fb214ef29a471dd240549e0, type: 3}
-    - {fileID: 21300000, guid: 96f279382258341e2b2430d48307f5ed, type: 3}
-    - {fileID: 21300000, guid: 20bfb3517764c4a8695ebfd227ca168d, type: 3}
-    - {fileID: 21300000, guid: aa35fd65e2ad9459bbecbd6cf095f175, type: 3}
-    animationFps: 6
-  attack:
-    frames:
-    - {fileID: 21300000, guid: e5950061ab53a44eb941258701ecf317, type: 3}
-    - {fileID: 21300000, guid: 4c1bc6667634a481ba3d0ba65b63f01e, type: 3}
-    - {fileID: 21300000, guid: bab3f95e814b64aa3a697479b6f86d2a, type: 3}
-    overlayFrames: []
-    animationFps: 18
-    hitFrameIndex: 1
-    endFrameDuration: 0.12
-    queueExpireTimeout: 0.15
-    castFrameIndex: 0
-    castEffectPrefab: {fileID: 0}
-    castEffectOffset: {x: 0, y: 0}
-    castEffectScale: 1
-    castSound: {fileID: 0}
-    hitEffectPrefab: {fileID: 0}
-    hitEffectOffset: {x: 0, y: 0}
-    hitEffectScale: 1
-    hitSound: {fileID: 0}
-    projectilePrefab: {fileID: 0}
-    projectileLaunchOffset: {x: 0, y: 0}
-    projectileScale: 1
-  tier1Pool: {fileID: 0}
-  tier2Pool: {fileID: 0}
-  tier3Pool: {fileID: 0}
   attackFrameOverlayRenderer: {fileID: 0}
   attackOverlayMaterial: {fileID: 0}
   basicAttackPower: 3
-  variantCheckInterval: 4
 --- !u!212 &390770568
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -1291,7 +1177,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 450d6ff224ad40e79f52f37c8be75379, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  defaultEffectPrefab: {fileID: 0}
+  prewarmEffectPrefab: {fileID: 0}
   impactPoint: {fileID: 0}
   spawnJitterX: 0.08
   spawnJitterY: 0.08
@@ -1572,9 +1458,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a53d75aa9ab74fefbad60a7f5cf781bf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveDistance: 0.2
-  moveOutDuration: 0.14
-  moveBackDuration: 0.05
   stageLayout: {fileID: 11400000, guid: a11674de15554c8586ea98384fdb2df5, type: 2}
 --- !u!114 &554845289
 MonoBehaviour:
@@ -1588,64 +1471,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 62b5dd37ee8544539f0f8cab19bcd0d9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  motionProfile: {fileID: 0}
-  idle:
-    frames:
-    - {fileID: 21300000, guid: c8ae0dd55fb214ef29a471dd240549e0, type: 3}
-    - {fileID: 21300000, guid: 96f279382258341e2b2430d48307f5ed, type: 3}
-    - {fileID: 21300000, guid: 20bfb3517764c4a8695ebfd227ca168d, type: 3}
-    - {fileID: 21300000, guid: aa35fd65e2ad9459bbecbd6cf095f175, type: 3}
-    animationFps: 6
-  idleA:
-    frames:
-    - {fileID: 21300000, guid: 796297ca0e12d41b2bc180244803081d, type: 3}
-    - {fileID: 21300000, guid: e63b3b0f27c434d60a7494695c5bec3a, type: 3}
-    - {fileID: 21300000, guid: cd2cf8fe83f8744f1af7f391199f028b, type: 3}
-    - {fileID: 21300000, guid: 8372c8e9bceb849e5a849357db8ca01e, type: 3}
-    animationFps: 6
-  idleB:
-    frames:
-    - {fileID: 21300000, guid: e354f737ab4764402b5da4e1298e3746, type: 3}
-    - {fileID: 21300000, guid: 93440b7ebab3345b8a651dd481430c35, type: 3}
-    - {fileID: 21300000, guid: d6e2dc719f90a49c384e694b0253e83e, type: 3}
-    - {fileID: 21300000, guid: 2660f68a267bb4620888688907fc8f7b, type: 3}
-    animationFps: 6
-  idleC:
-    frames:
-    - {fileID: 21300000, guid: c8ae0dd55fb214ef29a471dd240549e0, type: 3}
-    - {fileID: 21300000, guid: 96f279382258341e2b2430d48307f5ed, type: 3}
-    - {fileID: 21300000, guid: 20bfb3517764c4a8695ebfd227ca168d, type: 3}
-    - {fileID: 21300000, guid: aa35fd65e2ad9459bbecbd6cf095f175, type: 3}
-    animationFps: 6
-  attack:
-    frames:
-    - {fileID: 21300000, guid: e5950061ab53a44eb941258701ecf317, type: 3}
-    - {fileID: 21300000, guid: 4c1bc6667634a481ba3d0ba65b63f01e, type: 3}
-    - {fileID: 21300000, guid: bab3f95e814b64aa3a697479b6f86d2a, type: 3}
-    overlayFrames: []
-    animationFps: 18
-    hitFrameIndex: 1
-    endFrameDuration: 0.12
-    queueExpireTimeout: 0.15
-    castFrameIndex: 0
-    castEffectPrefab: {fileID: 0}
-    castEffectOffset: {x: 0, y: 0}
-    castEffectScale: 1
-    castSound: {fileID: 0}
-    hitEffectPrefab: {fileID: 0}
-    hitEffectOffset: {x: 0, y: 0}
-    hitEffectScale: 1
-    hitSound: {fileID: 0}
-    projectilePrefab: {fileID: 0}
-    projectileLaunchOffset: {x: 0, y: 0}
-    projectileScale: 1
-  tier1Pool: {fileID: 0}
-  tier2Pool: {fileID: 0}
-  tier3Pool: {fileID: 0}
+  motionProfile: {fileID: 11400000, guid: a33c12b94e0694bd3b814e308dcd2477, type: 2}
   attackFrameOverlayRenderer: {fileID: 0}
   attackOverlayMaterial: {fileID: 0}
   basicAttackPower: 3
-  variantCheckInterval: 4
 --- !u!212 &554845290
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -2277,7 +2106,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   sfxEnabled: 1
   sfxVolume: 0.3
-  hitClip: {fileID: 8300000, guid: 8b23b175a78d6b5458322e3a6c9905d0, type: 3}
   hitSfxCooldown: 0.08
   defeatClip: {fileID: 0}
   levelUpClip: {fileID: 8300000, guid: cfce0cea076109f478783201b2a9f57f, type: 3}
@@ -2531,6 +2359,7 @@ MonoBehaviour:
   comboText: {fileID: 352709195}
   tierText: {fileID: 700000023}
   comboLabel: Combo
+  comboTextFormat: '{count} {label}'
   tiers:
   - minCombo: 0
     tierName: Normal
@@ -2670,7 +2499,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 450d6ff224ad40e79f52f37c8be75379, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  defaultEffectPrefab: {fileID: 0}
+  prewarmEffectPrefab: {fileID: 0}
   impactPoint: {fileID: 0}
   spawnJitterX: 0
   spawnJitterY: 0
@@ -2690,7 +2519,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 450d6ff224ad40e79f52f37c8be75379, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  defaultEffectPrefab: {fileID: 0}
+  prewarmEffectPrefab: {fileID: 0}
   impactPoint: {fileID: 0}
   spawnJitterX: 0
   spawnJitterY: 0
@@ -2822,7 +2651,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 450d6ff224ad40e79f52f37c8be75379, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  defaultEffectPrefab: {fileID: 0}
+  prewarmEffectPrefab: {fileID: 0}
   impactPoint: {fileID: 0}
   spawnJitterX: 0
   spawnJitterY: 0
@@ -2856,9 +2685,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a53d75aa9ab74fefbad60a7f5cf781bf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveDistance: 0.2
-  moveOutDuration: 0.14
-  moveBackDuration: 0.05
   stageLayout: {fileID: 11400000, guid: a11674de15554c8586ea98384fdb2df5, type: 2}
 --- !u!114 &834607636
 MonoBehaviour:
@@ -2873,63 +2699,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   motionProfile: {fileID: 11400000, guid: adabc763987eb4de1b5ec6936b293711, type: 2}
-  idle:
-    frames:
-    - {fileID: 21300000, guid: c8ae0dd55fb214ef29a471dd240549e0, type: 3}
-    - {fileID: 21300000, guid: 96f279382258341e2b2430d48307f5ed, type: 3}
-    - {fileID: 21300000, guid: 20bfb3517764c4a8695ebfd227ca168d, type: 3}
-    - {fileID: 21300000, guid: aa35fd65e2ad9459bbecbd6cf095f175, type: 3}
-    animationFps: 6
-  idleA:
-    frames:
-    - {fileID: 21300000, guid: 796297ca0e12d41b2bc180244803081d, type: 3}
-    - {fileID: 21300000, guid: e63b3b0f27c434d60a7494695c5bec3a, type: 3}
-    - {fileID: 21300000, guid: cd2cf8fe83f8744f1af7f391199f028b, type: 3}
-    - {fileID: 21300000, guid: 8372c8e9bceb849e5a849357db8ca01e, type: 3}
-    animationFps: 6
-  idleB:
-    frames:
-    - {fileID: 21300000, guid: e354f737ab4764402b5da4e1298e3746, type: 3}
-    - {fileID: 21300000, guid: 93440b7ebab3345b8a651dd481430c35, type: 3}
-    - {fileID: 21300000, guid: d6e2dc719f90a49c384e694b0253e83e, type: 3}
-    - {fileID: 21300000, guid: 2660f68a267bb4620888688907fc8f7b, type: 3}
-    animationFps: 6
-  idleC:
-    frames:
-    - {fileID: 21300000, guid: c8ae0dd55fb214ef29a471dd240549e0, type: 3}
-    - {fileID: 21300000, guid: 96f279382258341e2b2430d48307f5ed, type: 3}
-    - {fileID: 21300000, guid: 20bfb3517764c4a8695ebfd227ca168d, type: 3}
-    - {fileID: 21300000, guid: aa35fd65e2ad9459bbecbd6cf095f175, type: 3}
-    animationFps: 6
-  attack:
-    frames:
-    - {fileID: 21300000, guid: e5950061ab53a44eb941258701ecf317, type: 3}
-    - {fileID: 21300000, guid: 4c1bc6667634a481ba3d0ba65b63f01e, type: 3}
-    - {fileID: 21300000, guid: bab3f95e814b64aa3a697479b6f86d2a, type: 3}
-    overlayFrames: []
-    animationFps: 18
-    hitFrameIndex: 1
-    endFrameDuration: 0.12
-    queueExpireTimeout: 0.15
-    castFrameIndex: 0
-    castEffectPrefab: {fileID: 0}
-    castEffectOffset: {x: 0, y: 0}
-    castEffectScale: 1
-    castSound: {fileID: 0}
-    hitEffectPrefab: {fileID: 0}
-    hitEffectOffset: {x: 0, y: 0}
-    hitEffectScale: 1
-    hitSound: {fileID: 0}
-    projectilePrefab: {fileID: 0}
-    projectileLaunchOffset: {x: 0, y: 0}
-    projectileScale: 1
-  tier1Pool: {fileID: 0}
-  tier2Pool: {fileID: 0}
-  tier3Pool: {fileID: 0}
   attackFrameOverlayRenderer: {fileID: 0}
   attackOverlayMaterial: {fileID: 0}
   basicAttackPower: 3
-  variantCheckInterval: 4
 --- !u!212 &834607637
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -4385,9 +4157,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a53d75aa9ab74fefbad60a7f5cf781bf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveDistance: 0.2
-  moveOutDuration: 0.14
-  moveBackDuration: 0.05
   stageLayout: {fileID: 11400000, guid: a11674de15554c8586ea98384fdb2df5, type: 2}
 --- !u!114 &1500000006
 MonoBehaviour:
@@ -4401,65 +4170,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 62b5dd37ee8544539f0f8cab19bcd0d9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  motionProfile: {fileID: 0}
-  idle:
-    frames:
-    - {fileID: 21300000, guid: f4122e8ab5ef4aec98b110a9a1a65540, type: 3}
-    - {fileID: 21300000, guid: 6d135dd7c6eb4f6f9b2d30aa95e88bb8, type: 3}
-    - {fileID: 21300000, guid: 8d7c4fa569af4ce584aea980f70d741a, type: 3}
-    - {fileID: 21300000, guid: 49197abdac394f57ac0c2a09b53d9ee0, type: 3}
-    animationFps: 6
-  idleA:
-    frames:
-    - {fileID: 21300000, guid: ba100b5afc1c4cf7856f7a797263d4de, type: 3}
-    - {fileID: 21300000, guid: 190bddd8503b4a8ab644d684b7785d3b, type: 3}
-    - {fileID: 21300000, guid: 1602e32832e94d578175c8a0f827a2b5, type: 3}
-    - {fileID: 21300000, guid: ad2a566ede094ddc9a5bb8ec8a831ff5, type: 3}
-    animationFps: 6
-  idleB:
-    frames:
-    - {fileID: 21300000, guid: df619cc01e1f4ab7a8027acc2eb3192d, type: 3}
-    - {fileID: 21300000, guid: bb3933c57c234c49afae6b811d30fcf9, type: 3}
-    - {fileID: 21300000, guid: b4ca52ad8f3e458894fdec32a2b49230, type: 3}
-    animationFps: 4
-  idleC:
-    frames:
-    - {fileID: 21300000, guid: 4324f7f22d444ac487112e01df69a349, type: 3}
-    - {fileID: 21300000, guid: a5b571142f784fb186791b670f69772a, type: 3}
-    - {fileID: 21300000, guid: 0b655c4d87d848bb853e1cc6ad13775f, type: 3}
-    - {fileID: 21300000, guid: 3233338b7f7f4dde84db351a4c6652e7, type: 3}
-    - {fileID: 21300000, guid: 294fa1b4f02f4ffd8b0940fd8fdedd9a, type: 3}
-    - {fileID: 21300000, guid: 818e0dd753394621ae710a66a5fad2a0, type: 3}
-    animationFps: 6
-  attack:
-    frames:
-    - {fileID: 21300000, guid: c33f718582be41a5a3a6a744411a5aab, type: 3}
-    - {fileID: 21300000, guid: 331ec9194c474153ba79a102a97dfa6d, type: 3}
-    - {fileID: 21300000, guid: 34866bf00b8846768783d3263645aa4d, type: 3}
-    overlayFrames: []
-    animationFps: 18
-    hitFrameIndex: 1
-    endFrameDuration: 0.12
-    queueExpireTimeout: 0.15
-    castFrameIndex: 0
-    castEffectPrefab: {fileID: 0}
-    castEffectOffset: {x: 0, y: 0}
-    castEffectScale: 1
-    castSound: {fileID: 0}
-    hitEffectPrefab: {fileID: 0}
-    hitEffectOffset: {x: 0, y: 0}
-    hitEffectScale: 1
-    hitSound: {fileID: 0}
-    projectilePrefab: {fileID: 0}
-    projectileLaunchOffset: {x: 0, y: 0}
-    projectileScale: 1
-  tier1Pool: {fileID: 11400000, guid: 58e789b616554da690b8e287516a0fe4, type: 2}
-  tier2Pool: {fileID: 11400000, guid: 5b0086c1a12343fc8c99cc976eee1fac, type: 2}
-  tier3Pool: {fileID: 0}
+  motionProfile: {fileID: 11400000, guid: 6d7fbc5585ad142b9842a487589b482c, type: 2}
   attackFrameOverlayRenderer: {fileID: 0}
   attackOverlayMaterial: {fileID: 0}
   basicAttackPower: 3
-  variantCheckInterval: 4
 --- !u!114 &1500000007
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4570,24 +4284,6 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 357fc874410294914a3a95033c0191af, type: 2}
   - {fileID: 11400000, guid: 75385727eeaea49959fd9576bb3196d5, type: 2}
   - {fileID: 11400000, guid: eca2326ede91343878ef2dd36059bf82, type: 2}
-  idle:
-    frames:
-    - {fileID: 21300000, guid: e604348805ed4bfca390f5710d90e771, type: 3}
-    - {fileID: 21300000, guid: d401c16d0ca94215bd670e9d94791577, type: 3}
-    - {fileID: 21300000, guid: d4d33c4bccfb4579ad701ec9c98ddceb, type: 3}
-    - {fileID: 21300000, guid: 6d371dd427724d60a29b6bd81ce9be3d, type: 3}
-    animationFps: 3
-  hit:
-    frames:
-    - {fileID: 21300000, guid: 2d1030e06585412c90742c9e7eb67dd5, type: 3}
-    - {fileID: 21300000, guid: b2af80d361ff473a9f3076c9f2846db1, type: 3}
-    holdFrame: 0
-    recoveryFrame: 1
-    recoveryDuration: 0.12
-    holdTimeout: 0.2
-    shakeStrength: 0.04
-    shakeFrequency: 35
-    shakeDecayDuration: 0.15
 --- !u!4 &1500000104
 Transform:
   m_ObjectHideFlags: 0
@@ -4649,12 +4345,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   anchor: {fileID: 1439357124}
-  randomHorizontalJitter: 0.2
-  riseDistance: 0.4
-  duration: 0.6
-  textColor: {r: 1, g: 0, b: 0, a: 1}
-  fontSize: 3
-  sortingOrder: 10
+  fontAsset: {fileID: 11400000, guid: 8b0950d02f08e461885e337917d59bc9, type: 2}
+  fontMaterialPreset: {fileID: 2100000, guid: 98fde137ffb644c95b361dbbb22b3058, type: 2}
   minSpawnInterval: 0.05
   poolSize: 8
 --- !u!114 &1500000108
@@ -4669,7 +4361,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 450d6ff224ad40e79f52f37c8be75379, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  defaultEffectPrefab: {fileID: 1000000, guid: 45a18ea5b786491d8064f8ef5b7e6dc0, type: 3}
+  prewarmEffectPrefab: {fileID: 1000000, guid: 45a18ea5b786491d8064f8ef5b7e6dc0, type: 3}
   impactPoint: {fileID: 1500000202}
   spawnJitterX: 0.08
   spawnJitterY: 0.08

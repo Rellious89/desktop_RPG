@@ -17,6 +17,12 @@ namespace Common
     /// tierScaleRoutine)을 통해서만 해당 Transform의 localScale을 건드리므로 동시에 두 연출이 같은
     /// Transform을 겹쳐 제어하는 일이 없다. 새 연출이 들어오면 진행 중이던 연출을 멈추고 그 순간의
     /// 실제 화면 스케일을 시작값으로 삼아 새 목표까지 이어간다.
+    ///
+    /// 콤보 텍스트 문자열은 <see cref="FormatComboText"/> 한 곳에서만 만든다 - 증가/즉시 동기화/리셋
+    /// 세 경로가 전부 이 메서드를 거치므로 표시 형식이 서로 어긋날 수 없다. 형식 자체는 Inspector의
+    /// Combo Text Format({count}/{label} 치환)으로 바꿀 수 있고, 기본값은 숫자가 앞에 오는
+    /// "{count} {label}"이다. RectTransform의 Anchor/Pivot과 연출 파라미터는 건드리지 않는다 -
+    /// 오른쪽 정렬 HUD에서 숫자가 길어져도 기준선이 그대로 유지된다.
     /// </summary>
     [DisallowMultipleComponent]
     public class ComboTierPresenter : MonoBehaviour
@@ -27,6 +33,13 @@ namespace Common
 
         [Header("Label")]
         [SerializeField] private string comboLabel = "COMBO";
+
+        [Tooltip("콤보 텍스트 표시 형식. {count}는 콤보 수치, {label}은 위 Combo Label로 치환된다. " +
+                 "기본값 \"{count} {label}\"이면 \"123 Combo\"처럼 숫자가 앞에 온다. 순서를 바꾸고 싶으면 " +
+                 "\"{label} {count}\"처럼 적으면 되고, 비워두면 기본값으로 되돌아간다.")]
+        [SerializeField] private string comboTextFormat = DefaultComboTextFormat;
+
+        private const string DefaultComboTextFormat = "{count} {label}";
 
         [Header("Tiers (minCombo 오름차순 - 자동 정렬됨)")]
         [SerializeField]
@@ -157,7 +170,7 @@ namespace Common
             currentTierIndex = newTierIndex;
             tierEstablished = true;
 
-            if (comboText != null) comboText.text = $"{comboLabel} {combo}";
+            if (comboText != null) comboText.text = FormatComboText(combo);
             if (tierText != null) tierText.text = tier.tierName;
 
             SetVisible(true);
@@ -201,7 +214,7 @@ namespace Common
 
             if (comboText != null)
             {
-                comboText.text = $"{comboLabel} {combo}";
+                comboText.text = FormatComboText(combo);
                 comboText.rectTransform.localScale = RestScale(baseComboScale, tier);
                 SetColorPreserveAlpha(comboText, tier.textColor, baseComboAlpha);
             }
@@ -229,7 +242,7 @@ namespace Common
 
             if (comboText != null)
             {
-                comboText.text = $"{comboLabel} 0";
+                comboText.text = FormatComboText(0);
                 comboText.rectTransform.localScale = baseComboScale;
                 SetColorPreserveAlpha(comboText, normalTier.textColor, baseComboAlpha);
             }
@@ -239,6 +252,15 @@ namespace Common
                 tierText.rectTransform.localScale = baseTierScale;
                 SetColorPreserveAlpha(tierText, normalTier.textColor, baseTierAlpha);
             }
+        }
+
+        /// <summary>콤보 텍스트를 만드는 유일한 지점 - UpdateForCombo/SyncImmediate/ApplyResetState가
+        /// 모두 이 메서드를 거치므로 표시 형식이 세 곳에서 어긋날 수 없다. comboTextFormat이 비어
+        /// 있으면(Inspector에서 실수로 지운 경우) 기본 형식으로 조용히 되돌아간다.</summary>
+        private string FormatComboText(int count)
+        {
+            string format = string.IsNullOrWhiteSpace(comboTextFormat) ? DefaultComboTextFormat : comboTextFormat;
+            return format.Replace("{count}", count.ToString()).Replace("{label}", comboLabel);
         }
 
         private void SetVisible(bool visible)

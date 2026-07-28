@@ -6,8 +6,9 @@ namespace Character
     /// <summary>
     /// 공격 모션 1개(프레임 배열 + 재생 타이밍)를 담는 독립 에셋. 여러 ComboTierAttackPool이 같은
     /// 에셋을 참조로 공유할 수 있다 - 데이터를 복제하지 않으므로 이 에셋을 수정하면 그것을 참조하는
-    /// 모든 풀에 즉시 반영된다. 필드 구성은 기존 PlayerCharacterAnimator.AttackAnimation과 동일하다
-    /// (0번 프레임이 Windup 시작, hitFrameIndex가 타격 프레임, 그 이후가 Recovery).
+    /// 모든 풀에 즉시 반영된다. 0번 프레임이 Windup 시작, hitFrameIndex가 타격 프레임, 그 이후가
+    /// Recovery다. 공격 하나의 Cast/Hit 연출(이펙트·사운드·발사체)까지 전부 이 에셋이 단독으로
+    /// 소유한다 - 씬 컴포넌트가 값을 대신 채워 넣는 fallback은 없다.
     /// </summary>
     [CreateAssetMenu(fileName = "AttackMotionDefinition", menuName = "Character/Attack Motion Definition")]
     public class AttackMotionDefinition : ScriptableObject, IAttackMotion
@@ -59,7 +60,8 @@ namespace Character
         [SerializeField] private AudioClip castSound;
 
         [Header("Hit Presentation")]
-        [Tooltip("이 공격의 Hit Frame에서 사용할 이펙트 프리팹. 런타임 연결 전에도 Motion Editor에서 배치 기준으로 사용한다.")]
+        [Tooltip("이 공격의 Hit Frame에서 사용할 이펙트 프리팹. 비어 있으면 이 공격에는 타격 이펙트가 없다 " +
+                 "(씬에서 대신 생성해주는 기본 이펙트는 없다). Motion Editor에서도 같은 값을 배치 기준으로 쓴다.")]
         [SerializeField] private GameObject hitEffectPrefab;
 
         [Tooltip("선택한 몬스터의 Receive Point를 기준으로 더할 이펙트 위치(월드 유닛)")]
@@ -68,7 +70,8 @@ namespace Character
         [Min(0.01f)]
         [SerializeField] private float hitEffectScale = 1f;
 
-        [Tooltip("이 공격의 Hit Frame에서 사용할 사운드. 비어 있으면 씬 기본 Hit SFX(AudioManager.hitClip)로 대체된다.")]
+        [Tooltip("이 공격의 Hit Frame에서 사용할 사운드. 비어 있으면 이 공격에는 타격음이 없다 " +
+                 "(씬에서 대신 재생해주는 기본 Hit 클립은 없다).")]
         [SerializeField] private AudioClip hitSound;
 
         [Header("Projectile")]

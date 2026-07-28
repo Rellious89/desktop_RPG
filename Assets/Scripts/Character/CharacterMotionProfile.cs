@@ -5,9 +5,11 @@ using UnityEngine;
 namespace Character
 {
     /// <summary>
-    /// 캐릭터 한 종의 애니메이션과 공격 이동 제작값을 함께 보관하는 에셋.
-    /// Motion Editor가 이 에셋을 편집하고, 런타임 컴포넌트는 연결된 프로필이 있을 때만
-    /// 프로필 값을 사용한다. 프로필이 비어 있으면 기존 Inspector 직렬화 값을 그대로 사용한다.
+    /// 캐릭터 한 종의 애니메이션과 공격 이동 제작값을 함께 보관하는 에셋 - 캐릭터 모션 제작
+    /// 데이터의 <b>유일한 원천</b>이다. Motion Editor가 이 에셋을 편집하고, 런타임 컴포넌트
+    /// (PlayerCharacterAnimator/AttackMovement)는 이 값만 읽는다. 씬 컴포넌트에 같은 값을 다시
+    /// 직렬화해두는 fallback 경로는 없다 - 프로필이 비어 있으면 해당 캐릭터는 조용히 임시
+    /// 데이터로 동작하는 대신 명시적인 오류를 남기고 비활성화된다.
     /// </summary>
     [CreateAssetMenu(fileName = "CharacterMotionProfile", menuName = "Character/Character Motion Profile")]
     public class CharacterMotionProfile : ScriptableObject
@@ -30,8 +32,6 @@ namespace Character
         [Serializable]
         public class AttackMovementSettings
         {
-            [Tooltip("켜면 AttackMovement 컴포넌트의 Inspector 값 대신 이 프로필 값을 사용한다.")]
-            [SerializeField] private bool overrideComponentValues = true;
             [Tooltip("Positive: move forward. Negative: move backward. Zero: no movement.")]
             [SerializeField] private float moveDistance = 0.2f;
             [Min(0.001f)]
@@ -39,21 +39,16 @@ namespace Character
             [Min(0.001f)]
             [SerializeField] private float moveBackDuration = 0.05f;
 
-            public bool OverrideComponentValues => overrideComponentValues;
             public float MoveDistance => moveDistance;
             public float MoveOutDuration => Mathf.Max(0.001f, moveOutDuration);
             public float MoveBackDuration => Mathf.Max(0.001f, moveBackDuration);
         }
 
+        /// <summary>이 캐릭터 자신의 표시 보정만 담는다. 상대(몬스터) 표시는 전적으로
+        /// MonsterMotionProfile이, 두 액터의 기본 서 있는 위치는 공용 CombatStageLayout이 담당한다.</summary>
         [Serializable]
         public class PreviewSettings
         {
-            // targetIdleSprite/targetHitSprite: 몬스터 프로필이 도입되기 전 남은 미사용 레거시 필드.
-            // 지금은 대상(몬스터) 표시를 MonsterMotionProfile이 전담하므로 어디서도 읽지 않는다.
-            // 기존에 값이 들어간 에셋이 있을 수 있어 필드/데이터는 삭제하지 않는다.
-            [SerializeField] private Sprite targetIdleSprite;
-            [SerializeField] private Sprite targetHitSprite;
-
             [Header("Actor Presentation")]
             [Tooltip("Combat Stage Layout의 Character Slot Position에 더할 이 캐릭터만의 보정 위치(로컬 유닛). " +
                      "Motion Editor Preview와 런타임(AttackMovement) 양쪽에서 동일하게 쓰인다.")]
@@ -64,23 +59,9 @@ namespace Character
             [Min(0.05f)]
             [SerializeField] private float characterScale = 1f;
 
-            // targetOffset/targetScale: 예전에는 "캐릭터-몬스터 사이 기본 거리"/"몬스터를 이 배율만큼
-            // 추가로 더 키워서 보여주기"를 캐릭터 프로필이 들고 있었다. 전자는 공용 CombatStageLayout.
-            // MonsterSlotPosition으로, 후자는 몬스터 자신의 Actor Scale로 이전됐다 - 각 액터는 이제 자기
-            // 표시 보정만 관리한다. 기존 데이터 보존을 위해 필드는 남기되 더 이상 계산에 쓰지 않는다.
-            [SerializeField] private Vector2 targetOffset = new Vector2(1.15f, 0f);
-            [Min(0.05f)]
-            [SerializeField] private float targetScale = 1f;
-
-            public Sprite TargetIdleSprite => targetIdleSprite;
-            public Sprite TargetHitSprite => targetHitSprite;
             public Vector2 ActorOffset => characterOffset;
             public Vector2 ReceivePointOffset => receivePointOffset;
             public float ActorScale => Mathf.Max(0.05f, characterScale);
-            [Obsolete("CombatStageLayout.MonsterSlotPosition으로 대체됨 - 더 이상 배치 계산에 쓰이지 않는다.")]
-            public Vector2 TargetOffset => targetOffset;
-            [Obsolete("몬스터 자신의 MonsterMotionProfile.Preview.ActorScale로 대체됨 - 더 이상 배치 계산에 쓰이지 않는다.")]
-            public float TargetScale => Mathf.Max(0.05f, targetScale);
         }
 
         [Header("Identity")]
@@ -118,5 +99,21 @@ namespace Character
         public ComboTierAttackPool Tier3Pool => tier3Pool;
         public AttackMovementSettings AttackMovement => attackMovement;
         public PreviewSettings Preview => preview;
+
+        /// <summary>
+        /// 이 프로필로 캐릭터를 실제로 구동할 수 있는지 판정하는 <b>단일 규칙</b>. 프로필이 연결돼
+        /// 있고 Base Idle에 재생 가능한 프레임이 하나 이상 있어야 한다(공격 풀은 없어도 Idle은
+        /// 돌아가므로 여기서는 보지 않는다 - PlayerCharacterAnimator가 따로 오류를 남긴다).
+        ///
+        /// PlayerCharacterAnimator와 AttackMovement가 <b>반드시 이 메서드를 함께</b> 써야 한다.
+        /// 각자 다른 기준(예: 한쪽은 null만, 다른 쪽은 Base Idle까지)으로 판정하면 "프로필은 있지만
+        /// Base Idle이 비어 있는" 캐릭터가 애니메이션 없이 이동만 하는 상태로 남는다.
+        /// </summary>
+        public static bool IsPlayable(CharacterMotionProfile profile)
+        {
+            return profile != null
+                   && profile.BaseIdle != null
+                   && profile.BaseIdle.Frames.Length > 0;
+        }
     }
 }

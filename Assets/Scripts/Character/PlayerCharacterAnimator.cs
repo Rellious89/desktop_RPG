@@ -7,8 +7,9 @@ using UnityEngine;
 namespace Character
 {
     /// <summary>
-    /// 기본 Idle 루프를 재생하다가, 일정 주기마다 1/n 확률로 Idle 변형(a/b/c) 중 하나를
-    /// 한 번 재생하고 다시 기본 Idle로 돌아온다. 변형 재생이 끝나면 다시 주기를 기다린 뒤 재판정한다.
+    /// 기본 Idle(프로필의 Base Idle) 루프를 재생하다가, Idle Event Check Interval마다 Idle Event
+    /// Chance 확률로 프로필에 등록된 Idle Event 중 하나를 균등 확률로 골라 한 번 재생하고 다시 기본
+    /// Idle로 돌아온다. Idle Event 재생이 끝나면 다시 주기를 기다린 뒤 재판정한다.
     ///
     /// 공격은 키 입력 1회 = 타격 1회로 정확히 대응된다. 키 입력마다 대기열(pendingAttacks)에 하나씩
     /// 쌓이고, 공격 클립을 0번 프레임부터 hitFrameIndex까지 재생(Windup)한 뒤 타격(HitPoint)이
@@ -17,8 +18,8 @@ namespace Character
     /// 타격 이후 대기 중인 입력이 있으면 즉시 Windup을 재시작(루프)하고, 없으면 hitFrameIndex
     /// 다음 프레임부터 마지막 프레임까지 이어서 재생(Recovery)한 뒤 Idle로 돌아간다.
     ///
-    /// 각 애니메이션은 프레임 낱장 Sprite를 Inspector에서 배열로 직접 받는다(아틀라스 런타임 슬라이싱
-    /// 아님). 프레임 수는 배열 길이(frames.Length)가 그대로 정답이라 별도로 입력받지 않는다.
+    /// 각 애니메이션은 프레임 낱장 Sprite를 프로필 에셋에서 배열로 직접 받는다(아틀라스 런타임
+    /// 슬라이싱 아님). 프레임 수는 배열 길이(frames.Length)가 그대로 정답이라 별도로 입력받지 않는다.
     /// Pivot/PPU도 각 스프라이트의 임포트 설정에 이미 들어있어서 여기서 따로 지정하지 않는다.
     ///
     /// 공격 가능한 Target이 하나도 없으면(Target.HasAttackableTarget == false) 새 키 입력을 아예
@@ -27,15 +28,18 @@ namespace Character
     /// Windup으로 이어갈지 판단할 때도 다시 한번 확인해서 - 마지막 남은 Target을 죽인 타격이었다면
     /// 그 뒤에 밀려 있던 예약 공격(pendingAttacks)은 전부 버리고 Recovery로 빠진다.
     ///
-    /// 콤보 티어별 공격 모션 풀: tier1/2/3Pool(ComboTierAttackPool 에셋) 중 ComboManager.CurrentTier에
-    /// 대응하는 풀에서 매 StartWindup() 시점에 모션을 하나 완전 랜덤으로 뽑아 그 사이클(Windup ->
-    /// Strike -> Recovery) 동안 그대로 쓴다 - 입력 처리/대기열/전환 규칙은 전혀 건드리지 않고 "어떤
-    /// 프레임 배열을 재생할지"만 매 사이클마다 다시 고른다(직전 모션과 같아도 그대로 허용). 상위 티어
-    /// 풀이 비어 있으면 한 단계씩 낮은 티어로 폴백하고(Tier3 -> Tier2 -> Tier1), 레거시 단일 attack
-    /// 필드는 tier1Pool이 비어 있을 때만 Tier 1 풀의 유일한 항목으로 자동 편입된다(기존에 이미 붙여둔
-    /// 스프라이트를 잃지 않기 위한 하위 호환). 모션 데이터 자체는 AttackMotionDefinition/
-    /// ComboTierAttackPool ScriptableObject 에셋에 있고, 여기서는 IAttackMotion 인터페이스로만
-    /// 다뤄서 레거시 AttackAnimation과 동일한 재생 루프를 공유한다.
+    /// 콤보 티어별 공격 모션 풀: 프로필의 Tier1/2/3 Pool(ComboTierAttackPool 에셋) 중
+    /// ComboManager.CurrentTier에 대응하는 풀에서 매 StartWindup() 시점에 모션을 하나 완전 랜덤으로
+    /// 뽑아 그 사이클(Windup -> Strike -> Recovery) 동안 그대로 쓴다 - 입력 처리/대기열/전환 규칙은
+    /// 전혀 건드리지 않고 "어떤 프레임 배열을 재생할지"만 매 사이클마다 다시 고른다(직전 모션과 같아도
+    /// 그대로 허용). 상위 티어 풀이 비어 있으면 한 단계씩 낮은 티어로 폴백한다(Tier3 -> Tier2 -> Tier1).
+    ///
+    /// <b>모션 제작 데이터의 원천은 CharacterMotionProfile 하나뿐이다.</b> Idle/Idle Event/공격 풀/
+    /// Attack Movement 값은 전부 프로필 에셋에 있고, 이 컴포넌트는 그 값을 읽어 재생만 한다 - 같은
+    /// 값을 씬 Inspector에 다시 직렬화해두는 경로는 없다. 프로필이 비어 있거나 재생 가능한 Base Idle이
+    /// 없으면 임시 데이터로 조용히 동작하지 않고 오류를 남긴 뒤 스스로 비활성화된다.
+    /// 공격 모션 데이터는 AttackMotionDefinition/ComboTierAttackPool 에셋에 있고, 여기서는
+    /// IAttackMotion 인터페이스로만 다룬다.
     /// </summary>
     [RequireComponent(typeof(SpriteRenderer))]
     [RequireComponent(typeof(FlashOnCue))]
@@ -59,94 +63,6 @@ namespace Character
         /// <summary>공격이 끝나고 Idle로 돌아가는 순간 발생.</summary>
         public static event Action AttackEnded;
 
-        [System.Serializable]
-        public class FrameAnimation
-        {
-            public Sprite[] frames;
-
-            [Tooltip("이 애니메이션의 프레임 재생 속도(초당 프레임 전환 횟수)")]
-            public float animationFps = 6f;
-        }
-
-        /// <summary>
-        /// 레거시 단일 슬롯용 공격 애니메이션 데이터. 0번 프레임이 항상 시작(Windup)이고,
-        /// hitFrameIndex가 타격 프레임, 그 이후부터 마지막 프레임까지가 복귀(Recovery)다. 프레임
-        /// 개수는 frames.Length 그대로다. IAttackMotion을 구현해서 ScriptableObject 기반
-        /// AttackMotionDefinition과 같은 재생 루프를 공유한다.
-        /// </summary>
-        [System.Serializable]
-        public class AttackAnimation : IAttackMotion
-        {
-            public Sprite[] frames;
-
-            [Header("Frame-synced Overlay")]
-            [Tooltip("공격 본체 frames와 같은 인덱스를 사용하는 오버레이 스프라이트. 비어 있거나 해당 요소가 null이면 그 프레임에는 오버레이가 없다.")]
-            public Sprite[] overlayFrames = Array.Empty<Sprite>();
-
-            [Header("Playback")]
-            [Tooltip("Windup/Recovery 프레임 재생 속도(초당 프레임 전환 횟수)")]
-            public float animationFps = 18f;
-
-            [Tooltip("이 프레임(0부터)에 도달하면 타격 판정(HitPoint)이 발생한다. " +
-                     "실제 프레임 수를 넘으면 마지막 프레임으로 자동 보정된다.")]
-            [Min(0)]
-            public int hitFrameIndex = 1;
-
-            [Header("Recovery (hitFrameIndex 다음 프레임부터 마지막 프레임까지)")]
-            [Tooltip("마지막 프레임에 도달한 뒤 그 프레임을 유지하는 시간(초)")]
-            public float endFrameDuration = 0.12f;
-
-            [Header("Queue")]
-            [Tooltip("마지막 입력 이후 이 시간(초) 동안 새 입력이 없으면, 남아있는 예약(대기열)을 전부 취소하고 " +
-                     "진행 중인 재생만 마친 뒤 복귀한다. 0.15~0.25 권장")]
-            public float queueExpireTimeout = 0.15f;
-
-            [Header("Cast Presentation")]
-            public int castFrameIndex;
-            public GameObject castEffectPrefab;
-            public Vector2 castEffectOffset;
-            [Min(0.01f)] public float castEffectScale = 1f;
-            public AudioClip castSound;
-
-            [Header("Hit Presentation")]
-            public GameObject hitEffectPrefab;
-            public Vector2 hitEffectOffset;
-            [Min(0.01f)] public float hitEffectScale = 1f;
-            public AudioClip hitSound;
-
-            [Header("Projectile")]
-            [Tooltip("Cast Frame에서 발사할 발사체 prefab(루트에 ProjectileMover 필요). 비어 있으면 발사체 없이 " +
-                     "기존 근접 공격과 완전히 동일하게 동작한다.")]
-            public GameObject projectilePrefab;
-
-            [Tooltip("시전자 Actor Origin 기준 발사 위치(로컬 유닛). 캐릭터가 flipX 상태면 X가 좌우 반전된다.")]
-            public Vector2 projectileLaunchOffset;
-
-            [Min(0.01f)] public float projectileScale = 1f;
-
-            public Sprite[] Frames => frames ?? Array.Empty<Sprite>();
-            public Sprite[] OverlayFrames => overlayFrames ?? Array.Empty<Sprite>();
-            public float AnimationFps => animationFps;
-            public int HitFrameIndex => hitFrameIndex;
-            public float EndFrameDuration => endFrameDuration;
-            public float QueueExpireTimeout => queueExpireTimeout;
-
-            public int CastFrameIndex => castFrameIndex;
-            public GameObject CastEffectPrefab => castEffectPrefab;
-            public Vector2 CastEffectOffset => castEffectOffset;
-            public float CastEffectScale => Mathf.Max(0.01f, castEffectScale);
-            public AudioClip CastSound => castSound;
-
-            public GameObject HitEffectPrefab => hitEffectPrefab;
-            public Vector2 HitEffectOffset => hitEffectOffset;
-            public float HitEffectScale => Mathf.Max(0.01f, hitEffectScale);
-            public AudioClip HitSound => hitSound;
-
-            public GameObject ProjectilePrefab => projectilePrefab;
-            public Vector2 ProjectileLaunchOffset => projectileLaunchOffset;
-            public float ProjectileScale => Mathf.Max(0.01f, projectileScale);
-        }
-
         private const int IdleIndex = 0;
 
         /// <summary>attackFrameOverlayRenderer가 비어 있을 때 Awake에서 만들어 붙이는 자식 오브젝트 이름.</summary>
@@ -166,33 +82,10 @@ namespace Character
 
         private enum AttackPhase { None, Windup, Recovery }
 
-        [Header("Character Motion Profile (optional)")]
-        [Tooltip("연결하면 Idle/Idle Event/공격 풀/AttackMovement 제작값을 캐릭터별 프로필에서 가져온다. " +
-                 "비어 있으면 아래 기존 Inspector 값을 그대로 사용한다.")]
+        [Header("Character Motion Profile (필수)")]
+        [Tooltip("이 캐릭터의 Idle/Idle Event/공격 풀/Attack Movement 제작값을 담은 프로필 에셋 - 모션 " +
+                 "데이터의 유일한 원천이다. 비어 있으면 이 캐릭터는 오류를 남기고 비활성화된다.")]
         [SerializeField] private CharacterMotionProfile motionProfile;
-
-        [Header("Base Idle (계속 루프)")]
-        [SerializeField] private FrameAnimation idle;
-
-        [Header("Idle Variants (한 번만 재생, 동일 확률)")]
-        [SerializeField] private FrameAnimation idleA;
-        [SerializeField] private FrameAnimation idleB;
-        [SerializeField] private FrameAnimation idleC;
-
-        [Header("Attack (레거시 단일 슬롯)")]
-        [Tooltip("tier1Pool이 비어 있을 때만 Tier 1 풀의 유일한 항목으로 자동 사용된다(하위 호환용). " +
-                 "새로 작업할 때는 아래 tier1Pool 에셋에 직접 등록하는 것을 권장한다.")]
-        [SerializeField] private AttackAnimation attack;
-
-        [Header("Combo Tier Attack Pools (콤보 티어별 공격 모션 풀 에셋)")]
-        [Tooltip("Tier 0/1(Normal)에서 사용할 공격 모션 풀 에셋(ComboTierAttackPool). 비어 있으면 위 attack 필드를 자동으로 사용한다.")]
-        [SerializeField] private ComboTierAttackPool tier1Pool;
-
-        [Tooltip("Tier 2(Boost)에서 사용할 공격 모션 풀 에셋. 비어 있으면 Tier 1 풀로 폴백한다.")]
-        [SerializeField] private ComboTierAttackPool tier2Pool;
-
-        [Tooltip("Tier 3(Fever)에서 사용할 공격 모션 풀 에셋. 비어 있으면 Tier 2 -> Tier 1 순으로 폴백한다.")]
-        [SerializeField] private ComboTierAttackPool tier3Pool;
 
         [Header("Frame-synced Overlay")]
         [Tooltip("공격 프레임과 같은 인덱스의 오버레이 스프라이트를 그릴 자식 SpriteRenderer. 비워두면 Awake에서 " +
@@ -208,16 +101,15 @@ namespace Character
         [Tooltip("기본 공격 1회(타격 1번)당 적용할 데미지량. 강공격/치명타 등 추가 계산식은 아직 없다.")]
         [SerializeField] private int basicAttackPower = 5;
 
-        [Header("Timing")]
-        [SerializeField] private float variantCheckInterval = 4f;
-
         private SpriteRenderer spriteRenderer;
         private FlashOnCue flashOnCue;
         private HitEffectSpawner castEffectSpawner;
         private ProjectileSpawner projectileSpawner;
+
+        // [0] = Base Idle(항상 존재), [1..] = 프로필의 Idle Events. Awake에서 프로필 기준으로 한 번만 만든다.
         private RuntimeFrameAnimation[] animations;
-        private bool usesProfileIdleEvents;
-        private float profileIdleEventChance;
+        private float idleEventCheckInterval = 4f;
+        private float idleEventChance;
 
         private int activeAnimIndex;
         private int currentFrame;
@@ -273,6 +165,18 @@ namespace Character
             spriteRenderer = GetComponent<SpriteRenderer>();
             flashOnCue = GetComponent<FlashOnCue>();
             castEffectSpawner = GetComponent<HitEffectSpawner>();
+
+            if (!CharacterMotionProfile.IsPlayable(motionProfile))
+            {
+                // 조용히 임시 데이터로 동작시키지 않는다 - 프로필이 이 캐릭터의 유일한 모션 데이터
+                // 원천이므로, 없으면 무엇을 재생해야 할지 알 수 없다. 오류를 남기고 스스로 꺼져서
+                // 다른 캐릭터/시스템(입력, 콤보, 몬스터)에는 영향을 주지 않는다.
+                Debug.LogError($"[PlayerCharacterAnimator] '{name}': Character Motion Profile이 없거나 재생 가능한 " +
+                               "Base Idle 프레임이 없습니다. 이 캐릭터를 비활성화합니다 - Inspector의 Motion Profile을 확인하세요.", this);
+                enabled = false;
+                return;
+            }
+
             // 발사체를 쓰는 공격이 하나도 없으면 이 스포너는 아무 일도 하지 않는다(풀도 만들지 않는다) -
             // 기존 씬/프리팹을 손대지 않아도 되도록 없으면 여기서 붙인다. Inspector에서 prewarmCount를
             // 조정하고 싶으면 미리 직접 붙여두면 된다.
@@ -281,62 +185,64 @@ namespace Character
             EnsureAttackFrameOverlay();
             BuildRuntimeConfiguration();
 
-            ComboTierAttackPool resolvedTier1Pool = motionProfile != null ? motionProfile.Tier1Pool : tier1Pool;
-            ComboTierAttackPool resolvedTier2Pool = motionProfile != null ? motionProfile.Tier2Pool : tier2Pool;
-            ComboTierAttackPool resolvedTier3Pool = motionProfile != null ? motionProfile.Tier3Pool : tier3Pool;
+            BuildResolvedPool(resolvedTier1, motionProfile.Tier1Pool);
+            BuildResolvedPool(resolvedTier2, motionProfile.Tier2Pool);
+            BuildResolvedPool(resolvedTier3, motionProfile.Tier3Pool);
 
-            BuildResolvedPool(resolvedTier1, resolvedTier1Pool);
-            if (resolvedTier1.Count == 0 && attack != null)
+            if (resolvedTier1.Count == 0)
             {
-                // 하위 호환: tier1Pool 에셋을 아직 연결하지 않았다면, 기존에 이미 붙여둔 레거시 attack
-                // 필드를 Tier 1 풀의 유일한 항목으로 그대로 쓴다 - 이미 배정된 스프라이트를 잃지 않는다.
-                attack.frames = SafeFrames(attack.frames);
-                if (attack.frames.Length > 0) resolvedTier1.Add(attack);
+                // Idle은 재생할 수 있으므로 컴포넌트를 끄지는 않는다 - 공격만 영영 시작되지 않기 때문에
+                // 무슨 일이 벌어지는지 알 수 있게 명시적으로 남긴다.
+                Debug.LogError($"[PlayerCharacterAnimator] '{name}': 프로필의 Tier 1 Attack Pool에 재생 가능한 공격 " +
+                               "모션이 하나도 없습니다 - 이 캐릭터는 공격하지 않습니다.", motionProfile);
             }
-            BuildResolvedPool(resolvedTier2, resolvedTier2Pool);
-            BuildResolvedPool(resolvedTier3, resolvedTier3Pool);
 
             activeAnimIndex = IdleIndex;
             currentFrame = 0;
             ApplyFrame();
         }
 
-        private void BuildRuntimeConfiguration()
+#if UNITY_EDITOR
+        /// <summary>Play Mode에 들어가기 전에 Inspector에서 바로 알 수 있도록, 필수 데이터가 빠진
+        /// 상태를 Edit Mode에서 경고로 남긴다 - 런타임에는 Awake가 같은 조건을 오류로 처리하고
+        /// 컴포넌트를 비활성화한다.</summary>
+        private void OnValidate()
         {
-            if (motionProfile != null && motionProfile.BaseIdle != null && motionProfile.BaseIdle.Frames.Length > 0)
+            if (Application.isPlaying) return;
+
+            if (motionProfile == null)
             {
-                var runtimeAnimations = new List<RuntimeFrameAnimation>
-                {
-                    new RuntimeFrameAnimation(motionProfile.BaseIdle.Frames, motionProfile.BaseIdle.AnimationFps)
-                };
-
-                IReadOnlyList<CharacterMotionProfile.FrameClip> idleEvents = motionProfile.IdleEvents;
-                for (int i = 0; i < idleEvents.Count; i++)
-                {
-                    CharacterMotionProfile.FrameClip clip = idleEvents[i];
-                    if (clip == null || clip.Frames.Length == 0) continue;
-                    runtimeAnimations.Add(new RuntimeFrameAnimation(clip.Frames, clip.AnimationFps));
-                }
-
-                animations = runtimeAnimations.ToArray();
-                usesProfileIdleEvents = true;
-                profileIdleEventChance = motionProfile.IdleEventChance;
-                variantCheckInterval = motionProfile.IdleEventCheckInterval;
+                Debug.LogWarning($"[PlayerCharacterAnimator] '{name}': Character Motion Profile이 비어 있습니다 - " +
+                                 "Play Mode에서 이 캐릭터는 비활성화됩니다.", this);
                 return;
             }
-
-            animations = new[]
+            if (!CharacterMotionProfile.IsPlayable(motionProfile))
             {
-                new RuntimeFrameAnimation(SafeFrames(idle.frames), idle.animationFps),
-                new RuntimeFrameAnimation(SafeFrames(idleA.frames), idleA.animationFps),
-                new RuntimeFrameAnimation(SafeFrames(idleB.frames), idleB.animationFps),
-                new RuntimeFrameAnimation(SafeFrames(idleC.frames), idleC.animationFps),
-            };
-            usesProfileIdleEvents = false;
-            profileIdleEventChance = 0f;
+                Debug.LogWarning($"[PlayerCharacterAnimator] '{name}': 프로필 '{motionProfile.name}'에 Base Idle " +
+                                 "프레임이 없습니다 - Play Mode에서 이 캐릭터와 Attack Movement가 모두 비활성화됩니다.", this);
+            }
         }
+#endif
 
-        private static Sprite[] SafeFrames(Sprite[] frames) => frames ?? Array.Empty<Sprite>();
+        private void BuildRuntimeConfiguration()
+        {
+            var runtimeAnimations = new List<RuntimeFrameAnimation>
+            {
+                new RuntimeFrameAnimation(motionProfile.BaseIdle.Frames, motionProfile.BaseIdle.AnimationFps)
+            };
+
+            IReadOnlyList<CharacterMotionProfile.FrameClip> idleEvents = motionProfile.IdleEvents;
+            for (int i = 0; i < idleEvents.Count; i++)
+            {
+                CharacterMotionProfile.FrameClip clip = idleEvents[i];
+                if (clip == null || clip.Frames.Length == 0) continue;
+                runtimeAnimations.Add(new RuntimeFrameAnimation(clip.Frames, clip.AnimationFps));
+            }
+
+            animations = runtimeAnimations.ToArray();
+            idleEventChance = motionProfile.IdleEventChance;
+            idleEventCheckInterval = motionProfile.IdleEventCheckInterval;
+        }
 
         /// <summary>pool 에셋에서 Frames가 비어 있는 항목을 제외하고 destination에 채운다(재생
         /// 불가능한 슬롯이 랜덤 선택에 걸리지 않도록). destination은 항상 먼저 비운 뒤 다시 채운다.
@@ -357,8 +263,9 @@ namespace Character
             }
         }
 
-        /// <summary>Tier3 -> Tier2 -> Tier1 순으로 폴백한다. resolvedTier1은 Awake에서 레거시 attack
-        /// 필드까지 반영된 뒤이므로, 하나라도 모션이 등록돼 있었다면 항상 최소 1개는 채워져 있다.</summary>
+        /// <summary>Tier3 -> Tier2 -> Tier1 순으로 폴백한다 - 상위 티어 풀이 비어 있으면 한 단계씩
+        /// 낮은 티어의 풀을 그대로 쓴다. Tier1까지 비어 있으면 Awake가 이미 오류를 남겼고, 여기서
+        /// 돌려주는 빈 리스트를 BeginAttackSession()이 보고 공격 자체를 시작하지 않는다.</summary>
         private List<IAttackMotion> GetPoolForTier(int tier)
         {
             if (tier >= 3)
@@ -403,7 +310,7 @@ namespace Character
             if (!playingVariant)
             {
                 variantTimer += Time.deltaTime;
-                if (variantTimer >= variantCheckInterval)
+                if (variantTimer >= idleEventCheckInterval)
                 {
                     variantTimer = 0f;
                     RollVariant();
@@ -766,18 +673,10 @@ namespace Character
         // ---- Idle / Idle 변형 ----
         private void RollVariant()
         {
-            int choice;
-            if (usesProfileIdleEvents)
-            {
-                if (animations.Length <= 1 || UnityEngine.Random.value > profileIdleEventChance) return;
-                choice = UnityEngine.Random.Range(1, animations.Length);
-            }
-            else
-            {
-                choice = UnityEngine.Random.Range(0, 4); // 기존 동작: 0 = idle 유지, 1/2/3 = a/b/c
-                if (choice == 0) return;
-                if (animations[choice].Frames.Length == 0) return;
-            }
+            // 등록된 Idle Event가 하나도 없으면(Base Idle 하나뿐이면) 아무것도 하지 않고, Chance 판정에
+            // 성공하면 Idle Event 중 하나를 완전 균등 확률로 골라 한 번 재생한다.
+            if (animations.Length <= 1 || UnityEngine.Random.value > idleEventChance) return;
+            int choice = UnityEngine.Random.Range(1, animations.Length);
 
             playingVariant = true;
             activeAnimIndex = choice;
