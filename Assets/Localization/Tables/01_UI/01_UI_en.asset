@@ -22,6 +22,10 @@ MonoBehaviour:
     m_Localized: 'Kill Count : {0}'
     m_Metadata:
       m_Items: []
+  - m_Id: 32483256033280
+    m_Localized: Combo
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
