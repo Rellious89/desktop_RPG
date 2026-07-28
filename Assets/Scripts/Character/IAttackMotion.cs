@@ -32,5 +32,17 @@ namespace Character
         Vector2 HitEffectOffset { get; }
         float HitEffectScale { get; }
         AudioClip HitSound { get; }
+
+        /// <summary>Cast Frame에서 발사할 발사체 prefab. null이면 이 공격에는 발사체가 없고, 발사체 관련
+        /// 처리를 전부 건너뛴 기존 근접 공격과 완전히 동일하게 동작한다. 발사체 내부의 프레임/재생
+        /// 데이터는 공격 모션이 아니라 prefab 자신이 소유한다.</summary>
+        GameObject ProjectilePrefab { get; }
+
+        /// <summary>시전자 Actor Origin(캐릭터 Transform) 기준 발사 위치 로컬 오프셋. 캐릭터
+        /// SpriteRenderer가 flipX 상태면 X만 좌우 반전해서 적용한다.</summary>
+        Vector2 ProjectileLaunchOffset { get; }
+
+        /// <summary>발사체 prefab 원본 로컬 스케일에 곱할 배율.</summary>
+        float ProjectileScale { get; }
     }
 }

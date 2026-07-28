@@ -36,6 +36,29 @@ namespace Common
         /// 동작한다.</summary>
         public static bool HasAttackableTarget => aliveCount > 0;
 
+        /// <summary>
+        /// 현재 공격 가능한(Alive) Target 인스턴스를 하나 돌려준다 - 발사체처럼 "지금 조준할 대상"의
+        /// 실제 컴포넌트가 필요한 쪽을 위한 읽기 전용 조회다. 아무 상태도 바꾸지 않는다.
+        ///
+        /// <see cref="HasAttackableTarget"/>이 false면 곧바로 실패로 빠지므로(aliveCount만 확인) 대부분의
+        /// 프레임에서 순회 비용이 아예 없다. 지금 씬에는 몬스터가 한 마리뿐이라 "여러 마리 중 어느 것을
+        /// 고를지"는 아직 규칙이 없다 - 등록 순서상 먼저 걸리는 Alive 대상을 그대로 쓴다. 정식 타겟팅
+        /// 규칙이 생기면 이 메서드 하나만 바꾸면 된다.
+        /// </summary>
+        public static bool TryGetAttackableTarget(out Target target)
+        {
+            target = null;
+            if (aliveCount <= 0) return false;
+
+            foreach (Target candidate in activeTargets)
+            {
+                if (candidate == null || candidate.IsDefeated) continue;
+                target = candidate;
+                return true;
+            }
+            return false;
+        }
+
         [SerializeField] private string targetId;
         [SerializeField] private int maxDurability = 30;
 

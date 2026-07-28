@@ -39,7 +39,7 @@ namespace Common
 
         private void HandleLevelUp(int newLevel)
         {
-            ShowToast("LEVEL UP!");
+            ShowToast("레벨 업!");
         }
 
         /// <summary>다른 보상 토스트에도 재사용할 수 있는 진입점.</summary>

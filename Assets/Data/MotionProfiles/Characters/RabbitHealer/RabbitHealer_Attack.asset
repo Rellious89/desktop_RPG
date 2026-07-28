@@ -34,3 +34,6 @@ MonoBehaviour:
   hitEffectOffset: {x: 0, y: 0}
   hitEffectScale: 1
   hitSound: {fileID: 8300000, guid: 8b23b175a78d6b5458322e3a6c9905d0, type: 3}
+  projectilePrefab: {fileID: 1100000, guid: 9d2ff938c9ef4c0ca80a306596d957a3, type: 3}
+  projectileLaunchOffset: {x: -0.46, y: 1.53}
+  projectileScale: 1

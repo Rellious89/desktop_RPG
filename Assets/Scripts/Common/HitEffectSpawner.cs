@@ -192,6 +192,24 @@ namespace Common
             }
         }
 
+        /// <summary>
+        /// 이펙트가 생성될 기준 월드 위치를 계산해서 돌려준다(읽기 전용 - 아무것도 생성하지 않고 스포너
+        /// 상태도 바꾸지 않는다). 발사체의 도착 지점처럼 "피격 이펙트와 같은 기준점"이 필요한 쪽이
+        /// impactPoint 같은 내부 필드에 직접 의존하지 않도록 열어둔 API다.
+        ///
+        /// offset은 <see cref="Spawn"/>의 offsetOverride와 완전히 같은 규칙으로 해석된다 - impactPoint가
+        /// 있으면 그 로컬 좌표계 기준, 없으면 fallbackOffset에 더하는 월드 오프셋이다. 다만 Spawn이
+        /// 매번 더하는 랜덤 지터는 반영하지 않는다 - 지터는 피격 이펙트 내부 표현일 뿐이라 발사체가
+        /// 조준해야 할 기준점은 흔들리지 않아야 한다.
+        /// </summary>
+        public Vector3 GetImpactWorldPosition(Vector2 offset = default)
+        {
+            Vector3 baseOffset = new Vector3(offset.x, offset.y, 0f);
+            return impactPoint != null
+                ? impactPoint.TransformPoint(baseOffset)
+                : transform.position + (Vector3)fallbackOffset + baseOffset;
+        }
+
         private void ReturnToPool(HitEffectPop pop)
         {
             ReturnInstanceToPool(pop.gameObject);

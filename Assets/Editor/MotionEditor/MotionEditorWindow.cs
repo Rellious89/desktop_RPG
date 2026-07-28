@@ -100,6 +100,9 @@ namespace CharacterEditor
             public int HitFrame;
             public Sprite[] Frames;
             public Sprite[] OverlayFrames;
+            public GameObject ProjectilePrefab;
+            public Vector2 ProjectileLaunchOffset;
+            public float ProjectileScale;
         }
 
         [MenuItem("Tools/KeyBuddy/Motion Editor")]
@@ -651,7 +654,10 @@ namespace CharacterEditor
                 Fps = serialized.FindProperty("animationFps").floatValue,
                 HitFrame = serialized.FindProperty("hitFrameIndex").intValue,
                 Frames = ReadSpriteArray(serialized.FindProperty("frames")),
-                OverlayFrames = ReadSpriteArray(serialized.FindProperty("overlayFrames"))
+                OverlayFrames = ReadSpriteArray(serialized.FindProperty("overlayFrames")),
+                ProjectilePrefab = serialized.FindProperty("projectilePrefab").objectReferenceValue as GameObject,
+                ProjectileLaunchOffset = serialized.FindProperty("projectileLaunchOffset").vector2Value,
+                ProjectileScale = serialized.FindProperty("projectileScale").floatValue
             };
         }
 
@@ -721,6 +727,9 @@ namespace CharacterEditor
             // 본체 프레임 변경 여부로 단축 평가하지 않는다.
             changed |= AppendFrameChanges(changes, slot, before.Frames, after.Frames);
             changed |= AppendFrameChanges(changes, slot, before.OverlayFrames, after.OverlayFrames, "오버레이");
+            if (before.ProjectilePrefab != after.ProjectilePrefab) { changes.Add($"{slot}: 발사체 프리팹 변경"); changed = true; }
+            if (before.ProjectileLaunchOffset != after.ProjectileLaunchOffset) { changes.Add($"{slot}: 발사 위치 변경"); changed = true; }
+            if (!Mathf.Approximately(before.ProjectileScale, after.ProjectileScale)) { changes.Add($"{slot}: 발사체 크기 변경"); changed = true; }
             return changed;
         }
 
@@ -1683,6 +1692,30 @@ namespace CharacterEditor
             EditorGUILayout.PropertyField(attackObject.FindProperty("hitEffectScale"), new GUIContent("Effect Scale"));
             EditorGUILayout.PropertyField(attackObject.FindProperty("hitSound"), new GUIContent("Hit Sound"));
 
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField("Projectile Presentation", EditorStyles.boldLabel);
+            SerializedProperty projectilePrefab = attackObject.FindProperty("projectilePrefab");
+            SerializedProperty projectileLaunchOffset = attackObject.FindProperty("projectileLaunchOffset");
+            SerializedProperty projectileScale = attackObject.FindProperty("projectileScale");
+            EditorGUILayout.PropertyField(projectilePrefab, new GUIContent("Projectile Prefab"));
+            EditorGUILayout.PropertyField(projectileLaunchOffset, new GUIContent("Launch Offset", "Actor Origin 기준 로컬 X/Y. Preview의 청록색 Launch Point로 확인합니다."));
+            RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+            EditorGUILayout.PropertyField(projectileScale, new GUIContent("Projectile Scale"));
+            RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+            if (projectilePrefab.objectReferenceValue != null)
+            {
+                GameObject prefab = projectilePrefab.objectReferenceValue as GameObject;
+                if (prefab != null && prefab.GetComponent<ProjectileMover>() == null)
+                {
+                    EditorGUILayout.HelpBox("발사체 프리팹 루트에 ProjectileMover가 필요합니다.", MessageType.Error);
+                }
+                EditorGUILayout.HelpBox("발사체는 Cast Frame의 Launch Point에서 출발해 Hit Frame의 Receive Point에 도착합니다. 이미지의 오른쪽(+X)이 머리입니다.", MessageType.Info);
+                if (hit.intValue <= cast.intValue)
+                {
+                    EditorGUILayout.HelpBox("발사체를 표시하려면 Cast Frame이 Hit Frame보다 앞서야 합니다.", MessageType.Warning);
+                }
+            }
+
             DrawFrameSection(attackObject, frames, hit, cast, overlayFrames);
 
             if (frames.arraySize > 0 && (hit.intValue < 0 || hit.intValue >= frames.arraySize))
@@ -2210,6 +2243,30 @@ namespace CharacterEditor
             // Cast/Hit Presentation이다.
             Sprite overlaySprite = GetAttackOverlayFrame(attack, time);
             if (overlaySprite != null) DrawSprite(overlaySprite, previewZoom * characterScale, characterAnchor, Color.white);
+
+            // Projectile Preview: 런타임과 마찬가지로 Cast 순간의 캐릭터 위치에서 시작점을 스냅샷으로
+            // 잡고, 몬스터의 Receive Point + 공격별 Hit Effect Offset을 도착점으로 쓴다. Launch Offset은
+            // 캐릭터 Actor Scale을 상속하고, 도착점의 자식 앵커/오프셋은 몬스터 Actor Scale을 상속한다.
+            // 경로와 Launch Point는 타임라인 위치와 무관하게 항상 보여서 X/Y를 편집하며 바로 맞출 수 있다.
+            if (attack?.Attack != null && attack.Attack.ProjectilePrefab != null && monsterSprite != null)
+            {
+                float castTime = Mathf.Clamp(attack.Attack.CastFrameIndex, 0, Mathf.Max(0, attack.Frames.Length - 1))
+                                 / Mathf.Max(0.01f, attack.Fps);
+                float projectileHitTime = Mathf.Clamp(attack.HitFrame, 0, Mathf.Max(0, attack.Frames.Length - 1))
+                                          / Mathf.Max(0.01f, attack.Fps);
+                float moveXAtCast = EvaluateMovement(castTime, moveDistance, moveOut, moveBack);
+                Vector2 castCharacterAnchor = baseAnchor + WorldToScreen(
+                    characterSlot + characterActorOffset + new Vector2(moveXAtCast, 0f), worldToScreen);
+                Vector2 launchPoint = castCharacterAnchor + WorldToScreen(
+                    attack.Attack.ProjectileLaunchOffset * characterScale, worldToScreen);
+                Vector2 projectileTarget = baseAnchor + WorldToScreen(
+                    monsterSlot + monsterActorOffset
+                    + (receiveOffset + attack.Attack.HitEffectOffset) * monsterScale,
+                    worldToScreen);
+
+                DrawProjectilePreview(attack.Attack, time, castTime, projectileHitTime, launchPoint,
+                    projectileTarget, worldToScreen);
+            }
 
             bool exactCast = attack != null && attack.Attack != null
                 && GetFrameIndex(attack, time, false) == Mathf.Clamp(attack.Attack.CastFrameIndex, 0, attack.Frames.Length - 1);
@@ -2788,6 +2845,112 @@ namespace CharacterEditor
             const float size = 5f;
             EditorGUI.DrawRect(new Rect(anchor.x - size, anchor.y - 1f, size * 2f, 2f), color);
             EditorGUI.DrawRect(new Rect(anchor.x - 1f, anchor.y - size, 2f, size * 2f), color);
+        }
+
+        /// <summary>발사체 경로/시작점을 항상 표시하고, Cast~Hit 구간에는 프리팹의 현재 Sprite를 런타임과
+        /// 같은 정규화 진행도로 보간해 그린다. ProjectileSpriteAnimation이 있으면 frames/Fade 설정까지
+        /// 읽고, 없으면 첫 SpriteRenderer의 현재 Sprite를 단일 이미지로 사용한다.</summary>
+        private static void DrawProjectilePreview(AttackMotionDefinition attack, float time, float castTime, float hitTime,
+            Vector2 launchPoint, Vector2 targetPoint, float worldToScreen)
+        {
+            Color oldHandlesColor = Handles.color;
+            Handles.color = new Color(0.25f, 0.95f, 1f, 0.42f);
+            Handles.DrawAAPolyLine(2f, launchPoint, targetPoint);
+            Handles.color = oldHandlesColor;
+
+            Color launchColor = new Color(0.15f, 0.95f, 1f);
+            DrawMarker(launchPoint, launchColor);
+            GUI.Label(new Rect(launchPoint.x + 7f, launchPoint.y - 17f, 92f, 18f), "Launch Point", EditorStyles.miniLabel);
+
+            if (hitTime <= castTime || time < castTime || time >= hitTime) return;
+
+            float progress = Mathf.InverseLerp(castTime, hitTime, time);
+            GameObject prefab = attack.ProjectilePrefab;
+            if (prefab == null) return;
+
+            SpriteRenderer renderer;
+            Color tint;
+            Sprite sprite = GetProjectilePreviewSprite(prefab, progress, hitTime - castTime, out renderer, out tint);
+            if (sprite == null || renderer == null) return;
+
+            Vector2 projectilePoint = Vector2.Lerp(launchPoint, targetPoint, progress);
+            Vector2 direction = targetPoint - launchPoint;
+            float angle = direction.sqrMagnitude > Mathf.Epsilon
+                ? Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg
+                : 0f;
+
+            float prefabScale = GetRelativePreviewScale(renderer.transform, prefab.transform);
+            float spritePpu = Mathf.Max(0.01f, sprite.pixelsPerUnit);
+            float spriteZoom = worldToScreen / spritePpu
+                               * Mathf.Max(0.01f, attack.ProjectileScale)
+                               * prefabScale;
+            DrawRotatedSprite(sprite, spriteZoom, projectilePoint, tint, angle);
+        }
+
+        private static Sprite GetProjectilePreviewSprite(GameObject prefab, float progress, float flightDuration,
+            out SpriteRenderer renderer, out Color tint)
+        {
+            ProjectileSpriteAnimation animation = prefab.GetComponentInChildren<ProjectileSpriteAnimation>(true);
+            SerializedObject serialized = animation != null ? new SerializedObject(animation) : null;
+            serialized?.Update();
+            renderer = serialized?.FindProperty("spriteRenderer")?.objectReferenceValue as SpriteRenderer;
+            if (renderer == null)
+            {
+                renderer = animation != null
+                    ? animation.GetComponent<SpriteRenderer>()
+                    : prefab.GetComponentInChildren<SpriteRenderer>(true);
+            }
+            tint = renderer != null ? renderer.color : Color.white;
+            if (renderer == null) return null;
+
+            Sprite sprite = renderer.sprite;
+            if (animation == null) return sprite;
+
+            SerializedProperty frames = serialized.FindProperty("frames");
+            if (frames != null && frames.arraySize > 0)
+            {
+                int index = Mathf.Clamp(Mathf.FloorToInt(Mathf.Clamp01(progress) * frames.arraySize), 0, frames.arraySize - 1);
+                // 런타임은 null 프레임에서 직전 Sprite를 유지한다. 첫 프레임부터 현재 인덱스까지 순서대로
+                // 훑어 같은 결과를 만든다(프리뷰는 에디터 전용이고 배열도 작으므로 할당 없는 짧은 순회면 충분).
+                for (int i = 0; i <= index; i++)
+                {
+                    Sprite candidate = frames.GetArrayElementAtIndex(i).objectReferenceValue as Sprite;
+                    if (candidate != null) sprite = candidate;
+                }
+            }
+
+            float fadeIn = serialized.FindProperty("fadeInRatio").floatValue;
+            float fadeOut = serialized.FindProperty("fadeOutRatio").floatValue;
+            float minFadeDuration = serialized.FindProperty("minFadeFlightDuration").floatValue;
+            if ((fadeIn > 0f || fadeOut > 0f) && flightDuration >= minFadeDuration)
+            {
+                float alphaMultiplier = 1f;
+                if (fadeIn > 0f && progress < fadeIn) alphaMultiplier = progress / fadeIn;
+                else if (fadeOut > 0f && progress > 1f - fadeOut) alphaMultiplier = (1f - progress) / fadeOut;
+                tint.a *= Mathf.Clamp01(alphaMultiplier);
+            }
+            return sprite;
+        }
+
+        private static float GetRelativePreviewScale(Transform child, Transform root)
+        {
+            float scale = 1f;
+            Transform current = child;
+            while (current != null)
+            {
+                scale *= Mathf.Abs(current.localScale.x);
+                if (current == root) break;
+                current = current.parent;
+            }
+            return Mathf.Max(0.0001f, scale);
+        }
+
+        private static void DrawRotatedSprite(Sprite sprite, float zoom, Vector2 anchor, Color tint, float angleDegrees)
+        {
+            Matrix4x4 oldMatrix = GUI.matrix;
+            GUIUtility.RotateAroundPivot(angleDegrees, anchor);
+            DrawSprite(sprite, zoom, anchor, tint);
+            GUI.matrix = oldMatrix;
         }
 
         /// <summary>고정 문자열 "1"을 Monster Profile의 색상/크기·현재 페이드 알파로 표시한다 - 호출부가

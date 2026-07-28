@@ -17,6 +17,10 @@ MonoBehaviour:
   - {fileID: 21300000, guid: c33f718582be41a5a3a6a744411a5aab, type: 3}
   - {fileID: 21300000, guid: 331ec9194c474153ba79a102a97dfa6d, type: 3}
   - {fileID: 21300000, guid: 34866bf00b8846768783d3263645aa4d, type: 3}
+  overlayFrames:
+  - {fileID: 21300000, guid: 01203e05d256b45f3b3cdbb01cdabe16, type: 3}
+  - {fileID: 21300000, guid: aa56d8b5810834e4085ad623e75c3af2, type: 3}
+  - {fileID: 21300000, guid: 61cafd3be65744e24b0e778fd0d22d5a, type: 3}
   animationFps: 18
   hitFrameIndex: 1
   endFrameDuration: 0.12
@@ -30,3 +34,6 @@ MonoBehaviour:
   hitEffectOffset: {x: 0, y: 0}
   hitEffectScale: 1
   hitSound: {fileID: 8300000, guid: 8b23b175a78d6b5458322e3a6c9905d0, type: 3}
+  projectilePrefab: {fileID: 0}
+  projectileLaunchOffset: {x: 0, y: 0}
+  projectileScale: 1

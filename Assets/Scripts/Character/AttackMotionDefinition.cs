@@ -71,6 +71,19 @@ namespace Character
         [Tooltip("이 공격의 Hit Frame에서 사용할 사운드. 비어 있으면 씬 기본 Hit SFX(AudioManager.hitClip)로 대체된다.")]
         [SerializeField] private AudioClip hitSound;
 
+        [Header("Projectile")]
+        [Tooltip("Cast Frame에서 발사할 발사체 prefab(루트에 ProjectileMover 필요). 비어 있으면 발사체 없이 " +
+                 "기존 근접 공격과 완전히 동일하게 동작한다. 비행 시간은 (Hit Frame - Cast Frame) / FPS로 " +
+                 "자동 계산되므로 별도 속도 설정이 없고, Hit Frame이 Cast Frame보다 뒤여야 한다.")]
+        [SerializeField] private GameObject projectilePrefab;
+
+        [Tooltip("시전자 Actor Origin 기준 발사 위치(로컬 유닛) - 시전 손이나 지팡이 끝에 맞춘다. " +
+                 "캐릭터가 flipX 상태면 X 오프셋이 좌우 반전된다.")]
+        [SerializeField] private Vector2 projectileLaunchOffset;
+
+        [Min(0.01f)]
+        [SerializeField] private float projectileScale = 1f;
+
         public Sprite[] Frames => frames ?? Array.Empty<Sprite>();
         public Sprite[] OverlayFrames => overlayFrames ?? Array.Empty<Sprite>();
         public float AnimationFps => animationFps;
@@ -88,5 +101,9 @@ namespace Character
         public Vector2 HitEffectOffset => hitEffectOffset;
         public float HitEffectScale => Mathf.Max(0.01f, hitEffectScale);
         public AudioClip HitSound => hitSound;
+
+        public GameObject ProjectilePrefab => projectilePrefab;
+        public Vector2 ProjectileLaunchOffset => projectileLaunchOffset;
+        public float ProjectileScale => Mathf.Max(0.01f, projectileScale);
     }
 }

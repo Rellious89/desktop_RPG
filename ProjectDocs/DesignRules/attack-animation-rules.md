@@ -111,3 +111,71 @@ Sprite Pivot은 Actor Origin이며 애니메이션 프레임 내부에서는 바
 - `Assets/Scripts/Common/HitEffectPop.cs`: 기본 이펙트 prefab의 짧은 확대·Fade 재생을 담당하며, 완료 콜백으로 `HitEffectSpawner` 풀에 반환된다. `HitEffectPop`이 없는 prefab은 스포너의 대기 코루틴이 대신 회수한다.
 - 기본 이펙트 에셋: `Assets/Art/Effects/HitBasic/HitBasic-spark-00.png`(128×128, PPU 200, pivot 중앙) + `Assets/Prefabs/Effects/HitEffect_Basic.prefab`. 정식 아트 리소스가 없어 만든 더미용 스타버스트 스프라이트다 - 실제 이펙트 아트가 준비되면 이 prefab의 `SpriteRenderer`만 교체하면 된다.
 - Scarecrow의 `ImpactPoint` 자식 Transform(`Assets/Scenes/desktopScene.unity`)이 `HitEffectSpawner.impactPoint`에 연결되어 있다 - Scarecrow 기준 대략 몸통 높이(로컬 y 0.5)에 둔 임시 지점이며, 정확한 피격 위치는 아트가 확정되면 다시 조정될 수 있다.
+
+## 발사체 (Projectile)
+
+원거리 공격의 발사체는 캐릭터 오버레이(`overlayFrames`)에 그려 넣지 않고, 시전 위치에서 몬스터 피격 위치까지 실제로 이동하는 독립 오브젝트로 처리한다. 최초 적용은 RabbitHealer 기본 공격 프로토타입이다.
+
+### 데이터
+
+공격 모션 하나가 소유하는 값은 세 개뿐이다(`AttackMotionDefinition` / `IAttackMotion` / 레거시 `PlayerCharacterAnimator.AttackAnimation` 모두 동일).
+
+- `projectilePrefab` (기본값 없음/비어 있음): **비어 있으면 발사체 관련 처리를 전부 건너뛰어 기존 근접 공격과 완전히 동일하게 동작한다.**
+- `projectileLaunchOffset` (기본 `(0,0)`): 시전자 Actor Origin 기준 로컬 오프셋. 캐릭터 `SpriteRenderer.flipX`면 X만 좌우 반전한다.
+- `projectileScale` (기본 `1`): 발사체 prefab 원본 로컬 스케일에 곱하는 배율.
+
+발사체 내부의 스프라이트/재생 데이터는 공격 모션이 아니라 **발사체 prefab이 소유한다** - 공격 모션에 중복 저장하지 않는다. 공격별 피격 이펙트 설정(`hitEffectPrefab/Offset/Scale`)도 기존 `AttackHitCue` 경로 그대로이며 발사체 prefab에 복제하지 않는다.
+
+### 타이밍
+
+발사체 때문에 공격 애니메이션이나 다음 공격이 기다리는 일은 없다. 기존 `HitPoint` 흐름을 그대로 두고 그 위에 얹는다.
+
+1. `Cast Frame` - `TryFireCastCue()`가 Cast Effect/Sound를 실행한 뒤 발사체를 생성한다(공격 인스턴스당 한 번).
+2. `Cast Frame → Hit Frame` - 직선 이동. 비행 시간은 `(HitFrameIndex - CastFrameIndex) / AnimationFps`로 계산하며, 별도의 고정 속도 값은 두지 않는다.
+3. `Hit Frame` - `Strike()`가 `HitPoint`를 쏘기 **직전에** 발사체를 목표 위치로 스냅하고 완료시킨다. 프레임 드롭이나 Update 오차가 있어도 시각과 피격 타이밍이 어긋나지 않는다.
+4. 이후 피해/피격 반응/데미지 숫자/피격 이펙트/사운드는 기존 순서 그대로다.
+
+발사체는 어떤 판정도 발생시키지 않는다 - 피해는 오직 기존 `HitPoint` 한 번뿐이라 한 공격에서 피해가 두 번 들어갈 여지가 없다.
+
+발사체를 쓰는 공격은 `CastFrameIndex < HitFrameIndex`여야 한다. 같거나 Cast가 더 늦으면 날아갈 구간 자체가 없으므로 모션당 한 번 경고를 남기고 발사체 없이 진행한다(공격 자체는 정상 동작).
+
+RabbitHealer 기본 공격 기준: FPS 18, Cast 0, Hit 1 → 비행 시간 약 0.056초.
+
+### 구성 요소
+
+- `Assets/Scripts/Common/ProjectileMover.cs`: 발사체 루트. 시작점/도착점/진행도/`+X` 기준 방향 회전/수명/풀 반환을 담당한다. 시각 표현은 전혀 건드리지 않는다.
+- `Assets/Scripts/Common/IProjectileVisual.cs`: 표현 컴포넌트 계약(`BeginFlight` → `SetFlightProgress(0~1)` → `ResetVisual`). Mover가 루트/자식을 통틀어 전부 찾아 같은 진행도를 넘기므로, 이동 시스템이 특정 `SpriteRenderer` 한 장에 묶이지 않는다.
+- `Assets/Scripts/Common/ProjectileSpriteAnimation.cs`: 기본 표현 구현. Sprite 배열을 비행 시간에 균등 분배해 재생한다 - 한 장이면 단일 이미지 발사체, 여러 장이면 애니메이션 발사체이며 Mover는 둘을 구분하지 않는다. Fade In/Out은 기본 0(꺼짐)이고, 비행 시간이 `minFadeFlightDuration`(기본 0.12초)보다 짧으면 켜져 있어도 적용하지 않는다.
+- `Assets/Scripts/Common/ProjectileSpawner.cs`: prefab별 오브젝트 풀. 시전자에 붙으며, `PlayerCharacterAnimator.Awake`가 없으면 자동으로 붙인다. 피격 이펙트 풀(`HitEffectSpawner`)과 책임을 섞지 않는다 - 수명 규칙과 복원 대상이 다르기 때문이다.
+
+### 방향 규칙
+
+- 발사체 원본 이미지의 **오른쪽(+X)이 머리(진행 방향), 왼쪽(-X)이 꼬리**다.
+- 런타임에 `시전 위치 → 도착 위치` 벡터로 Z축 회전을 계산한다.
+- 캐릭터의 `SpriteRenderer.flipX`는 발사체에 상속하지 않는다 - 좌우 반전은 발사 위치 X 오프셋에만 적용된다.
+
+### 좌표 규칙
+
+- 발사체는 캐릭터의 자식이 아니라 `StageVisualRootController.CombatFxRoot` 아래에서 이동한다 - 캐릭터의 flipX나 Attack Movement를 따라가지 않으면서, Stage 위치/배율은 Transform 계층을 통해 정확히 한 번만 상속받는다(`HitEffectSpawner`와 같은 규칙 - 별도 배율 보정 코드를 두지 않는다).
+- 시작점: 캐릭터 `transform.TransformPoint(launchOffset)` - Actor Scale과 Stage 배율을 그대로 따라가므로 어떤 배율에서도 시전 손 위치에 붙어 있는다.
+- 도착점: 몬스터 `HitEffectSpawner.GetImpactWorldPosition(hitEffectOffset)` - 피격 이펙트와 같은 기준점이다. private 필드에 직접 의존하지 않는 읽기 전용 API이며 `Spawn()` 동작은 바꾸지 않았다. 피격 이펙트의 랜덤 지터는 이펙트 내부 표현이라 발사체 목표점에는 반영하지 않는다.
+- 조준 대상은 `Target.TryGetAttackableTarget()`(읽기 전용 정적 조회)으로 찾는다. 목표 위치는 발사 순간에 스냅샷으로 굳으므로, 비행 중 대상이 처치되거나 리젠돼도 이전 발사체가 새 몬스터를 따라가지 않는다.
+
+### 풀링
+
+- prefab별 `Queue`로 재사용한다(기본 prewarm 4개). 여러 발사체가 동시에 날아가도 정상 동작하며, 풀이 비면 그때만 예외적으로 추가 생성한다.
+- 반환 시 위치/회전/로컬 스케일은 스포너가, Sprite/알파/재생 진행도는 `IProjectileVisual.ResetVisual`이 프리팹 원본 값으로 되돌린다.
+- 각 발사에 일련번호(`LaunchId`)를 발급한다 - 호출자가 완료시킬 때 대조해서, 이미 회수돼 다른 공격에 재사용된 인스턴스를 실수로 건드리지 않는다.
+- Strike가 끝내 오지 않으면(캐릭터 비활성화/교체) 도착 후 `arrivalHoldSeconds`(기본 0.35초) 뒤 스스로 회수된다. 캐릭터가 비활성화될 때도 `PlayerCharacterAnimator.OnDisable`이 즉시 회수한다.
+
+### RabbitHealer 프로토타입 연결값
+
+`Assets/Data/MotionProfiles/Characters/RabbitHealer/RabbitHealer_Attack.asset`
+
+| 항목 | 값 |
+| --- | --- |
+| `projectilePrefab` | `Assets/Prefabs/Effects/Projectile_RabbitHealer_Basic.prefab` |
+| `projectileLaunchOffset` | `(0.5, 0.22)` - 지팡이 끝 추정 위치, Play 모드에서 미세 조정 필요 |
+| `projectileScale` | `0.35` |
+
+발사체 prefab의 스프라이트는 아직 **임시**로 기존 더미 이펙트(`HitBasic-spark-00.png`)를 쓴다 - 정식 발사체 아트가 준비되면 `Visual` 자식의 `SpriteRenderer.sprite`와 `ProjectileSpriteAnimation.frames`만 교체한다. 오버레이(`overlayFrames`)에 그려져 있는 기존 노란 발사체는 아직 남아 있다 - 무기 잔상과 캐스팅 섬광만 남기고 지우는 것은 사용자 아트 작업이다.
