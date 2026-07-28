@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.Localization;
 
 namespace Common
 {
@@ -9,9 +10,10 @@ namespace Common
     [RequireComponent(typeof(TextMeshProUGUI))]
     public class SessionKillCounterDisplay : MonoBehaviour
     {
-        [SerializeField] private string label = "Kill Count";
+        [SerializeField] private LocalizedString killCountFormat;
 
         private TextMeshProUGUI text;
+        private readonly object[] formatArguments = new object[1];
 
         private void Awake()
         {
@@ -21,12 +23,23 @@ namespace Common
         private void OnEnable()
         {
             Target.AnyTargetDefeated += HandleAnyTargetDefeated;
+
+            if (killCountFormat != null && !killCountFormat.IsEmpty)
+            {
+                killCountFormat.StringChanged += ApplyLocalizedText;
+            }
+
             Refresh();
         }
 
         private void OnDisable()
         {
             Target.AnyTargetDefeated -= HandleAnyTargetDefeated;
+
+            if (killCountFormat != null)
+            {
+                killCountFormat.StringChanged -= ApplyLocalizedText;
+            }
         }
 
         private void HandleAnyTargetDefeated(string targetId)
@@ -36,7 +49,26 @@ namespace Common
 
         private void Refresh()
         {
-            text.text = $"{label} : {SessionKillCounter.SessionKillCount}";
+            int count = SessionKillCounter.SessionKillCount;
+
+            if (killCountFormat == null || killCountFormat.IsEmpty)
+            {
+                // Inspector 연결이 빠진 상태에서도 기존 HUD가 사라지지 않도록 영어 기본값을 유지한다.
+                text.text = $"Kill Count : {count}";
+                return;
+            }
+
+            formatArguments[0] = count;
+            killCountFormat.Arguments = formatArguments;
+            killCountFormat.RefreshString();
+        }
+
+        private void ApplyLocalizedText(string localizedText)
+        {
+            if (text != null)
+            {
+                text.text = localizedText;
+            }
         }
     }
 }
