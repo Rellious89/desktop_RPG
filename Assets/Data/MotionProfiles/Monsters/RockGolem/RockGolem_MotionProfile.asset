@@ -57,4 +57,4 @@ MonoBehaviour:
   preview:
     actorOffset: {x: 0.6, y: 0}
     receivePointOffset: {x: 0, y: 0.35}
-    actorScale: 1.6
+    actorScale: 1.4

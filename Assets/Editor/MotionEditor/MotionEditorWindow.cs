@@ -46,7 +46,14 @@ namespace CharacterEditor
         private static readonly Color DangerButtonColor = new Color(1f, 0.44f, 0.38f);
         private const float DeleteButtonWidth = 46f;
 
+        /// <summary>Fast/Slow Input Simulation의 입력 간격(초) - 각각 "연타"와 "천천히 두드리기"에 해당한다.</summary>
+        private const double FastInputInterval = 0.06d;
+        private const double SlowInputInterval = 0.4d;
+
         private enum ActorKind { Character, Monster }
+
+        /// <summary>누적 입력 시뮬레이션의 상태. 런타임 AttackPhase(None/Charging/Recovery)와 1:1 대응한다.</summary>
+        private enum ChargeSimPhase { Idle, Charging, Recovery }
         private enum Workspace { Overview, Idle, IdleEvents, Attack, Movement, Hit, Defeat }
         private enum PreviewMotionKind { Idle, IdleEvent, Attack, Hit, Defeat }
         private enum HistoryAction { None, Undo, Redo }
@@ -130,6 +137,9 @@ namespace CharacterEditor
         /// 켜면 기존 배열 뒤에 덧붙인다.</summary>
         private bool overlayDropAppends;
 
+        /// <summary>Attack Editor의 Input Response 영역 펼침 상태(기본 펼침).</summary>
+        private bool inputResponseExpanded = true;
+
         private SerializedObject activeProfileObject;
         private AttackMotionDefinition selectedAttack;
         private SerializedObject attackObject;
@@ -155,6 +165,23 @@ namespace CharacterEditor
         private float previewZoom = DefaultZoom;
         private bool previewCastCueFired;
         private bool previewHitCueFired;
+
+        // ---- Accumulated Input 입력 시뮬레이션 ----
+        // 누적 입력 공격은 그냥 자동 재생만 봐서는 설정을 확인할 수 없다(프레임이 시간이 아니라 입력으로
+        // 진행하므로). 런타임 PlayerCharacterAnimator와 같은 규칙으로 충전/유예/감쇠/이월을 흉내 내고,
+        // 그 결과 프레임을 previewElapsedTime(= frame / fps)으로 환산해 기존 Preview 그리기 경로에
+        // 그대로 태운다 - 발사체/피격 반응/Cast·Hit 사운드 판정이 자동 재생과 완전히 같은 코드를 탄다.
+        private bool chargeSimRunning;
+        private ChargeSimPhase chargeSimPhase;
+        private float chargeSimInputs;
+        private float chargeSimCarried;
+        private int chargeSimStrikes;
+        private double chargeSimLastInputTime;
+        private double chargeSimLastStepTime;
+        private double chargeSimAutoInterval;      // 0이면 자동 입력 없음(수동 또는 Stop Input 상태)
+        private double chargeSimResumeInterval = SlowInputInterval;
+        private double chargeSimNextAutoInput;
+        private float chargeSimRecoveryTimer;
 
         private Vector2 libraryScroll;
         private Vector2 navigationScroll;
@@ -1015,7 +1042,7 @@ namespace CharacterEditor
             if (workspace == Workspace.IdleEvents) DrawIdleEventButtons();
             DrawWorkspaceButton(Workspace.Attack, "Attacks");
             if (workspace == Workspace.Attack) DrawAttackButtons(entry.CharacterProfile);
-            DrawWorkspaceButton(Workspace.Movement, "Attack Movement");
+            DrawWorkspaceButton(Workspace.Movement, "Movement");
         }
 
         private void DrawMonsterNavigation(ResourceEntry entry)
@@ -1162,6 +1189,7 @@ namespace CharacterEditor
             selectedAttack = motion;
             attackObject = motion != null ? new SerializedObject(motion) : null;
             descriptionScroll = Vector2.zero;
+            ResetChargeSimulation(); // 다른 공격으로 넘어가면 이전 공격의 충전 상태는 남기지 않는다.
             RebuildFrameList();
             if (motion != null) RestartPreview();
         }
@@ -1471,11 +1499,42 @@ namespace CharacterEditor
                     DrawAttackEditor();
                     break;
                 case Workspace.Movement:
-                    EditorGUILayout.PropertyField(activeProfileObject.FindProperty("attackMovement"), new GUIContent("Attack Movement"), true);
-                    EditorGUILayout.HelpBox("이 값은 캐릭터별로 저장되며, 프로필이 연결된 AttackMovement가 우선 사용합니다.", MessageType.Info);
+                    DrawMovementWorkspace();
                     break;
             }
             if (activeProfileObject.ApplyModifiedProperties()) EditorUtility.SetDirty(entry.CharacterProfile);
+        }
+
+        /// <summary>이 캐릭터의 위치 연출 두 가지를 한 화면에서 편집한다. 둘 다 런타임에서는 같은
+        /// 컨트롤러(AttackMovement)가 하나의 Transform에 적용하므로 서로의 위치를 덮어쓰지 않는다 -
+        /// Attack Movement는 실제 타격에서, Charge Movement는 누적 입력 충전 중에만 동작한다.</summary>
+        private void DrawMovementWorkspace()
+        {
+            EditorGUILayout.LabelField("Attack Movement (실제 타격 시)", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(activeProfileObject.FindProperty("attackMovement"), GUIContent.none, true);
+            EditorGUILayout.HelpBox("Hit Frame에 도달할 때 1회 재생됩니다. 키 입력이나 충전 진행으로는 발동하지 않습니다.", MessageType.Info);
+
+            EditorGUILayout.Space(8f);
+            EditorGUILayout.LabelField("Charge Movement (누적 입력 충전 중)", EditorStyles.boldLabel);
+            SerializedProperty charge = activeProfileObject.FindProperty("chargeMovement");
+            SerializedProperty enabled = charge.FindPropertyRelative("enableChargeMovement");
+            EditorGUILayout.PropertyField(enabled, new GUIContent("Enable Charge Movement"));
+            using (new EditorGUI.DisabledScope(!enabled.boolValue))
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.PropertyField(charge.FindPropertyRelative("chargeMoveDistance"),
+                    new GUIContent("Charge Move Distance", "입력 1회당 움찔할 거리. 음수면 뒤로 당겨진다. Attack Movement보다 작게 잡는 것을 권장."));
+                RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+                EditorGUILayout.PropertyField(charge.FindPropertyRelative("chargeMoveInDuration"),
+                    new GUIContent("Charge Move In Duration", "움찔이 나가는 시간(초). 이후 곧바로 기준점으로 돌아오기 시작한다."));
+                RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+                EditorGUILayout.PropertyField(charge.FindPropertyRelative("chargeMoveReturnDuration"),
+                    new GUIContent("Charge Move Return Duration", "움찔이 기준점으로 돌아오는 시간(초). 충전 취소 복귀에도 같은 값을 쓴다."));
+                RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+            }
+            EditorGUILayout.HelpBox("누적 입력이 1회 쌓일 때마다 움찔 1회가 재생됩니다(Required Inputs가 5면 4회). " +
+                                    "발사를 일으키는 마지막 입력에서는 움찔 없이 Attack Movement만 나가고, 충전이 취소되면 원위치로 돌아옵니다. " +
+                                    "Use Accumulated Input이 꺼진 공격에는 영향이 없습니다.", MessageType.Info);
         }
 
         private void DrawMonsterInspector(ResourceEntry entry)
@@ -1668,13 +1727,11 @@ namespace CharacterEditor
                 EditorGUILayout.PropertyField(hit, new GUIContent("Hit Frame"));
                 RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
             }
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                EditorGUILayout.PropertyField(attackObject.FindProperty("endFrameDuration"), new GUIContent("End Hold"));
-                RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
-                EditorGUILayout.PropertyField(attackObject.FindProperty("queueExpireTimeout"), new GUIContent("Queue Window"));
-                RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
-            }
+            EditorGUILayout.PropertyField(attackObject.FindProperty("endFrameDuration"), new GUIContent("End Hold"));
+            RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+
+            EditorGUILayout.Space(6f);
+            DrawInputResponseSection(frames, hit, cast);
 
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField("Cast Presentation", EditorStyles.boldLabel);
@@ -1727,6 +1784,67 @@ namespace CharacterEditor
                 EditorGUILayout.HelpBox($"Cast Frame은 0~{frames.arraySize - 1} 범위여야 합니다.", MessageType.Warning);
             }
             if (attackObject.ApplyModifiedProperties()) EditorUtility.SetDirty(selectedAttack);
+        }
+
+        /// <summary>이 공격이 입력에 어떻게 반응할지(Direct / Accumulated)를 정하는 영역. 체크가 꺼져
+        /// 있으면 Direct Input 전용 설정(Queue Window)만, 켜져 있으면 누적 입력 설정만 펼친다 - 서로
+        /// 다른 모드의 값이 같은 화면에 섞여 보이지 않게 한다.</summary>
+        private void DrawInputResponseSection(SerializedProperty frames, SerializedProperty hit, SerializedProperty cast)
+        {
+            SerializedProperty accumulated = attackObject.FindProperty("useAccumulatedInput");
+            inputResponseExpanded = EditorGUILayout.Foldout(inputResponseExpanded, "Input Response", true, EditorStyles.foldoutHeader);
+            if (!inputResponseExpanded) return;
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.PropertyField(accumulated, new GUIContent("Use Accumulated Input",
+                    "켜면 입력을 모아서 한 번 타격하는 누적 입력 공격(궁수/마법사)이 되고, 꺼두면 " +
+                    "키 입력 1회 = 타격 1회인 기존 Direct Input 공격이다."));
+
+                if (!accumulated.boolValue)
+                {
+                    EditorGUILayout.PropertyField(attackObject.FindProperty("queueExpireTimeout"),
+                        new GUIContent("Queue Window (Direct)", "Direct Input 전용 - 마지막 입력 이후 이 시간(초) 동안 " +
+                                                                "새 입력이 없으면 남은 공격 예약을 취소한다. 0.15~0.25 권장."));
+                    RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+                    EditorGUILayout.LabelField(" ", "키 입력 1회 = 타격 1회 (기존 동작)", EditorStyles.miniLabel);
+                    return;
+                }
+
+                SerializedProperty required = attackObject.FindProperty("requiredInputsToStrike");
+                EditorGUILayout.PropertyField(required, new GUIContent("Required Inputs to Strike",
+                    "공격 시작(첫 입력 1회 포함)부터 타격까지 필요한 총 입력 수. 1 이상."));
+                RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+                EditorGUILayout.PropertyField(attackObject.FindProperty("noInputGraceTime"), new GUIContent("No-Input Grace Time",
+                    "입력이 끊긴 뒤 현재 충전 자세를 그대로 유지하는 시간(초). 이 동안에는 충전량이 줄지 않는다."));
+                RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+                EditorGUILayout.PropertyField(attackObject.FindProperty("chargeDecayDuration"), new GUIContent("Charge Decay Duration",
+                    "유예 시간이 지난 뒤 가득 찬 충전량이 0까지 줄어드는 데 걸리는 시간(초). 0이면 즉시 초기화."));
+                RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+                EditorGUILayout.PropertyField(attackObject.FindProperty("carryOverflowInputs"), new GUIContent("Carry Overflow Inputs",
+                    "타격 이후 Recovery 중에 들어온 입력을 다음 공격 충전으로 넘긴다(권장: On)."));
+
+                if (required.intValue < 1)
+                {
+                    EditorGUILayout.HelpBox("Required Inputs to Strike는 1 이상이어야 합니다.", MessageType.Error);
+                }
+                if (frames.arraySize > 0 && hit.intValue <= 0)
+                {
+                    EditorGUILayout.HelpBox("Hit Frame이 0이면 충전 진행을 보여줄 Windup 프레임이 없습니다 - " +
+                                            "첫 입력에서 바로 타격 프레임이 나옵니다. Hit Frame을 1 이상으로 두세요.", MessageType.Warning);
+                }
+                else if (frames.arraySize > 0)
+                {
+                    EditorGUILayout.LabelField(" ", $"충전 구간 Frame 0~{Mathf.Max(0, hit.intValue - 1)} / 타격 Frame {hit.intValue} / " +
+                                                    $"이후 Recovery는 FPS·End Hold 사용", EditorStyles.miniLabel);
+                }
+                if (attackObject.FindProperty("projectilePrefab").objectReferenceValue != null && cast.intValue < hit.intValue)
+                {
+                    EditorGUILayout.HelpBox("누적 입력 공격에서 Cast Frame이 Hit Frame보다 앞이면, 발사체는 충전 도중 " +
+                                            "그 프레임에 도달하는 순간 출발하고 비행 시간은 (Hit-Cast)/FPS로 고정됩니다 - " +
+                                            "충전 속도와 무관하므로 발사체가 타격보다 먼저 도착할 수 있습니다.", MessageType.Warning);
+                }
+            }
         }
 
         private void DrawMotionNameEditor(SerializedProperty name)
@@ -2040,7 +2158,10 @@ namespace CharacterEditor
 
         private void DrawPersistentPreview()
         {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Width(LeftWorkspaceWidth), GUILayout.Height(StageHeight + 116f)))
+            // 누적 입력 공격을 보고 있을 때만 시뮬레이션 readout + 조작 버튼 두 줄이 더 붙는다.
+            AttackMotionDefinition accumulatedAttack = GetAccumulatedPreviewAttack();
+            float extraHeight = accumulatedAttack != null ? 40f : 0f;
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Width(LeftWorkspaceWidth), GUILayout.Height(StageHeight + 116f + extraHeight)))
             {
                 EditorGUILayout.LabelField("Animation Preview", EditorStyles.boldLabel);
                 PreviewMotion main = GetMainPreviewMotion();
@@ -2075,6 +2196,7 @@ namespace CharacterEditor
                 previewFrameIndex = GetFrameIndex(main, (float)previewElapsedTime, previewLoop);
                 string hitText = main.HitFrame >= 0 ? (main.HitFrame + 1).ToString() : "-";
                 EditorGUILayout.LabelField($"{main.Label}  |  Frame {previewFrameIndex + 1}/{main.Frames.Length}   FPS {main.Fps:0.##}   Hit {hitText}", EditorStyles.centeredGreyMiniLabel);
+                if (accumulatedAttack != null) DrawChargeSimulationControls(accumulatedAttack);
             }
         }
 
@@ -2134,6 +2256,7 @@ namespace CharacterEditor
         private void SetPreviewTimelineFrame(int index, float fps, PreviewMotion main)
         {
             previewPlaying = false;
+            chargeSimRunning = false; // 손으로 프레임을 잡으면 시뮬레이션이 그 위를 덮어쓰지 않게 멈춘다.
             previewElapsedTime = Mathf.Max(0, index) / Mathf.Max(0.01f, fps);
             previewFrameIndex = GetFrameIndex(main, (float)previewElapsedTime, false);
             Repaint();
@@ -2754,6 +2877,8 @@ namespace CharacterEditor
 
         private void TogglePreviewPlayback()
         {
+            // 자동 재생과 입력 시뮬레이션은 동시에 돌지 않는다 - Play를 누르면 시뮬레이션은 멈춘다.
+            chargeSimRunning = false;
             if (previewPlaying)
             {
                 previewPlaying = false;
@@ -2792,7 +2917,213 @@ namespace CharacterEditor
             previewPlaying = false;
             previewElapsedTime = 0d;
             previewFrameIndex = 0;
+            ResetChargeSimulation();
             Repaint();
+        }
+
+        // ---- Accumulated Input 입력 시뮬레이션 ----
+
+        /// <summary>지금 Preview에 걸려 있는 캐릭터 공격이 누적 입력 모드일 때만 그 에셋을 돌려준다.
+        /// (Direct Input 공격이나 Idle/Hit 모션을 보고 있으면 null - 시뮬레이션 UI 자체가 뜨지 않는다.)</summary>
+        private AttackMotionDefinition GetAccumulatedPreviewAttack()
+        {
+            AttackMotionDefinition attack = GetActivePreviewAttackMotion()?.Attack;
+            return attack != null && attack.UseAccumulatedInput && attack.Frames.Length > 0 ? attack : null;
+        }
+
+        /// <summary>런타임 PlayerCharacterAnimator.AdvanceCharging과 같은 순서로 한 스텝 진행한다 -
+        /// (1) 자동 입력 주입, (2) 충전 완료면 타격, (3) 유예 시간 초과분만큼 감쇠, (4) 프레임 환산.</summary>
+        private void AdvanceChargeSimulation()
+        {
+            AttackMotionDefinition attack = GetAccumulatedPreviewAttack();
+            if (attack == null)
+            {
+                chargeSimRunning = false;
+                return;
+            }
+
+            double now = EditorApplication.timeSinceStartup;
+            // 창이 잠깐 멈춰 있었어도 한 번에 몰아서 감쇠하지 않도록 delta를 제한한다.
+            float delta = (float)Math.Max(0d, Math.Min(0.25d, now - chargeSimLastStepTime));
+            chargeSimLastStepTime = now;
+
+            if (chargeSimAutoInterval > 0d)
+            {
+                if (chargeSimNextAutoInput < now - 1d) chargeSimNextAutoInput = now; // 밀린 입력을 몰아치지 않는다
+                while (now >= chargeSimNextAutoInput)
+                {
+                    AddChargeSimulationInput(attack);
+                    chargeSimNextAutoInput += chargeSimAutoInterval;
+                }
+            }
+
+            int required = attack.RequiredInputsToStrike;
+            float fps = Mathf.Max(0.01f, attack.AnimationFps);
+            int lastFrame = attack.Frames.Length - 1;
+            int hitFrame = Mathf.Clamp(attack.HitFrameIndex, 0, lastFrame);
+            int frame = 0;
+
+            switch (chargeSimPhase)
+            {
+                case ChargeSimPhase.Charging:
+                    if (chargeSimInputs >= required)
+                    {
+                        chargeSimInputs = 0f;
+                        chargeSimCarried = 0f;
+                        chargeSimStrikes++;
+                        chargeSimPhase = ChargeSimPhase.Recovery;
+                        chargeSimRecoveryTimer = 0f;
+                        frame = hitFrame;
+                        break;
+                    }
+
+                    if (now - chargeSimLastInputTime > attack.NoInputGraceTime)
+                    {
+                        chargeSimInputs = attack.ChargeDecayDuration <= 0f
+                            ? 0f
+                            : chargeSimInputs - required * delta / attack.ChargeDecayDuration;
+                        if (chargeSimInputs <= 0f)
+                        {
+                            chargeSimInputs = 0f;
+                            EndChargeSimCycle();
+                            break;
+                        }
+                    }
+                    frame = Mathf.Clamp(Mathf.FloorToInt(chargeSimInputs / required * hitFrame), 0, Mathf.Max(0, hitFrame - 1));
+                    break;
+
+                case ChargeSimPhase.Recovery:
+                    chargeSimRecoveryTimer += delta;
+                    frame = Mathf.Min(hitFrame + Mathf.FloorToInt(chargeSimRecoveryTimer * fps), lastFrame);
+                    float tailStart = (lastFrame - hitFrame) / fps;
+                    if (chargeSimRecoveryTimer >= tailStart + Mathf.Max(0f, attack.EndFrameDuration))
+                    {
+                        // 이월된 입력이 있으면 Idle을 거치지 않고 다음 충전으로 이어간다(런타임과 동일).
+                        if (chargeSimCarried > 0f) BeginChargeSimCycle(attack, chargeSimCarried);
+                        else EndChargeSimCycle();
+                        frame = 0;
+                    }
+                    break;
+            }
+
+            previewPlaying = false; // 시뮬레이션과 자동 재생이 동시에 previewElapsedTime을 밀지 않게 한다.
+            previewFrameIndex = Mathf.Clamp(frame, 0, lastFrame);
+            previewElapsedTime = previewFrameIndex / fps;
+            EvaluatePreviewAudioCues();
+            Repaint();
+        }
+
+        private void AddChargeSimulationInput(AttackMotionDefinition attack)
+        {
+            chargeSimLastInputTime = EditorApplication.timeSinceStartup;
+            int required = attack.RequiredInputsToStrike;
+
+            switch (chargeSimPhase)
+            {
+                case ChargeSimPhase.Charging:
+                    chargeSimInputs = Mathf.Min(chargeSimInputs + 1f, required);
+                    break;
+                case ChargeSimPhase.Recovery:
+                    // Recovery는 끊지 않고, 이 입력은 다음 공격 충전으로 이월한다.
+                    if (attack.CarryOverflowInputs) chargeSimCarried = Mathf.Min(chargeSimCarried + 1f, required);
+                    break;
+                default:
+                    BeginChargeSimCycle(attack, 1f);
+                    break;
+            }
+        }
+
+        private void BeginChargeSimCycle(AttackMotionDefinition attack, float startInputs)
+        {
+            chargeSimPhase = ChargeSimPhase.Charging;
+            chargeSimInputs = Mathf.Clamp(startInputs, 0f, attack.RequiredInputsToStrike);
+            chargeSimCarried = 0f;
+            chargeSimRecoveryTimer = 0f;
+            // 새 공격 인스턴스 - Cast/Hit Cue를 이번 사이클에 다시 한 번 울릴 수 있게 되돌린다.
+            previewCastCueFired = false;
+            previewHitCueFired = false;
+        }
+
+        /// <summary>충전이 완전히 풀렸거나 Recovery가 끝나 Idle로 돌아간 상태. 자동 입력이 켜져 있으면
+        /// 다음 입력이 곧 새 사이클을 시작하므로 계속 돌리고, 수동/Stop 상태면 여기서 멈춘다.</summary>
+        private void EndChargeSimCycle()
+        {
+            chargeSimPhase = ChargeSimPhase.Idle;
+            chargeSimInputs = 0f;
+            chargeSimCarried = 0f;
+            chargeSimRecoveryTimer = 0f;
+            chargeSimRunning = chargeSimAutoInterval > 0d;
+        }
+
+        private void StartChargeSimulationInput(double interval)
+        {
+            chargeSimAutoInterval = interval;
+            chargeSimResumeInterval = interval;
+            chargeSimRunning = true;
+            previewPlaying = false;
+            chargeSimLastStepTime = EditorApplication.timeSinceStartup;
+            chargeSimNextAutoInput = chargeSimLastStepTime; // 즉시 첫 입력
+        }
+
+        /// <summary>자동 입력만 멈추고 시뮬레이션은 계속 돌린다 - 유예 시간과 감쇠가 실제로 어떻게
+        /// 동작하는지(자세 유지 -> 서서히 감소 -> Idle 복귀) 확인하는 것이 이 버튼의 목적이다.</summary>
+        private void StopChargeSimulationInput()
+        {
+            chargeSimAutoInterval = 0d;
+            if (chargeSimPhase == ChargeSimPhase.Idle) return;
+            chargeSimRunning = true;
+            chargeSimLastStepTime = EditorApplication.timeSinceStartup;
+        }
+
+        private void ResetChargeSimulation()
+        {
+            chargeSimRunning = false;
+            chargeSimPhase = ChargeSimPhase.Idle;
+            chargeSimInputs = 0f;
+            chargeSimCarried = 0f;
+            chargeSimStrikes = 0;
+            chargeSimRecoveryTimer = 0f;
+            chargeSimAutoInterval = 0d;
+        }
+
+        private void DrawChargeSimulationControls(AttackMotionDefinition attack)
+        {
+            int required = attack.RequiredInputsToStrike;
+            string phase = chargeSimPhase == ChargeSimPhase.Charging ? "Charging"
+                : chargeSimPhase == ChargeSimPhase.Recovery ? "Recovery"
+                : "Idle";
+            string mode = chargeSimAutoInterval <= 0d ? "Manual"
+                : chargeSimAutoInterval <= FastInputInterval ? "Fast"
+                : "Slow";
+
+            EditorGUILayout.LabelField(
+                $"Input: {Mathf.CeilToInt(chargeSimInputs)} / {required}   Phase: {phase}   " +
+                $"Charge: {Mathf.RoundToInt(Mathf.Clamp01(chargeSimInputs / required) * 100f)}%   " +
+                $"Carry: {Mathf.FloorToInt(chargeSimCarried)}   Strikes: {chargeSimStrikes}   [{mode}]",
+                EditorStyles.centeredGreyMiniLabel);
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button(new GUIContent("Add Input", "입력 1회를 넣는다."), GUILayout.Width(74f)))
+                {
+                    previewPlaying = false;
+                    chargeSimRunning = true;
+                    chargeSimLastStepTime = EditorApplication.timeSinceStartup;
+                    AddChargeSimulationInput(attack);
+                }
+                if (GUILayout.Button(new GUIContent("Fast Input", $"{FastInputInterval:0.00}초 간격 연타"), GUILayout.Width(74f)))
+                    StartChargeSimulationInput(FastInputInterval);
+                if (GUILayout.Button(new GUIContent("Slow Input", $"{SlowInputInterval:0.00}초 간격 입력"), GUILayout.Width(76f)))
+                    StartChargeSimulationInput(SlowInputInterval);
+                if (GUILayout.Button(new GUIContent("Stop Input", "입력만 멈춘다 - 유예/감쇠는 계속 진행된다."), GUILayout.Width(76f)))
+                    StopChargeSimulationInput();
+                if (GUILayout.Button(new GUIContent("Resume Input", "마지막 자동 입력 속도로 다시 시작한다."), GUILayout.Width(92f)))
+                    StartChargeSimulationInput(chargeSimResumeInterval);
+                if (GUILayout.Button(new GUIContent("Reset", "충전/이월/타격 횟수를 모두 초기화한다."), GUILayout.Width(56f)))
+                    ResetChargeSimulation();
+                GUILayout.FlexibleSpace();
+            }
         }
 
         private static void DrawStageBackground(Rect stage)
@@ -3445,6 +3776,12 @@ namespace CharacterEditor
 
         private void OnEditorUpdate()
         {
+            if (chargeSimRunning)
+            {
+                // 누적 입력 시뮬레이션이 도는 동안에는 그것이 프레임을 결정한다(시간 기반 자동 재생 대신).
+                AdvanceChargeSimulation();
+                return;
+            }
             if (!previewPlaying) return;
             float duration = GetPreviewDuration();
             if (duration <= 0f)

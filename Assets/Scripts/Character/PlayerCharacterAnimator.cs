@@ -11,12 +11,24 @@ namespace Character
     /// Chance 확률로 프로필에 등록된 Idle Event 중 하나를 균등 확률로 골라 한 번 재생하고 다시 기본
     /// Idle로 돌아온다. Idle Event 재생이 끝나면 다시 주기를 기다린 뒤 재판정한다.
     ///
-    /// 공격은 키 입력 1회 = 타격 1회로 정확히 대응된다. 키 입력마다 대기열(pendingAttacks)에 하나씩
-    /// 쌓이고, 공격 클립을 0번 프레임부터 hitFrameIndex까지 재생(Windup)한 뒤 타격(HitPoint)이
-    /// 발생할 때마다 그 대기열을 하나씩 소비한다. 재생 도중 새 입력이 들어와도 애니메이션을
-    /// 재시작하지 않고 대기열에만 추가되며, 타격 시점에 순서대로 소비된다.
-    /// 타격 이후 대기 중인 입력이 있으면 즉시 Windup을 재시작(루프)하고, 없으면 hitFrameIndex
-    /// 다음 프레임부터 마지막 프레임까지 이어서 재생(Recovery)한 뒤 Idle로 돌아간다.
+    /// 공격의 입력 방식은 공격 모션 에셋이 정한다(AttackMotionDefinition.UseAccumulatedInput).
+    ///
+    /// <b>Direct Input(기존 방식, 기본값)</b>: 키 입력 1회 = 타격 1회로 정확히 대응된다. 키 입력마다
+    /// 대기열(pendingAttacks)에 하나씩 쌓이고, 공격 클립을 0번 프레임부터 hitFrameIndex까지
+    /// 재생(Windup)한 뒤 타격(HitPoint)이 발생할 때마다 그 대기열을 하나씩 소비한다. 재생 도중 새
+    /// 입력이 들어와도 애니메이션을 재시작하지 않고 대기열에만 추가되며, 타격 시점에 순서대로
+    /// 소비된다. 타격 이후 대기 중인 입력이 있으면 즉시 Windup을 재시작(루프)하고, 없으면
+    /// hitFrameIndex 다음 프레임부터 마지막 프레임까지 이어서 재생(Recovery)한 뒤 Idle로 돌아간다.
+    ///
+    /// <b>Accumulated Input(누적 입력)</b>: 첫 입력으로 공격 준비를 시작하고, 이후 입력을 충전량으로
+    /// 모은다(Charging). Windup 프레임은 시간이 아니라 충전 진행률로 진행되므로 입력이 없는 동안은
+    /// 같은 프레임(활을 당긴 자세)이 그대로 유지된다. 충전량이 RequiredInputsToStrike에 도달하는
+    /// 순간 hitFrameIndex로 이동해 Cast/Hit을 기존 순서 그대로 실행하고, 그 뒤 Recovery만 기존
+    /// animationFps/endFrameDuration으로 재생한다. 입력이 끊기면 NoInputGraceTime 동안 자세를
+    /// 유지하다가 ChargeDecayDuration에 걸쳐 충전량이 0으로 줄고, 0이 되면 Idle로 돌아간다(줄어드는
+    /// 도중 다시 입력하면 그 지점에서 이어서 충전된다). 타격 이후 Recovery 중에 들어온 입력은
+    /// CarryOverflowInputs가 켜져 있으면 다음 공격의 충전으로 이월된다. 이 모드에는 대기열이 없으므로
+    /// queueExpireTimeout을 보지 않는다.
     ///
     /// 각 애니메이션은 프레임 낱장 Sprite를 프로필 에셋에서 배열로 직접 받는다(아틀라스 런타임
     /// 슬라이싱 아님). 프레임 수는 배열 길이(frames.Length)가 그대로 정답이라 별도로 입력받지 않는다.
@@ -29,8 +41,9 @@ namespace Character
     /// 그 뒤에 밀려 있던 예약 공격(pendingAttacks)은 전부 버리고 Recovery로 빠진다.
     ///
     /// 콤보 티어별 공격 모션 풀: 프로필의 Tier1/2/3 Pool(ComboTierAttackPool 에셋) 중
-    /// ComboManager.CurrentTier에 대응하는 풀에서 매 StartWindup() 시점에 모션을 하나 완전 랜덤으로
-    /// 뽑아 그 사이클(Windup -> Strike -> Recovery) 동안 그대로 쓴다 - 입력 처리/대기열/전환 규칙은
+    /// ComboManager.CurrentTier에 대응하는 풀에서 매 StartAttackCycle() 시점에 모션을 하나 완전 랜덤으로
+    /// 뽑아 그 사이클(Windup/Charging -> Strike -> Recovery) 동안 그대로 쓴다 - 누적 입력 충전 중에
+    /// 콤보 티어가 바뀌어도 지금 당기고 있는 모션은 교체하지 않고, 다음 공격 사이클부터 반영한다 - 입력 처리/대기열/전환 규칙은
     /// 전혀 건드리지 않고 "어떤 프레임 배열을 재생할지"만 매 사이클마다 다시 고른다(직전 모션과 같아도
     /// 그대로 허용). 상위 티어 풀이 비어 있으면 한 단계씩 낮은 티어로 폴백한다(Tier3 -> Tier2 -> Tier1).
     ///
@@ -63,6 +76,18 @@ namespace Character
         /// <summary>공격이 끝나고 Idle로 돌아가는 순간 발생.</summary>
         public static event Action AttackEnded;
 
+        /// <summary>누적 입력 공격의 충전이 시작될 때 발생(사이클당 한 번). 충전 중에는 아직 타격이
+        /// 일어나지 않았으므로, 이 신호로 "때린 것"을 세면 안 된다 - 콤보 타이머 일시정지처럼
+        /// "충전 중"이라는 상태를 표현하는 용도다.</summary>
+        public static event Action ChargeStarted;
+
+        /// <summary>충전 진행률(0~1)이 바뀔 때마다 발생. 프레임이 바뀌지 않는 미세한 변화도 포함한다.</summary>
+        public static event Action<float> ChargeProgressChanged;
+
+        /// <summary>충전 상태를 벗어날 때 발생 - 발사(Strike)로 끝났든 감쇠로 취소됐든 항상 한 번
+        /// 발생한다. 컴포넌트가 충전 도중 비활성화되는 경우에도 남기지 않고 보낸다.</summary>
+        public static event Action ChargeEnded;
+
         private const int IdleIndex = 0;
 
         /// <summary>attackFrameOverlayRenderer가 비어 있을 때 Awake에서 만들어 붙이는 자식 오브젝트 이름.</summary>
@@ -80,7 +105,9 @@ namespace Character
             }
         }
 
-        private enum AttackPhase { None, Windup, Recovery }
+        /// <summary>Windup은 Direct Input 전용(시간/FPS 기반), Charging은 Accumulated Input 전용
+        /// (충전량 기반)이다. 두 방식 모두 Strike 이후에는 같은 Recovery를 탄다.</summary>
+        private enum AttackPhase { None, Windup, Charging, Recovery }
 
         [Header("Character Motion Profile (필수)")]
         [Tooltip("이 캐릭터의 Idle/Idle Event/공격 풀/Attack Movement 제작값을 담은 프로필 에셋 - 모션 " +
@@ -106,6 +133,11 @@ namespace Character
         private HitEffectSpawner castEffectSpawner;
         private ProjectileSpawner projectileSpawner;
 
+        // 이 캐릭터의 Transform 이동을 단독으로 담당하는 컨트롤러(같은 GameObject). 키 입력이 아니라
+        // 실제 타격/충전 상태에만 반응하도록 여기서 직접 호출한다 - 정적 이벤트로 돌리면 씬에 다른
+        // 캐릭터가 함께 켜져 있을 때 남의 타격에 같이 움직인다.
+        private AttackMovement attackMovement;
+
         // [0] = Base Idle(항상 존재), [1..] = 프로필의 Idle Events. Awake에서 프로필 기준으로 한 번만 만든다.
         private RuntimeFrameAnimation[] animations;
         private float idleEventCheckInterval = 4f;
@@ -124,12 +156,22 @@ namespace Character
         private float lastInputTime;
         private bool castCueFired;
 
+        // ---- Accumulated Input 전용 상태(Direct Input 모드에서는 항상 0으로 남는다) ----
+        // 현재 충전량(입력 수 단위). 감쇠 때문에 정수로 떨어지지 않으므로 float다.
+        private float chargeInputs;
+        // 타격~Recovery 동안 받아둔 입력 - 다음 공격 사이클의 시작 충전량으로 이월된다.
+        private float carriedInputs;
+        // ChargeStarted를 보냈고 아직 ChargeEnded를 보내지 않은 상태. 시작/종료 신호가 정확히 한 번씩
+        // 짝을 이루게 만드는 유일한 근거다(구독자가 "충전 중" 상태를 영원히 붙잡고 있지 않도록).
+        private bool chargeSignalActive;
+        private float reportedChargeRatio = -1f;
+
         // 콤보 티어별로 정리된 재생 가능한 모션 풀(frames가 비어 있는 항목은 제외) - Awake에서 한 번만 만든다.
         private readonly List<IAttackMotion> resolvedTier1 = new List<IAttackMotion>();
         private readonly List<IAttackMotion> resolvedTier2 = new List<IAttackMotion>();
         private readonly List<IAttackMotion> resolvedTier3 = new List<IAttackMotion>();
 
-        // 이번 Windup~Recovery 사이클 동안 재생 중인 모션 - StartWindup()에서만 새로 뽑는다.
+        // 이번 사이클(Windup/Charging~Recovery) 동안 재생 중인 모션 - StartAttackCycle()에서만 새로 뽑는다.
         private IAttackMotion activeMotion;
         private Sprite[] activeMotionFrames = Array.Empty<Sprite>();
 
@@ -158,6 +200,10 @@ namespace Character
             ? 0
             : Mathf.Clamp(activeMotion.CastFrameIndex, 0, activeMotionFrames.Length - 1);
 
+        /// <summary>이번 사이클의 타격까지 필요한 총 입력 수(누적 입력 모드 전용). 에셋 프로퍼티가 이미
+        /// 1 이상으로 보정해서 돌려주지만, 0으로 나누는 경로가 생기지 않도록 여기서도 한 번 더 막는다.</summary>
+        private int ActiveRequiredInputs => Mathf.Max(1, activeMotion.RequiredInputsToStrike);
+
         public CharacterMotionProfile MotionProfile => motionProfile;
 
         private void Awake()
@@ -182,6 +228,7 @@ namespace Character
             // 조정하고 싶으면 미리 직접 붙여두면 된다.
             projectileSpawner = GetComponent<ProjectileSpawner>();
             if (projectileSpawner == null) projectileSpawner = gameObject.AddComponent<ProjectileSpawner>();
+            attackMovement = GetComponent<AttackMovement>(); // 없어도 된다(이동 없는 캐릭터)
             EnsureAttackFrameOverlay();
             BuildRuntimeConfiguration();
 
@@ -318,10 +365,13 @@ namespace Character
             }
         }
 
-        // ---- 입력 처리: 키 입력 1회 = 타격 1회. 대기열에 쌓아두고 재생이 순서대로 소비한다 ----
+        // ---- 입력 처리 ----
+        // Direct Input: 키 입력 1회 = 타격 1회. 대기열에 쌓아두고 재생이 순서대로 소비한다.
+        // Accumulated Input: 키 입력 1회 = 충전 1회. 대기열 대신 충전량(chargeInputs)이 늘어난다.
+        // 어느 쪽인지는 지금 재생 중인 모션이 정한다 - 공격이 시작되기 전(None)에는 아직 모션이 정해지지
+        // 않았으므로, 사이클을 시작하면서(StartAttackCycle) 이 첫 입력을 해당 모드의 값으로 반영한다.
         private void OnKeyInput()
         {
-            pendingAttacks++;
             lastInputTime = Time.time;
 
             switch (attackPhase)
@@ -329,12 +379,32 @@ namespace Character
                 case AttackPhase.None:
                     BeginAttackSession();
                     break;
-                case AttackPhase.Recovery:
-                    // 복귀 재생 중 새 입력 -> 복귀를 취소하고 대기 중인 타격을 이어서 처리한다.
-                    StartWindup();
-                    break;
                 case AttackPhase.Windup:
-                    // 이미 재생 중이면 애니메이션을 건드리지 않는다. 대기열에 쌓이는 것만으로 충분하다.
+                    // Direct: 이미 재생 중이면 애니메이션을 건드리지 않는다. 대기열에 쌓이는 것만으로 충분하다.
+                    pendingAttacks++;
+                    break;
+                case AttackPhase.Charging:
+                    // 누적: 충전량만 올린다. 프레임은 AdvanceCharging이 충전 진행률로 다시 계산한다.
+                    chargeInputs = Mathf.Min(chargeInputs + 1f, ActiveRequiredInputs);
+                    // 충전을 완성시키는 마지막 입력은 움찔이 아니라 발사다 - 이 입력에는 Charge
+                    // Movement를 요청하지 않고, 같은 프레임의 AdvanceCharging이 Strike로 넘어간다.
+                    if (chargeInputs < ActiveRequiredInputs) RequestChargeMovement();
+                    break;
+                case AttackPhase.Recovery:
+                    if (activeMotion.UseAccumulatedInput)
+                    {
+                        // 누적: Recovery는 기존 FPS로 끝까지 재생한다(끊지 않는다). 이 입력은 버리지 않고
+                        // 다음 공격의 시작 충전량으로 이월한다 - 빠르게 타이핑할 때 입력이 사라지지 않는다.
+                        if (activeMotion.CarryOverflowInputs)
+                        {
+                            carriedInputs = Mathf.Min(carriedInputs + 1f, ActiveRequiredInputs);
+                        }
+                    }
+                    else
+                    {
+                        // Direct: 복귀를 취소하고 대기 중인 타격을 이어서 처리한다.
+                        StartAttackCycle(1f);
+                    }
                     break;
             }
         }
@@ -345,22 +415,49 @@ namespace Character
 
             playingVariant = false;
             AttackStarted?.Invoke();
-            StartWindup();
+            StartAttackCycle(1f); // 세션을 연 이 첫 입력 1회를 사이클 시작값으로 넘긴다.
         }
 
-        private void StartWindup()
+        /// <summary>공격 한 사이클(Windup 또는 Charging -> Strike -> Recovery)을 시작한다.
+        /// 콤보 티어는 매 사이클 시작 시점에만 다시 확인한다 - 재생/충전 중인 공격을 끊지 않고
+        /// "다음 공격 시작부터" 새 티어가 반영되도록 하기 위함이다.
+        /// newInputs는 이 사이클을 시작시킨 새 키 입력 수다(Strike 직후 이어지는 사이클은 0).</summary>
+        private void StartAttackCycle(float newInputs)
         {
-            // 콤보 티어는 매 사이클(대기열에서 하나 꺼내 재생을 시작하는 시점)마다 다시 확인한다 -
-            // 재생 중인 공격을 끊지 않고 "다음 공격 시작부터" 새 티어가 반영되도록 하기 위함이다.
             activeMotion = SelectMotion(GetPoolForTier(ComboManager.CurrentTier));
             activeMotionFrames = activeMotion.Frames;
             // 콤보로 새 모션을 뽑았으면 오버레이도 그 모션 것으로 즉시 교체된다(직전 모션 것을 이어 쓰지 않는다).
             activeMotionOverlayFrames = activeMotion.OverlayFrames;
 
-            attackPhase = AttackPhase.Windup;
-            attackFrame = 0;
             attackPhaseTimer = 0f;
             castCueFired = false; // 새 공격 인스턴스 - Cast Cue를 다시 한 번만 쏠 수 있게 리셋한다.
+
+            if (activeMotion.UseAccumulatedInput)
+            {
+                attackPhase = AttackPhase.Charging;
+                BeginChargeSignal();
+                // 이월된 입력 + 이번 입력으로 시작한다. Direct 대기열이 남아 있는 경우(한 풀에 두 방식이
+                // 섞여 있어 직전 사이클이 Direct였던 경우)에도 그 입력을 버리지 않고 충전으로 넘긴다.
+                chargeInputs = Mathf.Clamp(carriedInputs + pendingAttacks + newInputs, 0f, ActiveRequiredInputs);
+                carriedInputs = 0f;
+                pendingAttacks = 0;
+                attackFrame = -1; // 아직 아무 프레임도 적용하지 않은 상태 - 첫 계산에서 반드시 적용된다.
+                // 사이클을 여는 이 충전(첫 입력 또는 이월분)도 움찔 1회로 알린다. 이월 입력은 직전
+                // 공격의 Recovery 중에 받은 것이라 그때는 타격 이동이 재생 중이었고, 여기서 비로소
+                // 이번 공격의 충전 입력이 된다 - 지난 공격의 움찔이 발사 뒤까지 남는 일은 없다.
+                if (chargeInputs < ActiveRequiredInputs) RequestChargeMovement();
+                AdvanceCharging(); // 첫 프레임 즉시 적용 + (이월만으로 충전이 다 찼다면) 즉시 타격
+                return;
+            }
+
+            attackPhase = AttackPhase.Windup;
+            EndChargeSignal(); // Direct 모션으로 넘어왔으면 충전 상태는 여기서 확실히 닫는다(보통 이미 닫혀 있다).
+            // 직전 사이클이 누적 입력이었고 이월된 입력이 남아 있으면(한 풀에 두 방식이 섞여 있는 경우)
+            // 그 입력도 버리지 않고 Direct 대기열로 옮긴다 - 어느 방향으로 모드가 바뀌든 사용자가 실제로
+            // 누른 입력은 사라지지 않는다.
+            pendingAttacks += Mathf.RoundToInt(newInputs + carriedInputs);
+            carriedInputs = 0f;
+            attackFrame = 0;
             ApplyAttackFrame();
             TryFireCastCue(); // Cast Frame Index가 0이면 시작하자마자 시전 연출
 
@@ -368,6 +465,108 @@ namespace Character
             {
                 Strike(); // hitFrameIndex가 0이면 시작하자마자 타격
             }
+        }
+
+        /// <summary>누적 입력 모드의 매 프레임 처리. 순서가 중요하다 -
+        /// (1) 충전이 다 찼으면 곧바로 타격(입력한 프레임에 바로 반응한다),
+        /// (2) 아니면 유예 시간이 지난 만큼 충전량을 줄이고, 0이 되면 Idle로 복귀,
+        /// (3) 남은 충전량으로 보여줄 Windup 프레임을 다시 계산한다.</summary>
+        private void AdvanceCharging()
+        {
+            int required = ActiveRequiredInputs;
+
+            if (chargeInputs >= required)
+            {
+                // 필요 입력량 도달 - Hit Frame으로 이동해 Cast/Hit을 기존 규칙 그대로 실행한다.
+                chargeInputs = 0f;
+                attackFrame = ActiveHitFrameIndex;
+                ApplyAttackFrame();
+                TryFireCastCue(); // Hit보다 항상 먼저 판정 - 같은 프레임이어도 Cast가 먼저 발생한다.
+                Strike();
+                return;
+            }
+
+            float silence = Time.time - lastInputTime;
+            if (silence > activeMotion.NoInputGraceTime)
+            {
+                float decayDuration = activeMotion.ChargeDecayDuration;
+                chargeInputs = decayDuration <= 0f
+                    ? 0f
+                    : chargeInputs - required * Time.deltaTime / decayDuration;
+
+                if (chargeInputs <= 0f)
+                {
+                    // 충전이 완전히 풀렸다 - 공격 자세를 접고 Idle로 돌아간다.
+                    chargeInputs = 0f;
+                    FinishSession();
+                    return;
+                }
+            }
+
+            ApplyChargeFrame();
+        }
+
+        /// <summary>충전 상태에 들어갔음을 알린다(사이클당 한 번). 이 신호 자체는 이동을 만들지 않는다 -
+        /// Charge Movement는 "충전 시작"이 아니라 "입력 1회"에 대응하므로 RequestChargeMovement가 따로
+        /// 호출한다.</summary>
+        private void BeginChargeSignal()
+        {
+            if (chargeSignalActive) return;
+            chargeSignalActive = true;
+            reportedChargeRatio = -1f;
+
+            ChargeStarted?.Invoke();
+        }
+
+        /// <summary>누적 입력 1회에 대응하는 충전 움찔을 요청한다. 이동은 정적 이벤트가 아니라 같은
+        /// GameObject의 컨트롤러를 직접 호출해서 이 캐릭터만 움직이게 한다. Direct 공격 경로에서는
+        /// 절대 호출되지 않는다(누적 입력 모드의 충전 처리에서만 부른다).</summary>
+        private void RequestChargeMovement()
+        {
+            if (attackMovement != null && attackMovement.enabled) attackMovement.RequestChargeMove();
+        }
+
+        /// <summary>충전 상태를 벗어났음을 알린다 - 발사로 끝났든(Strike) 감쇠로 취소됐든(FinishSession)
+        /// 항상 여기를 지나므로, 구독자 입장에서 시작/종료가 정확히 한 번씩 짝을 이룬다.</summary>
+        private void EndChargeSignal()
+        {
+            if (!chargeSignalActive) return;
+            chargeSignalActive = false;
+            reportedChargeRatio = -1f;
+
+            if (attackMovement != null && attackMovement.enabled) attackMovement.EndChargeMove();
+            ChargeEnded?.Invoke();
+        }
+
+        private void ReportChargeProgress()
+        {
+            float ratio = Mathf.Clamp01(chargeInputs / ActiveRequiredInputs);
+            if (Mathf.Approximately(ratio, reportedChargeRatio)) return;
+            reportedChargeRatio = ratio;
+            ChargeProgressChanged?.Invoke(ratio);
+        }
+
+        /// <summary>충전 진행률로 Windup 프레임(0 ~ Hit Frame 직전)을 고른다 - 시간 기반 FPS를 쓰지
+        /// 않으므로 입력이 없는 동안에는 같은 프레임이 그대로 유지되고(활시위를 당긴 자세), 충전량이
+        /// 줄면 프레임도 함께 되돌아간다. Hit Frame 자체는 충전이 다 찼을 때만 보여준다.</summary>
+        private void ApplyChargeFrame()
+        {
+            int hitFrame = ActiveHitFrameIndex;
+            int frame = Mathf.Clamp(
+                Mathf.FloorToInt(chargeInputs / ActiveRequiredInputs * hitFrame),
+                0,
+                Mathf.Max(0, hitFrame - 1));
+
+            if (frame != attackFrame)
+            {
+                attackFrame = frame;
+                ApplyAttackFrame();
+            }
+
+            // Cast Frame이 Hit Frame보다 앞이면 충전 도중 그 프레임을 지날 때 시전 연출이 나간다
+            // (공격 인스턴스당 한 번만 - castCueFired가 막는다).
+            TryFireCastCue();
+            ReportChargeProgress();
         }
 
         /// <summary>attackFrame이 Cast Frame Index에 도달하면 공격 인스턴스당 정확히 한 번만 Cast
@@ -478,13 +677,28 @@ namespace Character
 
         private void Strike()
         {
+            // 충전으로 시작한 공격이면 충전 상태를 먼저 닫는다 - 이동 컨트롤러가 충전 자세에서 곧바로
+            // 타격 이동으로 넘어가야 하고, 둘이 같은 프레임에 Transform을 서로 덮어쓰면 안 된다.
+            EndChargeSignal();
+
             // HitPoint보다 먼저 - 발사체가 목표 지점에 도착한 그 프레임에 피격 이펙트가 겹쳐 나오게 한다.
             CompleteActiveProjectile();
 
             if (pendingAttacks > 0) pendingAttacks--; // 이 타격으로 대기열에서 요청 하나를 소비(확정)한다.
 
             flashOnCue.Flash();
+            // 이동은 "실제 타격"에만 반응한다 - 키 입력이나 충전 진행으로는 절대 발동하지 않는다.
+            if (attackMovement != null && attackMovement.enabled) attackMovement.PlayAttackMove();
             HitPoint?.Invoke(new AttackHitCue(basicAttackPower, activeMotion.HitSound, activeMotion.HitEffectPrefab, activeMotion.HitEffectOffset, activeMotion.HitEffectScale)); // 이 호출이 처치를 유발하면 Target.HasAttackableTarget이 여기서 이미 false로 바뀌어 있을 수 있다.
+
+            if (activeMotion.UseAccumulatedInput)
+            {
+                // 누적 입력 모드에는 Direct 대기열도 Queue Window도 없다 - 발사 뒤에는 항상 Recovery를
+                // 기존 FPS로 끝까지 재생하고, 그 사이 입력은 carriedInputs로 모아 다음 사이클에 넘긴다.
+                carriedInputs = 0f;
+                StartRecovery();
+                return;
+            }
 
             // 처치를 유발한 타격이었다면(마지막 남은 Target이었을 경우) 이 시점에 이미 공격 불가 상태다 -
             // 아직 실행하지 않은 예약 공격은 전부 폐기하고 새 Windup을 시작하지 않는다. 지금 재생 중인
@@ -493,7 +707,7 @@ namespace Character
             bool inputStillFresh = Time.time - lastInputTime < activeMotion.QueueExpireTimeout;
             if (canAttack && pendingAttacks > 0 && inputStillFresh)
             {
-                StartWindup(); // 대기 중인 타격이 있고 입력이 이어지고 있으면 곧바로 다음 재생으로(모션은 여기서 새로 뽑힌다)
+                StartAttackCycle(0f); // 대기 중인 타격이 있고 입력이 이어지고 있으면 곧바로 다음 재생으로(모션은 여기서 새로 뽑힌다)
             }
             else
             {
@@ -511,8 +725,11 @@ namespace Character
 
         private void FinishSession()
         {
+            EndChargeSignal(); // 충전이 감쇠로 취소된 경로 - 여기서도 반드시 종료 신호가 나간다.
             attackPhase = AttackPhase.None;
             pendingAttacks = 0; // 정상 흐름이면 이미 0이지만 방어적으로 초기화
+            chargeInputs = 0f;
+            carriedInputs = 0f; // 세션이 끝나면 이월 입력도 버린다 - 다음 공격은 첫 입력부터 다시 시작한다.
             activeAnimIndex = IdleIndex;
             currentFrame = 0;
             frameTimer = 0f;
@@ -540,6 +757,11 @@ namespace Character
                     });
                     break;
 
+                case AttackPhase.Charging:
+                    // 누적 입력 모드는 시간이 아니라 충전량으로 진행한다 - AdvanceStep(FPS 타이머)을 타지 않는다.
+                    AdvanceCharging();
+                    break;
+
                 case AttackPhase.Recovery:
                     if (attackFrame < activeMotionFrames.Length - 1)
                     {
@@ -560,7 +782,17 @@ namespace Character
                         attackPhaseTimer += Time.deltaTime;
                         if (attackPhaseTimer >= activeMotion.EndFrameDuration)
                         {
-                            FinishSession();
+                            // 누적 입력 모드에서 Recovery 중에 받아둔 입력이 있으면 Idle을 거치지 않고
+                            // 곧바로 다음 충전으로 이어간다(콤보 티어는 이 시점에 다시 반영된다).
+                            // 공격 대상이 사라졌다면 이월 입력은 버리고 그대로 Idle로 돌아간다.
+                            if (activeMotion.UseAccumulatedInput && carriedInputs > 0f && Target.HasAttackableTarget)
+                            {
+                                StartAttackCycle(0f);
+                            }
+                            else
+                            {
+                                FinishSession();
+                            }
                         }
                     }
                     break;
@@ -668,6 +900,14 @@ namespace Character
         {
             SetOverlaySprite(null);
             ReleaseActiveProjectile();
+            // 충전 도중 캐릭터가 꺼지면(교체/파괴) 구독자에게 "충전 중" 상태가 영원히 남지 않게 닫는다 -
+            // 콤보 타이머가 영구 일시정지되거나 Charge Movement 위치가 남는 것을 막는다.
+            EndChargeSignal();
+            // 다음 활성화는 새 세션으로 시작한다 - 충전량/대기열을 들고 돌아오지 않는다.
+            attackPhase = AttackPhase.None;
+            pendingAttacks = 0;
+            chargeInputs = 0f;
+            carriedInputs = 0f;
         }
 
         // ---- Idle / Idle 변형 ----

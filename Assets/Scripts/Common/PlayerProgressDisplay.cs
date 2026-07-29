@@ -8,6 +8,12 @@ namespace Common
     /// <summary>
     /// PlayerProgress의 레벨/경험치를 HUD ProgressPanel(레벨 텍스트, EXP 바, 퍼센트 텍스트)에 표시한다.
     /// PlayerProgress.OnExperienceChanged가 발생했을 때만 갱신한다 - 매 프레임 폴링하지 않는다.
+    ///
+    /// <b>초기 표시와 획득 연출은 분리한다.</b> 저장 데이터 로드(PlayerProgress.Awake)는 이 컴포넌트의
+    /// OnEnable보다 늦게 끝날 수 있으므로, PlayerProgress.IsInitialized가 true가 되기 전에는 아무 것도
+    /// 그리지 않고 OnProgressInitialized를 기다렸다가 저장된 레벨/비율을 연출 없이 즉시 반영한다
+    /// (SyncToSavedProgress). 예전에는 로드 전 정적 기본값(Level 0)으로 표시가 굳어서, 첫 처치 때
+    /// 0 -> 저장 레벨까지 레벨업 연출이 쏟아졌다.
     /// 경험치 바는 Unity Slider를 표시 전용으로 사용한다. Slider는 Fill Image가 Sliced 타입이면
     /// fillAmount로 텍스처를 잘라내지 않고 Fill Rect의 폭을 바꾸므로, 나인슬라이스 양끝 모양을 유지한
     /// 채 진행률을 표현할 수 있다. Inspector의 Slider.Value로 Edit Mode에서도 즉시 미리볼 수 있다.
@@ -56,12 +62,18 @@ namespace Common
         {
             ResolveSlider();
             PlayerProgress.OnExperienceChanged += Refresh;
-            Refresh();
+            PlayerProgress.OnProgressInitialized += SyncToSavedProgress;
+
+            // PlayerProgress.Awake보다 이 OnEnable이 먼저 돌 수 있다 - 그때는 아직 저장 데이터가
+            // 로드되지 않았으므로(Level 0) 아무 것도 그리지 않고 초기화 신호를 기다린다. 이미 로드가
+            // 끝난 뒤라면(순서가 반대였거나 재활성화) 곧바로 현재 값으로 맞춘다.
+            if (PlayerProgress.IsInitialized) SyncToSavedProgress();
         }
 
         private void OnDisable()
         {
             PlayerProgress.OnExperienceChanged -= Refresh;
+            PlayerProgress.OnProgressInitialized -= SyncToSavedProgress;
 
             if (fillAnimationRoutine != null)
             {
@@ -73,8 +85,29 @@ namespace Common
             queuedLevelUps = 0;
         }
 
+        /// <summary>저장된 레벨/경험치를 <b>연출 없이</b> 그대로 표시에 반영한다. 초기 동기화는 경험치를
+        /// "획득한" 것이 아니므로 AnimateLevelUpQueue/AnimateNormalGain을 절대 타지 않는다 - 저장 레벨이
+        /// 29면 첫 프레임부터 Lv. 29와 그 비율이 보이고, 0에서 29까지 올라가는 연출은 없다.
+        /// 첫 실제 처치부터는 Refresh가 평소대로 획득 연출을 재생한다.</summary>
+        private void SyncToSavedProgress()
+        {
+            if (fillAnimationRoutine != null)
+            {
+                StopCoroutine(fillAnimationRoutine);
+                fillAnimationRoutine = null;
+            }
+            levelUpTransitionActive = false;
+            queuedLevelUps = 0;
+            presentationInitialized = false; // 아래 Refresh가 "즉시 동기화" 경로를 타게 한다.
+            Refresh();
+        }
+
         private void Refresh()
         {
+            // 저장 데이터 로드 전에는 표시를 시작하지 않는다 - 여기서 그리면 정적 기본값(Level 0)이
+            // 그대로 굳어서, 첫 처치 때 0 -> 29 레벨업 연출이 쏟아진다.
+            if (!PlayerProgress.IsInitialized) return;
+
             if (levelText != null)
             {
                 levelText.text = string.Format(levelFormat, PlayerProgress.CurrentLevel);
@@ -88,6 +121,7 @@ namespace Common
 
             if (!presentationInitialized)
             {
+                // 초기 동기화: presentedLevel과 두 Fill을 현재 저장값으로 즉시 맞춘다(연출 없음).
                 SetMainFill(ratio);
                 SetGainPreviewFill(ratio);
                 presentedLevel = PlayerProgress.CurrentLevel;

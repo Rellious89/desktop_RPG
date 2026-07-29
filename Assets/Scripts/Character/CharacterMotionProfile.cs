@@ -44,6 +44,35 @@ namespace Character
             public float MoveBackDuration => Mathf.Max(0.001f, moveBackDuration);
         }
 
+        /// <summary>누적 입력 공격에서 <b>입력 1회마다 한 번</b> 재생하는 작은 움찔. Attack Movement와
+        /// 같은 컨트롤러(AttackMovement)가 하나의 Transform에 적용하므로 둘이 서로 위치를 덮어쓰지
+        /// 않는다. 발사를 일으키는 마지막 입력에서는 움찔 없이 Attack Movement만 나가므로, Required
+        /// Inputs가 5면 움찔은 4회다.</summary>
+        [Serializable]
+        public class ChargeMovementSettings
+        {
+            [Tooltip("끄면 충전 중에도 캐릭터가 전혀 움직이지 않는다(Attack Movement만 동작).")]
+            [SerializeField] private bool enableChargeMovement = true;
+
+            [Tooltip("입력 1회당 움찔할 거리. 음수면 뒤로 당겨진다(활시위를 당기는 느낌). " +
+                     "Attack Movement보다 작게 잡는 것을 권장한다.")]
+            [SerializeField] private float chargeMoveDistance = -0.08f;
+
+            [Tooltip("움찔이 나가는 시간(초). 이 시간이 지나면 곧바로 기준점으로 돌아오기 시작한다.")]
+            [Min(0.001f)]
+            [SerializeField] private float chargeMoveInDuration = 0.1f;
+
+            [Tooltip("움찔이 기준점으로 돌아오는 시간(초). 충전이 취소될 때의 복귀에도 같은 값을 쓴다. " +
+                     "발사로 끝난 경우에는 Attack Movement가 현재 위치에서 이어받는다.")]
+            [Min(0.001f)]
+            [SerializeField] private float chargeMoveReturnDuration = 0.18f;
+
+            public bool EnableChargeMovement => enableChargeMovement;
+            public float ChargeMoveDistance => chargeMoveDistance;
+            public float ChargeMoveInDuration => Mathf.Max(0.001f, chargeMoveInDuration);
+            public float ChargeMoveReturnDuration => Mathf.Max(0.001f, chargeMoveReturnDuration);
+        }
+
         /// <summary>이 캐릭터 자신의 표시 보정만 담는다. 상대(몬스터) 표시는 전적으로
         /// MonsterMotionProfile이, 두 액터의 기본 서 있는 위치는 공용 CombatStageLayout이 담당한다.</summary>
         [Serializable]
@@ -85,6 +114,9 @@ namespace Character
         [Header("Attack Movement")]
         [SerializeField] private AttackMovementSettings attackMovement = new AttackMovementSettings();
 
+        [Header("Charge Movement (누적 입력 공격 전용)")]
+        [SerializeField] private ChargeMovementSettings chargeMovement = new ChargeMovementSettings();
+
         [Header("Editor Preview")]
         [SerializeField] private PreviewSettings preview = new PreviewSettings();
 
@@ -98,6 +130,7 @@ namespace Character
         public ComboTierAttackPool Tier2Pool => tier2Pool;
         public ComboTierAttackPool Tier3Pool => tier3Pool;
         public AttackMovementSettings AttackMovement => attackMovement;
+        public ChargeMovementSettings ChargeMovement => chargeMovement ?? (chargeMovement = new ChargeMovementSettings());
         public PreviewSettings Preview => preview;
 
         /// <summary>

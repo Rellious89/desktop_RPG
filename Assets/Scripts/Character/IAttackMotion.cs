@@ -19,7 +19,28 @@ namespace Character
         float AnimationFps { get; }
         int HitFrameIndex { get; }
         float EndFrameDuration { get; }
+
+        /// <summary>Direct Input 모드의 대기열(pendingAttacks) 만료 시간. Accumulated Input 모드에는
+        /// 대기열이 없으므로 이 값을 보지 않는다(누적 모드의 입력 공백은 NoInputGraceTime이 담당한다).</summary>
         float QueueExpireTimeout { get; }
+
+        /// <summary>true면 이 공격은 누적 입력 모드다 - 키 입력 1회 = 타격 1회가 아니라, 입력을 모아
+        /// RequiredInputsToStrike에 도달하는 순간 타격한다. Windup 프레임은 시간(FPS)이 아니라 충전
+        /// 진행률로 진행되고, Recovery만 기존 FPS/EndFrameDuration으로 재생한다. false면 기존 Direct
+        /// Input 동작 그대로다.</summary>
+        bool UseAccumulatedInput { get; }
+
+        /// <summary>누적 입력 모드에서 공격 시작(첫 입력 1회 포함)부터 타격까지 필요한 총 입력 수. 1 이상.</summary>
+        int RequiredInputsToStrike { get; }
+
+        /// <summary>누적 입력이 끊긴 뒤 현재 충전량을 그대로 유지하는 시간(초).</summary>
+        float NoInputGraceTime { get; }
+
+        /// <summary>유예 시간이 지난 뒤 가득 찬 충전량이 0까지 줄어드는 데 걸리는 시간(초). 0이면 즉시 0.</summary>
+        float ChargeDecayDuration { get; }
+
+        /// <summary>타격 이후(Recovery 포함) 들어온 입력을 다음 공격의 충전으로 넘길지 여부.</summary>
+        bool CarryOverflowInputs { get; }
 
         int CastFrameIndex { get; }
         GameObject CastEffectPrefab { get; }

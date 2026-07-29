@@ -1,19 +1,25 @@
 using System;
-using DesktopWindow;
+using Character;
 using UnityEngine;
 
 namespace Common
 {
     /// <summary>
-    /// 유효한 키 입력이 들어올 때마다 콤보를 올리고, 현재 티어에 해당하는 타임아웃 동안 입력이
-    /// 없으면 콤보를 0으로 되돌린다. 티어가 높을수록(Fever에 가까울수록) 타임아웃을 짧게 잡아서
-    /// 콤보를 유지하려면 더 빠르게 계속 입력해야 하는 긴장감을 준다.
-    /// GlobalKeyboardHook의 입력 신호를 보되, 실제 HitPoint/데미지와는 여전히 무관하다(콤보는
-    /// "유효한 전투 키 입력" 자체를 카운트하는 정책을 유지한다) - 다만 공격 가능한 Target이 하나도
-    /// 없는 동안(Target.HasAttackableTarget == false)에는 입력을 콤보로 인정하지 않고, 만료
-    /// 타이머(sinceLastInput)도 그 값 그대로 멈춰둔다(0으로 초기화하지 않는다) - 적이 없어서
-    /// 못 때리는 동안 콤보 제한 시간이 흘러 강제로 끊기는 것을 막기 위함이다. Target이 다시
-    /// Alive가 되면 남은 시간부터 타이머가 이어서 진행된다.
+    /// <b>실제 타격 1회 = 콤보 1</b>. 예전에는 키 입력 자체를 콤보로 셌지만, 누적 입력 공격이 생기면서
+    /// "아직 쏘지도 않은 충전 입력"까지 콤보로 잡히는 문제가 있었다. 이제 콤보를 올리는 유일한 근거는
+    /// PlayerCharacterAnimator.HitPoint(공격 모션이 Hit Frame에 도달한 순간)다 - 키 입력, 충전 진행,
+    /// 몬스터 처치는 콤보를 올리지 않는다. 콤보 수치의 단위는 입력 수가 아니라 타격 수다.
+    ///
+    /// 만료 타이머는 마지막 <b>타격</b>부터 잰다. 다음 두 경우에는 값을 그대로 둔 채 진행만 멈춘다
+    /// (0으로 초기화하지 않으므로, 재개되면 남은 시간부터 이어진다).
+    ///   - 공격 가능한 Target이 없을 때(Target.HasAttackableTarget == false): 적이 없어서 못 때리는
+    ///     동안 제한 시간이 흘러 콤보가 강제로 끊기는 것을 막는다.
+    ///   - 누적 입력 공격을 충전하는 동안(ChargeStarted ~ ChargeEnded): 충전 시간이 티어 타임아웃보다
+    ///     길 수 있어서, 정상적으로 활을 당기고 있는데 콤보가 끊기면 안 된다. 발사(Hit)로 끝나면 타이머가
+    ///     리셋되고, 충전이 취소되면 그 자리에서 다시 흐르기 시작한다.
+    ///
+    /// 티어가 높을수록(Fever에 가까울수록) 타임아웃을 짧게 잡아 콤보 유지에 긴장감을 준다. 티어 임계값
+    /// 자체는 기준 단위가 타격 수로 바뀐 뒤의 체감을 보고 조정한다(이번에는 그대로 둔다).
     /// 씬에 하나만 두면 된다. 다른 스크립트는 정적 프로퍼티/이벤트로 콤보 상태를 읽는다
     /// (Target.AnyTargetDefeated, SessionKillCounter와 같은 패턴).
     /// </summary>
@@ -28,7 +34,7 @@ namespace Common
         [Tooltip("3: Fever")]
         [SerializeField] private int tier3Threshold = 50;
 
-        [Header("Timeout per Tier (초) - 마지막 입력 이후 이 시간 동안 추가 입력이 없으면 콤보가 끊긴다")]
+        [Header("Timeout per Tier (초) - 마지막 타격 이후 이 시간 동안 다음 타격이 없으면 콤보가 끊긴다")]
         [Tooltip("콤보가 없거나 Tier 1일 때 적용되는 타임아웃")]
         [SerializeField] private float tier1Timeout = 1.0f;
         [SerializeField] private float tier2Timeout = 0.5f;
@@ -46,35 +52,63 @@ namespace Common
         /// <summary>타임아웃으로 콤보가 끊길 때 발생. 인자는 끊기기 직전의 콤보 수치.</summary>
         public static event Action<int> OnComboBroken;
 
-        private float sinceLastInput;
+        private float sinceLastHit;
+
+        /// <summary>누적 입력 공격을 충전하는 동안 true - 이 동안에는 만료 타이머가 흐르지 않는다.
+        /// PlayerCharacterAnimator가 시작/종료를 정확히 한 번씩 보내므로(비활성화 경로 포함) 여기서
+        /// 별도의 타임아웃 안전장치를 두지 않는다.</summary>
+        private bool chargeInProgress;
 
         private void OnEnable()
         {
             CurrentCombo = 0;
             CurrentTier = 0;
+            sinceLastHit = 0f;
+            chargeInProgress = false;
+
+            PlayerCharacterAnimator.HitPoint += HandleHitPoint;
+            PlayerCharacterAnimator.ChargeStarted += HandleChargeStarted;
+            PlayerCharacterAnimator.ChargeEnded += HandleChargeEnded;
+        }
+
+        private void OnDisable()
+        {
+            PlayerCharacterAnimator.HitPoint -= HandleHitPoint;
+            PlayerCharacterAnimator.ChargeStarted -= HandleChargeStarted;
+            PlayerCharacterAnimator.ChargeEnded -= HandleChargeEnded;
         }
 
         private void Update()
         {
-            bool canAttack = Target.HasAttackableTarget;
-
-            if (canAttack && GlobalKeyboardHook.AnyKeyDownThisFrame)
-            {
-                RegisterInput();
-            }
-
             if (CurrentCombo <= 0) return;
 
-            // 공격 가능한 Target이 없는 동안에는 콤보 값과 sinceLastInput을 그대로 둔 채 만료 타이머만
-            // 멈춘다 - BreakCombo를 호출하지 않는다. Fade-in이 끝나 다시 canAttack이 true가 되면 이
-            // 남은 값부터 이어서 진행된다(초기화하지 않는다).
-            if (!canAttack) return;
+            // 콤보 값과 sinceLastHit을 그대로 둔 채 만료 타이머만 멈춘다 - BreakCombo를 호출하지 않는다.
+            // 조건이 풀리면 남은 값부터 이어서 진행된다(초기화하지 않는다).
+            if (!Target.HasAttackableTarget) return;
+            if (chargeInProgress) return;
 
-            sinceLastInput += Time.deltaTime;
-            if (sinceLastInput >= CurrentTimeout())
+            sinceLastHit += Time.deltaTime;
+            if (sinceLastHit >= CurrentTimeout())
             {
                 BreakCombo();
             }
+        }
+
+        /// <summary>공격 모션이 Hit Frame에 도달한 순간 - Direct든 누적 입력이든 여기서만 콤보가 오른다.
+        /// 인자(데미지/연출 값)는 콤보와 무관하므로 보지 않는다.</summary>
+        private void HandleHitPoint(AttackHitCue cue)
+        {
+            RegisterHit();
+        }
+
+        private void HandleChargeStarted()
+        {
+            chargeInProgress = true;
+        }
+
+        private void HandleChargeEnded()
+        {
+            chargeInProgress = false;
         }
 
         private float CurrentTimeout()
@@ -87,9 +121,9 @@ namespace Common
             }
         }
 
-        private void RegisterInput()
+        private void RegisterHit()
         {
-            sinceLastInput = 0f;
+            sinceLastHit = 0f;
 
             CurrentCombo++;
             OnComboChanged?.Invoke(CurrentCombo);
@@ -101,7 +135,7 @@ namespace Common
         {
             int finalCombo = CurrentCombo;
             CurrentCombo = 0;
-            sinceLastInput = 0f;
+            sinceLastHit = 0f;
 
             OnComboChanged?.Invoke(CurrentCombo);
             UpdateTier();

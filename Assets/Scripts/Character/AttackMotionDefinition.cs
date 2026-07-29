@@ -36,10 +36,38 @@ namespace Character
         [Tooltip("마지막 프레임에 도달한 뒤 그 프레임을 유지하는 시간(초)")]
         [SerializeField] private float endFrameDuration = 0.12f;
 
-        [Header("Queue")]
-        [Tooltip("마지막 입력 이후 이 시간(초) 동안 새 입력이 없으면, 남아있는 예약(대기열)을 전부 취소하고 " +
-                 "진행 중인 재생만 마친 뒤 복귀한다. 0.15~0.25 권장")]
+        [Header("Queue (Direct Input 전용)")]
+        [Tooltip("Direct Input 모드에서만 쓰는 값이다. 마지막 입력 이후 이 시간(초) 동안 새 입력이 없으면, " +
+                 "남아있는 예약(대기열)을 전부 취소하고 진행 중인 재생만 마친 뒤 복귀한다. 0.15~0.25 권장. " +
+                 "Use Accumulated Input이 켜져 있으면 이 값은 전혀 사용되지 않는다(대기열 자체가 없다).")]
         [SerializeField] private float queueExpireTimeout = 0.15f;
+
+        [Header("Input Response")]
+        [Tooltip("이 공격의 입력 방식.\n" +
+                 "false(기본) = Direct Input: 키 입력 1회 = 대기열 +1 = 타격 1회(기존 동작).\n" +
+                 "true = Accumulated Input: 첫 입력으로 공격 준비를 시작하고, 추가 입력을 모아 " +
+                 "Required Inputs to Strike에 도달하는 순간 Cast/Hit이 발생한다(궁수/마법사용).")]
+        [SerializeField] private bool useAccumulatedInput;
+
+        [Tooltip("Accumulated Input 전용. 공격 시작(첫 입력 1회 포함)부터 타격까지 필요한 총 입력 수. " +
+                 "1 이상이어야 한다.")]
+        [Min(1)]
+        [SerializeField] private int requiredInputsToStrike = 10;
+
+        [Tooltip("Accumulated Input 전용. 충전 중 새 입력이 끊긴 뒤 현재 충전 자세를 그대로 유지하는 시간(초). " +
+                 "이 시간 동안에는 충전량이 줄지 않는다.")]
+        [Min(0f)]
+        [SerializeField] private float noInputGraceTime = 0.5f;
+
+        [Tooltip("Accumulated Input 전용. 유예 시간이 지난 뒤 충전량이 0으로 돌아가기까지 걸리는 시간(초) - " +
+                 "가득 찬 충전이 0이 되는 데 걸리는 시간 기준이다. 감소 중 다시 입력하면 그 지점에서 이어서 " +
+                 "충전된다. 0이면 유예 시간 직후 즉시 초기화된다.")]
+        [Min(0f)]
+        [SerializeField] private float chargeDecayDuration = 1f;
+
+        [Tooltip("Accumulated Input 전용. 발사 이후(타격 프레임~Recovery) 들어온 입력을 다음 공격의 충전으로 " +
+                 "넘길지 여부. 켜두면 빠르게 타이핑할 때 입력이 버려지지 않는다(권장: On).")]
+        [SerializeField] private bool carryOverflowInputs = true;
 
         [Header("Cast Presentation")]
         [Tooltip("이 프레임(0부터)에 도달하면 Cast Presentation(이펙트/사운드)이 한 번 실행된다. " +
@@ -94,6 +122,12 @@ namespace Character
         public float EndFrameDuration => endFrameDuration;
         public float QueueExpireTimeout => queueExpireTimeout;
 
+        public bool UseAccumulatedInput => useAccumulatedInput;
+        public int RequiredInputsToStrike => Mathf.Max(1, requiredInputsToStrike);
+        public float NoInputGraceTime => Mathf.Max(0f, noInputGraceTime);
+        public float ChargeDecayDuration => Mathf.Max(0f, chargeDecayDuration);
+        public bool CarryOverflowInputs => carryOverflowInputs;
+
         public int CastFrameIndex => castFrameIndex;
         public GameObject CastEffectPrefab => castEffectPrefab;
         public Vector2 CastEffectOffset => castEffectOffset;
@@ -108,5 +142,22 @@ namespace Character
         public GameObject ProjectilePrefab => projectilePrefab;
         public Vector2 ProjectileLaunchOffset => projectileLaunchOffset;
         public float ProjectileScale => Mathf.Max(0.01f, projectileScale);
+
+#if UNITY_EDITOR
+        /// <summary>런타임 프로퍼티는 항상 안전한 값으로 보정해서 돌려주지만(Mathf.Max), 잘못 들어온 값이
+        /// 조용히 다른 값으로 동작하면 제작자가 알 수 없다. 에셋을 편집할 때 바로 알 수 있게 여기서
+        /// 직렬화 값 자체를 유효 범위로 되돌리고 경고를 남긴다.</summary>
+        private void OnValidate()
+        {
+            if (requiredInputsToStrike < 1)
+            {
+                Debug.LogWarning($"[AttackMotionDefinition] '{name}': Required Inputs to Strike는 1 이상이어야 합니다 " +
+                                 $"(입력값 {requiredInputsToStrike}) - 1로 보정합니다.", this);
+                requiredInputsToStrike = 1;
+            }
+            if (noInputGraceTime < 0f) noInputGraceTime = 0f;
+            if (chargeDecayDuration < 0f) chargeDecayDuration = 0f;
+        }
+#endif
     }
 }

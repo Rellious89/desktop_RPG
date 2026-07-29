@@ -36,6 +36,17 @@ namespace Common
         public static int CurrentExp { get; private set; }
         public static int ExpToNextLevel { get; private set; }
 
+        /// <summary>저장 데이터 로드가 끝나 CurrentLevel/CurrentExp가 진짜 값인지 여부. Awake 순서상
+        /// UI(PlayerProgressDisplay)의 OnEnable이 이 컴포넌트의 Awake보다 먼저 돌 수 있어서, 그때
+        /// 읽으면 정적 기본값 0을 "레벨 0"으로 표시하고 그대로 굳어버린다. 표시 쪽은 이 값이 true가
+        /// 되기 전에는 아무 것도 그리지 않고, <see cref="OnProgressInitialized"/>를 기다린다.</summary>
+        public static bool IsInitialized { get; private set; }
+
+        /// <summary>저장 데이터 로드가 끝난 직후 한 번 발생. 이 신호로 하는 일은 "현재 값을 즉시
+        /// 표시"뿐이고, 경험치 획득 연출(레벨업 애니메이션 등)을 시작해서는 안 된다 - 실제 획득은
+        /// <see cref="OnExpGained"/>/<see cref="OnLevelUp"/>이 담당한다.</summary>
+        public static event Action OnProgressInitialized;
+
         /// <summary>이번 실행이 아니라 누적으로 처치한 총 횟수. 세션 킬카운트(SessionKillCounter)와 달리 저장된다.</summary>
         public static int TotalKillCount { get; private set; }
 
@@ -50,6 +61,7 @@ namespace Common
 
         private void Awake()
         {
+            IsInitialized = false;
             ExpToNextLevel = expToNextLevel;
 
             SaveData save = SaveSystem.Load();
@@ -65,6 +77,11 @@ namespace Common
                 CurrentExp = currentExp;
                 TotalKillCount = totalKillCount;
             }
+
+            // 로드가 끝난 뒤에만 표시를 허용한다 - 이 순간이 "레벨 0에서 시작해 29까지 올라가는" 가짜
+            // 레벨업 연출과 실제 경험치 획득 연출을 가르는 경계다.
+            IsInitialized = true;
+            OnProgressInitialized?.Invoke();
         }
 
         private void OnEnable()
