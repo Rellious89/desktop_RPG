@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4a8746ce2a8483a8d6a1b3f4ef0c912, type: 3}
+  m_Name: ElfArcher_MotionProfile
+  m_EditorClassIdentifier: 
+  displayName: ElfArcher
+  resourceFolderPath: Assets/Art/Character/ElfArcher
+  baseIdle:
+    displayName: Base Idle
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 5183f7714bfda4d9a94eb359aabac710, type: 3}
+    - {fileID: 21300000, guid: dec3f6bde29d64b29b1f1421d9506a56, type: 3}
+    - {fileID: 21300000, guid: cd310261d8d804df19cbd3a49745dfd9, type: 3}
+    - {fileID: 21300000, guid: 8bbb11a093dba47748ec5fe3a9ea97f4, type: 3}
+    animationFps: 6
+  idleEvents:
+  - displayName: idle a
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: dc399534d2c19423798ebeaadcb918b5, type: 3}
+    - {fileID: 21300000, guid: a360c774ae2724f39beee4dd29ca7f0c, type: 3}
+    - {fileID: 21300000, guid: 6fa84e698ef714e79a0d0a03694faa89, type: 3}
+    - {fileID: 21300000, guid: d7ef3858b7baa4154880dae6ce2d3c17, type: 3}
+    - {fileID: 21300000, guid: b83b3d67a58214b95926c9b3070e7b5d, type: 3}
+    animationFps: 6
+  - displayName: idle b
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 5b34d87fa2350426dae051d63bb8cc57, type: 3}
+    - {fileID: 21300000, guid: 6f31b4f1e8d9c4bd8beb86b0806b2ec6, type: 3}
+    - {fileID: 21300000, guid: 4495e1e8fb76a430681a46317f570dad, type: 3}
+    - {fileID: 21300000, guid: ef3ec185812ae41248020cca1e11aba7, type: 3}
+    - {fileID: 21300000, guid: d6aea95f523f44001a4f944ae0e46976, type: 3}
+    - {fileID: 21300000, guid: 2dad4663405734e85a60f1dbf249fdfa, type: 3}
+    animationFps: 6
+  idleEventCheckInterval: 4
+  idleEventChance: 0.5
+  tier1Pool: {fileID: 11400000, guid: f8e1bf7a261ff4424a4f67a8c4cfb397, type: 2}
+  tier2Pool: {fileID: 11400000, guid: eaf26c1e25bd24d0aafe0353c15afc01, type: 2}
+  tier3Pool: {fileID: 0}
+  attackMovement:
+    moveDistance: 0.2
+    moveOutDuration: 0.14
+    moveBackDuration: 0.05
+  preview:
+    characterOffset: {x: 0, y: 0}
+    receivePointOffset: {x: 0, y: 0.35}
+    characterScale: 1

@@ -104,6 +104,15 @@ Hard pixel edges only; no anti-aliasing, blur, semi-transparent halo or JPEG noi
 The forward planted foot must have one clear ground-contact point.
 ```
 
+캐릭터 Master는 생성 단계부터 **투명 RGBA 배경을 우선 요청**한다. 자홍색·녹색 등의 크로마키 배경은
+캐릭터 외곽선, 얇은 무기, 머리카락과 신체 사이의 빈틈에 배경색이 그림자 팔레트로 흡수될 수 있으므로
+정규 생산 입력으로 사용하지 않는다.
+
+- 이미지 생성 결과가 투명 배경을 정확히 만들지 못한 경우에만 단색 배경을 임시 작업본으로 허용한다.
+- 임시 단색 배경본은 배경 제거뿐 아니라 경계색 제거(`despill`)까지 끝낸 투명 PNG로 만든 뒤 Master 후보로 검수한다.
+- 배경색 계열이 외곽선·시위·장비 틈에 남아 있으면 Master 승인 및 PerfectPixel 업로드를 보류한다.
+- PerfectPixel에는 크로마키 원본이 아니라 승인된 투명 RGBA Master만 업로드한다.
+
 `character_prompt.md`의 Style, Outline, Palette 항목에는 `cute pixel art` 같은 추상 표현만 쓰지 않고
 Character Brief에서 승인한 색 수, 외곽선 두께, 광원과 비율을 넣는다.
 

@@ -25,7 +25,7 @@ PerfectPixel에서 제작자가 직접 작성하는 **자유 텍스트**는 아�
 
 | UI 필드 | 입력 원칙 |
 |---|---|
-| Upload image | 승인된 캐릭터 기준 이미지 1장. 논리 해상도로 축소하지 않은 선명한 컨셉 원본을 사용하고 최종 디자인과 장비가 모두 보여야 함 |
+| Upload image | 승인된 **투명 RGBA** 캐릭터 기준 이미지 1장. 논리 해상도로 축소하지 않은 선명한 컨셉 원본을 사용하고 최종 디자인과 장비가 모두 보여야 함. 크로마키 배경본은 업로드하지 않음 |
 | Character name | 영문 작업 ID 하나. 공백과 수식 문장 없이 일관되게 사용 |
 | Character description | 1~2개의 짧은 영문 문장. 외형·장비·고정 정체성만 기록 |
 | Art style | `Pixel Art` |
@@ -38,6 +38,9 @@ PerfectPixel에서 제작자가 직접 작성하는 **자유 텍스트**는 아�
 - 핵심 복장과 장비
 - 무기 종류와 개수
 - 모든 프레임에서 유지되어야 할 정체성
+
+업로드 전에는 캐릭터 외곽선, 얇은 무기, 머리카락과 신체 사이에 이전 배경색 계열이 남아 있지 않은지
+확대 점검한다. 단순 알파 제거 후 자홍색·녹색 경계색이 남은 이미지는 승인된 Master로 취급하지 않는다.
 
 ### Character description에서 뺄 것
 
@@ -61,6 +64,43 @@ PerfectPixel에서 제작자가 직접 작성하는 **자유 텍스트**는 아�
 | Repeat | 기본 Idle은 `Loop`, 이벤트 Idle은 1회 재생 옵션 |
 | Motion description | 짧은 영문 한 줄. 주 동작 → 보존할 핵심 → 복귀 순서 |
 | Facing direction | **드롭다운 선택값**. 기준 이미지가 이미 올바른 방향이면 `Not set`을 기준 Attempt로 먼저 시험한다. 결과가 반전될 때만 해당 화면 방향 옵션을 별도 Attempt로 시험하고, 출력 결과를 기록한다. |
+
+### 사용자 전달용 고정 양식
+
+PerfectPixel용 캐릭터 설명을 요청받으면 아래 순서와 필드명을 항상 유지한다. 프롬프트만 길게 풀어 쓰거나
+애니메이션 설정을 표 밖에 흩어놓지 않는다.
+
+```text
+# [캐릭터 표시 이름] — PerfectPixel Input Sheet
+
+## Character & Style
+Character name: [영문 작업 ID]
+Character description: [고정 외형을 설명하는 짧은 영문 1~2문장]
+Art style: Pixel Art
+Frame cell size: 512 x 512 px
+Facing direction dropdown: Not set
+
+## 1. [애니메이션 표시 이름]
+Animation name: [영문 Animation ID]
+Frames: [프레임 수]
+FPS: [animationFps]
+Repeat: [Loop 또는 Once]
+Facing direction dropdown: Not set
+Motion description: [핵심 동작을 설명하는 짧은 영문 한 줄]
+
+동작 설명:
+- [한국어 동작 요약]
+
+검수 기준:
+- [정체성, 무기 수, 접지점, 종료 포즈 등 필요한 기준]
+```
+
+- `Character name`과 `Character description`을 문서 첫머리에 둔다.
+- 모든 애니메이션은 `Animation name / Frames / FPS / Repeat / Facing direction dropdown / Motion description`을
+  빠짐없이 같은 순서로 적는다.
+- 프레임별 상세 포즈는 반드시 필요한 경우에만 한국어 `동작 설명` 또는 `검수 기준`에 적는다.
+- PerfectPixel에 복사할 영문 입력값과 사람이 확인할 한국어 설명을 섞지 않는다.
+- 출력 경로, Feedback 예시와 Unity 연결값은 사용자가 요청했거나 해당 모션에 꼭 필요할 때만 뒤에 추가한다.
 
 ### Motion description 작성 공식
 
