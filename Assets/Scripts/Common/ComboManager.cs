@@ -52,12 +52,41 @@ namespace Common
         /// <summary>타임아웃으로 콤보가 끊길 때 발생. 인자는 끊기기 직전의 콤보 수치.</summary>
         public static event Action<int> OnComboBroken;
 
+        /// <summary><see cref="ResetCombo"/>가 타임아웃 처리와 같은 경로를 타도록 잡아두는 씬 인스턴스.</summary>
+        private static ComboManager instance;
+
         private float sinceLastHit;
 
         /// <summary>누적 입력 공격을 충전하는 동안 true - 이 동안에는 만료 타이머가 흐르지 않는다.
         /// PlayerCharacterAnimator가 시작/종료를 정확히 한 번씩 보내므로(비활성화 경로 포함) 여기서
         /// 별도의 타임아웃 안전장치를 두지 않는다.</summary>
         private bool chargeInProgress;
+
+        private void Awake()
+        {
+            instance = this;
+        }
+
+        private void OnDestroy()
+        {
+            if (instance == this) instance = null;
+        }
+
+        /// <summary>캐릭터 교체처럼 "지금까지의 타격 흐름이 끊겼다"고 봐야 하는 순간에 콤보를 즉시
+        /// 0으로 되돌린다. 타임아웃으로 끊긴 경우와 구분할 이유가 없으므로 같은 경로(BreakCombo)를
+        /// 그대로 타서 OnComboChanged/OnComboTierChanged/OnComboBroken이 평소와 똑같이 나간다.</summary>
+        public static void ResetCombo()
+        {
+            if (instance != null)
+            {
+                if (CurrentCombo > 0) instance.BreakCombo();
+                return;
+            }
+
+            // 씬에 ComboManager가 없는 구성(테스트 씬 등)에서도 정적 값이 남아 있지 않게 정리한다.
+            CurrentCombo = 0;
+            CurrentTier = 0;
+        }
 
         private void OnEnable()
         {

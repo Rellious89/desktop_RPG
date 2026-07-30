@@ -12,11 +12,14 @@ namespace Common
     /// 레벨별 경험치 테이블은 아직 없다 - expToNextLevel 하나만 재사용하고, 초과분은 다음 레벨로
     /// 이월한다. 공격력 증가 등 다른 성장 보상도 아직 없다.
     ///
-    /// 저장/불러오기: Awake에서 SaveSystem.Load()를 먼저 시도하고, 저장 파일이 없거나 손상됐으면
-    /// (SaveSystem이 null을 반환하면) 아래 Inspector 시작값으로 새 게임을 시작한다. expToNextLevel은
-    /// 플레이어 상태가 아니라 디자인 값이라 저장 대상이 아니며 항상 Inspector 값을 쓴다.
+    /// 저장/불러오기: Awake에서 SaveSystem.Data(공유 저장 문서)를 읽고, 저장 파일이 없거나 손상돼서
+    /// SaveSystem.LoadedFromFile이 false면 아래 Inspector 시작값으로 새 게임을 시작한다.
+    /// expToNextLevel은 플레이어 상태가 아니라 디자인 값이라 저장 대상이 아니며 항상 Inspector 값을 쓴다.
     /// 저장은 처치 처리(킬카운트+경험치 지급)가 끝난 직후와, 앱 종료 직전(OnApplicationQuit)에만
     /// 한다 - 키 입력/HitPoint마다 저장하지 않는다.
+    ///
+    /// <b>이 컴포넌트는 저장 문서의 경험치/레벨/누적 킬 필드만 소유한다.</b> 캐릭터별 상태
+    /// (SaveData.characters)는 CharacterRoster가 소유하며, 서로의 필드를 읽거나 쓰지 않는다.
     /// </summary>
     public class PlayerProgress : MonoBehaviour
     {
@@ -64,19 +67,19 @@ namespace Common
             IsInitialized = false;
             ExpToNextLevel = expToNextLevel;
 
-            SaveData save = SaveSystem.Load();
-            if (save != null)
+            SaveData save = SaveSystem.Data;
+            if (!SaveSystem.LoadedFromFile)
             {
-                CurrentLevel = save.currentLevel;
-                CurrentExp = save.currentExp;
-                TotalKillCount = save.totalKillCount;
+                // 새 게임 - Inspector 시작값을 공유 저장 문서에도 그대로 반영해서, 다른 시스템이
+                // 같은 문서를 저장할 때 이 값이 기본값으로 되돌아가지 않게 한다.
+                save.currentLevel = currentLevel;
+                save.currentExp = currentExp;
+                save.totalKillCount = totalKillCount;
             }
-            else
-            {
-                CurrentLevel = currentLevel;
-                CurrentExp = currentExp;
-                TotalKillCount = totalKillCount;
-            }
+
+            CurrentLevel = save.currentLevel;
+            CurrentExp = save.currentExp;
+            TotalKillCount = save.totalKillCount;
 
             // 로드가 끝난 뒤에만 표시를 허용한다 - 이 순간이 "레벨 0에서 시작해 29까지 올라가는" 가짜
             // 레벨업 연출과 실제 경험치 획득 연출을 가르는 경계다.
@@ -125,12 +128,11 @@ namespace Common
 
         private void SaveProgress()
         {
-            SaveSystem.Save(new SaveData
-            {
-                currentLevel = CurrentLevel,
-                currentExp = CurrentExp,
-                totalKillCount = TotalKillCount,
-            });
+            SaveData save = SaveSystem.Data;
+            save.currentLevel = CurrentLevel;
+            save.currentExp = CurrentExp;
+            save.totalKillCount = TotalKillCount;
+            SaveSystem.Save();
         }
     }
 }

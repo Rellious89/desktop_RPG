@@ -1,3 +1,20 @@
 Key,Id,English(en),Korean (South Korea)(ko-KR)
 1,84858101760,Kill Count : {0},{0} 처치
 2,,Combo,콤보
+3,,Change,캐릭터 교체
+4,,Stamina,행동력
+5,,Inventory,가방
+6,,The summoned mercenary's action power has become 0.,소환된 용병의 행동력이 0이 되었습니다.
+7,,Available,교체가능
+8,,Active,소환중
+9,,Exhausted,교체불가
+10,,Recovering {0},회복중 {0}
+11,,RecoveryComplete,회복완료
+12,,RecoveryStation,회복소
+13,,Recovery,회복하기
+14,,Require : ,남은시간 : 
+15,,Join the party,파티 합류
+16,,Register mercenaries who need recovery.,회복이 필요한 용병을 등록하세요.
+17,,Confirm,확인
+18,,Cancle,취소
+19,,The recovery of {0} has been completed.,{0}(이)가 회복을 완료하였습니다.

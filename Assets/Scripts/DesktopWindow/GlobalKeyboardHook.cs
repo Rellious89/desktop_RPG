@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 #if UNITY_STANDALONE_WIN
@@ -27,12 +28,22 @@ namespace DesktopWindow
     /// pending 플래그에만 기록한다. Unity 메인 스레드는 매 프레임 Update()에서 그 플래그를
     /// Interlocked.Exchange로 원자적으로 읽고 리셋해서 프레임 값으로 반영한다(값을 잃어버리지 않음).
     ///
-    /// ExcludedKey: 창 배치 모드 전환 같은 시스템 단축키는 공격/콤보 입력(AnyKeyDownThisFrame)으로
-    /// 처리되면 안 된다. ExcludedKey에 등록한 키는 AnyKeyDownThisFrame에서 제외되고, 대신
-    /// ExcludedKeyDownThisFrame으로만 감지된다. 훅 스레드는 KeyCode를 직접 다루지 않고, 메인
-    /// 스레드가 매 프레임 미리 계산해둔 vkCode(volatile int)만 비교한다. 지원 범위는 A-Z / 0-9 /
-    /// F1-F15로 한정한다(그 밖의 키를 등록하면 제외 처리가 되지 않고 그냥 AnyKeyDownThisFrame으로
-    /// 흘러간다).
+    /// 공격 제외 키: UI 단축키(ESC)나 시스템 단축키(창 배치 모드 전환)는 공격/콤보 입력
+    /// (AnyKeyDownThisFrame)으로 처리되면 안 된다. 제외 대상은 두 곳에서 모인다 -
+    /// <see cref="AttackInputExclusionTable"/> 에셋(데이터로 관리하는 UI 단축키)과
+    /// <see cref="RegisterExcludedKey"/>로 등록하는 런타임 단축키(자기 키를 Inspector에 들고 있는
+    /// 컴포넌트용). 제외 키는 <b>키를 식별하는 이 단계에서</b> 걸러지므로 애초에
+    /// AnyKeyDownThisFrame에 포함되지 않고, 대신 <see cref="WasExcludedKeyDownThisFrame"/>으로만
+    /// 감지된다 - 공격/콤보/누적 충전/행동력 쪽에는 어떤 예외 처리도 넣지 않는다.
+    ///
+    /// 제외 키는 <b>자동 반복(auto-repeat)을 걸러낸다</b>. Windows는 키를 누르고 있으면 WM_KEYDOWN을
+    /// 반복해서 보내는데, UI 단축키가 그대로 반복되면 ESC를 한 번 길게 누르는 것으로 열린 패널이
+    /// 전부 닫힌다. 그래서 제외 키만 눌림 상태를 따로 추적해서 "실제로 처음 눌린 순간" 한 번만
+    /// 신호를 낸다. 일반 키(공격 입력)는 지금까지대로 반복 입력을 그대로 흘려보낸다.
+    ///
+    /// 훅 스레드는 KeyCode를 직접 다루지 않고, 메인 스레드가 미리 계산해둔 vkCode 배열만 비교한다.
+    /// 지원 범위는 A-Z / 0-9 / F1-F15 / Escape다(그 밖의 키를 등록하면 제외되지 않고 그냥
+    /// AnyKeyDownThisFrame으로 흘러간다 - 등록 시 경고를 남긴다).
     /// </summary>
     [DisallowMultipleComponent]
     public class GlobalKeyboardHook : MonoBehaviour
@@ -42,23 +53,70 @@ namespace DesktopWindow
                  "이 창에 포커스가 있을 때만 입력을 받게 되지만, 마우스 끊김이 이 후크 때문인지 확인하는 용도.")]
         [SerializeField] private bool useGlobalHook = true;
 
+        [Header("공격 제외 키")]
+        [Tooltip("공격 입력으로 쓰지 않을 키 목록 에셋. 비워두면 런타임에 등록된 키만 제외된다.")]
+        [SerializeField] private AttackInputExclusionTable attackInputExclusions;
+
         public static bool AnyKeyDownThisFrame { get; private set; }
 
-        /// <summary>AnyKeyDownThisFrame에서 제외할 단축키. 기본값 None이면 아무 것도 제외하지 않는다.</summary>
-        public static KeyCode ExcludedKey { get; set; } = KeyCode.None;
+        // 제외 키 목록: 테이블 에셋에서 온 것 + RegisterExcludedKey로 등록된 것의 합집합.
+        // 목록이 바뀌면 dirty 플래그만 올리고, 실제 스냅샷 재구성은 메인 스레드가 다음 Update에서 한다.
+        private static readonly HashSet<KeyCode> runtimeExcludedKeys = new HashSet<KeyCode>();
+        private static bool exclusionsDirty = true;
 
-        /// <summary>ExcludedKey로 등록된 키가 이번 프레임에 눌렸는지.</summary>
-        public static bool ExcludedKeyDownThisFrame { get; private set; }
+        // 이번 프레임에 눌린 제외 키. 인덱스는 resolvedExcludedKeys와 같다.
+        private static KeyCode[] resolvedExcludedKeys = System.Array.Empty<KeyCode>();
+        private static bool[] excludedKeyDownThisFrame = System.Array.Empty<bool>();
+
+        /// <summary>
+        /// 자기 단축키를 Inspector에 들고 있는 컴포넌트가 그 키를 공격 입력에서 빼달라고 등록하는
+        /// 진입점(예: 창 배치 모드 전환 키). 데이터로 관리하는 UI 단축키는 이 메서드가 아니라
+        /// <see cref="AttackInputExclusionTable"/> 에셋에 넣는다. 같은 키를 여러 번 등록해도 안전하다.
+        /// </summary>
+        public static void RegisterExcludedKey(KeyCode key)
+        {
+            if (key == KeyCode.None) return;
+            if (!runtimeExcludedKeys.Add(key)) return;
+
+            exclusionsDirty = true;
+        }
+
+        /// <summary>제외 키가 이번 프레임에 <b>처음</b> 눌렸는지(자동 반복 제외). 제외 목록에 없는
+        /// 키를 물으면 항상 false다 - 그런 키는 공격 입력으로 흘러가기 때문에 여기서 감지하면
+        /// 같은 입력이 두 곳에서 쓰인다.</summary>
+        public static bool WasExcludedKeyDownThisFrame(KeyCode key)
+        {
+            for (int i = 0; i < resolvedExcludedKeys.Length; i++)
+            {
+                if (resolvedExcludedKeys[i] == key) return excludedKeyDownThisFrame[i];
+            }
+            return false;
+        }
 
 #if UNITY_STANDALONE_WIN
         // 훅 스레드가 기록하고, 메인 스레드가 매 프레임 Interlocked.Exchange로 읽어서 비우는 pending
         // 플래그. 0/1만 쓰지만 Interlocked가 int만 지원해서 int로 둔다.
         private static int pendingAnyKey;
-        private static int pendingExcludedKey;
 
-        // 메인 스레드가 매 프레임 갱신하는, ExcludedKey에 대응하는 vkCode 캐시. 훅 스레드는 이 값만
-        // 정수 비교하고, KeyCode 변환이나 프로퍼티 접근은 하지 않는다.
-        private static volatile int cachedExcludedVkCode;
+        /// <summary>훅 스레드가 보는 제외 키 스냅샷. vkCode 배열과 그에 대응하는 pending/눌림 상태
+        /// 배열을 <b>한 덩어리로</b> 묶어 두는 이유는, 목록이 바뀔 때 배열 두 개를 따로 교체하면 훅
+        /// 스레드가 길이가 다른 두 배열을 섞어 읽을 수 있기 때문이다. 교체는 참조 하나만 바꾼다
+        /// (목록 변경은 시작 시점의 몇 번뿐이라, 그 순간 눌린 키 하나를 놓칠 수 있는 것은 감수한다).</summary>
+        private sealed class ExclusionSnapshot
+        {
+            public readonly int[] VkCodes;
+            public readonly int[] PendingDown;
+            public readonly int[] Held;
+
+            public ExclusionSnapshot(int[] vkCodes)
+            {
+                VkCodes = vkCodes;
+                PendingDown = new int[vkCodes.Length];
+                Held = new int[vkCodes.Length];
+            }
+        }
+
+        private static volatile ExclusionSnapshot exclusions = new ExclusionSnapshot(System.Array.Empty<int>());
 
         private Thread hookThread;
         private ManualResetEventSlim hookReadyEvent;
@@ -69,6 +127,10 @@ namespace DesktopWindow
 
         private void OnEnable()
         {
+            // 제외 키 목록/스냅샷은 static이라 씬을 다시 로드해도 남는다 - 이 인스턴스의 테이블 에셋
+            // 기준으로 한 번 다시 만들도록 표시한다(실제 재구성은 첫 Update에서 일어난다).
+            exclusionsDirty = true;
+
 #if UNITY_EDITOR
             Debug.LogWarning("[GlobalKeyboardHook] 전역 키보드 후크는 빌드된 Windows 실행 파일(.exe)에서만 동작합니다. Editor Play 모드에서는 이 창에 포커스가 있을 때만 감지됩니다.");
 #elif UNITY_STANDALONE_WIN
@@ -120,33 +182,93 @@ namespace DesktopWindow
 
         private void Update()
         {
+            RebuildExclusionsIfDirty();
+
 #if UNITY_EDITOR
-            bool excluded = ExcludedKey != KeyCode.None && Input.GetKeyDown(ExcludedKey);
-            ExcludedKeyDownThisFrame = excluded;
-            AnyKeyDownThisFrame = Input.anyKeyDown && !excluded;
+            UpdateFromUnityInput();
 #elif UNITY_STANDALONE_WIN
             if (!useGlobalHook)
             {
                 // 진단 모드: 후크를 설치하지 않았으니 포커스 있을 때만 감지되는 Input으로 대체한다.
-                bool excludedFallback = ExcludedKey != KeyCode.None && Input.GetKeyDown(ExcludedKey);
-                ExcludedKeyDownThisFrame = excludedFallback;
-                AnyKeyDownThisFrame = Input.anyKeyDown && !excludedFallback;
+                UpdateFromUnityInput();
                 return;
             }
 
-            // 훅 스레드가 참조할 수 있도록 이번 프레임 기준 제외 키의 vkCode를 미리 계산해둔다.
-            cachedExcludedVkCode = KeyCodeToVirtualKey(ExcludedKey);
-
-            // pending 플래그를 원자적으로 읽고 동시에 0으로 리셋한다 - 그 사이 훅 스레드가 새로 값을
-            // 써도 Interlocked라 유실되지 않고 다음 프레임에 반영된다.
-            AnyKeyDownThisFrame = Interlocked.Exchange(ref pendingAnyKey, 0) != 0;
-            ExcludedKeyDownThisFrame = Interlocked.Exchange(ref pendingExcludedKey, 0) != 0;
+            UpdateFromHook();
 #else
-            bool excluded = ExcludedKey != KeyCode.None && Input.GetKeyDown(ExcludedKey);
-            ExcludedKeyDownThisFrame = excluded;
-            AnyKeyDownThisFrame = Input.anyKeyDown && !excluded;
+            UpdateFromUnityInput();
 #endif
         }
+
+        /// <summary>제외 키 목록(테이블 + 런타임 등록)이 바뀌었을 때만 스냅샷을 다시 만든다 - 보통
+        /// 시작 시점에 한두 번 실행되고 그 뒤에는 아무 일도 하지 않는다. 메인 스레드 전용이다.</summary>
+        private void RebuildExclusionsIfDirty()
+        {
+            if (!exclusionsDirty) return;
+            exclusionsDirty = false;
+
+            var keys = new List<KeyCode>(runtimeExcludedKeys);
+            if (attackInputExclusions != null)
+            {
+                IReadOnlyList<KeyCode> tableKeys = attackInputExclusions.ExcludedKeys;
+                for (int i = 0; i < tableKeys.Count; i++)
+                {
+                    if (tableKeys[i] != KeyCode.None && !keys.Contains(tableKeys[i])) keys.Add(tableKeys[i]);
+                }
+            }
+
+            resolvedExcludedKeys = keys.ToArray();
+            excludedKeyDownThisFrame = new bool[resolvedExcludedKeys.Length];
+
+#if UNITY_STANDALONE_WIN
+            var vkCodes = new int[resolvedExcludedKeys.Length];
+            for (int i = 0; i < resolvedExcludedKeys.Length; i++)
+            {
+                vkCodes[i] = KeyCodeToVirtualKey(resolvedExcludedKeys[i]);
+                if (vkCodes[i] == 0)
+                {
+                    Debug.LogWarning($"[GlobalKeyboardHook] '{resolvedExcludedKeys[i]}'는 Virtual Key 변환을 " +
+                                     "지원하지 않는 키라 Windows 빌드에서 공격 입력으로 그대로 흘러갑니다 " +
+                                     "(지원 범위: A-Z / 0-9 / F1-F15 / Escape).", this);
+                }
+            }
+            exclusions = new ExclusionSnapshot(vkCodes);
+#endif
+        }
+
+        /// <summary>이 창에 포커스가 있을 때만 감지되는 Unity Input 경로(에디터/비Windows/진단 모드).
+        /// Input.GetKeyDown은 자동 반복을 이미 걸러주므로 별도 처리가 필요 없다.</summary>
+        private void UpdateFromUnityInput()
+        {
+            bool anyExcludedDown = false;
+            for (int i = 0; i < resolvedExcludedKeys.Length; i++)
+            {
+                bool down = Input.GetKeyDown(resolvedExcludedKeys[i]);
+                excludedKeyDownThisFrame[i] = down;
+                anyExcludedDown |= down;
+            }
+
+            // 제외 키가 눌린 프레임에는 공격 입력을 만들지 않는다. Input.anyKeyDown은 어떤 키가
+            // 눌렸는지 구분하지 못하므로, 제외 키와 일반 키를 같은 프레임에 누르면 둘 다 무시된다
+            // (기존 동작과 같은 한계다 - 훅 경로에서는 키별로 정확히 구분된다).
+            AnyKeyDownThisFrame = Input.anyKeyDown && !anyExcludedDown;
+        }
+
+#if UNITY_STANDALONE_WIN
+        /// <summary>훅 스레드가 쌓아둔 pending 플래그를 원자적으로 읽고 비운다 - 읽는 사이에 훅이
+        /// 새 값을 써도 Interlocked라 유실되지 않고 다음 프레임에 반영된다.</summary>
+        private void UpdateFromHook()
+        {
+            AnyKeyDownThisFrame = Interlocked.Exchange(ref pendingAnyKey, 0) != 0;
+
+            ExclusionSnapshot snapshot = exclusions;
+            for (int i = 0; i < excludedKeyDownThisFrame.Length; i++)
+            {
+                excludedKeyDownThisFrame[i] = i < snapshot.PendingDown.Length
+                                              && Interlocked.Exchange(ref snapshot.PendingDown[i], 0) != 0;
+            }
+        }
+#endif
 
 #if UNITY_STANDALONE_WIN
         /// <summary>
@@ -201,26 +323,58 @@ namespace DesktopWindow
         /// </summary>
         private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
         {
-            if (nCode >= 0 && (wParam == (IntPtr)Win32Interop.WM_KEYDOWN || wParam == (IntPtr)Win32Interop.WM_SYSKEYDOWN))
+            if (nCode >= 0)
             {
-                // KBDLLHOOKSTRUCT 전체를 마샬링하면 호출마다 박싱 할당이 생긴다. vkCode(구조체의 첫
-                // DWORD 필드)만 필요하므로 Marshal.ReadInt32로 직접 읽는다.
-                int vkCode = Marshal.ReadInt32(lParam);
-                int excludedVkCode = cachedExcludedVkCode;
+                bool isKeyDown = wParam == (IntPtr)Win32Interop.WM_KEYDOWN || wParam == (IntPtr)Win32Interop.WM_SYSKEYDOWN;
+                bool isKeyUp = wParam == (IntPtr)Win32Interop.WM_KEYUP || wParam == (IntPtr)Win32Interop.WM_SYSKEYUP;
 
-                if (excludedVkCode != 0 && vkCode == excludedVkCode)
+                if (isKeyDown || isKeyUp)
                 {
-                    Interlocked.Exchange(ref pendingExcludedKey, 1);
-                }
-                else
-                {
-                    Interlocked.Exchange(ref pendingAnyKey, 1);
+                    // KBDLLHOOKSTRUCT 전체를 마샬링하면 호출마다 박싱 할당이 생긴다. vkCode(구조체의 첫
+                    // DWORD 필드)만 필요하므로 Marshal.ReadInt32로 직접 읽는다.
+                    int vkCode = Marshal.ReadInt32(lParam);
+
+                    // 스냅샷 참조를 한 번만 읽어 둔다 - 메인 스레드가 목록을 교체해도 이 호출 안에서는
+                    // 같은 배열 쌍을 일관되게 본다.
+                    ExclusionSnapshot snapshot = exclusions;
+                    int excludedIndex = IndexOfVkCode(snapshot, vkCode);
+
+                    if (excludedIndex >= 0)
+                    {
+                        if (isKeyUp)
+                        {
+                            // 손을 뗐다 - 다음 눌림을 다시 "처음 눌림"으로 인정한다.
+                            Interlocked.Exchange(ref snapshot.Held[excludedIndex], 0);
+                        }
+                        else if (Interlocked.Exchange(ref snapshot.Held[excludedIndex], 1) == 0)
+                        {
+                            // 자동 반복이 아니라 실제로 처음 눌린 경우에만 신호를 낸다.
+                            Interlocked.Exchange(ref snapshot.PendingDown[excludedIndex], 1);
+                        }
+                    }
+                    else if (isKeyDown)
+                    {
+                        // 일반 키는 지금까지대로 반복 입력까지 그대로 공격 입력으로 흘려보낸다.
+                        Interlocked.Exchange(ref pendingAnyKey, 1);
+                    }
                 }
             }
 
             // 이 스레드가 설치한 훅이므로 CallNextHookEx의 hhk 인자는 실제로 무시된다(다음 훅으로
             // 자동 전달됨) - 명시적으로 IntPtr.Zero를 넘겨도 안전하다.
             return Win32Interop.CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
+        }
+
+        /// <summary>훅 스레드에서 호출된다 - 배열 순회뿐이고 Unity API를 부르지 않는다. 제외 키
+        /// 목록은 매우 짧아(현재 2개) 선형 검색으로 충분하다.</summary>
+        private static int IndexOfVkCode(ExclusionSnapshot snapshot, int vkCode)
+        {
+            int[] vkCodes = snapshot.VkCodes;
+            for (int i = 0; i < vkCodes.Length; i++)
+            {
+                if (vkCodes[i] != 0 && vkCodes[i] == vkCode) return i;
+            }
+            return -1;
         }
 
         /// <summary>
@@ -241,6 +395,7 @@ namespace DesktopWindow
             {
                 return 0x30 + (keyCode - KeyCode.Alpha0); // VK_0 = 0x30
             }
+            if (keyCode == KeyCode.Escape) return 0x1B; // VK_ESCAPE
             return 0;
         }
 #endif

@@ -234,7 +234,7 @@ namespace CharacterEditor
         }
 
         /// <summary>열려 있는 씬(들)에서 PlayerCharacterAnimator/TargetCombatController를 전부 찾아
-        /// (비활성 오브젝트 포함 - RuntimeCharacterSwitcher로 꺼져 있는 캐릭터도 맞춰야 한다) 각자의
+        /// (비활성 오브젝트 포함 - CharacterRoster가 꺼둔 대기 캐릭터도 맞춰야 한다) 각자의
         /// 연결된 Motion Profile + 공용 CombatStageLayout 기준으로 위치/스케일/Flip을 다시 계산해서
         /// 그 자리에서 Transform에 적용한다. Preview와 완전히 같은 공식(Slot + Actor Offset)을 쓴다.
         /// Undo에 등록하고 Scene을 Dirty 처리한다 - 자동 실행이 아니라 이 버튼을 눌렀을 때만 동작한다.</summary>

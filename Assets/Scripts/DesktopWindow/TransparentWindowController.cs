@@ -47,7 +47,7 @@ namespace DesktopWindow
     /// 소유하고, 매 프레임 커서 델타를 LayoutModeController.ApplyActiveDragDeltaPixels로 넘겨서 지금
     /// 드래그 중인 그룹에만 반영한다(네이티브 창 자체는 절대 움직이지 않는다).
     ///
-    /// 배치 모드 전환 키는 GlobalKeyboardHook.ExcludedKey로 등록되어, 이 키를 눌러도
+    /// 배치 모드 전환 키는 GlobalKeyboardHook.RegisterExcludedKey로 등록되어, 이 키를 눌러도
     /// AnyKeyDownThisFrame(공격/콤보가 구독하는 신호)에는 포함되지 않는다.
     ///
     /// DefaultExecutionOrder(-100): SizeToggleButton 등 다른 GameObject의 Awake가 이 컴포넌트의
@@ -76,6 +76,32 @@ namespace DesktopWindow
     public class TransparentWindowController : MonoBehaviour
     {
         public static TransparentWindowController Instance { get; private set; }
+
+        /// <summary>
+        /// 이 앱 창이 지금 <b>Windows 입력 포커스</b>를 갖고 있는지. UI 단축키(ESC로 패널 닫기)처럼
+        /// "다른 앱을 쓰는 중에는 절대 반응하면 안 되는" 판정에 쓴다 - 전역 키보드 후크는 포커스와
+        /// 무관하게 키를 잡아내므로, 후크 신호만 보고 패널을 닫으면 다른 프로그램에서 ESC를 눌러도
+        /// KeyBuddy 패널이 닫힌다.
+        ///
+        /// Windows 빌드에서는 GetForegroundWindow()와 우리 창 핸들을 직접 비교한다. 이 창은
+        /// 보더리스/투명/Always On Top으로 스타일을 바꿔 놓기 때문에 Unity의 Application.isFocused를
+        /// 그대로 신뢰하기 어렵고, 네이티브 상태가 유일하게 확실한 근거다. 창 핸들을 아직 못 찾았거나
+        /// (시작 직후) 에디터/다른 플랫폼이면 Application.isFocused로 대체한다.
+        /// </summary>
+        public static bool HasWindowFocus
+        {
+            get
+            {
+#if UNITY_STANDALONE_WIN
+                TransparentWindowController instance = Instance;
+                if (instance != null && instance.hwnd != IntPtr.Zero)
+                {
+                    return Win32Interop.GetForegroundWindow() == instance.hwnd;
+                }
+#endif
+                return Application.isFocused;
+            }
+        }
 
         [Header("Window")]
         [SerializeField] private bool alwaysOnTop = true;
@@ -107,6 +133,21 @@ namespace DesktopWindow
 
         private Win32Interop.RECT controlDockScreenRect;
         private readonly Vector3[] controlDockWorldCorners = new Vector3[4];
+
+        /// <summary>지금 마우스 입력을 받아야 하는 UI 영역들(WindowInputRegion). 등록/해제와 순회는
+        /// 전부 메인 스레드에서만 한다 - 훅 스레드는 이 목록이 아니라 아래 캐시 배열만 읽는다.</summary>
+        private readonly List<WindowInputRegion> inputRegions = new List<WindowInputRegion>();
+
+        /// <summary>등록된 영역들의 네이티브 화면 좌표 캐시. 메인 스레드가 매 프레임 앞에서부터 채우고
+        /// 마지막에 개수를 발행한다 - 배열은 필요할 때만 커지고(매 프레임 재할당 없음) 원소는 제자리에서
+        /// 덮어쓰므로 GC 할당이 생기지 않는다. 훅 스레드가 아주 드물게 한 프레임 오래된 사각형을 읽을
+        /// 수 있지만, 클릭/스크롤 하나의 관통 여부에만 영향을 주므로 기존 그룹 캐시와 같은 이유로 안전하다.</summary>
+        private Win32Interop.RECT[] cachedInputRegionRects = new Win32Interop.RECT[8];
+
+        /// <summary>cachedInputRegionRects에서 지금 유효한 원소 수. 채우기가 끝난 뒤에 발행한다.</summary>
+        private volatile int cachedInputRegionCount;
+
+        private readonly Vector3[] inputRegionWorldCorners = new Vector3[4];
 
         /// <summary>지금 실제로 적용되어 있는 WS_EX_TRANSPARENT 상태 캐시. 값이 바뀔 때만 SetWindowLong을 호출한다.</summary>
         private bool clickThroughApplied;
@@ -158,7 +199,7 @@ namespace DesktopWindow
             // 에디터에서도 이 키가 AnyKeyDownThisFrame(공격/콤보)로 새지 않도록 항상 등록해둔다 -
             // 실제 창 이동/클릭 관통 토글은 Windows 빌드에서만 일어나지만, 제외 등록 자체는
             // 플랫폼과 무관하게 필요하다.
-            GlobalKeyboardHook.ExcludedKey = placementModeToggleKey;
+            GlobalKeyboardHook.RegisterExcludedKey(placementModeToggleKey);
         }
 
         private void Start()
@@ -175,7 +216,7 @@ namespace DesktopWindow
 
         private void Update()
         {
-            if (GlobalKeyboardHook.ExcludedKeyDownThisFrame)
+            if (GlobalKeyboardHook.WasExcludedKeyDownThisFrame(placementModeToggleKey))
             {
                 LayoutModeController.Instance?.ToggleLayoutMode();
             }
@@ -184,6 +225,7 @@ namespace DesktopWindow
             if (hwnd == IntPtr.Zero) return;
 
             RecomputeControlDockScreenRect();
+            RecomputeInputRegionScreenRects();
             RecomputeLayoutGroupScreenRects();
             UpdateClickThroughState();
 
@@ -229,6 +271,35 @@ namespace DesktopWindow
 
             isDragging = true;
             Win32Interop.GetCursorPos(out dragLastCursor);
+#endif
+        }
+
+        /// <summary>
+        /// 마우스 입력을 받아야 하는 UI 영역을 등록한다. 이 창은 기본적으로 ControlDock 영역 밖이 전부
+        /// 클릭 관통(WS_EX_TRANSPARENT)이라, 등록하지 않은 영역에는 클릭 자체가 도달하지 않는다.
+        ///
+        /// <b>여러 영역을 동시에 등록할 수 있다.</b> 서로 덮어쓰지 않으므로 패널 두 개가 함께 열려도
+        /// 둘 다 클릭되고, 하나를 닫아도 다른 쪽의 입력 영역은 그대로 남는다. 같은 영역을 두 번
+        /// 등록해도 목록에는 하나만 들어간다.
+        ///
+        /// 호출부는 <see cref="WindowInputRegion"/>이며, 그 컴포넌트의 활성 상태에 등록이 묶여 있다.
+        /// Windows 빌드 밖에서는 아무 일도 하지 않는다.
+        /// </summary>
+        public void RegisterInputRegion(WindowInputRegion region)
+        {
+#if UNITY_STANDALONE_WIN
+            if (region == null || inputRegions.Contains(region)) return;
+            inputRegions.Add(region);
+#endif
+        }
+
+        /// <summary>등록을 해제한다 - 해제하지 않으면 패널이 닫힌 자리가 계속 클릭을 잡아먹는다.
+        /// 등록되지 않은 영역을 넘겨도 안전하다.</summary>
+        public void UnregisterInputRegion(WindowInputRegion region)
+        {
+#if UNITY_STANDALONE_WIN
+            if (region == null) return;
+            inputRegions.Remove(region);
 #endif
         }
 
@@ -527,9 +598,35 @@ namespace DesktopWindow
                 return !IsPointInsideAnyLayoutGroup(x, y);
             }
 
+            // 등록된 입력 영역(WindowInputRegion) 중 하나에라도 들어가면 클릭을 받는다 - ControlDock의
+            // 추가 버튼이나 열려 있는 패널이 여기에 해당한다. 여러 영역이 동시에 유효하다.
+            if (IsPointInsideAnyInputRegion(x, y)) return false;
+
             bool insideDock = x >= controlDockScreenRect.Left && x <= controlDockScreenRect.Right &&
                                y >= controlDockScreenRect.Top && y <= controlDockScreenRect.Bottom;
             return !insideDock;
+        }
+
+        /// <summary>등록된 입력 영역 중 어느 하나에라도 이 점이 포함되는지 확인한다. 훅 스레드에서도
+        /// 호출되므로 Unity API를 절대 부르지 않는다 - 캐시 배열 비교뿐이다.
+        ///
+        /// 배열 참조를 지역 변수로 먼저 잡고 개수를 배열 길이로 자르는 이유는, 메인 스레드가 같은
+        /// 순간에 캐시 배열을 더 큰 것으로 교체(EnsureInputRegionCacheCapacity)할 수 있기 때문이다 -
+        /// 이렇게 하면 어느 시점의 스냅샷을 보든 범위를 벗어나지 않는다.</summary>
+        private bool IsPointInsideAnyInputRegion(int nativeX, int nativeY)
+        {
+            Win32Interop.RECT[] rects = cachedInputRegionRects;
+            if (rects == null) return false;
+
+            int count = cachedInputRegionCount;
+            if (count > rects.Length) count = rects.Length;
+
+            for (int i = 0; i < count; i++)
+            {
+                if (IsPointInCachedRect(nativeX, nativeY, true, rects[i])) return true;
+            }
+
+            return false;
         }
 
         /// <summary>캐싱된 그룹들의 네이티브 화면 좌표 중 어느 하나에라도 이 점이 포함되는지 확인한다.
@@ -1028,6 +1125,55 @@ namespace DesktopWindow
             Vector2 maxScreen = RectTransformUtility.WorldToScreenPoint(null, controlDockWorldCorners[2]);
 
             controlDockScreenRect = ToNativeScreenRect(new Rect(minScreen.x, minScreen.y, maxScreen.x - minScreen.x, maxScreen.y - minScreen.y));
+        }
+
+        /// <summary>등록된 입력 영역들의 화면 좌표를 매 프레임 다시 계산한다
+        /// (RecomputeControlDockScreenRect와 같은 방식 - dirty 플래그 없이 단순 재계산).
+        ///
+        /// Receive Mouse Input이 꺼졌거나 계층상 비활성인 영역은 건너뛴다 - 그래서 패널이 꺼지면
+        /// 등록 해제를 놓쳐도 그 자리가 계속 클릭을 잡아먹지 않고 여기서 회복된다.
+        ///
+        /// RectTransform 좌표 계산은 Unity API라 반드시 메인 스레드에서만 한다 - 훅 스레드는 이 결과
+        /// (단순 화면 좌표 사각형)만 읽는다.</summary>
+        private void RecomputeInputRegionScreenRects()
+        {
+            int count = 0;
+
+            for (int i = 0; i < inputRegions.Count; i++)
+            {
+                WindowInputRegion region = inputRegions[i];
+                if (region == null) continue; // 파괴된 항목 - OnDisable에서 빠지지만 방어적으로 건너뛴다.
+                if (!region.IsReceivingMouseInput) continue;
+
+                RectTransform rect = region.RegionRect;
+                if (rect == null) continue;
+
+                rect.GetWorldCorners(inputRegionWorldCorners); // 0=bottom-left, 2=top-right
+
+                // Screen Space - Overlay 캔버스 기준이라 카메라 없이(null) 바로 스크린 좌표로 변환된다.
+                Vector2 minScreen = RectTransformUtility.WorldToScreenPoint(null, inputRegionWorldCorners[0]);
+                Vector2 maxScreen = RectTransformUtility.WorldToScreenPoint(null, inputRegionWorldCorners[2]);
+
+                EnsureInputRegionCacheCapacity(count + 1);
+                cachedInputRegionRects[count] = ToNativeScreenRect(
+                    new Rect(minScreen.x, minScreen.y, maxScreen.x - minScreen.x, maxScreen.y - minScreen.y));
+                count++;
+            }
+
+            // 원소를 모두 채운 뒤에 개수를 발행한다 - 훅 스레드가 아직 안 채운 칸을 읽지 않게 하기 위함이다.
+            cachedInputRegionCount = count;
+        }
+
+        /// <summary>캐시 배열을 필요한 만큼만 키운다(줄이지 않는다) - 등록 영역 수가 늘어난 순간에만
+        /// 한 번 재할당되고, 그 뒤로는 매 프레임 할당이 없다.</summary>
+        private void EnsureInputRegionCacheCapacity(int required)
+        {
+            if (cachedInputRegionRects.Length >= required) return;
+
+            int capacity = Mathf.Max(cachedInputRegionRects.Length * 2, required);
+            var grown = new Win32Interop.RECT[capacity];
+            Array.Copy(cachedInputRegionRects, grown, cachedInputRegionRects.Length);
+            cachedInputRegionRects = grown;
         }
 #endif
     }

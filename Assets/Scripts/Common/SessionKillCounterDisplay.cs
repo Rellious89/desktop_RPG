@@ -88,5 +88,18 @@ namespace Common
                 text.text = localizedText;
             }
         }
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            if (TryGetComponent(out LocalizedTMPText _))
+            {
+                Debug.LogWarning(
+                    $"[SessionKillCounterDisplay] '{name}': 같은 오브젝트의 LocalizedTMPText가 " +
+                    "킬카운트 포맷을 인자 없이 덮어씁니다. 동적 포맷은 이 컴포넌트가 담당하므로 " +
+                    "LocalizedTMPText를 제거하세요.", this);
+            }
+        }
+#endif
     }
 }

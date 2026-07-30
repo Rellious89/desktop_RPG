@@ -206,6 +206,14 @@ namespace Character
 
         public CharacterMotionProfile MotionProfile => motionProfile;
 
+        /// <summary>지금 <b>새 공격 사이클</b>을 시작해도 되는지. 두 조건을 모두 만족해야 한다.
+        ///   - 공격 가능한 Target이 있다(처치 직후 Fade-out/리젠 대기 중이 아니다)
+        ///   - 현재 캐릭터의 행동력이 남아 있다(CharacterRoster)
+        /// 진행 중인 공격을 끊는 판단에는 절대 쓰지 않는다 - 새 입력을 받을지, 타격 직후 다음
+        /// Windup으로 이어갈지에만 쓴다. 행동력이 0이 되는 순간은 "몬스터를 방금 처치한 순간"이라
+        /// 이 값이 false가 되면 다음 몬스터가 리젠돼도 새 전투가 시작되지 않는다.</summary>
+        private static bool CanStartNewAttack => Target.HasAttackableTarget && CharacterRoster.CurrentCharacterCanAct;
+
         private void Awake()
         {
             spriteRenderer = GetComponent<SpriteRenderer>();
@@ -338,10 +346,11 @@ namespace Character
 
         private void Update()
         {
-            // 공격 가능한 Target이 하나도 없으면 새 입력을 아예 공격으로 등록하지 않는다(대기열도
-            // 늘리지 않는다) - 처치/리젠 대기 중 허공 공격을 막기 위함이다. 이미 진행 중인 Windup/
-            // Recovery는 아래 AdvanceAttack()에서 그대로 마무리된다(여기서 끊지 않는다).
-            if (GlobalKeyboardHook.AnyKeyDownThisFrame && Target.HasAttackableTarget)
+            // 공격 가능한 Target이 하나도 없거나(처치/리젠 대기 중) 현재 캐릭터의 행동력이 0이면
+            // 새 입력을 아예 공격으로 등록하지 않는다(대기열도 늘리지 않는다). 이미 진행 중인 Windup/
+            // Recovery는 아래 AdvanceAttack()에서 그대로 마무리된다(여기서 끊지 않는다) - 행동력이
+            // 0이 되는 순간 재생 중이던 공격이 중간에 잘려 자세가 굳는 일이 없다.
+            if (GlobalKeyboardHook.AnyKeyDownThisFrame && CanStartNewAttack)
             {
                 OnKeyInput();
             }
@@ -700,10 +709,11 @@ namespace Character
                 return;
             }
 
-            // 처치를 유발한 타격이었다면(마지막 남은 Target이었을 경우) 이 시점에 이미 공격 불가 상태다 -
-            // 아직 실행하지 않은 예약 공격은 전부 폐기하고 새 Windup을 시작하지 않는다. 지금 재생 중인
-            // 이번 공격의 Recovery는 그대로 자연스럽게 마무리한다(끊지 않는다).
-            bool canAttack = Target.HasAttackableTarget;
+            // 처치를 유발한 타격이었다면(마지막 남은 Target이었거나 이 처치로 행동력이 0이 된 경우)
+            // 이 시점에 이미 공격 불가 상태다 - 아직 실행하지 않은 예약 공격은 전부 폐기하고 새
+            // Windup을 시작하지 않는다. 지금 재생 중인 이번 공격의 Recovery는 그대로 자연스럽게
+            // 마무리한다(끊지 않는다).
+            bool canAttack = CanStartNewAttack;
             bool inputStillFresh = Time.time - lastInputTime < activeMotion.QueueExpireTimeout;
             if (canAttack && pendingAttacks > 0 && inputStillFresh)
             {
@@ -784,8 +794,9 @@ namespace Character
                         {
                             // 누적 입력 모드에서 Recovery 중에 받아둔 입력이 있으면 Idle을 거치지 않고
                             // 곧바로 다음 충전으로 이어간다(콤보 티어는 이 시점에 다시 반영된다).
-                            // 공격 대상이 사라졌다면 이월 입력은 버리고 그대로 Idle로 돌아간다.
-                            if (activeMotion.UseAccumulatedInput && carriedInputs > 0f && Target.HasAttackableTarget)
+                            // 공격 대상이 사라졌거나 행동력이 다 떨어졌다면 이월 입력은 버리고 그대로
+                            // Idle로 돌아간다.
+                            if (activeMotion.UseAccumulatedInput && carriedInputs > 0f && CanStartNewAttack)
                             {
                                 StartAttackCycle(0f);
                             }
@@ -891,6 +902,31 @@ namespace Character
             attackFrameOverlayRenderer.flipX = spriteRenderer.flipX;
             attackFrameOverlayRenderer.flipY = spriteRenderer.flipY;
             attackFrameOverlayRenderer.sprite = null;
+        }
+
+        /// <summary>캐릭터가 다시 활성화될 때(교체로 돌아온 경우 포함) 항상 Base Idle 0프레임부터 새로
+        /// 시작한다. Awake는 오브젝트당 한 번만 실행되므로, 이 초기화가 없으면 두 번째 활성화부터는
+        /// 꺼지기 직전의 프레임/Idle Event 재생 상태를 그대로 들고 돌아온다 - 공격 도중에 교체된
+        /// 캐릭터가 나중에 그 공격 프레임에서 멈춰 있는 것처럼 보이는 원인이었다.
+        /// (대기열/충전 상태는 OnDisable이 이미 비웠지만, 여기서도 방어적으로 다시 0으로 둔다.)</summary>
+        private void OnEnable()
+        {
+            // Awake가 프로필 문제로 스스로 비활성화한 경우에는 animations가 없다 - 그때는 OnEnable도
+            // 호출되지 않지만, 실행 순서에 의존하지 않도록 여기서도 한 번 확인한다.
+            if (animations == null || animations.Length == 0) return;
+
+            attackPhase = AttackPhase.None;
+            pendingAttacks = 0;
+            chargeInputs = 0f;
+            carriedInputs = 0f;
+            castCueFired = false;
+
+            playingVariant = false;
+            activeAnimIndex = IdleIndex;
+            currentFrame = 0;
+            frameTimer = 0f;
+            variantTimer = 0f;
+            ApplyFrame();
         }
 
         /// <summary>공격 중 캐릭터가 비활성화되면(교체/파괴 직전 포함) 마지막 오버레이가 화면에 남지 않게 지우고,

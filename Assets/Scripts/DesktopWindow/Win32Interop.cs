@@ -31,6 +31,8 @@ namespace DesktopWindow
         public const int WH_KEYBOARD_LL = 13;
         public const int WM_KEYDOWN = 0x0100;
         public const int WM_SYSKEYDOWN = 0x0104;
+        public const int WM_KEYUP = 0x0101;
+        public const int WM_SYSKEYUP = 0x0105;
 
         public const int VK_LBUTTON = 0x01;
 
@@ -221,6 +223,12 @@ namespace DesktopWindow
 
         [DllImport("user32.dll")]
         public static extern bool GetCursorPos(out POINT lpPoint);
+
+        /// <summary>지금 포그라운드(입력 포커스)인 창의 핸들. 우리 창 핸들과 비교해서 "이 앱에 포커스가
+        /// 있는지"를 판정하는 데 쓴다 - 창 핸들을 찾는 용도로는 쓰지 않는다(그 이유는
+        /// TransparentWindowController.FindWindowHandleAndInitialize 주석 참고).</summary>
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetForegroundWindow();
 
         [DllImport("user32.dll")]
         public static extern short GetAsyncKeyState(int vKey);

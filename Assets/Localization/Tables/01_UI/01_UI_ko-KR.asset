@@ -26,6 +26,75 @@ MonoBehaviour:
     m_Localized: "\uCF64\uBCF4"
     m_Metadata:
       m_Items: []
+  - m_Id: 274212265648128
+    m_Localized: "\uCE90\uB9AD\uD130 \uAD50\uCCB4"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 282535723524096
+    m_Localized: "\uD589\uB3D9\uB825"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 380212448583680
+    m_Localized: "\uAC00\uBC29"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 602901335498752
+    m_Localized: "\uC18C\uD658\uB41C \uC6A9\uBCD1\uC758 \uD589\uB3D9\uB825\uC774
+      0\uC774 \uB418\uC5C8\uC2B5\uB2C8\uB2E4."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 710554061627392
+    m_Localized: "\uAD50\uCCB4\uAC00\uB2A5"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 710554074210304
+    m_Localized: "\uC18C\uD658\uC911"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 710554074210305
+    m_Localized: "\uAD50\uCCB4\uBD88\uAC00"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 710554074210306
+    m_Localized: "\uD68C\uBCF5\uC911 {0}"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 710554074210307
+    m_Localized: "\uD68C\uBCF5\uC644\uB8CC"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 743229082296320
+    m_Localized: "\uD68C\uBCF5\uC18C"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 743229094879232
+    m_Localized: "\uD68C\uBCF5\uD558\uAE30"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 743229094879233
+    m_Localized: "\uB0A8\uC740\uC2DC\uAC04 : "
+    m_Metadata:
+      m_Items: []
+  - m_Id: 743229094879234
+    m_Localized: "\uD30C\uD2F0 \uD569\uB958"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 743229094879235
+    m_Localized: "\uD68C\uBCF5\uC774 \uD544\uC694\uD55C \uC6A9\uBCD1\uC744 \uB4F1\uB85D\uD558\uC138\uC694."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 743229099073536
+    m_Localized: "\uD655\uC778"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 743229099073537
+    m_Localized: "\uCDE8\uC18C"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 748514651922432
+    m_Localized: "{0}(\uC774)\uAC00 \uD68C\uBCF5\uC744 \uC644\uB8CC\uD558\uC600\uC2B5\uB2C8\uB2E4."
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

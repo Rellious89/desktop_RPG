@@ -1,0 +1,334 @@
+using System;
+using System.Collections.Generic;
+using Common;
+using UnityEngine;
+
+namespace Inventory
+{
+    /// <summary>
+    /// 보유 재화와 보유 아이템을 소유하는 <b>단일 관리자</b>. 값이 바뀌는 경로는 이 컴포넌트의
+    /// 메서드뿐이고, UI(InventoryPanel)는 여기서 읽기만 한다 - 씬에 배치된 오브젝트나 프리팹 상태를
+    /// 인벤토리의 근거로 삼지 않는다. CharacterRoster와 같은 구조다.
+    ///
+    /// 데이터 소유는 두 갈래로 나뉜다.
+    ///   - <see cref="ItemDefinition"/> 에셋: 아이템이 무엇인지(이름/아이콘)
+    ///   - SaveData.currency / SaveData.items: 지금 얼마나 갖고 있는지
+    /// 재화는 아이템 목록과 <b>완전히 분리된 전역 값</b>이라 아이템 슬롯에 나타나지 않고, 경험치/레벨/
+    /// 행동력과도 연결되지 않는다.
+    ///
+    /// 같은 아이템은 항상 저장 항목 하나에 수량으로 누적된다(같은 id로 항목이 두 개 생기지 않는다).
+    /// 표시 순서는 저장 목록의 순서, 즉 <b>처음 획득한 순서</b>다 - 새 아이템은 뒤에 추가되고 그 뒤로
+    /// 자리가 바뀌지 않으므로 저장/불러오기를 거쳐도 순서가 유지된다.
+    ///
+    /// <b>몬스터 처치 보상과는 아직 연결하지 않았다.</b> 값을 넣는 경로는 아래 개발용 진입점뿐이며,
+    /// 정식 획득 규칙이 정해지면 그때 <see cref="AddCurrency"/>/<see cref="AddItem"/>을 호출하면 된다.
+    /// </summary>
+    [DisallowMultipleComponent]
+    public class InventoryManager : MonoBehaviour
+    {
+        /// <summary>UI가 한 항목을 그리는 데 필요한 최소 정보(정의 + 수량). 저장 구조를 그대로 밖으로
+        /// 내보내면 UI가 저장 필드를 직접 고칠 수 있게 되므로 읽기 전용 구조체로 감싼다.</summary>
+        public readonly struct Entry
+        {
+            public readonly ItemDefinition Definition;
+            public readonly int Count;
+
+            public Entry(ItemDefinition definition, int count)
+            {
+                Definition = definition;
+                Count = count;
+            }
+        }
+
+        [Header("Item Catalog")]
+        [Tooltip("이 게임에 존재하는 아이템 정의 목록. 저장 데이터의 itemId를 실제 아이템으로 " +
+                 "되돌릴 때 쓴다 - 여기에 없는 id가 저장 파일에 있으면 그 항목은 표시하지 않고 " +
+                 "경고만 남긴다(저장 값 자체는 지우지 않는다).")]
+        [SerializeField] private List<ItemDefinition> itemCatalog = new List<ItemDefinition>();
+
+        [Header("Debug (개발용 - 정식 UI에 노출하지 않는다)")]
+        [Tooltip("Debug - Add Currency가 더할 금액.")]
+        [SerializeField] private int debugCurrencyAmount = 1000;
+
+        [Tooltip("Debug - Add Item이 추가할 아이템.")]
+        [SerializeField] private ItemDefinition debugItem;
+
+        [Min(1)]
+        [Tooltip("Debug - Add Item이 한 번에 추가할 수량.")]
+        [SerializeField] private int debugItemCount = 1;
+
+        /// <summary>씬에 하나만 둔다. 패널이 정적으로 접근한다(CharacterRoster와 같은 패턴).</summary>
+        public static InventoryManager Instance { get; private set; }
+
+        /// <summary>재화나 아이템이 실제로 바뀐 직후 발생. 열려 있는 인벤토리 패널이 이 신호로
+        /// 즉시 갱신된다 - 값이 바뀌지 않은 호출에서는 발생하지 않는다.</summary>
+        public static event Action InventoryChanged;
+
+        // itemId -> 정의. 저장 데이터를 화면에 그릴 때마다 목록을 순회하지 않도록 Awake에서 한 번만 만든다.
+        private readonly Dictionary<string, ItemDefinition> definitionsById = new Dictionary<string, ItemDefinition>();
+
+        // Items 프로퍼티가 매번 새 리스트를 만들지 않도록 재사용하는 버퍼. 인벤토리가 바뀔 때만 다시 채운다.
+        private readonly List<Entry> entryCache = new List<Entry>();
+        private bool entryCacheDirty = true;
+
+        // 카탈로그에 없는 itemId는 처음 한 번만 경고한다(패널을 열 때마다 로그가 쏟아지지 않게).
+        private readonly HashSet<string> warnedUnknownItemIds = new HashSet<string>();
+
+        public int Currency => SaveSystem.Data.currency;
+
+        /// <summary>보유 아이템 목록(획득 순서). 카탈로그에 정의가 없는 저장 항목은 제외된다.</summary>
+        public IReadOnlyList<Entry> Items
+        {
+            get
+            {
+                RebuildEntryCacheIfNeeded();
+                return entryCache;
+            }
+        }
+
+        private void Awake()
+        {
+            if (Instance != null && Instance != this)
+            {
+                Debug.LogWarning("[InventoryManager] 씬에 InventoryManager가 이미 있습니다. 이 인스턴스는 무시합니다.", this);
+                enabled = false;
+                return;
+            }
+            Instance = this;
+
+            BuildDefinitionLookup();
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
+        }
+
+        private void BuildDefinitionLookup()
+        {
+            definitionsById.Clear();
+            if (itemCatalog == null) return;
+
+            for (int i = 0; i < itemCatalog.Count; i++)
+            {
+                ItemDefinition definition = itemCatalog[i];
+                if (definition == null)
+                {
+                    Debug.LogError($"[InventoryManager] Item Catalog[{i}]가 비어 있습니다 - 이 항목은 무시합니다.", this);
+                    continue;
+                }
+                if (definitionsById.ContainsKey(definition.ItemId))
+                {
+                    Debug.LogError($"[InventoryManager] Item Id '{definition.ItemId}'가 중복됩니다 - 저장 데이터가 " +
+                                   "서로 섞이므로 뒤에 있는 정의는 무시합니다.", this);
+                    continue;
+                }
+
+                definitionsById.Add(definition.ItemId, definition);
+            }
+        }
+
+        // ---- 조회 ----
+
+        public int GetItemCount(ItemDefinition definition)
+        {
+            return definition == null ? 0 : GetItemCount(definition.ItemId);
+        }
+
+        public int GetItemCount(string itemId)
+        {
+            if (string.IsNullOrEmpty(itemId)) return 0;
+
+            List<InventoryItemState> states = SaveSystem.Data.items;
+            for (int i = 0; i < states.Count; i++)
+            {
+                if (states[i] != null && states[i].itemId == itemId) return states[i].count;
+            }
+            return 0;
+        }
+
+        // ---- 변경 ----
+        //
+        // 공개 메서드는 전부 "메모리 값을 고치는 Apply* 내부 메서드 + 마지막에 SaveAndNotify 한 번"
+        // 구조다. 이렇게 나눠 둔 덕분에 여러 값을 한꺼번에 바꾸는 보상 지급(ApplyReward)도 저장과
+        // 알림을 정확히 한 번만 하고, 일부만 저장된 중간 상태가 생기지 않는다.
+
+        /// <summary>재화를 더한다(음수를 넣으면 감소하지만, 소비처는 이번 범위에 없다). 결과는 0 아래로
+        /// 내려가지 않는다. 값이 실제로 바뀐 경우에만 저장하고 <see cref="InventoryChanged"/>를 보낸다.</summary>
+        public void AddCurrency(int amount)
+        {
+            if (ApplyCurrencyDelta(amount)) SaveAndNotify();
+        }
+
+        /// <summary>재화를 직접 지정한다(0 아래로는 내려가지 않는다).</summary>
+        public void SetCurrency(int value)
+        {
+            if (ApplyCurrencyValue(value)) SaveAndNotify();
+        }
+
+        /// <summary>아이템을 추가한다. 이미 갖고 있으면 <b>새 항목을 만들지 않고</b> 기존 항목의 수량만
+        /// 늘린다 - 같은 아이템이 여러 슬롯으로 나뉘지 않는 근거가 이 한 곳이다.</summary>
+        public void AddItem(ItemDefinition definition, int count = 1)
+        {
+            if (ApplyItemDelta(definition, count)) SaveAndNotify();
+        }
+
+        /// <summary>
+        /// 처치 보상 한 건(재화 + 아이템)을 <b>한 번의 처리로</b> 적용한다. 재화와 아이템을 각각
+        /// AddCurrency/AddItem으로 주면 저장과 <see cref="InventoryChanged"/>가 두 번씩 발생하고,
+        /// 그 사이에 "재화만 오른 상태"가 화면에 한 번 그려진다 - 보상은 한 덩어리이므로 그렇게 나누지 않는다.
+        ///
+        /// 값 변경은 전부 메모리에서 끝낸 뒤 마지막에 딱 한 번 저장하므로, 저장이 실패하더라도 일부만
+        /// 기록된 파일이 남지 않는다(기존 저장 파일이 그대로 유지된다).
+        ///
+        /// 아이템 없이 재화만 주려면 <paramref name="item"/>에 null을 넘기면 된다.
+        /// </summary>
+        public void ApplyReward(int currencyAmount, ItemDefinition item, int itemCount = 1)
+        {
+            bool changed = ApplyCurrencyDelta(currencyAmount);
+            // 비트 OR로 두 호출을 모두 실행한다 - ||를 쓰면 재화가 바뀐 순간 아이템 지급이 통째로 생략된다.
+            changed |= ApplyItemDelta(item, itemCount);
+
+            if (changed) SaveAndNotify();
+        }
+
+        /// <summary>메모리의 재화 값만 바꾼다(저장/알림 없음). 실제로 값이 달라졌으면 true.</summary>
+        private bool ApplyCurrencyDelta(int amount)
+        {
+            return amount != 0 && ApplyCurrencyValue(SaveSystem.Data.currency + amount);
+        }
+
+        private bool ApplyCurrencyValue(int value)
+        {
+            int clamped = Mathf.Max(0, value);
+            if (clamped == SaveSystem.Data.currency) return false;
+
+            SaveSystem.Data.currency = clamped;
+            return true;
+        }
+
+        /// <summary>메모리의 아이템 수량만 바꾼다(저장/알림 없음). 실제로 값이 달라졌으면 true.</summary>
+        private bool ApplyItemDelta(ItemDefinition definition, int count)
+        {
+            if (definition == null || count <= 0) return false;
+
+            if (!definitionsById.ContainsKey(definition.ItemId))
+            {
+                // 카탈로그에 없는 아이템을 넣으면 저장은 되지만 인벤토리에 그려지지 않아 "사라진 것처럼"
+                // 보인다 - 조용히 넘어가지 않고 여기서 막는다.
+                Debug.LogError($"[InventoryManager] '{definition.ItemId}'가 Item Catalog에 없어 추가하지 않았습니다 - " +
+                               "Inspector의 Item Catalog에 이 정의를 등록하세요.", this);
+                return false;
+            }
+
+            List<InventoryItemState> states = SaveSystem.Data.items;
+            for (int i = 0; i < states.Count; i++)
+            {
+                if (states[i] == null || states[i].itemId != definition.ItemId) continue;
+
+                states[i].count += count;
+                return true;
+            }
+
+            // 처음 획득하는 아이템 - 목록 맨 뒤에 추가되고, 이 순서가 그대로 표시 순서가 된다.
+            states.Add(new InventoryItemState { itemId = definition.ItemId, count = count });
+            return true;
+        }
+
+        /// <summary>재화와 아이템을 모두 비운다. 캐릭터/경험치/행동력 저장 값은 건드리지 않는다.</summary>
+        public void ClearInventory()
+        {
+            SaveData data = SaveSystem.Data;
+            if (data.currency == 0 && data.items.Count == 0) return;
+
+            data.currency = 0;
+            data.items.Clear();
+            SaveAndNotify();
+        }
+
+        /// <summary>인벤토리가 실제로 바뀐 뒤에만 호출한다 - 저장은 이 경로 하나뿐이라 매 프레임이나
+        /// 입력마다 파일을 쓰는 경로가 존재하지 않는다.</summary>
+        private void SaveAndNotify()
+        {
+            entryCacheDirty = true;
+
+            if (!SaveSystem.Save())
+            {
+                Debug.LogError("[InventoryManager] 인벤토리를 저장하지 못했습니다 - 이번 실행에는 적용되지만 " +
+                               "앱을 다시 켜면 이전 값으로 돌아갑니다.", this);
+            }
+
+            InventoryChanged?.Invoke();
+        }
+
+        private void RebuildEntryCacheIfNeeded()
+        {
+            if (!entryCacheDirty) return;
+            entryCacheDirty = false;
+            entryCache.Clear();
+
+            List<InventoryItemState> states = SaveSystem.Data.items;
+            for (int i = 0; i < states.Count; i++)
+            {
+                InventoryItemState state = states[i];
+                if (state == null || state.count <= 0) continue;
+
+                if (!definitionsById.TryGetValue(state.itemId, out ItemDefinition definition))
+                {
+                    // 정의가 사라졌거나 아직 카탈로그에 없는 id - 저장 값은 그대로 두고 표시만 건너뛴다.
+                    if (warnedUnknownItemIds.Add(state.itemId))
+                    {
+                        Debug.LogWarning($"[InventoryManager] 저장된 아이템 '{state.itemId}'의 정의를 Item Catalog에서 " +
+                                         "찾지 못해 인벤토리에 표시하지 않습니다(저장 값은 유지됩니다).", this);
+                    }
+                    continue;
+                }
+
+                entryCache.Add(new Entry(definition, state.count));
+            }
+        }
+
+        // ---- 개발용 진입점 (정식 UI에 노출하지 않는다) ----
+
+        [ContextMenu("Debug - Add Currency")]
+        public void DebugAddCurrency()
+        {
+            AddCurrency(debugCurrencyAmount);
+        }
+
+        [ContextMenu("Debug - Set Currency To Zero")]
+        public void DebugSetCurrencyToZero()
+        {
+            SetCurrency(0);
+        }
+
+        /// <summary>같은 아이템을 반복해서 눌러 수량 누적을 확인하는 용도로도 쓴다.</summary>
+        [ContextMenu("Debug - Add Item")]
+        public void DebugAddItem()
+        {
+            if (debugItem == null)
+            {
+                Debug.LogWarning("[InventoryManager] Debug Item이 비어 있어 추가할 아이템이 없습니다.", this);
+                return;
+            }
+
+            AddItem(debugItem, debugItemCount);
+        }
+
+        /// <summary>카탈로그의 모든 아이템을 1개씩 넣는다 - 여러 종류 표시와 빈 슬롯 처리를 한 번에 확인한다.</summary>
+        [ContextMenu("Debug - Add One Of Every Item")]
+        public void DebugAddOneOfEveryItem()
+        {
+            for (int i = 0; i < itemCatalog.Count; i++)
+            {
+                AddItem(itemCatalog[i], 1);
+            }
+        }
+
+        [ContextMenu("Debug - Clear Inventory")]
+        public void DebugClearInventory()
+        {
+            ClearInventory();
+        }
+    }
+}

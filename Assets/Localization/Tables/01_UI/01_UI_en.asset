@@ -26,6 +26,74 @@ MonoBehaviour:
     m_Localized: Combo
     m_Metadata:
       m_Items: []
+  - m_Id: 274212265648128
+    m_Localized: Change
+    m_Metadata:
+      m_Items: []
+  - m_Id: 282535723524096
+    m_Localized: Stamina
+    m_Metadata:
+      m_Items: []
+  - m_Id: 380212448583680
+    m_Localized: Inventory
+    m_Metadata:
+      m_Items: []
+  - m_Id: 602901335498752
+    m_Localized: The summoned mercenary's action power has become 0.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 710554061627392
+    m_Localized: Available
+    m_Metadata:
+      m_Items: []
+  - m_Id: 710554074210304
+    m_Localized: Active
+    m_Metadata:
+      m_Items: []
+  - m_Id: 710554074210305
+    m_Localized: Exhausted
+    m_Metadata:
+      m_Items: []
+  - m_Id: 710554074210306
+    m_Localized: Recovering {0}
+    m_Metadata:
+      m_Items: []
+  - m_Id: 710554074210307
+    m_Localized: RecoveryComplete
+    m_Metadata:
+      m_Items: []
+  - m_Id: 743229082296320
+    m_Localized: RecoveryStation
+    m_Metadata:
+      m_Items: []
+  - m_Id: 743229094879232
+    m_Localized: Recovery
+    m_Metadata:
+      m_Items: []
+  - m_Id: 743229094879233
+    m_Localized: 'Require : '
+    m_Metadata:
+      m_Items: []
+  - m_Id: 743229094879234
+    m_Localized: Join the party
+    m_Metadata:
+      m_Items: []
+  - m_Id: 743229094879235
+    m_Localized: Register mercenaries who need recovery.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 743229099073536
+    m_Localized: Confirm
+    m_Metadata:
+      m_Items: []
+  - m_Id: 743229099073537
+    m_Localized: Cancel
+    m_Metadata:
+      m_Items: []
+  - m_Id: 748514651922432
+    m_Localized: The recovery of {0} has been completed.
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
