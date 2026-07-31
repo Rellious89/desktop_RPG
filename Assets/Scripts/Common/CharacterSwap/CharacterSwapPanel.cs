@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Character;
+using Recovery;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -44,8 +45,22 @@ namespace Common
 
         private readonly List<CharacterSwapListItem> spawnedItems = new List<CharacterSwapListItem>();
 
+        /// <summary>지금 열려 있는 패널. 회복소가 상태를 바꾼 뒤 이 목록을 다시 그리게 할 때 쓴다
+        /// (열려 있지 않으면 null이라 아무 일도 일어나지 않는다 - 패널을 억지로 열지 않는다).</summary>
+        private static CharacterSwapPanel openInstance;
+
         private CharacterDefinition pendingCharacter;
         private bool referencesValidated;
+
+        /// <summary>열려 있는 캐릭터 교체 패널의 목록을 다시 그린다. 회복소에서 상태가 바뀌었을 때
+        /// (등록/취소/시작/합류) 호출한다 - 상태 문구와 드래그 가능 여부가 함께 달라지기 때문이다.
+        /// 패널이 닫혀 있으면 아무 일도 하지 않는다.</summary>
+        public static void RequestRefresh()
+        {
+            if (openInstance == null) return;
+            openInstance.RefreshAllItems();
+            openInstance.UpdateSwapButton();
+        }
 
         protected override void OnModalOpened()
         {
@@ -59,15 +74,20 @@ namespace Common
 
             CharacterRoster.CurrentCharacterChanged += HandleCurrentCharacterChanged;
             CharacterRoster.CharacterStateChanged += HandleCharacterStateChanged;
+            RecoveryService.SlotsChanged += HandleRecoverySlotsChanged;
+
+            openInstance = this;
         }
 
         protected override void OnModalClosed()
         {
             CharacterRoster.CurrentCharacterChanged -= HandleCurrentCharacterChanged;
             CharacterRoster.CharacterStateChanged -= HandleCharacterStateChanged;
+            RecoveryService.SlotsChanged -= HandleRecoverySlotsChanged;
 
             if (swapButton != null) swapButton.onClick.RemoveListener(ApplyPendingSwap);
 
+            if (openInstance == this) openInstance = null;
             pendingCharacter = null;
         }
 
@@ -133,6 +153,18 @@ namespace Common
             }
         }
 
+        /// <summary>
+        /// 항목 하나를 다시 그린다. <b>교체 가능 여부와 회복 드래그 가능 여부를 각각 따로 계산해서</b>
+        /// 넘긴다 - 두 규칙의 소유자가 다르기 때문이다.
+        ///
+        /// <code>
+        /// 교체 가능   : CharacterRoster.GetSwapBlockReason  (Active/행동력 0/회복 중이면 불가)
+        /// 드래그 가능 : RecoveryStation.CanRegister          (Active/최대치/이미 등록됨/빈 슬롯 없음이면 불가)
+        /// </code>
+        ///
+        /// 그래서 행동력 0인 캐릭터는 <b>교체 불가 + 드래그 가능</b>이고, 행동력이 가득 찬 캐릭터는
+        /// <b>교체 가능 + 드래그 불가</b>가 된다. 이 둘을 하나의 interactable로 묶지 않는다.
+        /// </summary>
         private void RefreshItem(CharacterSwapListItem item)
         {
             CharacterRoster roster = CharacterRoster.Instance;
@@ -141,27 +173,65 @@ namespace Common
             CharacterDefinition character = item.BoundCharacter;
             if (character == null) return;
 
-            CharacterRoster.SwapBlockReason reason = roster.GetSwapBlockReason(character);
-            CharacterSwapListItem.DisplayState state;
-            switch (reason)
-            {
-                case CharacterRoster.SwapBlockReason.AlreadyCurrent:
-                    state = CharacterSwapListItem.DisplayState.InUse;
-                    break;
-                case CharacterRoster.SwapBlockReason.NoStamina:
-                    state = CharacterSwapListItem.DisplayState.Exhausted;
-                    break;
-                default:
-                    state = CharacterSwapListItem.DisplayState.Ready;
-                    break;
-            }
+            RecoveryStation station = RecoveryService.Station;
+            RecoveryCharacterState recoveryState = station != null
+                ? station.GetState(character)
+                : RecoveryCharacterState.Available;
 
+            CharacterRoster.SwapBlockReason swapReason = roster.GetSwapBlockReason(character);
+            bool canSwap = swapReason == CharacterRoster.SwapBlockReason.None;
+
+            // 회복소가 없는 씬/구성에서는 드래그 기능 자체가 없다.
+            bool canDrag = station != null && station.CanRegister(character);
+
+            CharacterSwapListItem.DisplayState state = ResolveDisplayState(swapReason, recoveryState);
+            // 상태 문구에는 상태만 담는다 - 남은 시간은 회복소 슬롯의 lb_time이 담당하며, 여기에
+            // 섞으면 같은 값을 두 곳에서 서로 다른 주기로 갱신하게 된다.
             item.Refresh(
                 roster.GetLevel(character),
                 roster.GetStamina(character),
                 roster.GetMaxStamina(character),
                 state,
-                character == pendingCharacter);
+                character == pendingCharacter,
+                canSwap,
+                canDrag);
+        }
+
+        /// <summary>표시 상태는 회복 상태를 먼저 본다 - 회복 중/합류 대기는 교체 차단 사유
+        /// (InRecovery)와 같은 사실을 가리키지만, 사용자에게는 "왜 못 고르는지"를 정확히 보여줘야 한다.
+        /// 1단계에서 임시로 쓰던 Exhausted 매핑을 이 판정이 대체한다.</summary>
+        private static CharacterSwapListItem.DisplayState ResolveDisplayState(
+            CharacterRoster.SwapBlockReason swapReason, RecoveryCharacterState recoveryState)
+        {
+            if (recoveryState == RecoveryCharacterState.Recovering)
+            {
+                return CharacterSwapListItem.DisplayState.Recovering;
+            }
+            if (recoveryState == RecoveryCharacterState.RecoveryComplete)
+            {
+                return CharacterSwapListItem.DisplayState.RecoveryComplete;
+            }
+
+            switch (swapReason)
+            {
+                case CharacterRoster.SwapBlockReason.AlreadyCurrent:
+                    return CharacterSwapListItem.DisplayState.InUse;
+                case CharacterRoster.SwapBlockReason.NoStamina:
+                    return CharacterSwapListItem.DisplayState.Exhausted;
+                case CharacterRoster.SwapBlockReason.InRecovery:
+                    // 로스터는 회복 중이라고 하는데 회복소가 그렇지 않다고 한 경우 - 회복소가 아직
+                    // 준비되지 않았을 때뿐이다. 고를 수 없다는 사실만은 정확히 보여준다.
+                    return CharacterSwapListItem.DisplayState.Recovering;
+                default:
+                    return CharacterSwapListItem.DisplayState.Ready;
+            }
+        }
+
+        private void HandleRecoverySlotsChanged()
+        {
+            // 등록/취소/시작/합류로 상태가 바뀌면 문구와 드래그 가능 여부가 함께 달라진다.
+            RefreshAllItems();
+            UpdateSwapButton();
         }
 
         // ---- 선택 / 교체 ----

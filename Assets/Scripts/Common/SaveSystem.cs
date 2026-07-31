@@ -97,6 +97,11 @@ namespace Common
             {
                 data.items = new System.Collections.Generic.List<InventoryItemState>();
             }
+
+            // 회복소가 없던 예전 저장 파일에는 recoverySlots 항목 자체가 없다 - 여기서 빈 슬롯 3개로
+            // 맞춰 두면 회복소 코드가 "목록이 없을 수도 있다"를 매번 따지지 않아도 되고, 예전 파일을
+            // 읽어도 예외 없이 회복소가 열린다.
+            SaveData.EnsureRecoverySlots(data);
         }
     }
 }

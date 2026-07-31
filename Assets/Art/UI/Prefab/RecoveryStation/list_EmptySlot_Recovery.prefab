@@ -13,8 +13,6 @@ GameObject:
   - component: {fileID: 2203743621840758701}
   - component: {fileID: 7960583195553824494}
   - component: {fileID: 8315095560275444245}
-  - component: {fileID: 8403176599342321259}
-  - component: {fileID: 479955905838938736}
   m_Layer: 5
   m_Name: list_EmptySlot_Recovery
   m_TagString: Untagged
@@ -150,76 +148,6 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
---- !u!114 &8403176599342321259
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 463019656868909819}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3189693b10b740559a9015ba76c6c338, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  fillSlider: {fileID: 0}
-  previewFill: {fileID: 0}
---- !u!114 &479955905838938736
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 463019656868909819}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e5995fd9597940e19b164007f7682ec1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  selectButton: {fileID: 0}
-  background: {fileID: 0}
-  portraitImage: {fileID: 0}
-  nameText: {fileID: 0}
-  levelText: {fileID: 0}
-  staminaValueText: {fileID: 0}
-  stateText: {fileID: 0}
-  staminaBar: {fileID: 0}
-  levelFormat: Lv. {0}
-  staminaFormat: '{0} / {1}'
-  stateReadyText:
-    m_TableReference:
-      m_TableCollectionName: 
-    m_TableEntryReference:
-      m_KeyId: 0
-      m_Key: 
-    m_FallbackState: 0
-    m_WaitForCompletion: 0
-    m_LocalVariables: []
-  stateInUseText:
-    m_TableReference:
-      m_TableCollectionName: 
-    m_TableEntryReference:
-      m_KeyId: 0
-      m_Key: 
-    m_FallbackState: 0
-    m_WaitForCompletion: 0
-    m_LocalVariables: []
-  stateExhaustedText:
-    m_TableReference:
-      m_TableCollectionName: 
-    m_TableEntryReference:
-      m_KeyId: 0
-      m_Key: 
-    m_FallbackState: 0
-    m_WaitForCompletion: 0
-    m_LocalVariables: []
-  normalColor: {r: 1, g: 1, b: 1, a: 1}
-  selectedColor: {r: 1, g: 0.85, b: 0.35, a: 1}
-  inUseColor: {r: 0.55, g: 0.8, b: 1, a: 1}
-  exhaustedColor: {r: 0.45, g: 0.45, b: 0.45, a: 1}
-  references:
-    version: 2
-    RefIds: []
 --- !u!1 &7250029152170340314
 GameObject:
   m_ObjectHideFlags: 0

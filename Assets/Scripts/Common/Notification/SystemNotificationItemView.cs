@@ -45,6 +45,13 @@ namespace Common
         private Action<SystemNotificationItemView> removalRequest;
         private bool exiting;
 
+        // 이 카드가 소유한 포맷 인자 <b>사본</b>. 호출부가 넘긴 배열을 그대로 들고 있으면 그 배열을
+        // 재사용하거나 고칠 때 이미 떠 있는 카드의 문구까지 바뀐다.
+        private object[] messageArguments;
+
+        // 포맷 실패 로그를 카드당 한 번만 남긴다(Locale이 바뀔 때마다 다시 시도되기 때문).
+        private bool formatFailureLogged;
+
         /// <summary>이 알림의 타입 식별자. Manager가 같은 타입 판단에 쓴다.</summary>
         public string NotificationId => definition != null ? definition.NotificationId : null;
 
@@ -52,6 +59,12 @@ namespace Common
 
         /// <summary>종료 연출이 이미 시작됐는지. 중복 닫기 방지의 근거다.</summary>
         public bool IsExiting => exiting;
+
+        /// <summary>지금 화면에 그려져 있는 본문. 검증과 디버깅용 읽기 전용 값이다.</summary>
+        public string CurrentMessageText => messageText != null ? messageText.text : null;
+
+        /// <summary>이 카드가 들고 있는 포맷 인자 개수(사본 기준).</summary>
+        public int MessageArgumentCount => messageArguments != null ? messageArguments.Length : 0;
 
         private void Reset()
         {
@@ -82,9 +95,30 @@ namespace Common
         /// <paramref name="onRemovalRequested"/>는 종료 연출이 끝난 뒤 정확히 한 번 호출된다.</summary>
         public void Bind(SystemNotificationDefinition definition, Action<SystemNotificationItemView> onRemovalRequested)
         {
+            Bind(definition, null, onRemovalRequested);
+        }
+
+        /// <summary>
+        /// 표시할 알림 종류와 <b>동적 포맷 인자</b>를 함께 지정한다. 문구의 {0}, {1}...에 채워지며,
+        /// 인자를 넘기지 않으면(null 또는 빈 배열) 문구를 <b>그대로</b> 표시한다 - 인자 없는 기존
+        /// 알림의 동작이 조금도 달라지지 않게 하기 위함이다.
+        ///
+        /// <paramref name="arguments"/>는 <b>사본으로 보관</b>한다. 호출부가 배열을 재사용하거나
+        /// 내용을 바꿔도 이미 떠 있는 카드의 문구는 영향을 받지 않는다.
+        ///
+        /// Locale이 바뀌면 <see cref="LocalizedTextReference.StringChanged"/>가 다시 호출되는데,
+        /// 그때도 이 사본으로 다시 포맷하므로 언어를 바꿔도 인자가 유지된다.
+        /// </summary>
+        public void Bind(SystemNotificationDefinition definition, object[] arguments,
+                         Action<SystemNotificationItemView> onRemovalRequested)
+        {
             this.definition = definition;
             removalRequest = onRemovalRequested;
             exiting = false;
+            formatFailureLogged = false;
+            messageArguments = arguments != null && arguments.Length > 0
+                ? (object[])arguments.Clone()
+                : null;
 
             if (closeButton != null)
             {
@@ -150,6 +184,7 @@ namespace Common
         {
             exiting = true;
             removalRequest = null;
+            messageArguments = null;
             UnbindMessage();
 
             if (transition != null)
@@ -212,7 +247,36 @@ namespace Common
         {
             if (messageText != null)
             {
-                messageText.text = localizedText;
+                messageText.text = FormatMessage(localizedText);
+            }
+        }
+
+        /// <summary>
+        /// 보관해 둔 인자로 문구를 포맷한다. 인자가 없으면 <b>string.Format을 부르지 않고</b> 원문을
+        /// 그대로 돌려준다 - 인자 없이 표시하는 기존 알림이 {0} 같은 표기 때문에 예외를 맞지 않게 한다.
+        ///
+        /// 포맷에 실패하면(문구의 자리표시자 번호가 인자 개수를 넘거나 중괄호가 깨진 경우) 예외를
+        /// 밖으로 던지지 않고 <b>원문을 그대로 표시</b>한다 - 알림 하나의 문구 오류 때문에 알림 자체가
+        /// 사라지거나 다른 처리가 멈추면 안 된다. 원인은 오류 로그로 분명히 남긴다.
+        /// </summary>
+        private string FormatMessage(string localizedText)
+        {
+            if (messageArguments == null || string.IsNullOrEmpty(localizedText)) return localizedText;
+
+            try
+            {
+                return string.Format(localizedText, messageArguments);
+            }
+            catch (FormatException e)
+            {
+                if (!formatFailureLogged)
+                {
+                    formatFailureLogged = true;
+                    Debug.LogError($"[SystemNotificationItemView] 알림 '{NotificationId}'의 문구를 인자 " +
+                                   $"{messageArguments.Length}개로 포맷하지 못했습니다 - 문구를 그대로 표시합니다. " +
+                                   $"Localization 문구의 자리표시자를 확인하세요: {e.Message}", this);
+                }
+                return localizedText;
             }
         }
 

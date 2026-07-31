@@ -92,6 +92,19 @@ namespace Common
         /// </summary>
         public SystemNotificationItemView Show(SystemNotificationDefinition definition)
         {
+            return Show(definition, null);
+        }
+
+        /// <summary>
+        /// 문구에 <b>동적 인자</b>를 채워 알림을 표시한다(예: "{0}(이)가 회복을 완료하였습니다.").
+        /// 인자를 넘기지 않으면 <see cref="Show(SystemNotificationDefinition)"/>와 완전히 같다.
+        ///
+        /// 인자는 각 카드가 <b>사본으로 소유</b>하므로, 호출부가 배열을 재사용하거나 내용을 바꿔도
+        /// 이미 떠 있는 카드의 문구는 바뀌지 않는다. 같은 타입 교체 정책(현재 1개 + 물러난 1개)과
+        /// Locale 변경 시 재적용 동작은 인자가 있든 없든 동일하다.
+        /// </summary>
+        public SystemNotificationItemView Show(SystemNotificationDefinition definition, params object[] arguments)
+        {
             if (definition == null)
             {
                 Debug.LogError("[SystemNotificationManager] Definition이 null이라 알림을 만들 수 없습니다.", this);
@@ -133,7 +146,7 @@ namespace Common
             }
 
             alive.Add(view);
-            view.Bind(definition, HandleRemovalRequested);
+            view.Bind(definition, arguments, HandleRemovalRequested);
 
             // 이전 카드의 종료보다 먼저 최신 인스턴스를 등록한다 - 이 순서가 "이전 카드의 지연 종료가
             // 새 등록을 지우지 않는다"는 보장의 근거다.

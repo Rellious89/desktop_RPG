@@ -34,6 +34,97 @@ namespace Common
         /// 누적된다. <b>목록 순서가 곧 획득 순서이자 인벤토리 표시 순서</b>다 - 처음 획득할 때 뒤에
         /// 추가되고 그 뒤로 자리가 바뀌지 않으므로, 저장/불러오기를 거쳐도 표시 순서가 유지된다.</summary>
         public List<InventoryItemState> items = new List<InventoryItemState>();
+
+        /// <summary>회복소 슬롯. <b>목록의 인덱스가 곧 슬롯 번호</b>이며, 비어 있는 슬롯도 항목을
+        /// 유지한다(목록을 줄이면 번호가 밀려 다른 슬롯의 진행이 뒤바뀐다). 회복소 기능이 없던 예전
+        /// 저장 파일에는 이 항목 자체가 없으므로 <see cref="EnsureRecoverySlots"/>가 빈 슬롯
+        /// <see cref="DefaultRecoverySlotCount"/>개로 맞춘다.
+        ///
+        /// 아직 시작하지 않은 대기(PendingRecovery)는 여기에 들어가지 않는다 - 재화를 내고 실제로
+        /// 시간이 흐르기 시작한 슬롯만 저장한다.</summary>
+        public List<RecoverySlotSaveState> recoverySlots = new List<RecoverySlotSaveState>();
+
+        /// <summary>저장 계층이 보장하는 최소 슬롯 수. 실제 사용 가능한 슬롯 수는 회복 밸런스 테이블의
+        /// Max Slots가 정하며, 그 값이 더 크면 회복소가 목록을 더 늘린다.</summary>
+        public const int DefaultRecoverySlotCount = 3;
+
+        /// <summary>
+        /// 슬롯 목록을 항상 "null 없는 <paramref name="minimumCount"/>개 이상"으로 맞춘다. 저장 파일에
+        /// 항목이 없거나(예전 파일), 일부가 null이거나, 슬롯 수를 늘린 경우를 <b>예외 없이</b> 흡수한다.
+        /// 이미 있는 슬롯은 잘라내지 않는다 - Max Slots를 나중에 줄여도 회복 중이던 저장 값을 지우지
+        /// 않기 위함이다.
+        /// </summary>
+        public static void EnsureRecoverySlots(SaveData data, int minimumCount = DefaultRecoverySlotCount)
+        {
+            if (data == null) return;
+            if (minimumCount < DefaultRecoverySlotCount) minimumCount = DefaultRecoverySlotCount;
+
+            if (data.recoverySlots == null)
+            {
+                data.recoverySlots = new List<RecoverySlotSaveState>();
+            }
+
+            for (int i = 0; i < data.recoverySlots.Count; i++)
+            {
+                if (data.recoverySlots[i] == null) data.recoverySlots[i] = new RecoverySlotSaveState();
+            }
+
+            while (data.recoverySlots.Count < minimumCount)
+            {
+                data.recoverySlots.Add(new RecoverySlotSaveState());
+            }
+        }
+    }
+
+    /// <summary>
+    /// 회복 슬롯 한 칸의 저장 상태. 캐릭터가 없으면 빈 슬롯이다.
+    ///
+    /// <b>진행률은 저장하지 않는다.</b> 지금 몇까지 찼는지는 <see cref="startedAtUtc"/>와 밸런스
+    /// 테이블만으로 다시 계산할 수 있고, 그래야 앱을 꺼 둔 동안 흐른 시간이 그대로 반영된다
+    /// (Time.time이나 코루틴 누적값은 앱이 꺼지면 사라지므로 근거가 될 수 없다).
+    ///
+    /// 완료 여부도 저장하지 않는다 - <see cref="completeAtUtc"/>와 현재 시각의 비교로 파생된다.
+    /// 상태 문자열을 따로 저장하면 실제 시각과 어긋난 상태가 파일에 남는다.
+    /// </summary>
+    [Serializable]
+    public class RecoverySlotSaveState
+    {
+        /// <summary>CharacterDefinition.CharacterId와 같은 값. 비어 있으면 빈 슬롯이다.</summary>
+        public string characterId;
+
+        /// <summary>회복을 시작한 순간의 현재 행동력. 지금 값 = min(최대, 이 값 + 경과 단계).</summary>
+        public int startStamina;
+
+        /// <summary>회복 시작 시각(UTC). ISO-8601 왕복 서식("o")에 InvariantCulture로 기록하므로
+        /// 사용자의 지역/언어 설정이 달라도 같은 값으로 다시 읽힌다.</summary>
+        public string startedAtUtc;
+
+        /// <summary>회복 완료 예정 시각(UTC). 서식은 <see cref="startedAtUtc"/>와 같다.</summary>
+        public string completeAtUtc;
+
+        /// <summary>
+        /// <b>이번 회복 주기</b>의 완료 알림을 이미 요청했는지. 알림을 매 프레임/재시작마다 반복하지
+        /// 않기 위한 표시이며, 슬롯 하나가 곧 회복 주기 하나이므로 이 값이 per-cycle marker다.
+        ///
+        /// 회복을 새로 시작할 때와 슬롯을 비울 때(합류) 모두 false로 초기화되므로, 같은 슬롯에서 다음
+        /// 주기가 시작되면 다시 한 번 알린다.
+        ///
+        /// <b>예전 저장 파일에는 이 필드가 없다.</b> JsonUtility는 그 경우 false를 넣는데, 그것이 곧
+        /// "아직 알리지 않음"이라 완료 상태로 저장돼 있던 슬롯이 다음 실행에서 정확히 한 번 알림을
+        /// 받는다 - 기본값이 안전한 쪽이다.
+        /// </summary>
+        public bool completionNotified;
+
+        public bool HasCharacter => !string.IsNullOrEmpty(characterId);
+
+        public void Clear()
+        {
+            characterId = null;
+            startStamina = 0;
+            startedAtUtc = null;
+            completeAtUtc = null;
+            completionNotified = false;
+        }
     }
 
     /// <summary>

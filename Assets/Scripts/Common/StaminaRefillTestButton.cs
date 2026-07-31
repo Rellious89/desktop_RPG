@@ -1,52 +1,31 @@
-using Character;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace Common
 {
     /// <summary>
-    /// ControlDock의 <b>테스트용</b> 행동력 전체 충전 버튼(btn_switching). 클릭하면 보유한 모든
-    /// 캐릭터의 현재 행동력이 최대치로 돌아간다 - 지금 소환된 캐릭터, 꺼져 있는 캐릭터, 행동력이 0인
-    /// 캐릭터를 모두 포함한다.
+    /// <b>기능이 제거된 옛 테스트 버튼(btn_switching)의 껍데기.</b> 예전에는 클릭하면 보유한 모든
+    /// 캐릭터의 행동력이 최대치로 돌아갔지만, 정식 회복 규칙(회복소)이 들어오면서 그 경로를 없앴다 -
+    /// 재화를 내고 시간을 기다리는 회복을 우회해 행동력을 채우는 버튼이 남아 있으면, 회복 중인
+    /// 캐릭터의 행동력이 회복소 계산과 어긋난다.
     ///
-    /// <b>캐릭터를 교체하지 않는다.</b> 이 오브젝트는 원래 캐릭터 순환 교체 테스트 버튼이었지만,
-    /// 정식 교체 UI(CharacterSwapPanel)가 그 역할을 가져간 뒤 행동력 반복 테스트용으로 바꿨다.
-    /// 씬의 다른 참조가 깨지지 않도록 GameObject 이름(btn_switching)은 그대로 두고 역할만 바꾼 것이라,
-    /// 이름과 하는 일이 다르다는 점에 주의한다.
+    /// <b>파일을 지우지 않고 남겨 둔 이유:</b> 이 컴포넌트는 씬(desktopScene)의 btn_switching에 붙어
+    /// 있다. 스크립트 파일을 지우면 그 자리에 "Missing Script"가 남아 씬이 더러워지므로, 코드 쪽
+    /// 동작만 먼저 없애고 <b>컴포넌트와 오브젝트 제거는 에디터에서</b> 하도록 남겼다. 그 정리가 끝나면
+    /// 이 파일도 함께 지운다.
     ///
-    /// 행동력 값과 저장은 전부 <see cref="CharacterRoster"/>가 소유한다 - 이 컴포넌트는 버튼 클릭을
-    /// 그쪽 메서드 하나로 넘기기만 하고 자체 데이터를 갖지 않는다. 시간 경과 회복이나 정식 회복소
-    /// 기능으로 확장하지 않는다.
+    /// 지금은 클릭해도 아무 일도 일어나지 않는다(Button의 onClick에 아무것도 등록하지 않는다).
     /// </summary>
     [RequireComponent(typeof(Button))]
     public class StaminaRefillTestButton : MonoBehaviour
     {
-        private Button button;
-
         private void Awake()
         {
-            button = GetComponent<Button>();
-        }
-
-        private void OnEnable()
-        {
-            button.onClick.AddListener(RefillAllStamina);
-        }
-
-        private void OnDisable()
-        {
-            button.onClick.RemoveListener(RefillAllStamina);
-        }
-
-        public void RefillAllStamina()
-        {
-            if (CharacterRoster.Instance == null)
-            {
-                Debug.LogError("[StaminaRefillTestButton] 씬에 CharacterRoster가 없어 행동력을 충전할 수 없습니다.", this);
-                return;
-            }
-
-            CharacterRoster.Instance.RefillAllStaminaToMax();
+            // 씬에 아직 남아 있다는 사실을 시작할 때 한 번만 알린다 - 조용히 죽어 있으면 "왜 눌러도
+            // 안 되지?"를 코드에서 찾아야 한다.
+            Debug.LogWarning($"[StaminaRefillTestButton] '{name}'의 행동력 전체 충전 기능은 제거됐습니다 - " +
+                             "회복은 회복소(RecoveryService)에서만 일어납니다. 이 컴포넌트와 버튼은 " +
+                             "에디터에서 정리하세요.", this);
         }
     }
 }

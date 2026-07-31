@@ -30,9 +30,14 @@ namespace Character
     /// 그 값을 보고 <b>새 공격 세션을 시작하지 않는다</b>(이미 재생 중인 공격은 끊지 않는다).
     /// 자동 교체는 하지 않는다 - 캐릭터는 Idle 상태로 대기하고, 교체는 사용자가 패널에서 한다.
     ///
-    /// 정식 회복 규칙(시간 경과 회복, 회복소 등)은 아직 없다. <see cref="SetStamina"/>와
-    /// <see cref="RefillAllStaminaToMax"/>는 반복 테스트를 위한 진입점이며, 후자는 ControlDock의
-    /// 테스트 버튼(StaminaRefillTestButton)과 Inspector 컨텍스트 메뉴가 공통으로 쓴다.
+    /// <b>행동력 회복은 회복소(Recovery.RecoveryService)가 소유한다.</b> 예전에 있던 "전체 충전"
+    /// 테스트 경로는 제거했다 - 회복은 재화를 내고 시간을 기다리는 정식 규칙 하나뿐이며, 그 경로를
+    /// 우회해 값을 최대치로 만드는 공개 API를 남겨 두지 않는다.
+    ///
+    /// 회복 중(Recovering/RecoveryComplete)인 캐릭터는 <see cref="GetSwapBlockReason"/>이
+    /// <see cref="SwapBlockReason.InRecovery"/>로 교체를 막고, <see cref="SetStamina"/>도 값 변경을
+    /// 거부한다 - 회복소가 계산한 행동력을 바깥에서 덮어쓰지 못하게 하기 위함이다. 회복소 자신은
+    /// 전용 경로인 <see cref="ApplyRecoveryStamina"/>를 쓴다.
     /// </summary>
     [DisallowMultipleComponent]
     public class CharacterRoster : MonoBehaviour
@@ -48,6 +53,9 @@ namespace Character
             NoStamina,
             /// <summary>로스터에 없거나 씬 오브젝트가 연결되지 않은 캐릭터.</summary>
             NotAvailable,
+            /// <summary>회복소 슬롯에 들어가 있다(회복 중이거나, 회복이 끝나 합류를 기다리는 중).
+            /// 행동력이 남아 있어도 교체할 수 없다 - 슬롯에서 합류시켜야 다시 쓸 수 있다.</summary>
+            InRecovery,
         }
 
         [Serializable]
@@ -102,9 +110,6 @@ namespace Character
         // 먼저 처리한 쪽이 다른 쪽의 이벤트를 삼켜서 둘이 서로에게 영향을 준다.
         private readonly DefeatEventFilter defeatFilter = new DefeatEventFilter();
 
-        // 전체 충전에서 "값이 실제로 바뀐 캐릭터"만 모아 두는 재사용 버퍼(호출마다 할당하지 않는다).
-        private readonly List<CharacterDefinition> refillChangedBuffer = new List<CharacterDefinition>();
-
         public IReadOnlyList<Entry> Entries => usableEntries;
 
         /// <summary>지금 전투 중인 캐릭터. 사용 가능한 항목이 하나도 없으면 null이다.</summary>
@@ -113,14 +118,23 @@ namespace Character
         /// <summary>지금 전투 중인 캐릭터가 <b>새 공격을 시작</b>할 수 있는지(행동력 &gt; 0).
         /// PlayerCharacterAnimator가 입력을 받을지 판단할 때 Target.HasAttackableTarget과 함께 본다.
         ///
-        /// 로스터가 없는 씬이나 사용 가능한 캐릭터가 하나도 없는 구성에서는 항상 true를 돌려준다 -
-        /// 행동력 시스템을 쓰지 않는 씬의 기존 전투를 막지 않기 위함이다.</summary>
+        /// 로스터가 없는 씬이나 사용 가능한 캐릭터가 <b>하나도 없는</b> 구성에서는 항상 true를 돌려준다 -
+        /// 행동력 시스템을 쓰지 않는 씬의 기존 전투를 막지 않기 위함이다.
+        ///
+        /// 반면 <b>캐릭터는 있는데 아무도 투입되지 않은 상태</b>(전원이 회복소 슬롯에 있어 시작
+        /// 캐릭터를 고르지 못한 경우)는 false다. 예전에는 이 경우도 "current가 null" 하나로 묶여
+        /// true가 됐는데, 그러면 화면에 아무도 없는 채로 공격 입력이 통한다.</summary>
         public static bool CurrentCharacterCanAct
         {
             get
             {
                 CharacterRoster roster = Instance;
-                if (roster == null || roster.current == null) return true;
+                // 로스터를 쓰지 않는 씬 / 로스터는 있지만 캐릭터 목록이 비어 있는 구성 - 기존 동작 유지.
+                if (roster == null || roster.usableEntries.Count == 0) return true;
+
+                // 캐릭터는 있는데 투입된 캐릭터가 없다 - 전투할 주체가 없으므로 공격을 허용하지 않는다.
+                if (roster.current == null) return false;
+
                 return roster.GetStamina(roster.current) > 0;
             }
         }
@@ -259,16 +273,45 @@ namespace Character
             return created;
         }
 
+        /// <summary>
+        /// 앱을 켤 때 전투에 투입할 캐릭터를 고른다. <b>회복소 슬롯에 들어 있는 캐릭터는 절대 고르지
+        /// 않는다</b> - 지난 실행에서 회복을 걸어 둔 캐릭터가 시작하자마자 Active가 되면, 시간이 흘러
+        /// 행동력이 1 이상이 되는 순간 회복 중인 캐릭터로 공격할 수 있게 된다(자동 합류와 다름없다).
+        ///
+        /// 이 판정을 하는 시점에는 RecoveryService가 아직 만들어지지 않았으므로,
+        /// <see cref="Recovery.RecoveryService.IsCharacterInRecovery"/>가 저장된 recoverySlots를 직접
+        /// 보는 폴백으로 답한다 - 회복소가 있을 때와 같은 근거다.
+        ///
+        /// 선택 순서는 결정적이다: Default Character가 쓸 수 있으면 그것, 아니면 Entries 순서대로
+        /// 처음 만나는 비회복 캐릭터. 전원이 회복 중이면 <b>null</b>을 돌려주고 아무도 켜지 않는다
+        /// (회복 중인 캐릭터를 대신 켜지 않는다).
+        /// </summary>
         private CharacterDefinition ResolveStartCharacter()
         {
-            if (defaultCharacter != null && IndexOf(defaultCharacter) >= 0) return defaultCharacter;
+            if (defaultCharacter != null && IndexOf(defaultCharacter) >= 0)
+            {
+                if (!Recovery.RecoveryService.IsCharacterInRecovery(defaultCharacter)) return defaultCharacter;
 
-            if (defaultCharacter != null)
+                Debug.Log($"[CharacterRoster] Default Character('{defaultCharacter.CharacterId}')가 회복소에 " +
+                          "있어 다른 캐릭터로 시작합니다.", this);
+            }
+            else if (defaultCharacter != null)
             {
                 Debug.LogWarning($"[CharacterRoster] Default Character('{defaultCharacter.CharacterId}')가 Entries에 " +
                                  "없어 목록의 첫 번째 캐릭터로 시작합니다.", this);
             }
-            return usableEntries[0].definition;
+
+            for (int i = 0; i < usableEntries.Count; i++)
+            {
+                CharacterDefinition candidate = usableEntries[i].definition;
+                if (!Recovery.RecoveryService.IsCharacterInRecovery(candidate)) return candidate;
+            }
+
+            // 보유 캐릭터가 전부 회복소에 들어가 있다. 회복 중인 캐릭터를 억지로 켜지 않고 아무도
+            // 투입하지 않은 상태로 시작한다 - CurrentCharacterCanAct가 false가 되어 공격도 막힌다.
+            Debug.LogWarning("[CharacterRoster] 보유한 모든 캐릭터가 회복소에 있어 전투에 투입할 캐릭터가 " +
+                             "없습니다 - 회복이 끝난 캐릭터를 합류시키면 다시 선택할 수 있습니다.", this);
+            return null;
         }
 
         // ---- 조회 ----
@@ -293,6 +336,9 @@ namespace Character
         {
             if (definition == null || IndexOf(definition) < 0) return SwapBlockReason.NotAvailable;
             if (definition == current) return SwapBlockReason.AlreadyCurrent;
+            // 회복 중에는 행동력이 이미 차 있어도 교체할 수 없다 - 행동력 값이 아니라 "슬롯에 있는가"가
+            // 근거이므로 행동력 판정보다 먼저 본다.
+            if (Recovery.RecoveryService.IsCharacterInRecovery(definition)) return SwapBlockReason.InRecovery;
             if (GetStamina(definition) <= 0) return SwapBlockReason.NoStamina;
             return SwapBlockReason.None;
         }
@@ -330,11 +376,18 @@ namespace Character
         /// <summary>현재 행동력을 직접 지정한다(0 ~ Max Stamina로 잘린다). 값이 실제로 바뀐 경우에만
         /// 저장하므로, 이미 0인 캐릭터가 다시 0으로 지정돼도 파일을 쓰지 않는다.
         ///
-        /// 정식 게임 규칙(회복)이 아직 없으므로 지금은 <b>개발용 진입점</b>이기도 하다 - 특정 캐릭터의
-        /// 행동력을 원하는 값으로 맞춰 반복 테스트할 때 쓴다.</summary>
+        /// <b>회복소 슬롯에 들어 있는 캐릭터는 거부한다.</b> 회복 중 행동력은 저장된 시작 시각으로부터
+        /// 계산되는 값이라, 바깥에서 덮어써도 다음 진행 확인에서 되돌아가 "값이 제멋대로 튀는" 것처럼
+        /// 보인다 - 조용히 넘기지 않고 경고를 남긴다.</summary>
         public void SetStamina(CharacterDefinition definition, int value)
         {
             if (definition == null) return;
+            if (Recovery.RecoveryService.IsCharacterInRecovery(definition))
+            {
+                Debug.LogWarning($"[CharacterRoster] '{definition.CharacterId}'는 회복소 슬롯에 있어 행동력을 " +
+                                 "바깥에서 바꿀 수 없습니다 - 합류시킨 뒤에 변경하세요.", this);
+                return;
+            }
 
             CharacterSaveState state = GetOrCreateState(definition);
             int clamped = Mathf.Clamp(value, 0, definition.MaxStamina);
@@ -345,53 +398,42 @@ namespace Character
             CharacterStateChanged?.Invoke(definition);
         }
 
+        // ---- 회복소 전용 경로 ----
+        //
+        // 회복소(Recovery.RecoveryStation)만 쓰는 두 메서드다. 저장과 알림을 호출부가 마지막에 한 번씩만
+        // 하도록 "메모리 변경"과 "이벤트 발생"을 나눠 두었다 - 슬롯 3개가 같은 프레임에 한 단계씩 올라도
+        // 파일 쓰기가 3번 일어나지 않게 하기 위함이다.
+
+        /// <summary>회복 진행 결과를 현재 행동력에 반영한다. <b>메모리만 바꾸고 저장하지 않으며 이벤트도
+        /// 보내지 않는다.</b> 저장과 알림은 회복소가 한 덩어리로 처리한다.</summary>
+        /// <returns>값이 실제로 달라졌으면 true.</returns>
+        public bool ApplyRecoveryStamina(CharacterDefinition definition, int value)
+        {
+            if (definition == null) return false;
+
+            CharacterSaveState state = GetOrCreateState(definition);
+            int clamped = Mathf.Clamp(value, 0, definition.MaxStamina);
+            if (clamped == state.currentStamina) return false;
+
+            state.currentStamina = clamped;
+            return true;
+        }
+
+        /// <summary>회복소가 저장을 마친 뒤, 값이 바뀐 캐릭터에 대해 상태 변경 이벤트를 대신 보내 달라고
+        /// 요청한다. 기존 UI(캐릭터 리스트/행동력 표시)가 이 이벤트를 이미 구독하고 있어 회복소가 별도
+        /// 연결을 만들 필요가 없다.</summary>
+        public void RaiseCharacterStateChanged(CharacterDefinition definition)
+        {
+            if (definition == null) return;
+            CharacterStateChanged?.Invoke(definition);
+        }
+
         // ---- 개발용 진입점 (정식 사용자 UI에 노출하지 않는다) ----
 
-        /// <summary>
-        /// 보유한 <b>모든</b> 캐릭터의 현재 행동력을 각자의 최대치로 되돌린다 - 지금 소환된 캐릭터,
-        /// 꺼져 있는 캐릭터, 행동력이 0이라 선택할 수 없던 캐릭터를 전부 포함한다. 캐릭터 교체는
-        /// 하지 않고, 레벨/경험치/콤보 등 다른 저장 값도 건드리지 않는다.
-        ///
-        /// 전체 충전은 한 번의 조작이므로 <b>저장도 한 번만</b> 한다(캐릭터마다 파일을 쓰지 않는다).
-        /// 값이 실제로 바뀐 캐릭터에 대해서만 <see cref="CharacterStateChanged"/>를 보내므로, 이미
-        /// 전원이 최대치면 저장도 갱신 신호도 발생하지 않는다 - 버튼을 여러 번 눌러도 최대치를
-        /// 넘지 않고 불필요한 파일 쓰기도 없다.
-        ///
-        /// ControlDock의 테스트 버튼(StaminaRefillTestButton)과 Inspector 컨텍스트 메뉴가 모두 이
-        /// 메서드 하나를 쓴다 - 충전 경로를 여러 벌 만들지 않는다. 회복 규칙이 아니라 반복 테스트를
-        /// 위한 리셋이다.
-        /// </summary>
-        [ContextMenu("Debug - Refill All Stamina")]
-        public void RefillAllStaminaToMax()
-        {
-            refillChangedBuffer.Clear();
-
-            for (int i = 0; i < usableEntries.Count; i++)
-            {
-                CharacterDefinition definition = usableEntries[i].definition;
-                CharacterSaveState state = GetOrCreateState(definition);
-                if (state.currentStamina == definition.MaxStamina) continue;
-
-                state.currentStamina = definition.MaxStamina;
-                refillChangedBuffer.Add(definition);
-            }
-
-            if (refillChangedBuffer.Count == 0) return;
-
-            if (!SaveSystem.Save())
-            {
-                // 저장에 실패해도 기존 저장 파일은 그대로 남는다(SaveSystem이 부분 기록을 하지 않는다).
-                // 다만 이번 실행 중의 행동력은 이미 충전된 상태이므로, 재실행 시 값이 되돌아간다는 것을
-                // 분명히 남긴다 - 조용히 성공한 것처럼 보이게 하지 않는다.
-                Debug.LogError("[CharacterRoster] 행동력 전체 충전을 저장하지 못했습니다 - 이번 실행에는 " +
-                               "적용되지만 앱을 다시 켜면 이전 값으로 돌아갑니다.", this);
-            }
-
-            for (int i = 0; i < refillChangedBuffer.Count; i++)
-            {
-                CharacterStateChanged?.Invoke(refillChangedBuffer[i]);
-            }
-        }
+        // 예전에 있던 RefillAllStaminaToMax(보유 캐릭터 전원의 행동력을 최대치로 되돌리는 테스트 경로)는
+        // 제거했다. 회복은 회복소에서 재화를 내고 시간을 기다리는 규칙 하나뿐이며, 그 규칙을 우회해
+        // 행동력을 채우는 공개 API가 남아 있으면 회복소가 계산한 값과 충돌한다. 유일한 호출부였던
+        // ControlDock의 테스트 버튼(StaminaRefillTestButton)도 함께 무력화했다.
 
         /// <summary>지금 전투 중인 캐릭터의 행동력을 0으로 만든다 - 소진 상태 표시와 공격 차단을
         /// 바로 확인하기 위한 개발용 단축 경로다.</summary>
@@ -402,40 +444,65 @@ namespace Character
             SetStamina(current, 0);
         }
 
-        /// <summary>Override Stamina On Start가 켜져 있을 때만 동작한다 - 모든 캐릭터의 현재 행동력을
+        /// <summary>Override Stamina On Start가 켜져 있을 때만 동작한다 - 캐릭터들의 현재 행동력을
         /// 지정 값으로 맞추고 한 번만 저장한다. 실제 저장 데이터를 덮어쓰므로 켜져 있다는 사실이
-        /// 로그에 반드시 남게 한다.</summary>
+        /// 로그에 반드시 남게 한다.
+        ///
+        /// <b>회복소 슬롯에 들어 있는 캐릭터는 건너뛴다.</b> 회복 중 행동력은 저장된 시작 시각으로부터
+        /// 계산되는 값인데, 회복소의 진행 계산은 <b>현재 값을 하한으로</b> 삼기 때문에(회복이 행동력을
+        /// 깎지 않는다는 규칙) 여기서 덮어쓴 값이 그대로 눌러앉는다. 최대치로 덮으면 완료 판정이 바로
+        /// true가 되어 회복이 공짜로 끝나 버린다 - 개발용 플래그가 회복 데이터를 망가뜨리지 않도록
+        /// 대상에서 제외한다.</summary>
         private void ApplyDebugStartStamina()
         {
             if (!overrideStaminaOnStart) return;
 
+            int applied = 0;
+            int skipped = 0;
             for (int i = 0; i < usableEntries.Count; i++)
             {
                 CharacterDefinition definition = usableEntries[i].definition;
-                GetOrCreateState(definition).currentStamina = Mathf.Clamp(debugStartStamina, 0, definition.MaxStamina);
-            }
-            SaveSystem.Save();
+                if (Recovery.RecoveryService.IsCharacterInRecovery(definition))
+                {
+                    skipped++;
+                    continue;
+                }
 
-            Debug.LogWarning($"[CharacterRoster] 개발용 Override Stamina On Start가 켜져 있어 모든 캐릭터의 " +
-                             $"행동력을 {debugStartStamina}(으)로 덮어썼습니다 - 실제 플레이 검증 전에 끄세요.", this);
+                GetOrCreateState(definition).currentStamina = Mathf.Clamp(debugStartStamina, 0, definition.MaxStamina);
+                applied++;
+            }
+
+            if (applied > 0) SaveSystem.Save();
+
+            Debug.LogWarning($"[CharacterRoster] 개발용 Override Stamina On Start가 켜져 있어 캐릭터 {applied}명의 " +
+                             $"행동력을 {debugStartStamina}(으)로 덮어썼습니다" +
+                             (skipped > 0 ? $"(회복소에 있는 {skipped}명은 제외)" : "") +
+                             " - 실제 플레이 검증 전에 끄세요.", this);
         }
 
         /// <summary>이전 캐릭터를 먼저 끄고 새 캐릭터를 켠다 - 순서를 지켜야 두 캐릭터가 같은 프레임에
         /// 동시에 활성화되지 않는다. 목록에 있는 나머지 캐릭터도 모두 꺼서, 씬에서 실수로 켜둔
-        /// 오브젝트가 남아 함께 공격하는 상황을 막는다.</summary>
+        /// 오브젝트가 남아 함께 공격하는 상황을 막는다.
+        ///
+        /// <paramref name="next"/>가 null이면 <b>아무도 투입하지 않은 상태</b>가 된다(모든 캐릭터
+        /// 오브젝트를 끄고 <see cref="current"/>를 null로 둔다). 보유 캐릭터가 전부 회복소에 있을 때
+        /// 쓰이며, 회복 중인 캐릭터를 대신 켜지 않기 위한 정상 경로다.</summary>
         private void ApplyActiveCharacter(CharacterDefinition next)
         {
             for (int i = 0; i < usableEntries.Count; i++)
             {
                 Entry entry = usableEntries[i];
-                if (entry.definition == next) continue;
+                if (next != null && entry.definition == next) continue;
                 if (entry.characterObject.activeSelf) entry.characterObject.SetActive(false);
             }
 
             int index = IndexOf(next);
-            if (index < 0) return;
+            // next가 null이면 index도 -1이지만, 그때는 "아무도 없음"이 정상 결과이므로 여기서 멈추지
+            // 않고 current를 null로 갱신하고 이벤트까지 보낸다. 로스터에 없는 캐릭터를 넘긴 경우
+            // (index < 0 이면서 next != null)만 상태를 바꾸지 않고 돌아간다.
+            if (index < 0 && next != null) return;
 
-            usableEntries[index].characterObject.SetActive(true);
+            if (index >= 0) usableEntries[index].characterObject.SetActive(true);
 
             bool changed = current != next;
             current = next;

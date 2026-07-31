@@ -192,6 +192,58 @@ namespace Inventory
             if (changed) SaveAndNotify();
         }
 
+        /// <summary>
+        /// 잔액이 충분할 때만 차감한다. 부족하면 <b>아무것도 바꾸지 않고</b> false를 돌려준다.
+        ///
+        /// <see cref="AddCurrency"/>에 음수를 넘기는 방식과 결정적으로 다르다 - 그쪽은 결과를 0으로
+        /// 자르기 때문에, 300이 있는데 500을 쓰면 "성공한 것처럼" 잔액이 0이 된다(부분 지불). 값을
+        /// 소비하는 기능은 반드시 이 경로를 쓴다.
+        /// </summary>
+        public bool TrySpendCurrency(int amount)
+        {
+            if (!TrySpendCurrencyWithoutSave(amount)) return false;
+            if (amount != 0) SaveAndNotify();
+            return true;
+        }
+
+        /// <summary>
+        /// <see cref="TrySpendCurrency"/>와 같은 판정이지만 <b>메모리만</b> 바꾼다(저장도 알림도 없다).
+        /// 재화 차감과 다른 저장 값 변경이 한 트랜잭션이어서 SaveSystem.Save()가 그 사이에 두 번
+        /// 일어나면 안 되는 호출부(회복소 시작)를 위한 경로다.
+        ///
+        /// 호출부는 반드시 뒤이어 SaveSystem.Save()를 하고 <see cref="NotifyChangedAfterExternalSave"/>를
+        /// 불러야 한다. 저장이 실패하면 <see cref="RefundCurrencyWithoutSave"/>로 되돌린다.
+        /// </summary>
+        public bool TrySpendCurrencyWithoutSave(int amount)
+        {
+            if (amount < 0)
+            {
+                Debug.LogError($"[InventoryManager] 음수 금액({amount})은 차감할 수 없습니다.", this);
+                return false;
+            }
+            if (amount == 0) return true;
+            if (SaveSystem.Data.currency < amount) return false;
+
+            SaveSystem.Data.currency -= amount;
+            return true;
+        }
+
+        /// <summary>차감했던 금액을 메모리에서 되돌린다(저장/알림 없음). 트랜잭션 취소 전용이며,
+        /// 재화 획득에는 <see cref="AddCurrency"/>를 쓴다.</summary>
+        public void RefundCurrencyWithoutSave(int amount)
+        {
+            if (amount <= 0) return;
+            SaveSystem.Data.currency += amount;
+        }
+
+        /// <summary>다른 시스템이 재화를 바꾸고 SaveSystem.Save()까지 마친 뒤, 인벤토리 표시를
+        /// 갱신하라고 알린다. 저장은 하지 않는다 - 저장을 두 번 하지 않기 위해 나눠 둔 경로다.</summary>
+        public void NotifyChangedAfterExternalSave()
+        {
+            entryCacheDirty = true;
+            InventoryChanged?.Invoke();
+        }
+
         /// <summary>메모리의 재화 값만 바꾼다(저장/알림 없음). 실제로 값이 달라졌으면 true.</summary>
         private bool ApplyCurrencyDelta(int amount)
         {
