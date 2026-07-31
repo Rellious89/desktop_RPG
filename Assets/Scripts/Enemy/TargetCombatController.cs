@@ -133,6 +133,19 @@ namespace Enemy
         private bool shaking;
         private float shakeStartTime;
 
+        // 씬에 배치된 최초 localPosition. stageLayout이 없는 몬스터의 "전투 위치" 기준점으로 쓴다 -
+        // 대기 위치로 옮겨 다니는 동안에도 이 값은 절대 바뀌지 않는다.
+        private Vector3 sceneAuthoredLocalPosition;
+
+        // 기준 위치(basePosition) 자체를 시간에 걸쳐 옮기는 이동 tween - 대기 위치에서 전투 위치로
+        // 승격할 때 쓴다. 피격 흔들림은 언제나 "그 시점의 basePosition"에 오프셋을 더하는 방식이라
+        // (UpdateShake), 이동 중에 맞아도 서로 덮어쓰지 않고 자연스럽게 합쳐진다.
+        private bool moving;
+        private Vector3 moveStart;
+        private Vector3 moveEnd;
+        private float moveDuration;
+        private float moveElapsed;
+
         // 처치/리젠 알파 Fade 대상. Awake에서 자신 및 자식의 SpriteRenderer를 전부 수집한다 -
         // ReceivePoint/ImpactPoint/DamageAnchor 같은 비시각 앵커는 SpriteRenderer가 없으므로 자동으로
         // 제외된다. RGB는 절대 건드리지 않고 각자의 원래 알파만 개별로 저장해 그 값 기준으로 Fade한다.
@@ -142,13 +155,35 @@ namespace Enemy
 
         public MonsterMotionProfile MotionProfile => motionProfile;
 
+        /// <summary>이 몬스터의 Target. 대기열 관리자가 처치 이벤트를 구독할 때 쓴다.</summary>
+        public Target CombatTarget
+        {
+            get
+            {
+                EnsureRuntimeReferences();
+                return target;
+            }
+        }
+
+        /// <summary>지금 이 몬스터가 맡은 역할 - 실제 값은 Target 하나가 소유한다(공격 가능 레지스트리와
+        /// 같은 값을 보게 해서 두 곳이 어긋날 여지를 없앤다).</summary>
+        public TargetEngagementRole EngagementRole =>
+            CombatTarget != null ? target.EngagementRole : TargetEngagementRole.Current;
+
+        /// <summary>이 몬스터가 재생 가능한 모션 프로필을 갖고 있는지 - 관리자가 슬롯 구성을 검증할 때
+        /// Awake의 자기 비활성화 기준과 똑같은 조건으로 확인할 수 있게 열어둔다.</summary>
+        public bool HasPlayableMotionProfile => IsProfilePlayable(motionProfile);
+
+        /// <summary>역할이 실제로 바뀐 직후 발생(Current/Standby/Exiting). Phase 4의 알파/위치 연출
+        /// 컴포넌트가 이 신호 하나만 보고 붙을 수 있도록 남겨둔 확장점이다 - 이 컴포넌트 자체는 역할에
+        /// 따른 시각 변화를 아직 만들지 않는다.</summary>
+        public event Action<TargetEngagementRole> EngagementRoleChanged;
+
+        private bool runtimeReferencesResolved;
+
         private void Awake()
         {
-            spriteRenderer = GetComponent<SpriteRenderer>();
-            flashOnCue = GetComponent<FlashOnCue>();
-            target = GetComponent<Target>();
-            damageNumberSpawner = GetComponent<DamageNumberSpawner>();
-            hitEffectSpawner = GetComponent<HitEffectSpawner>();
+            EnsureRuntimeReferences();
 
             if (!IsProfilePlayable(motionProfile))
             {
@@ -184,6 +219,26 @@ namespace Enemy
 
             idleCurrentFrame = 0;
             ApplyIdleFrame();
+        }
+
+        /// <summary>컴포넌트 참조와 Fade 대상 Renderer/원래 알파를 한 번만 수집한다. Awake에서 부르지만,
+        /// 대기열 관리자의 public API가 이 컴포넌트의 Awake보다 먼저 호출될 수 있으므로(같은 프레임의
+        /// Awake 순서는 보장되지 않는다) 그 진입점들도 전부 이 메서드를 먼저 거친다 - 두 번 이상
+        /// 호출해도 아무 일도 하지 않으므로 Fade 도중에 원래 알파가 덮어써지는 일은 없다.</summary>
+        private void EnsureRuntimeReferences()
+        {
+            if (runtimeReferencesResolved) return;
+            runtimeReferencesResolved = true;
+
+            // 씬에 배치된 최초 위치는 여기서 딱 한 번 캐시한다 - 대기열이 위치를 옮기기 전의 값이어야
+            // "전투 위치" fallback으로 쓸 수 있다.
+            sceneAuthoredLocalPosition = transform.localPosition;
+
+            spriteRenderer = GetComponent<SpriteRenderer>();
+            flashOnCue = GetComponent<FlashOnCue>();
+            target = GetComponent<Target>();
+            damageNumberSpawner = GetComponent<DamageNumberSpawner>();
+            hitEffectSpawner = GetComponent<HitEffectSpawner>();
 
             visualRenderers = GetComponentsInChildren<SpriteRenderer>(true);
             originalAlphas = new float[visualRenderers.Length];
@@ -203,15 +258,36 @@ namespace Enemy
                    && profile.Hit != null && profile.Hit.Frames.Length > 0;
         }
 
+        /// <summary>대기열 관리자가 프로필 풀 후보를 거를 때 쓰는 공개 판정 - 런타임 교체 후보에
+        /// 요구하는 조건은 랜덤 리젠 후보와 완전히 동일하다(Base Idle/Hit 프레임 존재 + Base Idle 첫
+        /// 프레임이 null이 아님). "교체하고 나서야 재생할 프레임이 없다"를 발견하는 일이 없도록 후보
+        /// 단계에서 같은 기준으로 걸러낸다.</summary>
+        public static bool IsProfileUsable(MonsterMotionProfile profile)
+        {
+            return IsProfilePlayable(profile) && profile.BaseIdle.Frames[0] != null;
+        }
+
         /// <summary>Preview(DrawPairedStage)와 같은 공식: Slot + Actor Offset. stageLayout이 없으면
-        /// 지금 Transform 위치를 그대로 기준점으로 쓴다(Awake에서 경고를 남긴 뒤의 안전한 동작).</summary>
+        /// <b>씬에 배치된 최초 위치</b>(Awake에서 캐시한 값)를 기준점으로 쓴다 - 지금 Transform 위치를
+        /// 쓰면 대기 위치로 옮겨둔 몬스터의 "전투 위치"를 물었을 때 대기 위치가 그대로 돌아오므로,
+        /// 대기열이 자리를 오갈 때마다 기준선이 흘러가 버린다.</summary>
         private Vector3 ResolveInitialBasePosition()
         {
-            if (stageLayout == null) return transform.localPosition;
+            if (stageLayout == null) return sceneAuthoredLocalPosition;
 
             Vector2 offset = motionProfile.Preview.ActorOffset;
             Vector2 slot = stageLayout.MonsterSlotPosition;
-            return new Vector3(slot.x + offset.x, slot.y + offset.y, transform.localPosition.z);
+            return new Vector3(slot.x + offset.x, slot.y + offset.y, sceneAuthoredLocalPosition.z);
+        }
+
+        /// <summary>지금 프로필 기준의 "전투 위치"(Current가 서야 할 자리)를 돌려준다 - stageLayout이
+        /// 연결돼 있으면 Monster Slot + Actor Offset, 없으면 씬에 배치된 최초 위치다. 대기열 관리자가
+        /// 전용 combatPosition Transform을 갖고 있지 않을 때의 안전한 fallback이다. 아무 상태도 바꾸지
+        /// 않으며, 프로필이 바뀌면(Actor Offset이 달라지면) 결과도 함께 달라진다.</summary>
+        public Vector3 ResolveCombatBaseLocalPosition()
+        {
+            EnsureRuntimeReferences();
+            return ResolveInitialBasePosition();
         }
 
         private void ApplyActorScale()
@@ -228,10 +304,58 @@ namespace Enemy
         /// 피격 반응이 진행 중이 아닐 때(선택/교체/초기화 시점)만 호출해야 한다.</summary>
         public void SetPresentationBasePosition(Vector3 localPosition)
         {
+            EnsureRuntimeReferences();
+
+            moving = false; // 진행 중이던 이동 tween보다 명시적 지정이 항상 우선한다.
             basePosition = localPosition;
             transform.localPosition = localPosition;
             shaking = false;
         }
+
+        /// <summary>기준 위치를 duration 동안 targetLocalPosition으로 옮긴다(대기 위치 -> 전투 위치
+        /// 승격 이동). <b>위치의 소유자는 언제나 이 컴포넌트다</b> - 관리자는 목적지와 시간만 주고
+        /// Transform을 직접 건드리지 않는다. 이동 중 피격이 들어와도 흔들림은 "그 시점의 기준 위치"에
+        /// 오프셋을 더하는 방식이라 순간이동하거나 옛 기준 위치로 고착되지 않는다. duration이 0 이하면
+        /// 즉시 이동과 동일하다.</summary>
+        public void BeginPresentationMove(Vector3 targetLocalPosition, float duration)
+        {
+            EnsureRuntimeReferences();
+
+            if (duration <= 0f)
+            {
+                SetPresentationBasePosition(targetLocalPosition);
+                return;
+            }
+
+            moveStart = basePosition;
+            moveEnd = targetLocalPosition;
+            moveDuration = duration;
+            moveElapsed = 0f;
+            moving = true;
+        }
+
+        /// <summary>이동 tween 진행. 흔들림 중에는 Transform을 직접 쓰지 않고 기준 위치만 갱신한다 -
+        /// 같은 프레임 뒤에 오는 UpdateShake가 "새 기준 위치 + 흔들림 오프셋"으로 최종 위치를 정한다.</summary>
+        private void UpdatePresentationMove()
+        {
+            if (!moving) return;
+
+            moveElapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(moveElapsed / moveDuration);
+            float eased = t * t * (3f - 2f * t); // SmoothStep - 시작/끝이 부드럽다.
+            basePosition = Vector3.LerpUnclamped(moveStart, moveEnd, eased);
+
+            if (t >= 1f)
+            {
+                basePosition = moveEnd;
+                moving = false;
+            }
+
+            if (!shaking) transform.localPosition = basePosition;
+        }
+
+        /// <summary>이동 tween이 진행 중인지 - 관리자/테스트가 승격 이동 완료를 확인할 때 쓴다.</summary>
+        public bool IsPresentationMoving => moving;
 
         /// <summary>Idle/Idle Event/Hit/Hit Reaction/Defeat를 전부 motionProfile에서만 가져온다 -
         /// 씬 컴포넌트에 같은 값을 다시 직렬화해둔 fallback 경로는 없다(호출 전에 Awake/
@@ -356,18 +480,22 @@ namespace Enemy
             target.OnRespawnStarted -= HandleRespawnStarted;
             target.OnRespawned -= HandleRespawned;
 
-            if (fadeRoutine != null)
-            {
-                StopCoroutine(fadeRoutine);
-                fadeRoutine = null;
-            }
+            CancelFade();
         }
 
         private void OnHitPoint(AttackHitCue cue)
         {
-            // 진입 시점 상태를 기준으로 판정한다: 이미 처치된 상태로 들어온 타격은 여기서 완전히
-            // 무시한다. 반대로 이 시점에 살아 있었다면, 아래에서 ApplyDamage로 처치를 유발해
-            // IsDefeated가 true로 바뀌더라도 피격 반응/데미지 숫자/이펙트까지 반드시 끝까지 표시한다.
+            // <b>역할 게이트가 가장 먼저다.</b> HitPoint는 씬의 모든 활성 컨트롤러가 함께 받는 정적
+            // 이벤트라, 대기열 몬스터(Standby)나 퇴장 중인 몬스터(Exiting)도 같은 스냅샷 안에서 이
+            // 핸들러를 호출받는다 - 그쪽은 살아 있고(IsDefeated == false) 화면에도 보이므로 처치
+            // 상태만으로는 절대 걸러지지 않는다. 구독 해제에만 기대지 않고 여기서 명시적으로 막아,
+            // 승격/강등이 어느 시점에 일어나든 "Current가 아닌 몬스터가 맞는" 경우가 원천적으로 없게 한다.
+            //
+            // 진입 시점 상태를 기준으로 판정하는 규칙은 그대로다: 이 시점에 Current로 살아 있었다면,
+            // 아래에서 ApplyDamage로 처치를 유발해 IsDefeated가 true로 바뀌더라도 피격 반응/데미지
+            // 숫자/이펙트/ReceiveImpact까지 반드시 끝까지 표시한다. 반대로 진입 시점에 Current가
+            // 아니었다면 damage/반응/숫자/이펙트/ReceiveImpact 어느 것도 실행되지 않는다.
+            if (target.EngagementRole != TargetEngagementRole.Current) return;
             if (target.IsDefeated) return;
 
             lastHitTime = Time.time;
@@ -475,6 +603,148 @@ namespace Enemy
             EnterRecovery(); // 기존 복귀 흐름(Recovery -> Idle)을 그대로 재사용한다.
         }
 
+        // ---------------------------------------------------------------------------------------
+        // 대기열(Encounter Queue) 관리자 전용 API
+        //
+        // 아래 다섯 메서드가 MonsterEncounterQueue가 이 몬스터를 다루는 유일한 통로다 - 관리자는
+        // Target이나 SpriteRenderer를 직접 건드리지 않는다. 전부 이벤트를 발생시키지 않는 명시적
+        // 호출이라(역할 변경 알림인 EngagementRoleChanged 제외) 처치/보상 구독자와 완전히 분리돼 있다.
+        // ---------------------------------------------------------------------------------------
+
+        /// <summary>이 몬스터를 대기열 관리 대상으로 편입시킨다 - 처치 후 자체 리스폰을 멈추고(이후
+        /// 재사용 시점은 관리자가 정한다) 지정된 역할로 시작한다. 관리자가 슬롯 구성을 전부 검증한
+        /// 뒤에만 호출해야 한다: 호출 전까지 이 몬스터는 기존 standalone 몬스터와 완전히 동일하게
+        /// 동작하므로, 구성이 잘못됐을 때 관리자가 그냥 손을 떼면 아무것도 망가지지 않는다.</summary>
+        public void JoinEncounter(TargetEngagementRole role)
+        {
+            EnsureRuntimeReferences();
+            if (target == null) return;
+
+            target.ConfigureLifecycle(TargetLifecycleMode.EncounterManaged);
+            SetEngagementRole(role);
+        }
+
+        /// <summary>대기열 관리에서 빼내 기존 standalone 동작(자체 리스폰 + Current 역할)으로 되돌린다.
+        /// 관리자가 해체되거나 이 몬스터를 더 이상 소유하지 않을 때 쓴다.</summary>
+        public void LeaveEncounter()
+        {
+            EnsureRuntimeReferences();
+            if (target == null) return;
+
+            target.ConfigureLifecycle(TargetLifecycleMode.StandaloneSelfRespawn);
+            SetEngagementRole(TargetEngagementRole.Current);
+        }
+
+        /// <summary>역할만 바꾼다 - 체력/처치 상태/포즈/알파는 그대로 두고 공격 가능 레지스트리만 즉시
+        /// 갱신된다(이 호출이 끝난 시점부터 Target.HasAttackableTarget이 새 역할을 반영한다).
+        /// 처치/보상 이벤트는 발생하지 않는다.</summary>
+        public void SetEngagementRole(TargetEngagementRole role)
+        {
+            EnsureRuntimeReferences();
+            if (target == null || target.EngagementRole == role) return;
+
+            target.SetEngagementRole(role);
+            EngagementRoleChanged?.Invoke(role);
+        }
+
+        /// <summary>이 몬스터를 다음 등장에 재사용할 수 있도록 상태를 전부 초기화한다 - 체력/처치 상태
+        /// (Target.PrepareForEncounter) + 역할 + 진행 중이던 Fade/흔들림/피격 자세까지 한 번에 되돌리고,
+        /// 프로필 교체가 필요하면 같은 호출에서 처리한다. <b>어떤 처치/보상 이벤트도 발생하지 않는다.</b>
+        ///
+        /// <b>호출 순서 규칙</b>: 처치 Fade-out이 진행 중인 슬롯을 되살리는 유일한 경로가 이 메서드다 -
+        /// 여기서 Fade를 취소하고 알파를 원래 값으로 되돌리기 전에 <see cref="Target.PrepareForEncounter"/>가
+        /// 먼저 IsDefeated를 해제한다. 반대로 <see cref="ApplyCurrentVisual"/>은 아직 처치 상태인 슬롯의
+        /// 알파를 절대 건드리지 않으므로(경고 후 무시), 진행 중인 사망 연출을 우발적으로 덮어쓰는 경로가
+        /// 없다. 역할별 알파/위치는 이 호출 뒤에 관리자가 명시적으로 적용한다.</summary>
+        public void PrepareForEncounter(TargetEngagementRole role, MonsterMotionProfile profileOverride = null)
+        {
+            EnsureRuntimeReferences();
+            if (target == null) return;
+
+            if (profileOverride != null && profileOverride != motionProfile)
+            {
+                if (IsProfilePlayable(profileOverride))
+                {
+                    ApplyRuntimeMotionProfile(profileOverride);
+                }
+                else
+                {
+                    Debug.LogWarning($"[TargetCombatController] '{name}': 대기열이 지정한 교체 프로필 " +
+                                     $"'{profileOverride.name}'에 Base Idle/Hit 프레임이 없어 무시하고 기존 프로필을 유지합니다.", this);
+                }
+            }
+
+            target.PrepareForEncounter(role);
+
+            CancelFade();
+            ApplyTargetAlphas(toOriginal: true);
+
+            moving = false;
+            shaking = false;
+            transform.localPosition = basePosition;
+
+            defeatedByCurrentHit = false;
+            profileChangedForCurrentRespawn = false;
+            lastHitTime = 0f;
+            ExitToIdle(); // hitPhase/Idle 애니메이션 상태까지 완전히 초기 상태로 되돌린다.
+
+            EngagementRoleChanged?.Invoke(role);
+        }
+
+        /// <summary>Current(전투 중) 표현 - 각 Renderer의 알파를 Awake에서 캐시한 원래 값으로 즉시
+        /// 되돌린다. <b>처치 상태(사망 Fade-out 진행 중)에서는 아무것도 하지 않고 경고만 남긴다</b> -
+        /// 진행 중인 사망 연출을 승격/복구 호출이 우발적으로 덮어쓰는 것을 구조적으로 막기 위함이다.
+        /// 처치된 슬롯을 되살리는 정식 경로는 <see cref="PrepareForEncounter"/> 하나뿐이다.</summary>
+        public void ApplyCurrentVisual()
+        {
+            EnsureRuntimeReferences();
+            if (target != null && target.IsDefeated)
+            {
+                Debug.LogWarning($"[TargetCombatController] '{name}': 처치 연출이 진행 중인 몬스터에 Current 알파 복구를 " +
+                                 "요청받아 무시했습니다 - 되살리려면 PrepareForEncounter를 먼저 호출하세요.", this);
+                return;
+            }
+
+            SetPresentationAlphaScale(1f);
+        }
+
+        /// <summary>Standby(대기) 표현 - 각 Renderer의 알파를 "원래 알파 x standbyAlpha"로 즉시 맞춘다.
+        /// 언제나 캐시된 원래 알파에서 절대값으로 계산하므로 몇 번을 반복 호출해도 곱이 누적되지 않는다.</summary>
+        public void ApplyStandbyVisual(float standbyAlpha)
+        {
+            EnsureRuntimeReferences();
+            SetPresentationAlphaScale(standbyAlpha);
+        }
+
+        /// <summary>Exiting(퇴장) 표현 - 지정한 시간 동안 알파를 0으로 페이드한다. 처치 순간
+        /// <see cref="HandleDefeated"/>가 이미 Target.DefeatFadeDuration으로 같은 Fade를 시작하므로,
+        /// 관리자가 자기 시간을 쓰고 싶을 때만 호출하면 된다(진행 중이던 Fade는 지금 알파에서 이어서
+        /// 다시 시작한다 - 알파가 튀지 않는다).</summary>
+        public void ApplyExitingVisual(float duration)
+        {
+            EnsureRuntimeReferences();
+            StartFade(toOriginal: false, duration: Mathf.Max(0f, duration));
+        }
+
+        /// <summary>모든 역할 알파의 실제 구현 - 진행 중이던 Fade를 취소하고 각 Renderer의 알파를
+        /// "원래 알파 x scale"로 즉시 맞춘다(RGB는 건드리지 않는다). 역할 판정 자체는 알파와 무관하게
+        /// 항상 Target.EngagementRole이 소유한다 - 알파는 표현일 뿐이다.</summary>
+        private void SetPresentationAlphaScale(float scale)
+        {
+            EnsureRuntimeReferences();
+            if (visualRenderers == null) return;
+
+            CancelFade();
+            float clamped = Mathf.Clamp01(scale);
+            for (int i = 0; i < visualRenderers.Length; i++)
+            {
+                if (visualRenderers[i] == null) continue;
+                Color c = visualRenderers[i].color;
+                c.a = originalAlphas[i] * clamped;
+                visualRenderers[i].color = c;
+            }
+        }
+
         /// <summary>randomizeProfileOnRespawn이 켜져 있고 respawnProfilePool에 현재 motionProfile을
         /// 제외한 유효한 후보(null 아님/중복 제거/Base Idle 첫 프레임 존재)가 있으면 그중 하나를 동일
         /// 확률로 골라 ApplyRuntimeMotionProfile()로 교체한다. 후보 유효성 기준은 Awake와 동일하다
@@ -483,6 +753,10 @@ namespace Enemy
         /// 바꾸지 않고 false를 반환한다 - 기존 고정 프로필 리젠 동작이 그대로 유지된다.</summary>
         private bool TrySwitchToRandomRespawnProfile()
         {
+            // 이 기능은 Target의 자체 리스폰(Standalone) 전용이다. 대기열 관리 대상이면 애초에
+            // OnRespawnStarted가 발생하지 않아 여기까지 오지 않지만, "다음 등장에 어떤 프로필을 쓸지"는
+            // 관리자가 PrepareForEncounter의 profileOverride로 결정한다는 소유권을 코드로도 못박아 둔다.
+            if (target != null && target.LifecycleMode != TargetLifecycleMode.StandaloneSelfRespawn) return false;
             if (!randomizeProfileOnRespawn) return false;
             if (respawnProfilePool == null || respawnProfilePool.Length == 0) return false;
 
@@ -536,12 +810,16 @@ namespace Enemy
         /// 동시에 제어하거나 순간이동하는 일이 없다.</summary>
         private void StartFade(bool toOriginal, float duration)
         {
-            if (fadeRoutine != null)
-            {
-                StopCoroutine(fadeRoutine);
-                fadeRoutine = null;
-            }
+            CancelFade();
             fadeRoutine = StartCoroutine(FadeRoutine(toOriginal, duration));
+        }
+
+        private void CancelFade()
+        {
+            if (fadeRoutine == null) return;
+
+            StopCoroutine(fadeRoutine);
+            fadeRoutine = null;
         }
 
         private IEnumerator FadeRoutine(bool toOriginal, float duration)
@@ -661,7 +939,8 @@ namespace Enemy
 
         private void Update()
         {
-            UpdateShake();
+            UpdatePresentationMove(); // 기준 위치를 먼저 옮기고,
+            UpdateShake();            // 그 위에 흔들림 오프셋을 얹는다(순서가 바뀌면 이동 중 흔들림이 튄다).
 
             switch (hitPhase)
             {
