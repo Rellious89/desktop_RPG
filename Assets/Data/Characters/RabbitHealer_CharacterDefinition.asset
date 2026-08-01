@@ -16,4 +16,4 @@ MonoBehaviour:
   displayName: 
   motionProfile: {fileID: 11400000, guid: 73ad72f60c266498e821b7d0e8ea4842, type: 2}
   portrait: {fileID: 0}
-  maxStamina: 5
+  maxStamina: 30

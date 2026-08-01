@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Mulmaru SDF Outline B
-  m_Shader: {fileID: 4800000, guid: d7b2f2d8bdf84bf8a1a6cdd3a4e6f901, type: 3}
+  m_Shader: {fileID: 4800000, guid: 4c2e8f91b67a4d0ca58f3e7b9216d4af, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []

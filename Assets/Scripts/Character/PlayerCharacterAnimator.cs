@@ -53,6 +53,12 @@ namespace Character
     /// 없으면 임시 데이터로 조용히 동작하지 않고 오류를 남긴 뒤 스스로 비활성화된다.
     /// 공격 모션 데이터는 AttackMotionDefinition/ComboTierAttackPool 에셋에 있고, 여기서는
     /// IAttackMotion 인터페이스로만 다룬다.
+    ///
+    /// <b>프로필은 런타임에 교체할 수 있다</b>(<see cref="TryApplyMotionProfile"/>) - 캐릭터마다 씬
+    /// 오브젝트를 하나씩 켜고 끄는 대신, 하나의 액터 오브젝트가 프로필만 갈아 끼워 여러 캐릭터를
+    /// 연기하기 위한 경로다. 교체는 CharacterRuntimeActor가 소유하며, 이 컴포넌트는 "새 프로필이
+    /// 재생 가능한지 먼저 판정하고, 통과했을 때만 이전 캐릭터의 전투 상태를 전부 지우고 Base Idle
+    /// 0프레임부터 다시 시작한다"는 규칙만 지킨다.
     /// </summary>
     [RequireComponent(typeof(SpriteRenderer))]
     [RequireComponent(typeof(FlashOnCue))]
@@ -132,6 +138,11 @@ namespace Character
         private FlashOnCue flashOnCue;
         private HitEffectSpawner castEffectSpawner;
         private ProjectileSpawner projectileSpawner;
+
+        // 컴포넌트 캐시/발사체 스포너/오버레이 렌더러를 "정확히 한 번만" 만들었는지 표시한다.
+        // Awake와 TryApplyMotionProfile 어느 쪽이 먼저 오더라도(비활성 오브젝트에 Awake 전에 프로필을
+        // 적용하는 경로 포함) 같은 초기화를 공유하고, 반복 호출해도 오브젝트가 늘어나지 않게 한다.
+        private bool initialized;
 
         // 이 캐릭터의 Transform 이동을 단독으로 담당하는 컨트롤러(같은 GameObject). 키 입력이 아니라
         // 실제 타격/충전 상태에만 반응하도록 여기서 직접 호출한다 - 정적 이벤트로 돌리면 씬에 다른
@@ -216,9 +227,7 @@ namespace Character
 
         private void Awake()
         {
-            spriteRenderer = GetComponent<SpriteRenderer>();
-            flashOnCue = GetComponent<FlashOnCue>();
-            castEffectSpawner = GetComponent<HitEffectSpawner>();
+            EnsureInitialized();
 
             if (!CharacterMotionProfile.IsPlayable(motionProfile))
             {
@@ -231,13 +240,70 @@ namespace Character
                 return;
             }
 
+            ApplyProfileData(motionProfile);
+        }
+
+        /// <summary>컴포넌트 캐시와 "한 번만 만들어 재사용하는" 런타임 오브젝트(발사체 스포너,
+        /// AttackFrameOverlay 자식)를 준비한다. <b>여러 번 불러도 안전하고</b>, Awake보다 먼저
+        /// (비활성 오브젝트에 프로필을 미리 적용하는 경로에서) 불려도 안전하다 - 프로필 데이터를
+        /// 전혀 보지 않으므로 어떤 프로필이 연결돼 있든 결과가 같다.</summary>
+        private void EnsureInitialized()
+        {
+            if (initialized) return;
+            initialized = true;
+
+            spriteRenderer = GetComponent<SpriteRenderer>();
+            flashOnCue = GetComponent<FlashOnCue>();
+            castEffectSpawner = GetComponent<HitEffectSpawner>();
+
             // 발사체를 쓰는 공격이 하나도 없으면 이 스포너는 아무 일도 하지 않는다(풀도 만들지 않는다) -
             // 기존 씬/프리팹을 손대지 않아도 되도록 없으면 여기서 붙인다. Inspector에서 prewarmCount를
-            // 조정하고 싶으면 미리 직접 붙여두면 된다.
+            // 조정하고 싶으면 미리 직접 붙여두면 된다. 프로필을 몇 번 갈아 끼워도 이 경로는 초기화
+            // 1회에 묶여 있어 스포너가 중복으로 붙지 않는다.
             projectileSpawner = GetComponent<ProjectileSpawner>();
             if (projectileSpawner == null) projectileSpawner = gameObject.AddComponent<ProjectileSpawner>();
             attackMovement = GetComponent<AttackMovement>(); // 없어도 된다(이동 없는 캐릭터)
             EnsureAttackFrameOverlay();
+        }
+
+        /// <summary>이 오브젝트가 재생할 캐릭터 모션 프로필을 런타임에 교체한다 - 캐릭터마다 씬
+        /// 오브젝트를 따로 두지 않고 <b>하나의 액터 오브젝트</b>가 여러 캐릭터를 연기하기 위한 유일한
+        /// 진입점이다(CharacterRuntimeActor가 호출한다).
+        ///
+        /// 순서를 지킨다: <b>먼저 새 프로필이 재생 가능한지 판정하고</b>(실패하면 지금 재생 중인 상태를
+        /// 전혀 건드리지 않고 false), 통과했을 때만 이전 캐릭터의 전투 상태를 전부 지우고 새 프로필로
+        /// 다시 만든다. 마지막에는 항상 Base Idle 0프레임에서 시작한다.
+        ///
+        /// 오브젝트가 비활성이거나 아직 Awake가 불리기 전이어도 안전하고, 같은/다른 프로필로 몇 번을
+        /// 다시 불러도 오브젝트를 새로 만들거나 파괴하지 않는다(발사체 스포너/오버레이 렌더러 재사용).</summary>
+        /// <returns>프로필이 실제로 적용됐으면 true. false면 이전 상태가 그대로 유지된다.</returns>
+        public bool TryApplyMotionProfile(CharacterMotionProfile profile)
+        {
+            // 옛 상태를 건드리기 전에 판정한다 - 실패한 교체가 지금 잘 돌아가는 캐릭터를 망가뜨리면 안 된다.
+            if (!CharacterMotionProfile.IsPlayable(profile))
+            {
+                Debug.LogError($"[PlayerCharacterAnimator] '{name}': 적용하려는 Character Motion Profile이 없거나 " +
+                               "재생 가능한 Base Idle 프레임이 없습니다 - 교체를 취소하고 현재 상태를 그대로 둡니다.", this);
+                return false;
+            }
+
+            EnsureInitialized();
+            ApplyProfileData(profile);
+
+            // Awake가 프로필 문제로 스스로 껐던 컴포넌트라면 여기서 되살린다 - 방금 재생 가능한
+            // 데이터가 들어왔으므로 꺼둘 이유가 없다.
+            if (!enabled) enabled = true;
+            return true;
+        }
+
+        /// <summary>이미 재생 가능하다고 판정된 프로필을 실제로 적용한다(검증은 호출부가 끝냈다).
+        /// 이전 캐릭터의 전투/충전/발사체/오버레이 상태를 먼저 전부 지우고, 프로필 기준 런타임 데이터를
+        /// 다시 만든 뒤, Base Idle 0프레임에서 시작한다.</summary>
+        private void ApplyProfileData(CharacterMotionProfile profile)
+        {
+            ClearCombatState();
+
+            motionProfile = profile;
             BuildRuntimeConfiguration();
 
             BuildResolvedPool(resolvedTier1, motionProfile.Tier1Pool);
@@ -252,8 +318,59 @@ namespace Character
                                "모션이 하나도 없습니다 - 이 캐릭터는 공격하지 않습니다.", motionProfile);
             }
 
+            ResetToBaseIdle();
+        }
+
+        /// <summary>진행 중이던 공격 사이클의 흔적을 하나도 남기지 않고 전부 비운다 - 캐릭터 교체
+        /// (프로필 적용)와 비활성화가 같은 정리 경로를 쓴다.
+        ///
+        /// 지우는 대상: 공격 단계/프레임/타이머, Direct 대기열, 누적 충전량과 이월 입력, Cast 1회 플래그,
+        /// 충전 신호(ChargeEnded를 정확히 한 번 보낸다), 이번 사이클의 모션/프레임/오버레이 배열과 화면에
+        /// 남은 오버레이 스프라이트, 날아가던 발사체와 그 launchId, 발사체 조준 대상 캐시, 프레임 순서
+        /// 경고 캐시, Idle Event 재생 상태.</summary>
+        private void ClearCombatState()
+        {
+            // 충전 도중이면 구독자(콤보 타이머 등)에게 "충전 중" 상태가 영원히 남지 않게 닫는다.
+            // EndChargeSignal 자체가 chargeSignalActive로 중복 발생을 막으므로 여러 번 불러도 안전하다.
+            EndChargeSignal();
+            ReleaseActiveProjectile();
+
+            attackPhase = AttackPhase.None;
+            attackFrame = 0;
+            attackPhaseTimer = 0f;
+            pendingAttacks = 0;
+            chargeInputs = 0f;
+            carriedInputs = 0f;
+            castCueFired = false;
+            lastInputTime = 0f;
+            reportedChargeRatio = -1f;
+
+            activeMotion = null;
+            activeMotionFrames = Array.Empty<Sprite>();
+            activeMotionOverlayFrames = Array.Empty<Sprite>();
+            SetOverlaySprite(null);
+
+            // 다음 캐릭터의 조준/경고 판정이 이전 캐릭터의 캐시를 물려받지 않게 한다.
+            cachedProjectileTarget = null;
+            cachedProjectileTargetSpawner = null;
+            warnedProjectileMotions.Clear();
+
+            playingVariant = false;
+            variantTimer = 0f;
+        }
+
+        /// <summary>항상 Base Idle의 0프레임에서 다시 시작한다 - 활성화/프로필 교체 직후의 유일한
+        /// 시작 지점이다. animations가 아직 없으면(프로필 문제로 Awake가 스스로 꺼진 경우) 아무것도
+        /// 하지 않는다.</summary>
+        private void ResetToBaseIdle()
+        {
+            if (animations == null || animations.Length == 0) return;
+
+            playingVariant = false;
             activeAnimIndex = IdleIndex;
             currentFrame = 0;
+            frameTimer = 0f;
+            variantTimer = 0f;
             ApplyFrame();
         }
 
@@ -532,7 +649,10 @@ namespace Character
         /// 절대 호출되지 않는다(누적 입력 모드의 충전 처리에서만 부른다).</summary>
         private void RequestChargeMovement()
         {
-            if (attackMovement != null && attackMovement.enabled) attackMovement.RequestChargeMove();
+            // isActiveAndEnabled를 본다 - 오브젝트가 꺼지는 중(교체)에는 컴포넌트의 enabled가 아직
+            // true여도 Update가 돌지 않으므로, 그때 이동 구간을 새로 여는 것은 다음 활성화까지
+            // 남는 잔여 상태만 만든다.
+            if (attackMovement != null && attackMovement.isActiveAndEnabled) attackMovement.RequestChargeMove();
         }
 
         /// <summary>충전 상태를 벗어났음을 알린다 - 발사로 끝났든(Strike) 감쇠로 취소됐든(FinishSession)
@@ -543,7 +663,7 @@ namespace Character
             chargeSignalActive = false;
             reportedChargeRatio = -1f;
 
-            if (attackMovement != null && attackMovement.enabled) attackMovement.EndChargeMove();
+            if (attackMovement != null && attackMovement.isActiveAndEnabled) attackMovement.EndChargeMove();
             ChargeEnded?.Invoke();
         }
 
@@ -697,7 +817,7 @@ namespace Character
 
             flashOnCue.Flash();
             // 이동은 "실제 타격"에만 반응한다 - 키 입력이나 충전 진행으로는 절대 발동하지 않는다.
-            if (attackMovement != null && attackMovement.enabled) attackMovement.PlayAttackMove();
+            if (attackMovement != null && attackMovement.isActiveAndEnabled) attackMovement.PlayAttackMove();
             HitPoint?.Invoke(new AttackHitCue(basicAttackPower, activeMotion.HitSound, activeMotion.HitEffectPrefab, activeMotion.HitEffectOffset, activeMotion.HitEffectScale)); // 이 호출이 처치를 유발하면 Target.HasAttackableTarget이 여기서 이미 false로 바뀌어 있을 수 있다.
 
             if (activeMotion.UseAccumulatedInput)
@@ -740,11 +860,7 @@ namespace Character
             pendingAttacks = 0; // 정상 흐름이면 이미 0이지만 방어적으로 초기화
             chargeInputs = 0f;
             carriedInputs = 0f; // 세션이 끝나면 이월 입력도 버린다 - 다음 공격은 첫 입력부터 다시 시작한다.
-            activeAnimIndex = IdleIndex;
-            currentFrame = 0;
-            frameTimer = 0f;
-            variantTimer = 0f;
-            ApplyFrame();
+            ResetToBaseIdle();
 
             AttackEnded?.Invoke();
         }
@@ -915,18 +1031,9 @@ namespace Character
             // 호출되지 않지만, 실행 순서에 의존하지 않도록 여기서도 한 번 확인한다.
             if (animations == null || animations.Length == 0) return;
 
-            attackPhase = AttackPhase.None;
-            pendingAttacks = 0;
-            chargeInputs = 0f;
-            carriedInputs = 0f;
-            castCueFired = false;
-
-            playingVariant = false;
-            activeAnimIndex = IdleIndex;
-            currentFrame = 0;
-            frameTimer = 0f;
-            variantTimer = 0f;
-            ApplyFrame();
+            // 대기열/충전 상태는 OnDisable이 이미 비웠지만, 여기서도 방어적으로 다시 0으로 둔다.
+            ClearCombatState();
+            ResetToBaseIdle();
         }
 
         /// <summary>공격 중 캐릭터가 비활성화되면(교체/파괴 직전 포함) 마지막 오버레이가 화면에 남지 않게 지우고,
@@ -934,16 +1041,10 @@ namespace Character
         /// 혼자 남아 계속 날아갈 수 있기 때문이다(Strike가 오지 않으므로 완료 처리도 되지 않는다).</summary>
         private void OnDisable()
         {
-            SetOverlaySprite(null);
-            ReleaseActiveProjectile();
-            // 충전 도중 캐릭터가 꺼지면(교체/파괴) 구독자에게 "충전 중" 상태가 영원히 남지 않게 닫는다 -
-            // 콤보 타이머가 영구 일시정지되거나 Charge Movement 위치가 남는 것을 막는다.
-            EndChargeSignal();
-            // 다음 활성화는 새 세션으로 시작한다 - 충전량/대기열을 들고 돌아오지 않는다.
-            attackPhase = AttackPhase.None;
-            pendingAttacks = 0;
-            chargeInputs = 0f;
-            carriedInputs = 0f;
+            // 오버레이 스프라이트/발사체/충전 신호를 포함한 전투 상태 전부를 여기서 지운다 - 캐릭터
+            // 교체(CharacterRuntimeActor.Deactivate)는 오브젝트를 끄는 것만으로 정리가 끝나야 하므로,
+            // 프로필 교체와 완전히 같은 정리 경로를 쓴다. 다음 활성화는 언제나 새 세션이다.
+            ClearCombatState();
         }
 
         // ---- Idle / Idle 변형 ----

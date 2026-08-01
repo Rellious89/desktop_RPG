@@ -815,6 +815,7 @@ GameObject:
   - component: {fileID: 2586736142525909227}
   - component: {fileID: 7989393940918023634}
   - component: {fileID: 5327538711147503284}
+  - component: {fileID: 6991062175229860006}
   m_Layer: 5
   m_Name: pn_Inventory
   m_TagString: Untagged
@@ -856,6 +857,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   closeButton: {fileID: 4944185587174524050}
+  blockBackgroundInput: 0
   inputBlocker: {fileID: 0}
   inputBlockerColor: {r: 0, g: 0, b: 0, a: 0}
   listRoot: {fileID: 7261296033965540891}
@@ -875,6 +877,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   targetPanel: {fileID: 2586736142525909227}
   keepInsideRect: {fileID: 0}
+--- !u!114 &6991062175229860006
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4080729873112905017}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e4ae5c234a9946e8bc38aa044486d79b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  receiveMouseInput: 1
 --- !u!1 &4545504779047233088
 GameObject:
   m_ObjectHideFlags: 0
@@ -1286,6 +1301,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7261296033965540891}
     m_Modifications:
+    - target: {fileID: 1805023608301821095, guid: f33a3506abea94cee928851987f11ccf, type: 3}
+      propertyPath: m_Name
+      value: lb_StackCount
+      objectReference: {fileID: 0}
     - target: {fileID: 3845846384880761093, guid: f33a3506abea94cee928851987f11ccf, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5

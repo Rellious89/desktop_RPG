@@ -11,15 +11,16 @@ namespace Character
     /// (CharacterSwapPanel)이 그 유일한 호출부다 - 활성화 주체가 둘 이상이면 두 캐릭터가 동시에
     /// 켜지거나 아무도 켜지지 않는 상태가 생긴다.
     ///
-    /// 교체 방식은 기존 구조를 그대로 쓴다: 씬에 미리 배치된 캐릭터 GameObject를 켜고 끈다.
-    /// PlayerCharacterAnimator/AttackMovement가 OnDisable에서 대기열·충전·발사체·이동을 스스로
-    /// 정리하고 OnEnable에서 Base Idle부터 다시 시작하므로, 공격 도중에 교체해도 이전 캐릭터의
-    /// 입력이나 자세가 남지 않는다.
+    /// 교체 방식은 <b>런타임 액터 하나</b>다: 씬에 캐릭터마다 GameObject를 배치해 켜고 끄는 대신,
+    /// <see cref="CharacterRuntimeActor"/> 하나에 그 캐릭터의 모션 프로필을 적용한다. 전투/충전/
+    /// 발사체/오버레이/이동/색 정리는 액터가 소유하므로(각 컴포넌트의 OnDisable 재사용), 공격
+    /// 도중에 교체해도 이전 캐릭터의 입력이나 자세가 남지 않는다. 이 컴포넌트는 "누가 지금
+    /// 전투 중인가"만 소유하고, 화면에 어떻게 그릴지는 전혀 알지 않는다.
     ///
     /// 데이터 원천은 두 곳으로 명확히 나뉜다.
-    ///   - <see cref="CharacterDefinition"/> 에셋: 캐릭터가 무엇인지(이름/초상화/최대 행동력)
+    ///   - <see cref="CharacterDefinition"/> 에셋: 캐릭터가 무엇인지(이름/초상화/최대 행동력/프로필)
     ///   - SaveData.characters: 캐릭터가 지금 어떤 상태인지(레벨/현재 행동력)
-    /// 씬 오브젝트는 "그 캐릭터를 화면에 그리는 수단"일 뿐, 목록의 근거가 아니다.
+    /// 목록의 근거는 정의 에셋 하나뿐이다 - 씬에 캐릭터 오브젝트가 있는지는 더 이상 보지 않는다.
     ///
     /// <b>행동력 소비 규칙: 몬스터 처치 1회당 1.</b> 근거는 <see cref="Target.AnyTargetDefeated"/>
     /// (처치가 확정된 순간 정확히 한 번 발생하는 기존 이벤트) 하나뿐이다 - 키 입력, 공격 시작,
@@ -51,26 +52,36 @@ namespace Character
             AlreadyCurrent,
             /// <summary>행동력이 0이라 투입할 수 없는 경우.</summary>
             NoStamina,
-            /// <summary>로스터에 없거나 씬 오브젝트가 연결되지 않은 캐릭터.</summary>
+            /// <summary>로스터에 없는 캐릭터이거나, 지금 구성으로는 투입할 수 없는 상태
+            /// (Runtime Actor 미연결 등 설정 문제로 적용 자체가 실패하는 경우 포함).</summary>
             NotAvailable,
             /// <summary>회복소 슬롯에 들어가 있다(회복 중이거나, 회복이 끝나 합류를 기다리는 중).
             /// 행동력이 남아 있어도 교체할 수 없다 - 슬롯에서 합류시켜야 다시 쓸 수 있다.</summary>
             InRecovery,
         }
 
+        /// <summary>로스터 한 칸. 예전에는 정의와 "그 캐릭터의 씬 GameObject"를 짝지어 들고 있었지만,
+        /// 캐릭터를 그리는 주체가 런타임 액터 하나로 합쳐지면서 씬 오브젝트 칸이 사라졌다. 클래스 이름과
+        /// 바깥 리스트 필드 이름(<c>entries</c>)을 그대로 둔 이유는, 씬에 이미 직렬화돼 있는 항목의
+        /// <see cref="definition"/> 연결을 Unity가 그대로 읽어 오게 하기 위함이다 - 없어진 칸은
+        /// 사용자가 다음에 씬을 저장할 때 조용히 떨어져 나간다.</summary>
         [Serializable]
         public class Entry
         {
             [Tooltip("이 캐릭터의 정의 에셋.")]
             public CharacterDefinition definition;
-
-            [Tooltip("씬에 배치된 이 캐릭터의 GameObject(PlayerCharacterAnimator가 붙어 있는 오브젝트).")]
-            public GameObject characterObject;
         }
 
         [Header("Roster")]
-        [Tooltip("보유 캐릭터 목록. 순서가 곧 교체 패널 리스트 순서이자 테스트 버튼의 순환 순서다.")]
+        [Tooltip("보유 캐릭터 목록. 순서가 곧 교체 패널 리스트 순서다.")]
         [SerializeField] private List<Entry> entries = new List<Entry>();
+
+        [Header("Runtime Actor")]
+        [Tooltip("보유 캐릭터 전원을 연기하는 씬의 런타임 액터 오브젝트(CharacterRuntimeActor). " +
+                 "교체는 이 액터 하나에 프로필을 적용하는 방식이라 캐릭터별 오브젝트는 필요 없다. " +
+                 "반드시 에디터에서 직접 연결한다 - 코드가 자동으로 찾거나 만들지 않으며, 비어 있으면 " +
+                 "오류를 남기고 아무도 투입하지 않는다.")]
+        [SerializeField] private CharacterRuntimeActor runtimeActor;
 
         [Tooltip("앱 시작 시 전투에 투입할 캐릭터. 비워두면 목록의 첫 번째를 쓴다.")]
         [SerializeField] private CharacterDefinition defaultCharacter;
@@ -153,12 +164,26 @@ namespace Character
             if (usableEntries.Count == 0)
             {
                 Debug.LogError("[CharacterRoster] 사용할 수 있는 캐릭터가 하나도 없습니다 - Entries에 " +
-                               "Definition과 씬 캐릭터 오브젝트를 연결하세요.", this);
+                               "Character Definition을 연결하세요.", this);
+                // 로스터가 인정하지 않는 캐릭터가 화면에 남아 계속 입력을 받는 것을 막는다.
+                // CurrentCharacterCanAct는 "목록이 비어 있으면 true"(로스터를 쓰지 않는 씬 호환)라서,
+                // 액터를 켜둔 채로 두면 아무도 투입되지 않았는데 공격이 통한다.
+                if (runtimeActor != null) runtimeActor.Deactivate();
                 return;
             }
 
             SyncSaveStates();
             ApplyDebugStartStamina();
+
+            if (runtimeActor == null)
+            {
+                // current는 null로 남는다 - 사용 가능한 캐릭터가 있으므로 CurrentCharacterCanAct도
+                // false가 되어 공격이 시작되지 않는다(조용히 반쪽으로 동작하지 않는다).
+                Debug.LogError("[CharacterRoster] Runtime Actor가 연결되지 않았습니다 - 캐릭터를 화면에 " +
+                               "투입할 수 없습니다. Inspector의 Runtime Actor에 씬의 CharacterRuntimeActor를 " +
+                               "연결하세요.", this);
+            }
+
             ApplyActiveCharacter(ResolveStartCharacter());
         }
 
@@ -190,8 +215,14 @@ namespace Character
             SpendStamina(current, staminaCostPerDefeat);
         }
 
-        /// <summary>비어 있거나 중복된 슬롯을 걸러내고, 정의와 씬 오브젝트가 서로 다른 캐릭터를
-        /// 가리키는 설정 실수(프로필 불일치)를 시작 시 한 번에 드러낸다.</summary>
+        /// <summary>실제로 투입할 수 있는 항목만 남긴다. 판정 근거는 정의 에셋뿐이다 - 씬에 그 캐릭터의
+        /// 오브젝트가 있는지, 그 오브젝트가 어떤 프로필을 물고 있는지는 더 이상 보지 않는다(연기하는
+        /// 액터가 하나뿐이라 대조할 상대가 없다).
+        ///
+        /// 걸러내는 것: 빈 항목/빈 정의, 중복 Character Id, 모션 프로필 미연결, 재생 가능한 Base Idle
+        /// 없음. 뒤의 두 가지는 <b>서로 다른 오류 메시지</b>로 남긴다 - "프로필을 연결하지 않은 것"과
+        /// "프로필은 있는데 Base Idle이 비어 있는 것"은 사용자가 해야 할 일이 전혀 다르기 때문이다.
+        /// 여기서 걸러 두면 나중에 그 캐릭터를 골랐을 때 액터 적용이 실패하는 일이 없다.</summary>
         private void BuildUsableEntries()
         {
             usableEntries.Clear();
@@ -206,37 +237,29 @@ namespace Character
                     Debug.LogError($"[CharacterRoster] Entries[{i}]에 Character Definition이 비어 있습니다 - 이 항목은 무시합니다.", this);
                     continue;
                 }
-                if (entry.characterObject == null)
-                {
-                    Debug.LogError($"[CharacterRoster] '{entry.definition.CharacterId}'에 씬 캐릭터 오브젝트가 " +
-                                   "연결되지 않았습니다 - 이 항목은 무시합니다.", this);
-                    continue;
-                }
                 if (!seenIds.Add(entry.definition.CharacterId))
                 {
                     Debug.LogError($"[CharacterRoster] Character Id '{entry.definition.CharacterId}'가 중복됩니다 - " +
                                    "저장 데이터가 서로 섞이므로 뒤에 있는 항목은 무시합니다.", this);
                     continue;
                 }
+                if (entry.definition.MotionProfile == null)
+                {
+                    Debug.LogError($"[CharacterRoster] '{entry.definition.CharacterId}'의 Definition에 Character " +
+                                   "Motion Profile이 연결되지 않았습니다 - 연기할 모션 데이터가 없으므로 이 항목은 " +
+                                   "무시합니다.", entry.definition);
+                    continue;
+                }
+                if (!CharacterMotionProfile.IsPlayable(entry.definition.MotionProfile))
+                {
+                    Debug.LogError($"[CharacterRoster] '{entry.definition.CharacterId}'의 프로필 " +
+                                   $"'{entry.definition.MotionProfile.name}'에 재생 가능한 Base Idle 프레임이 " +
+                                   "없습니다 - 이 항목은 무시합니다.", entry.definition.MotionProfile);
+                    continue;
+                }
 
-                WarnOnProfileMismatch(entry);
                 usableEntries.Add(entry);
             }
-        }
-
-        /// <summary>정의가 참조하는 모션 프로필과 씬 오브젝트가 실제로 재생하는 프로필이 다르면,
-        /// 리스트에 표시되는 이름/초상화와 화면에 나오는 캐릭터가 어긋난다 - 조용히 두지 않는다.</summary>
-        private void WarnOnProfileMismatch(Entry entry)
-        {
-            if (entry.definition.MotionProfile == null) return;
-
-            var animator = entry.characterObject.GetComponent<PlayerCharacterAnimator>();
-            if (animator == null || animator.MotionProfile == null) return;
-            if (animator.MotionProfile == entry.definition.MotionProfile) return;
-
-            Debug.LogError($"[CharacterRoster] '{entry.definition.CharacterId}'의 Definition이 참조하는 프로필" +
-                           $"('{entry.definition.MotionProfile.name}')과 씬 오브젝트 '{entry.characterObject.name}'의 " +
-                           $"프로필('{animator.MotionProfile.name}')이 다릅니다.", this);
         }
 
         /// <summary>저장 문서에 이번 로스터의 캐릭터 항목이 모두 존재하도록 맞춘다. 새로 추가된
@@ -335,6 +358,9 @@ namespace Character
         public SwapBlockReason GetSwapBlockReason(CharacterDefinition definition)
         {
             if (definition == null || IndexOf(definition) < 0) return SwapBlockReason.NotAvailable;
+            // 연기할 액터가 없으면 어떤 캐릭터도 투입할 수 없다 - 행동력/회복 상태보다 먼저 본다.
+            // 이 상태에서는 current가 항상 null이라 AlreadyCurrent와 겹치지 않는다.
+            if (runtimeActor == null) return SwapBlockReason.NotAvailable;
             if (definition == current) return SwapBlockReason.AlreadyCurrent;
             // 회복 중에는 행동력이 이미 차 있어도 교체할 수 없다 - 행동력 값이 아니라 "슬롯에 있는가"가
             // 근거이므로 행동력 판정보다 먼저 본다.
@@ -345,15 +371,21 @@ namespace Character
 
         // ---- 변경 ----
 
-        /// <summary>전투 캐릭터를 교체한다. 교체가 실제로 일어났으면 true, 막혔으면 false를 돌려주고
-        /// 그 이유를 <paramref name="reason"/>에 담는다(호출부가 사용자에게 표시할 수 있도록).</summary>
+        /// <summary>전투 캐릭터를 교체한다. 교체가 <b>실제로 일어났을 때만</b> true를 돌려준다 - 예전에는
+        /// 자격 판정만 통과하면 무조건 true였는데, 이제 적용 주체가 런타임 액터라 "자격은 있는데 적용에
+        /// 실패하는" 경우(액터 미연결 등)가 존재한다. 그때는 false와 함께 이유를
+        /// <see cref="SwapBlockReason.NotAvailable"/>로 돌려준다 - 호출부(교체 패널)가 실패를 그대로
+        /// 로그/표시하므로, "false인데 사유는 None"인 상태를 만들지 않는다.</summary>
         public bool TrySwitchTo(CharacterDefinition definition, out SwapBlockReason reason)
         {
             reason = GetSwapBlockReason(definition);
             if (reason != SwapBlockReason.None) return false;
 
-            ApplyActiveCharacter(definition);
-            return true;
+            if (ApplyActiveCharacter(definition)) return true;
+
+            // 자격은 통과했는데 적용이 실패했다(설정 문제) - 지금 이 캐릭터는 투입할 수 없는 상태다.
+            reason = SwapBlockReason.NotAvailable;
+            return false;
         }
 
         public bool TrySwitchTo(CharacterDefinition definition)
@@ -480,36 +512,52 @@ namespace Character
                              " - 실제 플레이 검증 전에 끄세요.", this);
         }
 
-        /// <summary>이전 캐릭터를 먼저 끄고 새 캐릭터를 켠다 - 순서를 지켜야 두 캐릭터가 같은 프레임에
-        /// 동시에 활성화되지 않는다. 목록에 있는 나머지 캐릭터도 모두 꺼서, 씬에서 실수로 켜둔
-        /// 오브젝트가 남아 함께 공격하는 상황을 막는다.
+        /// <summary>전투 캐릭터를 실제로 갈아 끼운다 - 런타임 액터 하나에 이 캐릭터의 프로필을 적용하고,
+        /// <b>적용이 성공했을 때만</b> current를 옮긴다. 캐릭터 오브젝트를 순회하며 켜고 끄는 경로는
+        /// 더 이상 없다.
         ///
-        /// <paramref name="next"/>가 null이면 <b>아무도 투입하지 않은 상태</b>가 된다(모든 캐릭터
-        /// 오브젝트를 끄고 <see cref="current"/>를 null로 둔다). 보유 캐릭터가 전부 회복소에 있을 때
-        /// 쓰이며, 회복 중인 캐릭터를 대신 켜지 않기 위한 정상 경로다.</summary>
-        private void ApplyActiveCharacter(CharacterDefinition next)
+        /// <paramref name="next"/>가 null이면 <b>아무도 투입하지 않은 상태</b>가 된다(액터를 끄고
+        /// current를 null로 둔다). 보유 캐릭터가 전부 회복소에 있을 때 쓰이며, 회복 중인 캐릭터를
+        /// 대신 켜지 않기 위한 정상 경로다 - 시작 시점에도 이 경로가 그대로 관측되도록 상태 변경
+        /// 신호를 보낸다.
+        ///
+        /// 적용에 실패하면 current를 <b>건드리지 않는다</b> - 액터는 직전 캐릭터를 그대로 화면에
+        /// 유지(롤백)하므로, 로스터가 기억하는 캐릭터와 화면에 보이는 캐릭터가 어긋나지 않는다.</summary>
+        /// <returns>이 호출로 상태가 실제로 적용됐으면 true.</returns>
+        private bool ApplyActiveCharacter(CharacterDefinition next)
         {
-            for (int i = 0; i < usableEntries.Count; i++)
+            if (next == null)
             {
-                Entry entry = usableEntries[i];
-                if (next != null && entry.definition == next) continue;
-                if (entry.characterObject.activeSelf) entry.characterObject.SetActive(false);
+                if (runtimeActor != null) runtimeActor.Deactivate();
+                SetCurrentCharacter(null);
+                return true;
             }
 
-            int index = IndexOf(next);
-            // next가 null이면 index도 -1이지만, 그때는 "아무도 없음"이 정상 결과이므로 여기서 멈추지
-            // 않고 current를 null로 갱신하고 이벤트까지 보낸다. 로스터에 없는 캐릭터를 넘긴 경우
-            // (index < 0 이면서 next != null)만 상태를 바꾸지 않고 돌아간다.
-            if (index < 0 && next != null) return;
+            if (runtimeActor == null)
+            {
+                Debug.LogError($"[CharacterRoster] '{next.CharacterId}'를 투입할 수 없습니다 - Runtime Actor가 " +
+                               "연결되지 않았습니다. 현재 캐릭터를 바꾸지 않습니다.", this);
+                return false;
+            }
 
-            if (index >= 0) usableEntries[index].characterObject.SetActive(true);
+            if (!runtimeActor.TryApply(next))
+            {
+                // 액터가 이미 직전 상태로 되돌려 놓았다 - 여기서 current를 옮기지 않는 것이 화면과
+                // 로스터를 일치시키는 유일한 방법이다.
+                Debug.LogError($"[CharacterRoster] '{next.CharacterId}' 적용에 실패했습니다 - 현재 캐릭터를 " +
+                               "바꾸지 않습니다(액터 로그에서 원인을 확인하세요).", this);
+                return false;
+            }
 
-            bool changed = current != next;
+            SetCurrentCharacter(next);
+            return true;
+        }
+
+        /// <summary>current를 옮기고 그 사실을 알린다. 콤보는 "이 캐릭터가 지금까지 이어온 타격 수"라서
+        /// 새 캐릭터가 물려받으면 안 된다 - 물려받으면 첫 타격부터 상위 티어 공격 풀이 뽑힌다.</summary>
+        private void SetCurrentCharacter(CharacterDefinition next)
+        {
             current = next;
-            if (!changed) return;
-
-            // 콤보는 "이 캐릭터가 지금까지 이어온 타격 수"라서 새 캐릭터가 물려받으면 안 된다 -
-            // 물려받으면 첫 타격부터 상위 티어 공격 풀이 뽑힌다.
             ComboManager.ResetCombo();
             CurrentCharacterChanged?.Invoke(current);
         }

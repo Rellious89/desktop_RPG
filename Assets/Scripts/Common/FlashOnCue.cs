@@ -37,6 +37,20 @@ namespace Common
             flashRoutine = StartCoroutine(FlashRoutine());
         }
 
+        /// <summary>섬광이 재생 중일 때 오브젝트가 꺼지면(캐릭터 교체 등) 코루틴은 그 자리에서 중단되고
+        /// 색을 되돌리는 마지막 줄에 영영 도달하지 못한다 - 그러면 다음에 이 렌더러를 다시 켰을 때
+        /// flashColor(보통 흰색)가 그대로 남아 캐릭터가 하얗게 굳은 것처럼 보인다. 여기서 직접 원래
+        /// 색으로 되돌려 그 잔상을 남기지 않는다.</summary>
+        private void OnDisable()
+        {
+            if (flashRoutine != null)
+            {
+                StopCoroutine(flashRoutine);
+                flashRoutine = null;
+            }
+            if (spriteRenderer != null) spriteRenderer.color = originalColor;
+        }
+
         private IEnumerator FlashRoutine()
         {
             spriteRenderer.color = flashColor;

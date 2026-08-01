@@ -21,6 +21,9 @@ namespace Character
     /// 연결된 CharacterMotionProfile의 AttackMovement/ChargeMovement에서 읽어오고(Motion Editor가
     /// 편집하는 값과 100% 동일), 이 컴포넌트는 실제 Transform 이동 실행과 Stage Layout 기준 배치만
     /// 담당한다. 프로필이 없으면 임시 수치로 조용히 움직이는 대신 오류를 남기고 스스로 비활성화된다.
+    ///
+    /// 프로필이 런타임에 교체되면(하나의 액터 오브젝트가 여러 캐릭터를 연기하는 경로)
+    /// <see cref="RefreshFromCurrentProfile"/>로 기준점/배율/이동 수치를 새 프로필 기준으로 다시 잡는다.
     /// </summary>
     [RequireComponent(typeof(PlayerCharacterAnimator))]
     public class AttackMovement : MonoBehaviour
@@ -63,14 +66,23 @@ namespace Character
         // ("입력 1회 = 움찔 1회"가 실제로 지켜졌는지 확인하는 용도).
         private int chargeMoveCount;
 
+        // characterAnimator 캐시를 이미 잡았는지. Awake와 RefreshFromCurrentProfile 중 어느 쪽이 먼저
+        // 오더라도(비활성 오브젝트에 Awake 전에 프로필을 적용하는 경로 포함) 같은 초기화를 공유한다.
+        private bool initialized;
+
+        // basePosition이 실제 기준점으로 채워졌는지. 아직 한 번도 잡지 않았다면 basePosition은 그냥
+        // 0이라, 그 값으로 오프셋을 "되돌리면" 캐릭터가 원점으로 순간이동한다 - 되돌릴 옛 오프셋이
+        // 있는지 판단하는 유일한 근거다.
+        private bool layoutApplied;
+
         private void Awake()
         {
-            characterAnimator = GetComponent<PlayerCharacterAnimator>();
+            EnsureInitialized();
             // PlayerCharacterAnimator와 완전히 같은 판정(CharacterMotionProfile.IsPlayable)을 쓴다 -
             // 각자 다른 기준을 쓰면 "프로필은 있지만 Base Idle이 비어 있는" 캐릭터가 애니메이션 없이
             // 이동만 하는 상태로 남는다. 컴포넌트 Awake 순서에 의존하지 않도록 상대 컴포넌트의
             // enabled를 보지 않고 같은 데이터를 각자 직접 검사한다.
-            if (characterAnimator == null || !CharacterMotionProfile.IsPlayable(characterAnimator.MotionProfile))
+            if (!HasPlayableProfile())
             {
                 // 이동 수치의 유일한 원천이 사라진 상태 - 임시 수치로 움직이면 캐릭터마다 다른 연출이
                 // 조용히 뭉개지므로, 오류를 남기고 이동만 끈다(다른 컴포넌트에는 영향을 주지 않는다).
@@ -85,7 +97,63 @@ namespace Character
                                  "Transform 위치/스케일을 그대로 사용합니다(Motion Editor Preview와 어긋날 수 있습니다).", this);
             }
 
+            ApplyProfileLayout();
+        }
+
+        private void EnsureInitialized()
+        {
+            if (initialized) return;
+            initialized = true;
+
+            characterAnimator = GetComponent<PlayerCharacterAnimator>();
+        }
+
+        private bool HasPlayableProfile()
+        {
+            return characterAnimator != null && CharacterMotionProfile.IsPlayable(characterAnimator.MotionProfile);
+        }
+
+        /// <summary>같은 GameObject의 PlayerCharacterAnimator가 <b>지금</b> 들고 있는 프로필 기준으로
+        /// 배치와 이동 수치를 다시 잡는다 - 하나의 액터 오브젝트가 프로필만 갈아 끼워 다른 캐릭터를
+        /// 연기할 때(CharacterRuntimeActor), 애니메이터가 프로필을 바꾼 <b>직후</b> 호출한다.
+        ///
+        /// 진행 중이던 타격/충전 이동을 먼저 취소하고 옛 오프셋을 0으로 되돌린 뒤에 기준점을 다시
+        /// 계산한다 - 순서를 지켜야 Stage Layout이 없는 폴백 경로(현재 Transform 위치를 기준점으로
+        /// 쓰는 경로)에서 이전 캐릭터의 전진 오프셋이 새 기준점에 눌러앉지 않는다.
+        ///
+        /// 오브젝트가 비활성이거나 아직 Awake가 불리기 전이어도, 몇 번을 다시 불러도 안전하다.</summary>
+        /// <returns>새 프로필 기준으로 배치를 다시 잡았으면 true. 프로필이 재생 불가능하면 아무것도
+        /// 바꾸지 않고 false다.</returns>
+        public bool RefreshFromCurrentProfile()
+        {
+            EnsureInitialized();
+            if (!HasPlayableProfile())
+            {
+                Debug.LogError($"[AttackMovement] '{name}': PlayerCharacterAnimator의 Character Motion Profile이 " +
+                               "없거나 Base Idle 프레임이 비어 있어 배치를 갱신할 수 없습니다 - 현재 상태를 그대로 둡니다.", this);
+                return false;
+            }
+
+            // 진행 중이던 구간을 끊고 옛 기준점 기준 오프셋을 0으로 되돌린다(기준점을 다시 읽기 전에).
+            // 아직 기준점을 한 번도 잡지 않았다면(Awake 전에 프로필을 적용하는 경로) 되돌릴 옛 오프셋
+            // 자체가 없다 - 씬에 배치된 현재 위치를 그대로 둬야 Stage Layout이 없는 폴백이 그 위치를
+            // 기준점으로 쓸 수 있다.
+            if (layoutApplied) ApplyOffset(0f);
+            ResetToBase();
+            ApplyProfileLayout();
+
+            // Awake가 프로필 문제로 스스로 껐던 컴포넌트라면 여기서 되살린다.
+            if (!enabled) enabled = true;
+            return true;
+        }
+
+        /// <summary>기준점(Character Slot + Actor Offset), Actor Scale, 이동 수치를 현재 프로필에서
+        /// 한꺼번에 다시 읽어 적용한다. Stage Layout이 비어 있으면 기존 폴백(씬에 배치된 현재 Transform
+        /// 위치/스케일 유지)이 그대로 살아 있다.</summary>
+        private void ApplyProfileLayout()
+        {
             basePosition = ResolveInitialBasePosition();
+            layoutApplied = true;
             transform.localPosition = basePosition;
             ApplyActorScale();
             ResolveActiveSettings();
@@ -117,6 +185,7 @@ namespace Character
         public void SetPresentationBasePosition(Vector3 localPosition)
         {
             basePosition = localPosition;
+            layoutApplied = true;
             transform.localPosition = localPosition;
             ResetToBase();
         }
@@ -212,10 +281,11 @@ namespace Character
             targetOffset = 0f;
         }
 
-        /// <summary>공격 중 캐릭터가 꺼지면(교체/파괴) 밀려 있던 이동 상태가 남지 않게 기준점으로 되돌린다.</summary>
+        /// <summary>공격 중 캐릭터가 꺼지면(교체/파괴) 밀려 있던 이동 상태가 남지 않게 기준점으로 되돌린다.
+        /// 기준점을 아직 한 번도 잡지 않았으면 위치는 건드리지 않는다(0으로 되돌릴 옛 오프셋이 없다).</summary>
         private void OnDisable()
         {
-            ApplyOffset(0f);
+            if (layoutApplied) ApplyOffset(0f);
             ResetToBase();
         }
 

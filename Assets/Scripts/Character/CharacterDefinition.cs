@@ -4,9 +4,9 @@ namespace Character
 {
     /// <summary>
     /// 캐릭터 한 종의 <b>비(非)모션</b> 정의 - 리스트/교체 UI가 캐릭터를 식별하고 표시하는 데 필요한
-    /// 값만 담는다(저장 키, 표시 이름, 초상화, 최대 행동력). 씬에 배치된 캐릭터 GameObject가 아니라
-    /// 이 에셋이 "캐릭터가 무엇인지"의 단일 원천이며, CharacterRoster가 이 정의와 씬 오브젝트를 짝지어
-    /// 관리한다.
+    /// 값만 담는다(저장 키, 표시 이름, 초상화, 최대 행동력). 이 에셋이 "캐릭터가 무엇인지"의 단일
+    /// 원천이며, CharacterRoster는 이 정의만으로 보유 목록을 만든다 - 캐릭터마다 씬 오브젝트를 두던
+    /// 구조는 사라졌고, 지금은 런타임 액터 하나가 이 정의의 프로필을 받아 그 캐릭터를 연기한다.
     ///
     /// <b>모션 데이터는 여기에 복사하지 않는다.</b> Idle/공격 풀/Attack Movement는 지금까지대로
     /// <see cref="CharacterMotionProfile"/> 하나만 소유하고, 이 에셋은 그 프로필을 참조만 한다 -
@@ -27,8 +27,9 @@ namespace Character
         [SerializeField] private string displayName;
 
         [Header("References")]
-        [Tooltip("이 캐릭터의 모션 데이터 원천. 씬 오브젝트의 PlayerCharacterAnimator에 연결된 것과 " +
-                 "같은 에셋이어야 한다 - CharacterRoster가 시작 시 대조해서 다르면 오류를 남긴다.")]
+        [Tooltip("이 캐릭터의 모션 데이터 원천. 캐릭터를 투입하면 런타임 액터가 이 프로필을 그대로 " +
+                 "적용해 연기한다 - 비어 있거나 재생 가능한 Base Idle이 없으면 CharacterRoster가 시작 시 " +
+                 "오류를 남기고 이 캐릭터를 목록에서 제외한다.")]
         [SerializeField] private CharacterMotionProfile motionProfile;
 
         [Tooltip("리스트 항목에 표시할 초상화. 비워두면 Motion Profile의 Base Idle 첫 프레임을 " +

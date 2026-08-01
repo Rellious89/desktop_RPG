@@ -94,6 +94,38 @@ MonoBehaviour:
     m_Localized: The recovery of {0} has been completed.
     m_Metadata:
       m_Items: []
+  - m_Id: 1312127083077632
+    m_Localized: Dungeon
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1312127095660544
+    m_Localized: Dungeon 1
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1312127095660545
+    m_Localized: Dungeon 2
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1312127095660546
+    m_Localized: Dungeon 3
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1312127095660547
+    m_Localized: Enter
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1312127095660548
+    m_Localized: "\uC18C\uC18D \uC138\uACC4 {0}"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1312127095660549
+    m_Localized: "\uB4F1\uC7A5 \uBAAC\uC2A4\uD130"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1312127095660550
+    m_Localized: "\uC8FC\uC694 \uBCF4\uC0C1"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
