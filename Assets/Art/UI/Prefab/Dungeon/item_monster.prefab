@@ -87,6 +87,7 @@ GameObject:
   - component: {fileID: 8176684906014991029}
   - component: {fileID: 1463440179582856241}
   - component: {fileID: 5480446206419525687}
+  - component: {fileID: 8039208328318838040}
   m_Layer: 5
   m_Name: item_monster
   m_TagString: Untagged
@@ -166,6 +167,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_ShowMaskGraphic: 1
+--- !u!114 &8039208328318838040
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4528183710139800145}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 07cd7331112a9458e804225ab435ea98, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  iconImage: {fileID: 966002481364782025}
 --- !u!1 &7829237015764293316
 GameObject:
   m_ObjectHideFlags: 0

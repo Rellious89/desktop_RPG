@@ -37,7 +37,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 18}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!222 &4241349852708820392
 CanvasRenderer:
@@ -288,7 +288,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 18}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!222 &3181503187500720922
 CanvasRenderer:
@@ -1882,13 +1882,14 @@ GameObject:
   - component: {fileID: 7754058147889036733}
   - component: {fileID: 1567117283060713209}
   - component: {fileID: 3175243179643093810}
+  - component: {fileID: 2521496569388273579}
   m_Layer: 5
   m_Name: pn_Dungeon
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &7754058147889036733
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1936,6 +1937,44 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   targetPanel: {fileID: 7754058147889036733}
   keepInsideRect: {fileID: 0}
+--- !u!114 &2521496569388273579
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6261672582022755719}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 298d291a498bf4cd29413e5815958f9d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  closeButton: {fileID: 5404682196814609654}
+  blockBackgroundInput: 0
+  inputBlocker: {fileID: 0}
+  inputBlockerColor: {r: 0, g: 0, b: 0, a: 0}
+  catalog: {fileID: 11400000, guid: cd3315d21f80b472ea09d0497224b772, type: 2}
+  dungeonListContent: {fileID: 2944004991522152559}
+  dungeonListItemTemplate: {fileID: 148437104656814294, guid: 3660717675ad041de8f30d0fd0390aeb, type: 3}
+  detailRoot: {fileID: 8027198197981889011}
+  worldText: {fileID: 5723753576325531136}
+  worldTextFormat:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 1312127095660548
+      m_Key: 
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  monsterPreviewContent: {fileID: 5156344264748382069}
+  monsterPreviewTemplate: {fileID: 8039208328318838040, guid: e0fd49d843dfe445ca04ee633eb59081, type: 3}
+  rewardPreviewContent: {fileID: 3410321000256828123}
+  rewardPreviewTemplate: {fileID: 4534572599468100820, guid: 59cf4cd9fc52b48bcb640bf18054c0da, type: 3}
+  enterButton: {fileID: 4697031232264850176}
+  references:
+    version: 2
+    RefIds: []
 --- !u!1 &6383087097290657500
 GameObject:
   m_ObjectHideFlags: 0
@@ -2064,7 +2103,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_SizeDelta: {x: 47.67, y: 26.01}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &2662684503025428051
 CanvasRenderer:
@@ -2629,7 +2668,6 @@ GameObject:
   - component: {fileID: 3445581166920025505}
   - component: {fileID: 5723753576325531136}
   - component: {fileID: 7852159134796287826}
-  - component: {fileID: 6076485952961097227}
   m_Layer: 5
   m_Name: lb
   m_TagString: Untagged
@@ -2654,7 +2692,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 1, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 18}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &3445581166920025505
 CanvasRenderer:
@@ -2767,31 +2805,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_HorizontalFit: 0
   m_VerticalFit: 2
---- !u!114 &6076485952961097227
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8527357946958456780}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ac2fe041186f04abb8c0c248afb8f108, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  target: {fileID: 5723753576325531136}
-  text:
-    m_TableReference:
-      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
-    m_TableEntryReference:
-      m_KeyId: 1312127095660548
-      m_Key: 
-    m_FallbackState: 0
-    m_WaitForCompletion: 0
-    m_LocalVariables: []
-  references:
-    version: 2
-    RefIds: []
 --- !u!1 &8659617492339239589
 GameObject:
   m_ObjectHideFlags: 0

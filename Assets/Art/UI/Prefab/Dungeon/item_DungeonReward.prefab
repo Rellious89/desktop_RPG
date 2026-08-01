@@ -311,8 +311,9 @@ GameObject:
   - component: {fileID: 3196295849664703729}
   - component: {fileID: 7872259761065460075}
   - component: {fileID: 6769596795538843968}
+  - component: {fileID: 4534572599468100820}
   m_Layer: 5
-  m_Name: item_item
+  m_Name: item_DungeonReward
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -391,3 +392,17 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_ShowMaskGraphic: 1
+--- !u!114 &4534572599468100820
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8950922568281474428}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ebd75effba694b90b8cb86855f5c4f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  iconImage: {fileID: 5211156361898623889}
+  countText: {fileID: 5605981016419843871}
