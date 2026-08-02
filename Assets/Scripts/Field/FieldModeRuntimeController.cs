@@ -17,19 +17,27 @@ namespace Field
     /// 무엇이 빠졌는지는 실행 즉시 로그로 드러나야 하기 때문이다. 필수 참조가 하나라도 비어 있으면
     /// <b>전투를 열지 않는 쪽으로</b> 실패한다(fail closed).
     ///
+    /// <b>필드 화면은 루트 세 개를 켜고 끄는 것으로만 바뀐다</b>(Common/Town/Dungeon). 오브젝트를 옮기거나
+    /// 만들거나 지우지 않고, 계층을 뒤지지도 않는다 - 셋 다 Inspector에 직접 연결된 필수 참조이며 서로
+    /// 다른 오브젝트여야 한다. Common은 <b>두 모드 모두에서</b> 켜져 있다.
+    ///
     /// <b>마을 적용 순서</b>(공격이 성립할 수 있는 것부터 닫는다):
     ///   1. 플레이어 전투/입력을 <b>동기적으로</b> 끈다 - 진행 중이던 공격/충전/복귀/발사체/이동과
     ///      남은 입력이 그 자리에서 전부 취소된다.
     ///   2. 몬스터 대기열을 접는다 - Current/Standby가 이벤트 없이 정리되고 화면에서 사라진다.
-    ///   3. 콤보를 끊는다(타임아웃으로 끊긴 것과 같은 경로).
-    ///   4. 회복소 입구 버튼을 보이게 한다.
+    ///   3. <b>대기열이 안전하게 접힌 뒤에</b> 화면을 바꾼다: Dungeon 끄기 -> Common 켜기 -> Town 켜기.
+    ///   4. 콤보를 끊는다(타임아웃으로 끊긴 것과 같은 경로).
+    ///   5. 회복소 입구 버튼을 보이게 한다.
     ///
     /// <b>던전 적용 순서</b>(성공이 확인되기 전에는 절대 열지 않는다):
     ///   1. 전투/입력은 계속 꺼둔 채로 시작한다.
     ///   2. 남아 있던 이전 전투를 먼저 접는다.
-    ///   3. 열려 있는 회복소 패널을 닫고 입구 버튼을 숨긴다.
-    ///   4. 선택한 던전의 몬스터로 대기열을 연다.
-    ///   5. <b>대기열이 성공했고, 매니저가 여전히 그 던전을 가리킬 때만</b> 전투를 켠다.
+    ///   3. 화면을 바꾼다: Common 켜기 -> Town 끄기 -> Dungeon 켜기.
+    ///   4. 열려 있는 회복소 패널을 닫고 입구 버튼을 숨긴다.
+    ///   5. 던전 루트가 <b>실제로</b> 살아났는지 activeInHierarchy로 확인한다 - 꺼진 부모 밑이라 켜지지
+    ///      않았다면 오류를 남기고 전투를 닫은 채, 대기열도 접힌 채로 끝낸다.
+    ///   6. 그 확인을 통과한 뒤에야 선택한 던전의 몬스터로 대기열을 연다.
+    ///   7. <b>대기열이 성공했고, 매니저가 여전히 그 던전을 가리킬 때만</b> 전투를 켠다.
     ///
     /// <b>초기 동기화는 첫 Update보다 먼저 끝난다.</b> 플레이어 입력은 Update에서 읽히고 대기열은
     /// Start에서 슬롯을 잡으므로, 이 컴포넌트는 OnEnable에서 전투를 먼저 끄고(입력 경로 차단) Start에서
@@ -40,6 +48,11 @@ namespace Field
     /// 그러지 않으면 던전인데도 전투가 영영 닫힌 채로 남고 대기열/회복소가 옛 모드로 굳는다. 반대로
     /// 꺼질 때는 구독을 짝지어 해제하고 전투를 반드시 닫는다 - 따라갈 수 없는 컨트롤러가 던전 입력을
     /// 열어둔 채로 사라지지 않게 하기 위함이다.
+    ///
+    /// <b>참조가 모자라면 그냥 돌아가지 않는다.</b> 필수 참조가 하나라도 없거나 루트가 겹쳐 있으면 정상
+    /// 적용은 불가능하지만, 그렇다고 아무것도 하지 않으면 대기열이 자기 Start에서 세운 Current가 그대로
+    /// 살아 있게 된다 - 그래서 가진 참조만으로 할 수 있는 만큼(전투 닫기 + 대기열 접기)은 반드시 한다.
+    /// 이 정지 경로도 이벤트 없는 경로라 처치/보상/행동력은 하나도 발생하지 않는다.
     ///
     /// <b>여기서 하지 않는 일</b>: 저장/로드, 전환 연출, 필드 표시 UI, NPC/순찰/월드 진행, 입장 비용/
     /// 클리어/보스/레이드. 인벤토리와 캐릭터 교체는 어느 모드에서도 건드리지 않는다(항상 그대로 쓸 수 있다).
@@ -60,6 +73,18 @@ namespace Field
         [Tooltip("몬스터 대기열. 마을에서는 접고(Suspend), 던전에서는 그 던전의 몬스터로 다시 연다.")]
         [SerializeField] private MonsterEncounterQueue encounterQueue;
 
+        [Header("Field Roots (필수 - 셋 다 서로 다른 오브젝트여야 한다)")]
+        [Tooltip("두 모드 모두에서 켜져 있어야 하는 공용 필드 루트. 모드와 무관하게 계속 필요한 것들이 " +
+                 "여기 들어간다 - 마을에서도 던전에서도 이 루트는 항상 켠다.")]
+        [SerializeField] private GameObject commonFieldRoot;
+
+        [Tooltip("마을에서만 켜지는 필드 루트. 던전에서는 끈다.")]
+        [SerializeField] private GameObject townFieldRoot;
+
+        [Tooltip("던전에서만 켜지는 필드 루트. 마을에서는 끈다. 이 루트가 실제로 켜진 것을 확인한 " +
+                 "뒤에야 몬스터 대기열을 연다 - 꺼진 부모 밑에 있으면 전투를 시작하지 않는다.")]
+        [SerializeField] private GameObject dungeonFieldRoot;
+
         [Header("Recovery Station (선택)")]
         [Tooltip("회복소 패널(pn_RecoveryStation). 던전에 들어갈 때 열려 있으면 닫는다 - 비워두면 닫지 않는다.")]
         [SerializeField] private RecoveryStationPanel recoveryStationPanel;
@@ -79,9 +104,22 @@ namespace Field
         /// 실패하면 던전 모드여도 false다 - "던전에 있다"와 "전투가 열렸다"는 다른 사실이다.</summary>
         public bool CombatEnabled { get; private set; }
 
+        /// <summary>필드 루트 세 개가 전부 연결됐고 <b>서로 다른 오브젝트</b>인지. 같은 오브젝트를 두 칸에
+        /// 넣으면 한 번의 전환 안에서 같은 대상에 켜기와 끄기를 모두 요청하게 되어(예: 마을에서 Dungeon을
+        /// 끄고 Town을 켜기) 결과가 연결 순서에 좌우된다 - 그런 구성은 유효하지 않은 것으로 본다.</summary>
+        public bool HasValidFieldRoots =>
+            commonFieldRoot != null && townFieldRoot != null && dungeonFieldRoot != null
+            && commonFieldRoot != townFieldRoot
+            && commonFieldRoot != dungeonFieldRoot
+            && townFieldRoot != dungeonFieldRoot;
+
+        /// <summary>가장 마지막 적용에서 필요한 루트가 <b>실제로</b>(activeInHierarchy) 살아났는지.
+        /// activeSelf가 아니라 계층 전체를 본 결과라, 꺼진 부모 밑에 놓인 루트는 여기서 false가 된다.</summary>
+        public bool FieldRootsActive { get; private set; }
+
         /// <summary>필수 참조가 전부 연결돼 있는지. false면 어떤 모드에서도 전투를 열지 않는다.</summary>
         public bool HasRequiredReferences =>
-            fieldModeManager != null && playerAnimator != null && encounterQueue != null;
+            fieldModeManager != null && playerAnimator != null && encounterQueue != null && HasValidFieldRoots;
 
         private bool subscribed;
 
@@ -109,11 +147,15 @@ namespace Field
             SetCombat(false);
             Subscribe();
 
-            if (!startCompleted) return; // 최초 활성화 - 나머지는 Start가 맡는다.
+            if (!startCompleted) return; // 최초 활성화 - 나머지는 Start가 맡는다(몬스터 Awake 이후여야 한다).
 
-            // 참조가 빠져 있으면 재적용 자체가 불가능하다. 전투는 방금 닫았으므로 그대로 두는 것이
-            // fail closed다(무엇이 빠졌는지는 Start가 이미 남겼다).
-            if (!HasRequiredReferences) return;
+            // 참조가 빠져 있으면 재적용 자체가 불가능하다. 그렇다고 그냥 돌아가면 꺼져 있는 동안
+            // 남아 있던 전투가 그대로 서 있을 수 있으므로, 할 수 있는 만큼은 닫고 나간다.
+            if (!HasRequiredReferences)
+            {
+                FailClosed();
+                return;
+            }
 
             Apply(fieldModeManager.CurrentMode, fieldModeManager.CurrentDungeon);
         }
@@ -155,11 +197,24 @@ namespace Field
 
             if (!ValidateReferences())
             {
-                // 실패해도 전투는 이미 꺼져 있다(OnEnable). 여기서 더 열지 않는 것이 fail closed다.
+                // 전투는 이미 꺼져 있지만(OnEnable) 대기열은 아직 자기 Start에서 슬롯을 잡아 Current를
+                // 세울 수 있다 - 참조가 빠졌다고 그냥 돌아가면 "공격은 막혔는데 몬스터는 서 있는" 상태가
+                // 남는다. 여기가 몬스터 Awake 이후의 첫 안전 지점이므로 할 수 있는 만큼 닫고 나간다.
+                FailClosed();
                 return;
             }
 
             Apply(fieldModeManager.CurrentMode, fieldModeManager.CurrentDungeon);
+        }
+
+        /// <summary>참조가 모자라 정상 적용을 할 수 없을 때, <b>가진 참조만으로 할 수 있는 최대한의 정지</b>를
+        /// 동기적으로 수행한다 - 전투를 닫고 대기열을 접는다. 대기열 접기는 이벤트 없는 경로라
+        /// 처치/보상/킬카운트/경험치/행동력은 하나도 발생하지 않으며, 필드 루트는 건드리지 않는다
+        /// (어느 루트가 무엇인지 신뢰할 수 없는 상태에서 화면 구성을 바꾸면 더 나쁜 결과가 된다).</summary>
+        private void FailClosed()
+        {
+            SetCombat(false); // playerAnimator가 없으면 읽기 전용 상태만 닫힌다.
+            if (encounterQueue != null) encounterQueue.Suspend();
         }
 
         /// <summary>필수/선택 참조를 한 번에 점검한다 - 무엇이 빠졌는지 로그 하나로 알 수 있어야 한다.</summary>
@@ -181,6 +236,28 @@ namespace Field
                 Debug.LogError($"[FieldModeRuntimeController] '{name}': Monster Encounter Queue가 연결되지 " +
                                "않았습니다 - 몬스터를 정리하거나 던전 전투를 열 수 없어 전투를 열지 않습니다.", this);
             }
+            if (commonFieldRoot == null)
+            {
+                Debug.LogError($"[FieldModeRuntimeController] '{name}': Common Field Root가 연결되지 않았습니다 - " +
+                               "모드와 무관하게 켜둬야 할 공용 필드를 제어할 수 없어 전투를 열지 않습니다.", this);
+            }
+            if (townFieldRoot == null)
+            {
+                Debug.LogError($"[FieldModeRuntimeController] '{name}': Town Field Root가 연결되지 않았습니다 - " +
+                               "마을 필드를 켜고 끌 수 없어 전투를 열지 않습니다.", this);
+            }
+            if (dungeonFieldRoot == null)
+            {
+                Debug.LogError($"[FieldModeRuntimeController] '{name}': Dungeon Field Root가 연결되지 않았습니다 - " +
+                               "던전 필드를 켤 수 없어 전투를 열지 않습니다.", this);
+            }
+
+            // 같은 오브젝트를 두 칸에 넣으면 한 번의 전환에서 그 대상에 켜기와 끄기를 모두 요청하게 되어
+            // 결과가 순서에 좌우된다 - 조용히 한쪽이 이기게 두지 않고 유효하지 않은 구성으로 취급한다.
+            LogIfSameRoot(commonFieldRoot, "Common Field Root", townFieldRoot, "Town Field Root");
+            LogIfSameRoot(commonFieldRoot, "Common Field Root", dungeonFieldRoot, "Dungeon Field Root");
+            LogIfSameRoot(townFieldRoot, "Town Field Root", dungeonFieldRoot, "Dungeon Field Root");
+
             if (recoveryStationButton == null)
             {
                 Debug.LogWarning($"[FieldModeRuntimeController] '{name}': 회복소 입구 버튼이 연결되지 않아 " +
@@ -195,13 +272,25 @@ namespace Field
             return HasRequiredReferences;
         }
 
+        /// <summary>필드 루트 두 칸에 같은 오브젝트가 연결됐으면 오류로 남긴다(판정 자체는
+        /// <see cref="HasValidFieldRoots"/>가 소유한다 - 여기서는 무엇이 겹쳤는지만 알려준다).</summary>
+        private void LogIfSameRoot(GameObject first, string firstLabel, GameObject second, string secondLabel)
+        {
+            if (first == null || second == null || first != second) return;
+
+            Debug.LogError($"[FieldModeRuntimeController] '{name}': {firstLabel}과(와) {secondLabel}에 같은 " +
+                           $"오브젝트('{first.name}')가 연결돼 있습니다 - 한 번의 전환에서 켜기와 끄기를 동시에 " +
+                           "요청하게 되므로 서로 다른 오브젝트를 연결하세요. 전투를 열지 않습니다.", this);
+        }
+
         private void HandleFieldModeChanged(FieldMode mode, DungeonDefinition dungeon)
         {
             if (!HasRequiredReferences)
             {
-                // Start가 이미 무엇이 빠졌는지 남겼다 - 전환 때마다 같은 로그를 쏟지 않고, 전투만
-                // 확실히 닫아둔다.
-                SetCombat(false);
+                // Start가 이미 무엇이 빠졌는지 남겼다 - 전환 때마다 같은 로그를 쏟지 않고, 전투를 닫고
+                // 대기열을 접는 것까지만 확실히 한다(그러지 않으면 던전에서 마을로 나가는 전환에서
+                // 몬스터가 그대로 남는다).
+                FailClosed();
                 return;
             }
 
@@ -209,15 +298,20 @@ namespace Field
         }
 
         /// <summary>모드 하나를 실제 런타임 상태로 만든다 - 진입점이 초기 동기화든 전환 이벤트든
-        /// 언제나 같은 순서를 지나게 하기 위해 경로를 하나로 모아둔다.</summary>
+        /// 언제나 같은 순서를 지나게 하기 위해 경로를 하나로 모아둔다.
+        ///
+        /// <b>전제</b>: 호출 전에 <see cref="HasRequiredReferences"/>가 확인돼 있다 - 세 진입점(Start,
+        /// 재활성화 OnEnable, 전환 이벤트)이 모두 먼저 보고 실패하면 <see cref="FailClosed"/>로 빠진다.
+        /// 그래서 아래에서는 매니저/플레이어/대기열/루트 참조를 다시 null 검사하지 않는다.</summary>
         private void Apply(FieldMode mode, DungeonDefinition dungeon)
         {
             if (mode == FieldMode.Dungeon) ApplyDungeon(dungeon);
             else ApplyTown();
         }
 
-        /// <summary>마을. 공격이 성립할 수 있는 것부터 닫고, 마지막에 회복소를 열어준다.
-        /// <b>어떤 처치/보상 이벤트도 만들지 않는다</b> - 몬스터 정리는 전부 이벤트 없는 경로다.</summary>
+        /// <summary>마을. 공격이 성립할 수 있는 것부터 닫고, 몬스터가 안전하게 정리된 <b>뒤에</b> 화면을
+        /// 마을 구성으로 바꾼 다음, 마지막에 회복소를 열어준다.
+        /// <b>어떤 처치/보상/행동력 이벤트도 만들지 않는다</b> - 몬스터 정리는 전부 이벤트 없는 경로다.</summary>
         private void ApplyTown()
         {
             // 1. 입력과 진행 중이던 공격을 그 자리에서 끊는다(발사체/이동/충전/대기열 입력 포함).
@@ -226,10 +320,22 @@ namespace Field
             // 2. 몬스터를 이벤트 없이 정리한다 - Current도 Standby도 남지 않는다.
             encounterQueue.Suspend();
 
-            // 3. 타격 흐름이 끊겼으므로 콤보도 함께 끊는다(타임아웃과 같은 경로라 표시도 평소와 같다).
+            // 3. 대기열이 안전하게 접힌 뒤에야 화면 구성을 바꾼다. 순서는 Dungeon 끄기 -> Common 켜기 ->
+            //    Town 켜기다 - 던전 쪽을 먼저 닫아야 두 필드가 같은 순간에 함께 보이지 않는다.
+            SetRootActive(dungeonFieldRoot, false);
+            SetRootActive(commonFieldRoot, true);
+            SetRootActive(townFieldRoot, true);
+
+            // 켜라고 했는데도 살아나지 않았다면(꺼진 부모 밑) 조용히 넘어가지 않고 남긴다. 마을에서는
+            // 전투가 이미 닫혀 있으므로 추가로 닫을 것은 없다. &&가 아니라 &인 것은 의도적이다 -
+            // 둘 다 검사해서 잘못된 루트를 한 번에 전부 알려준다.
+            FieldRootsActive = VerifyRootLive(commonFieldRoot, "Common Field Root")
+                               & VerifyRootLive(townFieldRoot, "Town Field Root");
+
+            // 4. 타격 흐름이 끊겼으므로 콤보도 함께 끊는다(타임아웃과 같은 경로라 표시도 평소와 같다).
             ComboManager.ResetCombo();
 
-            // 4. 마을에서는 회복소를 쓸 수 있어야 한다(패널은 사용자가 직접 연다 - 여기서 열지 않는다).
+            // 5. 마을에서는 회복소를 쓸 수 있어야 한다(패널은 사용자가 직접 연다 - 여기서 열지 않는다).
             SetRecoveryButtonVisible(true);
 
             AppliedMode = FieldMode.Town;
@@ -237,7 +343,11 @@ namespace Field
         }
 
         /// <summary>던전. <b>준비가 성공했고 매니저가 여전히 그 던전을 가리킬 때만</b> 전투를 연다 -
-        /// 실패하면 던전 모드인 채로 전투가 닫힌 상태가 되고, 무엇이 잘못됐는지는 로그가 남긴다.</summary>
+        /// 실패하면 던전 모드인 채로 전투가 닫힌 상태가 되고, 무엇이 잘못됐는지는 로그가 남긴다.
+        ///
+        /// <b>필드 루트는 모드를 따라가지 던전 데이터를 따라가지 않는다.</b> 매니저가 던전이라고 말하면
+        /// 던전 화면을 만드는 것이 맞고, 그 안에 세울 몬스터가 없는 것은 별개의 실패다 - 그래서 던전이
+        /// 비어 있는(있어서는 안 되는) 경우에도 루트 구성은 던전 그대로 두고 전투만 닫는다.</summary>
         private void ApplyDungeon(DungeonDefinition dungeon)
         {
             // 1. 준비가 끝날 때까지 전투/입력은 닫아둔다.
@@ -246,22 +356,42 @@ namespace Field
             AppliedMode = FieldMode.Dungeon;
             AppliedDungeon = null;
 
-            if (dungeon == null)
+            // 2. 이전 전투가 남아 있으면 먼저 접는다 - 새 던전의 몬스터가 옛 Current 옆에 서는 일이 없고,
+            //    화면을 바꾸는 동안 공격 가능한 몬스터가 남아 있지도 않는다.
+            encounterQueue.Suspend();
+
+            // 3. 화면 구성을 던전으로 바꾼다. 순서는 Common 켜기 -> Town 끄기 -> Dungeon 켜기다 -
+            //    공용을 먼저 세워두고 마을을 닫은 뒤에 던전을 여는 순서라, 중간에 아무 필드도 없는
+            //    상태나 두 필드가 겹쳐 보이는 상태가 생기지 않는다.
+            SetRootActive(commonFieldRoot, true);
+            SetRootActive(townFieldRoot, false);
+            SetRootActive(dungeonFieldRoot, true);
+
+            // 4. 던전에서는 회복소를 쓸 수 없다. 열려 있으면 닫고 입구 버튼을 숨긴다.
+            CloseRecoveryStation();
+
+            // 5. <b>루트가 진짜로 켜졌는지</b> activeSelf가 아니라 activeInHierarchy로 확인한다 - 꺼진
+            //    부모 밑에 놓였거나 배치가 잘못되면 SetActive(true)를 불러도 화면에는 아무것도 없다.
+            //    그 상태에서 대기열을 열면 보이지 않는 몬스터를 때리게 되므로 여기서 멈춘다(전투는 이미
+            //    닫혀 있고 대기열도 2번에서 접힌 그대로다).
+            FieldRootsActive = VerifyRootLive(commonFieldRoot, "Common Field Root")
+                               & VerifyRootLive(dungeonFieldRoot, "Dungeon Field Root");
+            if (!FieldRootsActive)
             {
-                Debug.LogError($"[FieldModeRuntimeController] '{name}': 던전 모드인데 던전이 비어 있습니다 - " +
-                               "몬스터를 세우지 않고 전투를 닫아 둡니다.", this);
-                encounterQueue.Suspend();
-                SetRecoveryButtonVisible(false);
+                Debug.LogError($"[FieldModeRuntimeController] '{name}': 던전 필드 루트가 실제로 활성화되지 않아 " +
+                               "몬스터를 세우지 않고 전투를 닫아 둡니다 - 위 오류의 루트와 그 부모 오브젝트를 확인하세요.", this);
                 return;
             }
 
-            // 2. 이전 전투가 남아 있으면 먼저 접는다 - 새 던전의 몬스터가 옛 Current 옆에 서는 일이 없다.
-            encounterQueue.Suspend();
+            if (dungeon == null)
+            {
+                Debug.LogError($"[FieldModeRuntimeController] '{name}': 던전 모드인데 던전이 비어 있습니다 - " +
+                               "몬스터를 세우지 않고 전투를 닫아 둡니다(대기열은 접힌 상태 그대로다).", this);
+                return;
+            }
 
-            // 3. 던전에서는 회복소를 쓸 수 없다. 열려 있으면 닫고 입구 버튼을 숨긴다.
-            CloseRecoveryStation();
-
-            // 4. 이 던전의 몬스터로 대기열을 연다(실패하면 접힌 상태 그대로 false).
+            // 6. 던전 루트가 살아 있는 것을 확인한 뒤에야 이 던전의 몬스터로 대기열을 연다
+            //    (실패하면 접힌 상태 그대로 false).
             if (!encounterQueue.TryStartDungeonEncounter(dungeon.Monsters))
             {
                 Debug.LogError($"[FieldModeRuntimeController] '{name}': 던전 '{dungeon.DungeonId}'의 몬스터 준비에 " +
@@ -269,7 +399,7 @@ namespace Field
                 return;
             }
 
-            // 5. 준비가 끝난 지금도 매니저가 같은 던전을 가리키는지 다시 확인한다 - 준비 도중에 상태가
+            // 7. 준비가 끝난 지금도 매니저가 같은 던전을 가리키는지 다시 확인한다 - 준비 도중에 상태가
             //    달라졌다면(구독자 예외/재진입 등) 그 던전의 전투를 여는 것은 틀린 일이다. 입력만 닫고
             //    끝내면 방금 세운 Current가 그대로 서 있게 되므로, 만들어 둔 전투를 여기서 되돌린다.
             if (fieldModeManager.CurrentMode != FieldMode.Dungeon || fieldModeManager.CurrentDungeon != dungeon)
@@ -282,6 +412,36 @@ namespace Field
 
             AppliedDungeon = dungeon;
             SetCombat(true);
+        }
+
+        /// <summary>필드 루트 하나를 켜거나 끈다. 이미 같은 상태면 <see cref="GameObject.SetActive"/>를
+        /// 다시 부르지 않는다 - 같은 값으로 다시 부르는 것은 어차피 아무 일도 하지 않으므로 결과는 같고,
+        /// 자식들의 OnEnable/OnDisable이 불필요하게 다시 돌지 않는다.
+        ///
+        /// <b>여기서 activeSelf를 보는 것은 "다시 부를 필요가 있는가"를 판단하기 위해서일 뿐이다</b> -
+        /// "실제로 화면에 살아났는가"는 activeSelf로 알 수 없으므로 <see cref="VerifyRootLive"/>가
+        /// activeInHierarchy로 따로 확인한다.</summary>
+        private static void SetRootActive(GameObject root, bool active)
+        {
+            if (root == null) return;
+            if (root.activeSelf == active) return;
+
+            root.SetActive(active);
+        }
+
+        /// <summary>켜라고 요청한 루트가 <b>실제로</b> 살아 있는지 activeInHierarchy로 확인한다 - 부모가
+        /// 꺼져 있으면 activeSelf만 true이고 화면에는 아무것도 나오지 않는다. 계층을 뒤지지 않고 이
+        /// 오브젝트 하나의 상태만 읽으므로 어떤 탐색도 하지 않는다.</summary>
+        /// <returns>루트가 실제로 활성 상태면 true.</returns>
+        private bool VerifyRootLive(GameObject root, string label)
+        {
+            if (root == null) return false;
+            if (root.activeInHierarchy) return true;
+
+            Debug.LogError($"[FieldModeRuntimeController] '{name}': {label}('{root.name}')을(를) 켰지만 여전히 " +
+                           "비활성입니다 - 부모 오브젝트가 꺼져 있거나 배치가 잘못됐습니다. 필드 루트는 꺼진 " +
+                           "부모 밑에 두지 마세요.", root);
+            return false;
         }
 
         /// <summary>플레이어 전투/입력 상태를 바꾸고 그 사실을 읽기 전용 상태로도 남긴다.</summary>
