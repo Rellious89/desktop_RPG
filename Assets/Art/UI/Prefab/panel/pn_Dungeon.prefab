@@ -1953,7 +1953,7 @@ MonoBehaviour:
   blockBackgroundInput: 0
   inputBlocker: {fileID: 0}
   inputBlockerColor: {r: 0, g: 0, b: 0, a: 0}
-  catalog: {fileID: 11400000, guid: cd3315d21f80b472ea09d0497224b772, type: 2}
+  catalog: {fileID: 11400000, guid: 5a3dc674fb40a445ba6d768b5775d116, type: 2}
   dungeonListContent: {fileID: 2944004991522152559}
   dungeonListItemTemplate: {fileID: 148437104656814294, guid: 3660717675ad041de8f30d0fd0390aeb, type: 3}
   detailRoot: {fileID: 8027198197981889011}

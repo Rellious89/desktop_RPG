@@ -22,6 +22,16 @@ MonoBehaviour:
     m_ReadOnly: 1
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: be2871dfcdd4c4e5481ce59a6786ddc2
+    m_Address: Assets/Localization/Tables/03_Monster Shared Data.asset
+    m_ReadOnly: 1
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c48b8484b515e4dbcb03c833282b217c
+    m_Address: Assets/Localization/Tables/02_World&Dungeon Shared Data.asset
+    m_ReadOnly: 1
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 1
   m_Settings: {fileID: 11400000, guid: 2dbb1b816adf1433b94a701ee70d6da1, type: 2}
   m_SchemaSet:

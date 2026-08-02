@@ -1,0 +1,71 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9620f8c34305754d8cc9a7e49e852d9, type: 3}
+  m_Name: 02_World&Dungeon_ko-KR
+  m_EditorClassIdentifier: 
+  m_LocaleId:
+    m_Code: ko-KR
+  m_SharedData: {fileID: 11400000, guid: c48b8484b515e4dbcb03c833282b217c, type: 2}
+  m_Metadata:
+    m_Items: []
+  m_TableData:
+  - m_Id: 379596038144
+    m_Localized: "\uC560\uB2C8\uBA40\uB79C\uB4DC"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 379612815360
+    m_Localized: "\uD310\uD0C0\uC9C0\uC544"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 379612815361
+    m_Localized: "\uB9DD\uC790\uC758 \uB3C4\uC2DC"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 379612815362
+    m_Localized: "\uC560\uB2C8\uBA40\uB79C\uB4DC_\uB358\uC80401"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 379617009664
+    m_Localized: "\uC560\uB2C8\uBA40\uB79C\uB4DC_\uB358\uC80402"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 379617009665
+    m_Localized: "\uC560\uB2C8\uBA40\uB79C\uB4DC_\uB358\uC80403"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 379617009666
+    m_Localized: "\uD310\uD0C0\uC9C0\uC544_\uB358\uC80401"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 379617009667
+    m_Localized: "\uD310\uD0C0\uC9C0\uC544_\uB358\uC80402"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 379617009668
+    m_Localized: "\uD310\uD0C0\uC9C0\uC544_\uB358\uC80403"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 379617009669
+    m_Localized: "\uB9DD\uC790\uC758 \uB3C4\uC2DC_\uB358\uC80401"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 379617009670
+    m_Localized: "\uB9DD\uC790\uC758 \uB3C4\uC2DC_\uB358\uC80402"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 379617009671
+    m_Localized: "\uB9DD\uC790\uC758 \uB3C4\uC2DC_\uB358\uC80403"
+    m_Metadata:
+      m_Items: []
+  references:
+    version: 2
+    RefIds: []

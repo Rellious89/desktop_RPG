@@ -269,14 +269,20 @@ namespace Dungeon
                                  "않아 월드 문구를 비워 둡니다 - Inspector에서 Category와 Key를 지정하세요.", this);
             }
 
-            LocalizedTextReference nameReference = dungeon != null ? dungeon.WorldName : null;
+            // 월드 이름 문구는 던전이 아니라 월드 정의가 소유한다 - 던전에 월드가 연결되어 있지 않으면
+            // 그릴 문구 자체가 없는 것이고, 여기서 대신 지어내지 않는다.
+            WorldDefinition world = dungeon != null ? dungeon.World : null;
+            LocalizedTextReference nameReference = world != null ? world.LocalizedName : null;
             bool hasName = nameReference != null && nameReference.HasReference;
             if (!hasName && !missingWorldNameWarned)
             {
                 missingWorldNameWarned = true;
                 string id = dungeon != null ? dungeon.DungeonId : "(없음)";
-                Debug.LogWarning($"[DungeonPanel] 던전 '{id}'의 월드 이름에 Localization Table/Key가 지정되지 " +
-                                 "않아 월드 문구를 비워 둡니다 - 던전 에셋에서 Category와 Key를 지정하세요.", this);
+                string cause = world == null
+                    ? "던전 에셋에 World Definition이 연결되지 않아"
+                    : "월드 이름에 Localization Table/Key가 지정되지 않아";
+                Debug.LogWarning($"[DungeonPanel] 던전 '{id}'의 {cause} 월드 문구를 비워 둡니다 - " +
+                                 "던전 에셋의 World와 월드 에셋의 Category/Key를 확인하세요.", this);
             }
 
             if (!hasFormat || !hasName)
@@ -361,17 +367,18 @@ namespace Dungeon
             RectTransform parent = ResolveMonsterPreviewParent();
             if (monsterPreviewTemplate == null || parent == null) return;
 
-            IReadOnlyList<DungeonMonsterPreviewEntry> entries = dungeon.MonsterPreviews;
-            for (int i = 0; i < entries.Count; i++)
+            // 던전 에셋에 적힌 순서 그대로 만든다 - MonsterDefinition.DisplayOrder로 다시 정렬하지 않는다.
+            IReadOnlyList<MonsterDefinition> monsters = dungeon.Monsters;
+            for (int i = 0; i < monsters.Count; i++)
             {
-                DungeonMonsterPreviewEntry entry = entries[i];
-                if (entry == null) continue;
+                MonsterDefinition monster = monsters[i];
+                if (monster == null) continue;
 
                 DungeonMonsterPreviewView view = Instantiate(monsterPreviewTemplate, parent, false);
                 view.name = $"{monsterPreviewTemplate.name}_{i}";
                 // 비활성 상태에서 먼저 표시할 값을 넣고 마지막에 켠다 - 켠 뒤에 넣으면 프리팹에 저장된
                 // 이미지가 한 프레임 먼저 보인다.
-                view.Bind(entry);
+                view.Bind(monster);
                 view.gameObject.SetActive(true);
                 spawnedMonsterPreviews.Add(view);
             }

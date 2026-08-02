@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 55edbe3391faf4fd7a712b1250140dfe, type: 3}
+  m_Name: Dungeon_3
+  m_EditorClassIdentifier: 
+  dungeonId: 3
+  dungeonName:
+    m_TableReference:
+      m_TableCollectionName: GUID:c48b8484b515e4dbcb03c833282b217c
+    m_TableEntryReference:
+      m_KeyId: 379617009665
+      m_Key: 
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  world: {fileID: 11400000, guid: 79144df9714ff41edad2ce9c6244bd91, type: 2}
+  representativeSprite: {fileID: 0}
+  monsters:
+  - {fileID: 11400000, guid: 7d7b2be59499e458ebc51a62bb25e1d5, type: 2}
+  - {fileID: 11400000, guid: f1c479ab5d0554bd682c233ea9353d28, type: 2}
+  - {fileID: 11400000, guid: 8589e8a46793f40a18fc028b8c128a79, type: 2}
+  rewardItems: []
+  displayOrder: 30
+  references:
+    version: 2
+    RefIds: []

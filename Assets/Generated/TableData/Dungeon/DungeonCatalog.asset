@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 550b1eb02b90341bb8e941a3093fc2fe, type: 3}
+  m_Name: DungeonCatalog
+  m_EditorClassIdentifier: 
+  dungeons:
+  - {fileID: 11400000, guid: c41af48b8189b427897cc7dd37eeeb6b, type: 2}
+  - {fileID: 11400000, guid: 896cccf79b3de406383335a1c0879370, type: 2}
+  - {fileID: 11400000, guid: ab7d6716f47f74bb1adb376d3c54a102, type: 2}
+  - {fileID: 11400000, guid: 63d4ce595405a4715a77ebc3849a871f, type: 2}
+  - {fileID: 11400000, guid: 9eb5880d32e9944c9900320a79d204c1, type: 2}
+  - {fileID: 11400000, guid: 4e13a928ed5554679878c787fa42f11b, type: 2}
+  - {fileID: 11400000, guid: d724c65b2b9974fe9a22d1136b5a284a, type: 2}
+  - {fileID: 11400000, guid: e0bb9dbdfe4ae4702a290c787e3b9742, type: 2}
+  - {fileID: 11400000, guid: 4b2420a8e45664fe3bef263783fab6f2, type: 2}

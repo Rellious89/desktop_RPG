@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9620f8c34305754d8cc9a7e49e852d9, type: 3}
+  m_Name: 03_Monster_en
+  m_EditorClassIdentifier: 
+  m_LocaleId:
+    m_Code: en
+  m_SharedData: {fileID: 11400000, guid: be2871dfcdd4c4e5481ce59a6786ddc2, type: 2}
+  m_Metadata:
+    m_Items: []
+  m_TableData:
+  - m_Id: 358792290304
+    m_Localized: Scarerow
+    m_Metadata:
+      m_Items: []
+  - m_Id: 358796484608
+    m_Localized: Specter
+    m_Metadata:
+      m_Items: []
+  - m_Id: 358796484609
+    m_Localized: VenomCultist
+    m_Metadata:
+      m_Items: []
+  - m_Id: 358796484610
+    m_Localized: Werewolf
+    m_Metadata:
+      m_Items: []
+  - m_Id: 358796484611
+    m_Localized: HyenaRaider
+    m_Metadata:
+      m_Items: []
+  - m_Id: 358796484612
+    m_Localized: MoleMiner
+    m_Metadata:
+      m_Items: []
+  - m_Id: 358796484613
+    m_Localized: RockGolem
+    m_Metadata:
+      m_Items: []
+  references:
+    version: 2
+    RefIds: []

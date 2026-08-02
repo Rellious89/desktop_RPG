@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3518a03940b5244549dde75e84609149, type: 3}
+  m_Name: Monster_2
+  m_EditorClassIdentifier: 
+  monsterId: 2
+  localizedName:
+    m_TableReference:
+      m_TableCollectionName: GUID:be2871dfcdd4c4e5481ce59a6786ddc2
+    m_TableEntryReference:
+      m_KeyId: 358796484608
+      m_Key: 
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  world: {fileID: 11400000, guid: b8ca4f12582f54475999d8df148f9c91, type: 2}
+  motionProfile: {fileID: 11400000, guid: 75385727eeaea49959fd9576bb3196d5, type: 2}
+  previewSprite: {fileID: 21300000, guid: 809683b8bf25949cb954f894803b5674, type: 3}
+  maxDurability: 10
+  displayOrder: 20
+  references:
+    version: 2
+    RefIds: []

@@ -17,6 +17,18 @@ MonoBehaviour:
     m_SerializedData: []
   m_GUID: 6130070d1054a4d95b43ea4672a083e4
   m_SerializeEntries:
+  - m_GUID: 1a562c6b3e51e4ed79782bf6b3f27a21
+    m_Address: 03_Monster_ko-KR
+    m_ReadOnly: 1
+    m_SerializedLabels:
+    - Locale-ko-KR
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3f02f700fa2794a1cac5c79fdfd47288
+    m_Address: 02_World&Dungeon_ko-KR
+    m_ReadOnly: 1
+    m_SerializedLabels:
+    - Locale-ko-KR
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 58edee75b51c345058cb4c3701047464
     m_Address: 01_UI_ko-KR
     m_ReadOnly: 1

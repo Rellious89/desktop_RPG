@@ -17,8 +17,20 @@ MonoBehaviour:
     m_SerializedData: []
   m_GUID: 387c7beb9ed7c43ecb17141feaff488b
   m_SerializeEntries:
+  - m_GUID: 000111b5591e64f178b5eee5d9beb09e
+    m_Address: 03_Monster_en
+    m_ReadOnly: 1
+    m_SerializedLabels:
+    - Locale-en
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 847c4e00981244bc6961e607f826cd8c
     m_Address: 01_UI_en
+    m_ReadOnly: 1
+    m_SerializedLabels:
+    - Locale-en
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e502bcddd512a46319fea73eb37a6ba5
+    m_Address: 02_World&Dungeon_en
     m_ReadOnly: 1
     m_SerializedLabels:
     - Locale-en

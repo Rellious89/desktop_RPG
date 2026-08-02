@@ -4,11 +4,13 @@ using UnityEngine.UI;
 namespace Dungeon
 {
     /// <summary>
-    /// 등장 몬스터 미리보기 한 칸(item_monster). 아이콘 한 장을 그리는 것이 전부다 - 툴팁도, 수량도,
-    /// 등장 확률도, 전투 데이터와의 연결도 이 단계의 범위가 아니다.
+    /// 등장 몬스터 미리보기 한 칸(item_monster). 아이콘 한 장을 그리는 것이 전부다 - 툴팁도, 이름도,
+    /// 수량도, 등장 확률도, 전투 데이터와의 연결도 이 단계의 범위가 아니다.
     ///
-    /// 표시할 이미지는 <see cref="DungeonMonsterPreviewEntry"/>가 그대로 들고 있는 Sprite이며,
-    /// MonsterMotionProfile이나 전투 쪽 타입은 참조하지 않는다.
+    /// 표시할 이미지는 <see cref="MonsterDefinition.PreviewSprite"/>가 결정한다 - 이 뷰는 모션 프로필을
+    /// 직접 읽지 않고, "무엇을 그릴지"의 판단(직접 지정한 이미지인지 Base Idle 첫 프레임인지)은 전부
+    /// 몬스터 정의 쪽에 있다. Sprite를 직접 받는 오버로드는 몬스터 정의 없이 이미지 한 장만 보여줄 때
+    /// 쓴다.
     /// </summary>
     [DisallowMultipleComponent]
     public class DungeonMonsterPreviewView : MonoBehaviour
@@ -23,10 +25,16 @@ namespace Dungeon
         /// <summary>지금 표시 중인 이미지. 검증/디버깅용 읽기 전용 값이다.</summary>
         public Sprite CurrentSprite => iconImage != null ? iconImage.sprite : null;
 
-        /// <summary>미리보기 항목 하나를 표시한다. 항목이 없거나 이미지가 비어 있으면 빈 칸이 된다.</summary>
-        public void Bind(DungeonMonsterPreviewEntry entry)
+        /// <summary>몬스터 하나를 표시한다. 몬스터가 없거나 표시할 이미지를 구하지 못하면 빈 칸이 된다.</summary>
+        public void Bind(MonsterDefinition monster)
         {
-            ApplySprite(entry != null ? entry.PreviewSprite : null);
+            ApplySprite(monster != null ? monster.PreviewSprite : null);
+        }
+
+        /// <summary>이미지 한 장을 직접 표시한다. null이면 빈 칸이 된다.</summary>
+        public void Bind(Sprite sprite)
+        {
+            ApplySprite(sprite);
         }
 
         /// <summary>표시를 비운다.</summary>
