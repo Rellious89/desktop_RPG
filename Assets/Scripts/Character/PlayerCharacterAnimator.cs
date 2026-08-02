@@ -167,6 +167,15 @@ namespace Character
         private float lastInputTime;
         private bool castCueFired;
 
+        // 지금 전투(공격 입력/시작)가 허용되는지. 기본값은 true라 필드 모드 컨트롤러가 없는 씬/
+        // 테스트는 예전과 완전히 같이 동작한다. 마을에서는 FieldModeRuntimeController가 false로
+        // 내려서 GlobalKeyboardHook 입력과 직접 시작 경로를 함께 막는다.
+        private bool combatEnabled = true;
+
+        // AttackStarted를 보냈고 아직 AttackEnded를 보내지 않은 상태. 강제 취소(SetCombatEnabled(false))가
+        // 세션을 끊을 때도 시작/종료가 정확히 한 번씩 짝을 이루게 만드는 유일한 근거다.
+        private bool attackSessionActive;
+
         // ---- Accumulated Input 전용 상태(Direct Input 모드에서는 항상 0으로 남는다) ----
         // 현재 충전량(입력 수 단위). 감쇠 때문에 정수로 떨어지지 않으므로 float다.
         private float chargeInputs;
@@ -217,13 +226,60 @@ namespace Character
 
         public CharacterMotionProfile MotionProfile => motionProfile;
 
-        /// <summary>지금 <b>새 공격 사이클</b>을 시작해도 되는지. 두 조건을 모두 만족해야 한다.
+        /// <summary>지금 <b>새 공격 사이클</b>을 시작해도 되는지. 세 조건을 모두 만족해야 한다.
+        ///   - 전투가 허용된 필드 모드다(<see cref="SetCombatEnabled"/> - 마을에서는 false)
         ///   - 공격 가능한 Target이 있다(처치 직후 Fade-out/리젠 대기 중이 아니다)
         ///   - 현재 캐릭터의 행동력이 남아 있다(CharacterRoster)
         /// 진행 중인 공격을 끊는 판단에는 절대 쓰지 않는다 - 새 입력을 받을지, 타격 직후 다음
         /// Windup으로 이어갈지에만 쓴다. 행동력이 0이 되는 순간은 "몬스터를 방금 처치한 순간"이라
         /// 이 값이 false가 되면 다음 몬스터가 리젠돼도 새 전투가 시작되지 않는다.</summary>
-        private static bool CanStartNewAttack => Target.HasAttackableTarget && CharacterRoster.CurrentCharacterCanAct;
+        private bool CanStartNewAttack =>
+            combatEnabled && Target.HasAttackableTarget && CharacterRoster.CurrentCharacterCanAct;
+
+        /// <summary>지금 이 캐릭터가 공격을 시작할 수 있는 상태인지(읽기 전용 런타임 상태).
+        /// 필드 모드 전환이 이 값을 소유하며, 씬에 그 컨트롤러가 없으면 항상 true다.</summary>
+        public bool CombatEnabled => combatEnabled;
+
+        /// <summary>
+        /// 전투(공격 입력과 공격 시작)를 켜고 끄는 <b>유일한 런타임 진입점</b> - 필드 모드 전환이
+        /// 호출한다. false로 내리면 그 즉시(호출한 프레임 안에서, Update를 기다리지 않고) 진행 중이던
+        /// 공격 사이클을 전부 접는다: 공격 단계/대기열/충전/이월 입력/발사체/오버레이 스프라이트가
+        /// 사라지고 Base Idle 0프레임으로 돌아가며, 같은 GameObject의 <see cref="AttackMovement"/>
+        /// 이동 구간도 함께 취소된다.
+        ///
+        /// <b>처치/보상 이벤트는 하나도 만들지 않는다.</b> 여기서 나가는 정적 이벤트는 세션을 닫는
+        /// <see cref="AttackEnded"/>(그리고 충전 중이었다면 <see cref="ChargeEnded"/>)뿐이라, 구독자가
+        /// "공격 중" 상태를 영원히 붙잡고 있는 경로가 생기지 않는다.
+        ///
+        /// 오브젝트가 비활성이거나 아직 Awake 전이어도 안전하다 - 필드 모드 초기 동기화는 첫 Update
+        /// 이전에 이 값을 내려야 하므로, 실행 순서에 의존하지 않아야 한다.
+        /// </summary>
+        public void SetCombatEnabled(bool value)
+        {
+            combatEnabled = value;
+
+            // 몇 번을 다시 꺼도 안전하다(이미 접힌 세션은 아무 이벤트도 만들지 않는다).
+            if (!value) CancelActiveAttack();
+        }
+
+        /// <summary>진행 중이던 공격 사이클을 즉시 접는다 - 프로필 교체와 완전히 같은 정리 경로
+        /// (<see cref="ClearCombatState"/>)를 쓰고, 이동 컨트롤러까지 기준점으로 되돌린 뒤, 열려 있던
+        /// 세션이 있었을 때만 <see cref="AttackEnded"/>를 한 번 보낸다.</summary>
+        private void CancelActiveAttack()
+        {
+            bool hadSession = attackSessionActive || attackPhase != AttackPhase.None;
+
+            ClearCombatState();  // 충전 신호(ChargeEnded)/발사체/오버레이/대기열까지 전부 여기서 닫힌다.
+            ResetToBaseIdle();
+
+            // ClearCombatState의 EndChargeSignal이 충전 복귀 구간을 열어 둘 수 있으므로 그 뒤에 끊는다.
+            if (attackMovement != null) attackMovement.CancelMovement();
+
+            if (!hadSession) return;
+
+            attackSessionActive = false;
+            AttackEnded?.Invoke();
+        }
 
         private void Awake()
         {
@@ -334,6 +390,11 @@ namespace Character
             // EndChargeSignal 자체가 chargeSignalActive로 중복 발생을 막으므로 여러 번 불러도 안전하다.
             EndChargeSignal();
             ReleaseActiveProjectile();
+
+            // 세션 표시도 함께 지운다 - 비활성화로 끊긴 뒤 다시 켜졌을 때 옛 세션이 남아 있다가
+            // 뒤늦게 AttackEnded를 한 번 더 만들어내는 경로를 없앤다(호출자가 필요하면 지우기 전에
+            // 이 값을 먼저 읽는다).
+            attackSessionActive = false;
 
             attackPhase = AttackPhase.None;
             attackFrame = 0;
@@ -463,7 +524,8 @@ namespace Character
 
         private void Update()
         {
-            // 공격 가능한 Target이 하나도 없거나(처치/리젠 대기 중) 현재 캐릭터의 행동력이 0이면
+            // 전투가 허용되지 않는 필드 모드(마을)이거나, 공격 가능한 Target이 하나도 없거나
+            // (처치/리젠 대기 중) 현재 캐릭터의 행동력이 0이면
             // 새 입력을 아예 공격으로 등록하지 않는다(대기열도 늘리지 않는다). 이미 진행 중인 Windup/
             // Recovery는 아래 AdvanceAttack()에서 그대로 마무리된다(여기서 끊지 않는다) - 행동력이
             // 0이 되는 순간 재생 중이던 공격이 중간에 잘려 자세가 굳는 일이 없다.
@@ -537,9 +599,13 @@ namespace Character
 
         private void BeginAttackSession()
         {
+            // 입력 경로(Update)와 별개로 여기서도 한 번 더 막는다 - 공격 세션을 여는 지점이 하나뿐이라,
+            // 이 가드가 "마을에서는 어떤 경로로도 공격이 시작되지 않는다"의 마지막 근거가 된다.
+            if (!combatEnabled) return;
             if (GetPoolForTier(ComboManager.CurrentTier).Count == 0) return;
 
             playingVariant = false;
+            attackSessionActive = true;
             AttackStarted?.Invoke();
             StartAttackCycle(1f); // 세션을 연 이 첫 입력 1회를 사이클 시작값으로 넘긴다.
         }
@@ -862,6 +928,10 @@ namespace Character
             carriedInputs = 0f; // 세션이 끝나면 이월 입력도 버린다 - 다음 공격은 첫 입력부터 다시 시작한다.
             ResetToBaseIdle();
 
+            // 강제 취소가 이미 세션을 닫은 뒤라면 여기서 한 번 더 보내지 않는다(정상 흐름에서는 항상 true다).
+            if (!attackSessionActive) return;
+
+            attackSessionActive = false;
             AttackEnded?.Invoke();
         }
 

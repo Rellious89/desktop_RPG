@@ -281,12 +281,22 @@ namespace Character
             targetOffset = 0f;
         }
 
-        /// <summary>공격 중 캐릭터가 꺼지면(교체/파괴) 밀려 있던 이동 상태가 남지 않게 기준점으로 되돌린다.
-        /// 기준점을 아직 한 번도 잡지 않았으면 위치는 건드리지 않는다(0으로 되돌릴 옛 오프셋이 없다).</summary>
-        private void OnDisable()
+        /// <summary>진행 중이던 타격/충전 이동 구간을 즉시 끊고 기준점으로 되돌린다 - 필드 모드가
+        /// 전투를 끄면서 공격을 강제로 취소할 때(<see cref="PlayerCharacterAnimator.SetCombatEnabled"/>)
+        /// 쓰는 유일한 진입점이다. 비활성화 정리와 같은 처리라 규칙이 한 곳에만 있다.
+        ///
+        /// 기준점을 아직 한 번도 잡지 않았으면 위치는 건드리지 않는다(0으로 되돌릴 옛 오프셋이 없다).
+        /// 이동 중이 아닐 때 불러도 안전하고, 몇 번을 다시 불러도 같은 결과다.</summary>
+        public void CancelMovement()
         {
             if (layoutApplied) ApplyOffset(0f);
             ResetToBase();
+        }
+
+        /// <summary>공격 중 캐릭터가 꺼지면(교체/파괴) 밀려 있던 이동 상태가 남지 않게 기준점으로 되돌린다.</summary>
+        private void OnDisable()
+        {
+            CancelMovement();
         }
 
         /// <summary>이동 수치를 매 이동 시작 시점에 프로필에서 다시 읽는다 - Play Mode 중 Motion

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Common;
+using Dungeon;
 using UnityEngine;
 
 namespace Enemy
@@ -96,6 +97,11 @@ namespace Enemy
         private bool subscribed;
         private bool started;
 
+        // 필드 모드가 "지금은 전투가 없다"고 선언한 상태(마을). 소유권 획득 자체를 막으므로, 이 플래그가
+        // 켜져 있는 동안에는 Start/OnEnable이 몇 번을 지나가도 슬롯이 되살아나지 않는다 - 컨트롤러의
+        // 초기 동기화가 대기열의 Start보다 먼저 오든 나중에 오든 결과가 같다.
+        private bool suspended;
+
         // 처치 알림(HitPoint 콜스택 안)에서 켜고 LateUpdate에서만 소비하는 예약 플래그.
         private bool promotionPending;
 
@@ -125,6 +131,10 @@ namespace Enemy
 
         /// <summary>유효 후보만 남긴 프로필 풀 크기(0이면 각 슬롯의 현재 프로필을 유지한다).</summary>
         public int UsableProfileCount => usableProfiles.Count;
+
+        /// <summary>필드 모드가 대기열을 접어둔 상태인지(마을). true인 동안 Current/Standby는 모두
+        /// null이고, 두 슬롯은 비공격 역할로 비활성화돼 있으며, LateUpdate는 아무 일도 하지 않는다.</summary>
+        public bool IsSuspended => suspended;
 
         /// <summary>종료 중에는 다른 오브젝트를 건드리면 안 되므로 그 시점을 기억해둔다. Enter Play Mode
         /// 옵션으로 도메인 리로드를 껐을 때 정적 상태가 남아 있을 수 있어 플래그를 매 재생마다 초기화하고,
@@ -198,6 +208,9 @@ namespace Enemy
         {
             if (configured) return;
 
+            // 마을(접힘) 상태에서는 어떤 경로로도 슬롯을 되살리지 않는다 - 던전 입장만이 이 상태를 푼다.
+            if (suspended) return;
+
             if (!TryConfigureSlots()) return;
 
             deactivatedByRelease = null; // 성공적으로 소유권을 잡은 뒤에만 참조를 놓는다.
@@ -259,6 +272,186 @@ namespace Enemy
             slot.LeaveEncounter();                                  // 자체 리스폰(standalone) 소유권 반환
             slot.ApplyCurrentVisual();
             slot.SetPresentationBasePosition(ResolveCombatLocalPosition(slot));
+        }
+
+        // -------------------------------------------------------------------------------------
+        // 필드 모드 전용 API - 접기(마을) / 선택 던전으로 열기
+        //
+        // 마을에서 <see cref="ReleaseOwnership"/>를 쓰지 않는 이유가 이 두 메서드가 따로 있는 이유다:
+        // 해제는 "살아남는 한 슬롯을 standalone Current로 되돌리는" 정책이라, 마을에 공격 가능한
+        // 몬스터가 한 마리 서 있게 된다. 마을에서 필요한 것은 정반대 - 공격 가능한 Target이 하나도
+        // 없는 상태다.
+        // -------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// 대기열을 접는다(마을 전환/던전 재입장 전 정리). 접힌 뒤에는 <see cref="CurrentMonster"/>와
+        /// <see cref="StandbyMonster"/>가 모두 null이고, 두 슬롯은 비공격 역할로 비활성화되며,
+        /// <see cref="LateUpdate"/>는 아무 일도 하지 않는다 - 승격 예약도 퇴장 타이머도 남지 않는다.
+        ///
+        /// <b>처치/보상/킬카운트/경험치/재화/아이템/행동력 이벤트를 하나도 만들지 않는다.</b> 되돌리는 데
+        /// 쓰는 것은 전부 이벤트 없는 prepare 경로(<see cref="TargetCombatController.PrepareForEncounter"/>)뿐이라,
+        /// 처치 구독자 입장에서는 아무 일도 일어나지 않은 것과 같다.
+        ///
+        /// 순서를 지킨다: <b>구독 해제/상태 초기화 -> 비공격 역할 부여 -> 상태 복원 -> 비활성화</b>.
+        /// 역할을 먼저 내려야 슬롯이 꺼지기 전 어느 순간에도 공격 가능한 Target이 남지 않는다.
+        ///
+        /// 몇 번을 다시 불러도 안전하고, 아직 소유권을 잡기 전(첫 Start 이전)에 불러도 안전하다.
+        /// </summary>
+        public void Suspend()
+        {
+            suspended = true;
+
+            Unsubscribe();
+            configured = false;
+            promotionPending = false;
+
+            currentSlot = null;
+            standbySlot = null;
+            exitingSlot = null;
+
+            // 다음 던전이 자기 몬스터로 다시 채운다 - 접힌 상태에 이전 던전(또는 직렬화 풀)의 후보가
+            // 남아 있지 않게 여기서 비운다.
+            usableProfiles.Clear();
+
+            // 종료/씬 언로드 중에는 다른 오브젝트를 건드리지 않는다(ReleaseOwnership과 같은 규칙).
+            if (applicationQuitting || !gameObject.scene.isLoaded) return;
+
+            SuspendSlot(firstSlot);
+            SuspendSlot(secondSlot);
+        }
+
+        /// <summary>슬롯 하나를 "비공격 역할 + 이벤트 없는 초기 상태"로 되돌린 뒤 화면에서 감춘다.
+        ///
+        /// 아직 활성화된 적이 없는 슬롯에는 <see cref="TargetCombatController.PrepareForEncounter"/>를
+        /// 호출하지 않는다 - 그 경로는 Idle 애니메이션 상태를 되돌리는데, Awake가 한 번도 돌지 않은
+        /// 오브젝트에는 되돌릴 애니메이션 자체가 없기 때문이다. 그런 슬롯은 이미 화면에 없고 Target
+        /// 레지스트리에도 등록되지 않았으므로 역할/수명 지정만으로 충분하다.</summary>
+        private void SuspendSlot(TargetCombatController slot)
+        {
+            if (slot == null) return;
+
+            // 자체 리스폰 소유권을 회수하고(진행 중이던 리스폰 코루틴이 멈춘다) 비공격 역할로 내린다.
+            slot.JoinEncounter(TargetEngagementRole.Standby);
+
+            // 이벤트 없음: 체력/처치 상태/진행 중인 Fade/흔들림/피격 자세까지 한 번에 초기화된다.
+            if (slot.gameObject.activeInHierarchy) slot.PrepareForEncounter(TargetEngagementRole.Standby);
+
+            slot.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// 선택한 던전의 몬스터로 대기열을 새로 연다(<see cref="DungeonDefinition.Monsters"/>를 그대로
+        /// 넘기면 된다). 성공하면 접힘 상태가 풀리고 <b>정확히 하나</b>의 Current와 하나의 Standby가
+        /// 만들어지며, 그 뒤의 승격/재장전/중복 보상 방지는 전부 기존 대기열 규칙 그대로다.
+        ///
+        /// <b>런타임 풀은 이 던전의 몬스터로만 만든다.</b> 직렬화된 Profile Pool은 보지도 않고 섞이지도
+        /// 않는다 - 후보는 넘어온 <see cref="MonsterDefinition.MotionProfile"/> 중 재생 가능한 것뿐이며,
+        /// 유효 후보가 하나뿐이면 그 몬스터가 계속 반복 등장한다.
+        ///
+        /// <b>실패하면 아무것도 열지 않는다(fail closed).</b> 슬롯 구성이 잘못됐거나 유효한 몬스터가
+        /// 하나도 없으면 오류를 남기고 <b>접힌 상태로</b> false를 돌려준다 - 공격 가능한 Target이 하나도
+        /// 없으므로 전투가 시작될 수 없다. 이 보장은 <b>이 메서드가 직접</b> 만든다: 검증보다 먼저
+        /// <see cref="Suspend"/>로 이전 전투를 접으므로, 호출자가 무엇을 먼저 했는지와 무관하게 실패한
+        /// 호출은 언제나 Current/Standby 없는 접힘 상태를 남긴다(호출자 쪽 Suspend는 전환 순서를
+        /// 문서화하는 의미로 남아 있어도 되며, 두 번 접어도 결과는 같다).
+        ///
+        /// 순서를 지킨다: <b>접기 -> 검증 -> 풀 구성 -> 두 슬롯 모두 비공격(Standby) -> 활성화 ->
+        /// 프로필/상태 준비 -> 표현 -> 마지막에 하나만 Current</b>. 준비가 끝나기 전에는 어느 순간에도
+        /// 공격 가능한 몬스터가 존재하지 않는다.
+        /// </summary>
+        /// <returns>대기열이 실제로 열렸으면 true.</returns>
+        public bool TryStartDungeonEncounter(IReadOnlyList<MonsterDefinition> monsters)
+        {
+            // 무엇보다 먼저 접는다 - 이 아래의 어떤 실패도 "이전 전투가 그대로 살아 있는" 상태를 남길 수
+            // 없게 만드는 유일한 근거다(구독/승격 예약/퇴장 타이머/이전 풀도 여기서 함께 정리된다).
+            Suspend();
+
+            if (!ValidateSlot(firstSlot, nameof(firstSlot)) || !ValidateSlot(secondSlot, nameof(secondSlot)))
+            {
+                return false;
+            }
+            if (firstSlot == secondSlot)
+            {
+                Debug.LogError($"[MonsterEncounterQueue] '{name}': First Slot과 Second Slot에 같은 몬스터가 " +
+                               "연결돼 있습니다. 서로 다른 몬스터 두 개를 연결하세요 - 던전 전투를 시작하지 않습니다.", this);
+                return false;
+            }
+
+            if (!TryBuildDungeonProfiles(monsters))
+            {
+                Debug.LogError($"[MonsterEncounterQueue] '{name}': 선택한 던전에 재생 가능한 Motion Profile을 가진 " +
+                               "몬스터가 하나도 없습니다 - 대기열을 열지 않고 접힌 상태를 유지합니다(전투가 시작되지 않습니다).", this);
+                return false;
+            }
+
+            // 여기서부터는 실패 경로가 없다 - 구독/승격 예약/퇴장 슬롯은 위의 Suspend가 이미 비웠으므로
+            // 정리 소유자가 하나뿐이다(같은 일을 두 곳에서 하지 않는다).
+            currentSlot = firstSlot;
+            standbySlot = secondSlot;
+
+            // 1) 두 슬롯 모두 비공격 역할로 먼저 내린다 - 아직 꺼져 있는 동안 확정하므로, 다음 단계에서
+            //    켜지더라도 Target.OnEnable이 공격 가능 수를 올리지 않는다.
+            currentSlot.JoinEncounter(TargetEngagementRole.Standby);
+            standbySlot.JoinEncounter(TargetEngagementRole.Standby);
+
+            // 2) 활성화. 아직 한 번도 켜진 적이 없는 슬롯이라면 여기서 Awake가 돌아 애니메이션 상태가
+            //    만들어진다 - 그래서 프로필/상태 준비는 반드시 이 다음이다(기존 TryConfigureSlots가
+            //    대기 슬롯을 다루는 순서와 같다).
+            if (!currentSlot.gameObject.activeSelf) currentSlot.gameObject.SetActive(true);
+            if (!standbySlot.gameObject.activeSelf) standbySlot.gameObject.SetActive(true);
+
+            // 3) 프로필/체력/처치 상태/포즈를 이벤트 없이 준비한다. 유효 후보가 하나뿐이면 두 슬롯이
+            //    같은 프로필을 쓴다(같은 몬스터가 반복 등장하는 정상 동작이다).
+            MonsterMotionProfile currentProfile = PickNextProfile(null);
+            currentSlot.PrepareForEncounter(TargetEngagementRole.Standby, currentProfile);
+            ApplyCurrentPresentation(currentSlot, instant: true);
+
+            MonsterMotionProfile standbyProfile = PickNextProfile(currentProfile);
+            standbySlot.PrepareForEncounter(TargetEngagementRole.Standby, standbyProfile);
+            ApplyStandbyPresentation(standbySlot);
+
+            // 4) 준비가 전부 끝난 뒤에야 소유권을 확정하고 정확히 하나를 Current로 올린다.
+            deactivatedByRelease = null;
+            suspended = false;
+            configured = true;
+            Subscribe();
+
+            currentSlot.SetEngagementRole(TargetEngagementRole.Current);
+            return true;
+        }
+
+        /// <summary>넘어온 던전 몬스터에서 재생 가능한 모션 프로필만 골라 런타임 풀을 다시 만든다.
+        /// null 정의/프로필 없음/중복/재생 불가는 걸러내고, 직렬화된 Profile Pool은 참조하지 않는다.</summary>
+        /// <returns>유효 후보가 하나 이상 남았으면 true.</returns>
+        private bool TryBuildDungeonProfiles(IReadOnlyList<MonsterDefinition> monsters)
+        {
+            usableProfiles.Clear();
+            if (monsters == null) return false;
+
+            for (int i = 0; i < monsters.Count; i++)
+            {
+                MonsterDefinition definition = monsters[i];
+                if (definition == null) continue;
+
+                MonsterMotionProfile profile = definition.MotionProfile;
+                if (profile == null)
+                {
+                    Debug.LogWarning($"[MonsterEncounterQueue] '{name}': 몬스터 '{definition.MonsterId}'에 Motion " +
+                                     "Profile이 없어 이번 던전 후보에서 제외합니다.", definition);
+                    continue;
+                }
+                if (usableProfiles.Contains(profile)) continue; // 같은 프로필을 여러 몬스터가 써도 후보는 하나다.
+                if (!TargetCombatController.IsProfileUsable(profile))
+                {
+                    Debug.LogWarning($"[MonsterEncounterQueue] '{name}': 몬스터 '{definition.MonsterId}'의 프로필 " +
+                                     $"'{profile.name}'에 Base Idle/Hit 프레임이 없어 이번 던전 후보에서 제외합니다.", definition);
+                    continue;
+                }
+
+                usableProfiles.Add(profile);
+            }
+
+            return usableProfiles.Count > 0;
         }
 
         // -------------------------------------------------------------------------------------
@@ -479,7 +672,9 @@ namespace Enemy
 
         private void LateUpdate()
         {
-            if (!configured) return;
+            // 접힌 동안(마을)에는 승격도 퇴장 마감도 없다 - configured가 이미 false지만, "접혀 있으면
+            // LateUpdate는 아무 일도 하지 않는다"를 코드로도 명시해 둔다.
+            if (suspended || !configured) return;
 
             if (promotionPending)
             {
