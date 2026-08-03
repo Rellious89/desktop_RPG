@@ -134,6 +134,18 @@ MonoBehaviour:
     m_Localized: "\uD310\uD0C0\uC9C0\uC544"
     m_Metadata:
       m_Items: []
+  - m_Id: 2186870288015360
+    m_Localized: ReturnTwon
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2186870304792576
+    m_Localized: Safe Area
+    m_Metadata:
+      m_Items: []
+  - m_Id: 2186870304792577
+    m_Localized: Dangerous Area
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

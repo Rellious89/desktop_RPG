@@ -23,6 +23,11 @@ Key,Id,English(en),Korean (South Korea)(ko-KR)
 22,,Dungeon 2,던전 2
 23,,Dungeon 3,던전 3
 24,,Enter,입장하기
-25,,소속 세계,소속 세계
+25,,소속 세계 {0},소속 세계 {0}
 26,,등장 몬스터,등장 몬스터
 27,,주요 보상,주요 보상
+28,,애니멀랜드,애니멀랜드
+29,,판타지아,판타지아
+30,,ReturnTwon,마을로
+31,,Safe Area,안전지역
+32,,Dangerous Area,위험지역
