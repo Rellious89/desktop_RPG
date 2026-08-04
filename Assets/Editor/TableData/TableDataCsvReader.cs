@@ -6,7 +6,7 @@ using System.IO;
 namespace TableDataEditor
 {
     /// <summary>
-    /// CSV 세 장의 <b>컬럼 이름</b>. 3단계에서 만들 CSV는 이 이름을 그대로 써야 한다 -
+    /// CSV 네 장의 <b>컬럼 이름</b>. CSV는 이 이름을 그대로 써야 한다 -
     /// 헤더가 어긋나면 값을 추측해 읽지 않고 오류로 멈춘다.
     /// </summary>
     public static class TableDataColumns
@@ -25,17 +25,58 @@ namespace TableDataEditor
             WorldId, NameCategory, NameKey, DisplayOrder, Enabled, Memo,
         };
 
+        // Item.csv
+        public const string ItemId = "item_id";
+        public const string IconKey = "icon_key";
+
+        public static readonly string[] Item =
+        {
+            ItemId, NameCategory, NameKey, IconKey, DisplayOrder, Enabled, Memo,
+        };
+
         // Monster.csv
         public const string MonsterId = "monster_id";
+        public const string BaseMonsterId = "base_monster_id";
         public const string MotionProfileKey = "motion_profile_key";
         public const string PreviewSpriteKey = "preview_sprite_key";
         public const string MaxDurability = "max_durability";
 
-        public static readonly string[] Monster =
+        /// <summary>드롭 슬롯 개수. <b>CSV는 항상 이만큼의 칸을 가진다</b> - 슬롯 수를 늘리고 줄이는 것은
+        /// 표 구조를 바꾸는 일이므로 데이터가 아니라 코드에서 정한다.</summary>
+        public const int MonsterDropSlotCount = 3;
+
+        /// <summary>슬롯 번호(1부터)로 드롭 컬럼 이름을 만든다. 이름을 한 곳에서만 만들어 두면
+        /// 헤더 상수와 읽는 코드가 어긋날 수 없다.</summary>
+        public static string DropItemId(int slot) => "drop_item_id_" + slot;
+
+        public static string DropChance(int slot) => "drop_chance_" + slot;
+
+        public static string DropCount(int slot) => "drop_count_" + slot;
+
+        public static readonly string[] Monster = BuildMonsterColumns();
+
+        private static string[] BuildMonsterColumns()
         {
-            MonsterId, NameCategory, NameKey, WorldId, MotionProfileKey, PreviewSpriteKey,
-            MaxDurability, DisplayOrder, Enabled, Memo,
-        };
+            var columns = new List<string>
+            {
+                MonsterId, NameCategory, NameKey, WorldId, MotionProfileKey, PreviewSpriteKey,
+                MaxDurability, BaseMonsterId,
+            };
+
+            for (int slot = 1; slot <= MonsterDropSlotCount; slot++)
+            {
+                // $drop_item_name_n은 작업자용 참조 컬럼이라 여기 넣지 않는다 - 넣으면 필수 컬럼이 되고,
+                // 임포터가 값을 읽는 칸처럼 보이게 된다.
+                columns.Add(DropItemId(slot));
+                columns.Add(DropChance(slot));
+                columns.Add(DropCount(slot));
+            }
+
+            columns.Add(DisplayOrder);
+            columns.Add(Enabled);
+            columns.Add(Memo);
+            return columns.ToArray();
+        }
 
         // Dungeon.csv
         public const string DungeonId = "dungeon_id";

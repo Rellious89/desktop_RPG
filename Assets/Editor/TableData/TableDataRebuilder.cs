@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using CommonEditor;
 using Dungeon;
+using Inventory;
 using UnityEditor;
 using UnityEngine;
 
@@ -40,6 +41,13 @@ namespace TableDataEditor
         /// <summary>CSV가 아니라 런타임 클래스 쪽 문제일 때 진단의 "파일" 칸에 쓰는 이름.</summary>
         private const string RuntimeSchemaPseudoFile = "(runtime schema)";
 
+        // MonsterDefinition.DropEntry 안쪽 필드 이름. 사전 검사와 쓰기가 같은 상수를 보게 해서
+        // 한쪽만 고쳐진 채로 "검사는 통과했는데 쓰다가 죽는" 상태가 생기지 않게 한다.
+        private const string DropsField = "drops";
+        private const string DropItemField = "item";
+        private const string DropChanceField = "chancePercent";
+        private const string DropCountField = "count";
+
         public static TableDataRebuildResult Rebuild()
         {
             var result = new TableDataRebuildResult
@@ -61,6 +69,10 @@ namespace TableDataEditor
                 TableDataPaths.WorldOutputFolder, w => w.WorldId,
                 snapshot.Worlds.ConvertAll(r => r.Id), TableDataPaths.WorldAssetPath,
                 TableDataPaths.WorldCsvFileName, TableDataColumns.WorldId, result);
+            var itemAssets = ResolveTargets<ItemDefinition>(
+                TableDataPaths.ItemOutputFolder, i => i.ItemId,
+                snapshot.Items.ConvertAll(r => r.Id), TableDataPaths.ItemAssetPath,
+                TableDataPaths.ItemCsvFileName, TableDataColumns.ItemId, result);
             var monsterAssets = ResolveTargets<MonsterDefinition>(
                 TableDataPaths.MonsterOutputFolder, m => m.MonsterId,
                 snapshot.Monsters.ConvertAll(r => r.Id), TableDataPaths.MonsterAssetPath,
@@ -71,19 +83,24 @@ namespace TableDataEditor
                 TableDataPaths.DungeonCsvFileName, TableDataColumns.DungeonId, result);
 
             var worldCatalog = ResolveSingleton<WorldCatalog>(TableDataPaths.WorldCatalogAssetPath, result);
+            var itemCatalog = ResolveSingleton<ItemCatalog>(TableDataPaths.ItemCatalogAssetPath, result);
             var monsterCatalog = ResolveSingleton<MonsterCatalog>(TableDataPaths.MonsterCatalogAssetPath, result);
             var dungeonCatalog = ResolveSingleton<DungeonCatalog>(TableDataPaths.DungeonCatalogAssetPath, result);
 
             AssetDatabase.StartAssetEditing();
             try
             {
-                // World -> Monster -> Dungeon 순서로 채운다. 뒤의 것이 앞의 것을 참조하므로, 참조할 대상은
-                // 이미 메모리에 만들어져 있어야 한다(여기서는 다시 로드하지 않고 위에서 만든 인스턴스를 쓴다).
+                // World -> Item -> Monster -> Dungeon 순서로 채운다. 뒤의 것이 앞의 것을 참조하므로, 참조할
+                // 대상은 이미 메모리에 만들어져 있어야 한다(여기서는 다시 로드하지 않고 위에서 만든 인스턴스를
+                // 쓴다). Item을 Monster보다 앞에 둔 것은 이후 단계에서 몬스터가 드롭 아이템을 가리키게 되어도
+                // 이 순서를 다시 뒤집지 않게 하기 위함이다.
                 foreach (WorldRow row in snapshot.Worlds) WriteWorld(worldAssets[row.Id], row);
-                foreach (MonsterRow row in snapshot.Monsters) WriteMonster(monsterAssets[row.Id], row, worldAssets);
-                foreach (DungeonRow row in snapshot.Dungeons) WriteDungeon(dungeonAssets[row.Id], row, worldAssets, monsterAssets);
+                foreach (ItemRow row in snapshot.Items) WriteItem(itemAssets[row.Id], row);
+                foreach (MonsterRow row in snapshot.Monsters) WriteMonster(monsterAssets[row.Id], row, worldAssets, itemAssets);
+                foreach (DungeonRow row in snapshot.Dungeons) WriteDungeon(dungeonAssets[row.Id], row, worldAssets, monsterAssets, itemAssets);
 
                 WriteCatalog(worldCatalog, "worlds", SortForCatalog(snapshot.Worlds, r => r.Enabled, r => r.DisplayOrder, r => r.Id, worldAssets));
+                WriteCatalog(itemCatalog, "items", SortForCatalog(snapshot.Items, r => r.Enabled, r => r.DisplayOrder, r => r.Id, itemAssets));
                 WriteCatalog(monsterCatalog, "monsters", SortForCatalog(snapshot.Monsters, r => r.Enabled, r => r.DisplayOrder, r => r.Id, monsterAssets));
                 WriteCatalog(dungeonCatalog, "dungeons", SortForCatalog(snapshot.Dungeons, r => r.Enabled, r => r.DisplayOrder, r => r.Id, dungeonAssets));
             }
@@ -99,6 +116,7 @@ namespace TableDataEditor
 
             // 카탈로그는 목록 검사 결과를 캐시하므로, 방금 바꾼 내용으로 다시 검사하게 표시한다.
             worldCatalog.MarkDirty();
+            itemCatalog.MarkDirty();
             monsterCatalog.MarkDirty();
             dungeonCatalog.MarkDirty();
 
@@ -113,6 +131,7 @@ namespace TableDataEditor
             EnsureFolder("Assets", "Generated");
             EnsureFolder(TableDataPaths.GeneratedRoot, "TableData");
             EnsureFolder(TableDataPaths.OutputRoot, "World");
+            EnsureFolder(TableDataPaths.OutputRoot, "Item");
             EnsureFolder(TableDataPaths.OutputRoot, "Monster");
             EnsureFolder(TableDataPaths.OutputRoot, "Dungeon");
         }
@@ -210,24 +229,62 @@ namespace TableDataEditor
             EditorUtility.SetDirty(asset);
         }
 
+        /// <summary>
+        /// item_id는 <b>저장 파일의 키</b>라 여기서 쓰는 값이 CSV에 적힌 것과 한 글자도 달라서는 안 된다
+        /// (검증이 다듬지 않은 값을 그대로 통과시켰으므로 그대로 쓴다). 사람이 손으로 채우던
+        /// <c>displayName</c>은 임포터의 관심사가 아니라 건드리지 않는다 - 이름의 원천은 localizedName이다.
+        /// </summary>
+        private static void WriteItem(ItemDefinition asset, ItemRow row)
+        {
+            var serialized = new SerializedObject(asset);
+            serialized.FindProperty("itemId").stringValue = row.Id;
+            serialized.FindProperty("displayOrder").intValue = row.DisplayOrder;
+            serialized.FindProperty("icon").objectReferenceValue = row.Icon;
+            ApplyLocalizedName(serialized.FindProperty("localizedName"), row.Name);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(asset);
+        }
+
+        /// <summary>
+        /// base_monster_id는 <b>문자열 그대로</b> 적는다 - 다른 에셋을 가리키는 참조로 만들지 않는 것은
+        /// 의도적이다. 참조가 되는 순간 "base를 따라가면 값이 있다"는 경로가 생기고, 그러면 상속하지
+        /// 않는다는 규칙이 코드가 아니라 약속으로만 남는다.
+        /// </summary>
         private static void WriteMonster(
-            MonsterDefinition asset, MonsterRow row, Dictionary<string, WorldDefinition> worlds)
+            MonsterDefinition asset, MonsterRow row,
+            Dictionary<string, WorldDefinition> worlds, Dictionary<string, ItemDefinition> items)
         {
             var serialized = new SerializedObject(asset);
             serialized.FindProperty("monsterId").stringValue = row.Id;
+            serialized.FindProperty("baseMonsterId").stringValue = row.BaseMonsterId;
             serialized.FindProperty("displayOrder").intValue = row.DisplayOrder;
             serialized.FindProperty("maxDurability").intValue = row.MaxDurability;
             serialized.FindProperty("motionProfile").objectReferenceValue = row.MotionProfile;
             serialized.FindProperty("previewSprite").objectReferenceValue = row.PreviewSprite;
             serialized.FindProperty("world").objectReferenceValue = Lookup(worlds, row.WorldId);
             ApplyLocalizedName(serialized.FindProperty("localizedName"), row.Name);
+
+            SerializedProperty dropList = serialized.FindProperty("drops");
+            dropList.arraySize = row.Drops.Count;
+            for (int i = 0; i < row.Drops.Count; i++)
+            {
+                MonsterDropRow drop = row.Drops[i];
+                SerializedProperty element = dropList.GetArrayElementAtIndex(i);
+
+                // 배열을 늘리면 Unity가 바로 앞 칸을 복사해 넣기도 하므로 세 칸을 모두 덮어쓴다.
+                element.FindPropertyRelative(DropItemField).objectReferenceValue = Lookup(items, drop.ItemId);
+                element.FindPropertyRelative(DropChanceField).floatValue = drop.ChancePercent;
+                element.FindPropertyRelative(DropCountField).intValue = drop.Count;
+            }
+
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(asset);
         }
 
         private static void WriteDungeon(
             DungeonDefinition asset, DungeonRow row,
-            Dictionary<string, WorldDefinition> worlds, Dictionary<string, MonsterDefinition> monsters)
+            Dictionary<string, WorldDefinition> worlds, Dictionary<string, MonsterDefinition> monsters,
+            Dictionary<string, ItemDefinition> items)
         {
             var serialized = new SerializedObject(asset);
             serialized.FindProperty("dungeonId").stringValue = row.Id;
@@ -244,10 +301,10 @@ namespace TableDataEditor
             }
 
             SerializedProperty rewardList = serialized.FindProperty("rewardItems");
-            rewardList.arraySize = row.RewardItems.Count;
-            for (int i = 0; i < row.RewardItems.Count; i++)
+            rewardList.arraySize = row.RewardItemIds.Count;
+            for (int i = 0; i < row.RewardItemIds.Count; i++)
             {
-                rewardList.GetArrayElementAtIndex(i).objectReferenceValue = row.RewardItems[i];
+                rewardList.GetArrayElementAtIndex(i).objectReferenceValue = Lookup(items, row.RewardItemIds[i]);
             }
 
             serialized.ApplyModifiedPropertiesWithoutUndo();
@@ -337,14 +394,55 @@ namespace TableDataEditor
         {
             bool ok = true;
             ok &= VerifyFields<WorldDefinition>(log, "worldId", "localizedName", "displayOrder");
-            ok &= VerifyFields<MonsterDefinition>(log, "monsterId", "localizedName", "world", "motionProfile",
-                "previewSprite", "maxDurability", "displayOrder");
+            ok &= VerifyFields<ItemDefinition>(log, "itemId", "localizedName", "icon", "displayOrder");
+            ok &= VerifyFields<MonsterDefinition>(log, "monsterId", "baseMonsterId", "localizedName", "world",
+                "motionProfile", "previewSprite", "maxDurability", DropsField, "displayOrder");
+            ok &= VerifyDropEntryFields(log);
             ok &= VerifyFields<DungeonDefinition>(log, "dungeonId", "dungeonName", "world", "representativeSprite",
                 "monsters", "rewardItems", "displayOrder");
             ok &= VerifyFields<WorldCatalog>(log, "worlds");
+            ok &= VerifyFields<ItemCatalog>(log, "items");
             ok &= VerifyFields<MonsterCatalog>(log, "monsters");
             ok &= VerifyFields<DungeonCatalog>(log, "dungeons");
             return ok;
+        }
+
+        /// <summary>
+        /// 드롭 칸 안쪽 필드 이름까지 확인한다. 목록 필드가 있다는 것만으로는 부족하다 - 안쪽 이름이
+        /// 어긋나면 <c>FindPropertyRelative</c>가 null을 돌려주고, 그때는 이미 앞선 몬스터 몇 마리를
+        /// 쓴 뒤라 프로젝트가 반쯤 갱신된 상태로 남는다. 임시 인스턴스에서 칸을 하나 늘려 확인하며,
+        /// 인스턴스는 곧바로 버리므로 프로젝트에는 아무것도 남지 않는다.
+        /// </summary>
+        private static bool VerifyDropEntryFields(TableDataDiagnosticLog log)
+        {
+            var probe = ScriptableObject.CreateInstance<MonsterDefinition>();
+            try
+            {
+                var serialized = new SerializedObject(probe);
+                SerializedProperty list = serialized.FindProperty(DropsField);
+                if (list == null) return false; // 목록 자체가 없는 경우는 VerifyFields가 이미 보고했다.
+
+                list.arraySize = 1;
+                SerializedProperty element = list.GetArrayElementAtIndex(0);
+
+                bool ok = true;
+                foreach (string field in new[] { DropItemField, DropChanceField, DropCountField })
+                {
+                    if (element.FindPropertyRelative(field) != null) continue;
+
+                    log.Error(RuntimeSchemaPseudoFile, TableDataDiagnostic.FileLevelRow,
+                        field, nameof(MonsterDefinition.DropEntry),
+                        $"{nameof(MonsterDefinition.DropEntry)}에 직렬화 필드 '{field}'가 없습니다 - " +
+                        "런타임 클래스가 바뀌었으니 임포터를 함께 고쳐야 합니다.");
+                    ok = false;
+                }
+
+                return ok;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(probe);
+            }
         }
 
         private static bool VerifyFields<T>(TableDataDiagnosticLog log, params string[] fields) where T : ScriptableObject

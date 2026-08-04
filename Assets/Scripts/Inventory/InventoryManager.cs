@@ -16,6 +16,14 @@ namespace Inventory
     /// 재화는 아이템 목록과 <b>완전히 분리된 전역 값</b>이라 아이템 슬롯에 나타나지 않고, 경험치/레벨/
     /// 행동력과도 연결되지 않는다.
     ///
+    /// <b>정의를 모으는 곳은 두 군데다.</b> Item.csv에서 만들어진 <see cref="ItemCatalog"/> 에셋과,
+    /// 카탈로그가 생기기 전부터 씬에 직접 박아 둔 <see cref="itemCatalog"/> 목록이다. 둘 다 있으면
+    /// <b>카탈로그를 먼저</b> 등록하고 씬 목록을 뒤에 등록하며, 같은 Item Id가 양쪽에 있으면
+    /// <b>먼저 등록된 쪽(= 카탈로그)이 남고</b> 뒤의 것은 오류와 함께 무시한다 - 다른 카탈로그
+    /// 에셋들과 같은 규칙이고, 저장 파일의 키 하나가 어느 정의로 그려질지가 실행 순서에 따라
+    /// 달라지지 않게 하기 위함이다. 임포터도 같은 충돌을 Rebuild 단계에서 오류로 막으므로,
+    /// 이 경로는 사람이 수동 에셋을 나중에 고친 경우를 잡는 마지막 그물이다.
+    ///
     /// 같은 아이템은 항상 저장 항목 하나에 수량으로 누적된다(같은 id로 항목이 두 개 생기지 않는다).
     /// 표시 순서는 저장 목록의 순서, 즉 <b>처음 획득한 순서</b>다 - 새 아이템은 뒤에 추가되고 그 뒤로
     /// 자리가 바뀌지 않으므로 저장/불러오기를 거쳐도 순서가 유지된다.
@@ -26,6 +34,22 @@ namespace Inventory
     [DisallowMultipleComponent]
     public class InventoryManager : MonoBehaviour
     {
+        /// <summary>
+        /// 보상 한 건에 들어가는 아이템 한 칸(정의 + 수량). 여러 칸을 한 번에 넘겨 <b>처치 하나가
+        /// 저장과 알림을 각각 한 번만</b> 일으키게 하려고 있는 값이다.
+        /// </summary>
+        public readonly struct RewardItemStack
+        {
+            public readonly ItemDefinition Definition;
+            public readonly int Count;
+
+            public RewardItemStack(ItemDefinition definition, int count)
+            {
+                Definition = definition;
+                Count = count;
+            }
+        }
+
         /// <summary>UI가 한 항목을 그리는 데 필요한 최소 정보(정의 + 수량). 저장 구조를 그대로 밖으로
         /// 내보내면 UI가 저장 필드를 직접 고칠 수 있게 되므로 읽기 전용 구조체로 감싼다.</summary>
         public readonly struct Entry
@@ -41,9 +65,14 @@ namespace Inventory
         }
 
         [Header("Item Catalog")]
-        [Tooltip("이 게임에 존재하는 아이템 정의 목록. 저장 데이터의 itemId를 실제 아이템으로 " +
-                 "되돌릴 때 쓴다 - 여기에 없는 id가 저장 파일에 있으면 그 항목은 표시하지 않고 " +
-                 "경고만 남긴다(저장 값 자체는 지우지 않는다).")]
+        [Tooltip("Item.csv에서 만들어진 ItemCatalog 에셋(Assets/Generated/TableData/Item/ItemCatalog.asset). " +
+                 "비워 두어도 되며, 그 경우 아래 목록만 쓴다 - 연결하면 CSV로 추가한 아이템이 별도 작업 " +
+                 "없이 인벤토리에서 인식된다. 같은 Item Id가 아래 목록에도 있으면 이 카탈로그 쪽이 남는다.")]
+        [SerializeField] private ItemCatalog generatedItemCatalog;
+
+        [Tooltip("카탈로그 이전부터 씬에 직접 넣어 둔 아이템 정의 목록. 저장 데이터의 itemId를 실제 " +
+                 "아이템으로 되돌릴 때 위 카탈로그와 함께 쓴다 - 어느 쪽에도 없는 id가 저장 파일에 " +
+                 "있으면 그 항목은 표시하지 않고 경고만 남긴다(저장 값 자체는 지우지 않는다).")]
         [SerializeField] private List<ItemDefinition> itemCatalog = new List<ItemDefinition>();
 
         [Header("Debug (개발용 - 정식 UI에 노출하지 않는다)")]
@@ -66,6 +95,10 @@ namespace Inventory
 
         // itemId -> 정의. 저장 데이터를 화면에 그릴 때마다 목록을 순회하지 않도록 Awake에서 한 번만 만든다.
         private readonly Dictionary<string, ItemDefinition> definitionsById = new Dictionary<string, ItemDefinition>();
+
+        // 등록에 성공한 정의를 등록 순서 그대로. 개발용 진입점이 "모든 아이템"을 돌 때 쓴다 - 두 갈래
+        // 출처를 다시 합치는 코드가 여러 곳에 생기지 않게 여기 한 번만 모아 둔다.
+        private readonly List<ItemDefinition> registeredDefinitions = new List<ItemDefinition>();
 
         // Items 프로퍼티가 매번 새 리스트를 만들지 않도록 재사용하는 버퍼. 인벤토리가 바뀔 때만 다시 채운다.
         private readonly List<Entry> entryCache = new List<Entry>();
@@ -104,28 +137,71 @@ namespace Inventory
             if (Instance == this) Instance = null;
         }
 
+        /// <summary>
+        /// 두 출처의 정의를 하나의 조회표로 합친다. <b>등록 순서가 곧 우선순위</b>이며, 생성 카탈로그
+        /// (Item.csv)를 먼저 등록하고 씬에 박아 둔 목록을 뒤에 등록한다 - 같은 Item Id가 양쪽에 있으면
+        /// 카탈로그 쪽이 남는다. 순서를 코드로 고정해 두었으므로 결과는 실행마다 같다.
+        ///
+        /// 카탈로그를 연결하지 않았으면 예전과 완전히 같게 동작한다(씬 목록만 등록된다).
+        /// </summary>
         private void BuildDefinitionLookup()
         {
             definitionsById.Clear();
+            registeredDefinitions.Clear();
+
+            // 1순위 - Item.csv가 만든 카탈로그. ItemCatalog 자체가 빈 칸/식별자 없음/중복을 이미 걸러
+            // 주므로 여기서는 남은 항목만 받는다.
+            if (generatedItemCatalog != null)
+            {
+                IReadOnlyList<ItemDefinition> catalogItems = generatedItemCatalog.Items;
+                for (int i = 0; i < catalogItems.Count; i++)
+                {
+                    TryRegister(catalogItems[i], $"Generated Item Catalog[{i}]", generatedItemCatalog);
+                }
+            }
+
+            // 2순위 - 카탈로그가 생기기 전부터 씬에 있던 목록. 기존 수동 포션 연결이 여기로 그대로 남는다.
             if (itemCatalog == null) return;
 
             for (int i = 0; i < itemCatalog.Count; i++)
             {
-                ItemDefinition definition = itemCatalog[i];
-                if (definition == null)
-                {
-                    Debug.LogError($"[InventoryManager] Item Catalog[{i}]가 비어 있습니다 - 이 항목은 무시합니다.", this);
-                    continue;
-                }
-                if (definitionsById.ContainsKey(definition.ItemId))
-                {
-                    Debug.LogError($"[InventoryManager] Item Id '{definition.ItemId}'가 중복됩니다 - 저장 데이터가 " +
-                                   "서로 섞이므로 뒤에 있는 정의는 무시합니다.", this);
-                    continue;
-                }
-
-                definitionsById.Add(definition.ItemId, definition);
+                TryRegister(itemCatalog[i], $"Item Catalog[{i}]", this);
             }
+        }
+
+        /// <summary>정의 하나를 조회표에 넣는다. 넣지 못한 이유는 <b>전부 오류로 남긴다</b> - 조용히
+        /// 빠진 정의는 "저장은 되는데 화면에 없는 아이템"으로 나타나 원인을 찾기 어렵다.</summary>
+        private void TryRegister(ItemDefinition definition, string where, UnityEngine.Object context)
+        {
+            if (definition == null)
+            {
+                Debug.LogError($"[InventoryManager] {where}가 비어 있습니다 - 이 항목은 무시합니다.", context);
+                return;
+            }
+
+            if (!definition.IsValid)
+            {
+                // Item Id가 없는 정의는 저장 키를 만들 수 없다. 예전에는 에셋 파일 이름으로 대신했지만
+                // 그러면 파일 이름을 바꾸는 것만으로 저장 항목과의 연결이 끊기므로, 지금은 조용히
+                // 넘어가지 않고 여기서 걸러 낸다(ItemCatalog와 같은 규칙).
+                Debug.LogError($"[InventoryManager] {where}('{definition.name}')에 Item Id가 없어 " +
+                               "무시합니다 - 에셋에서 식별자를 직접 지정하세요.", definition);
+                return;
+            }
+
+            if (definitionsById.TryGetValue(definition.ItemId, out ItemDefinition existing))
+            {
+                if (existing == definition) return;
+
+                Debug.LogError($"[InventoryManager] Item Id '{definition.ItemId}'가 이미 '{existing.name}'으로 " +
+                               $"등록되어 있어 {where}('{definition.name}')는 무시합니다 - 저장 데이터가 서로 " +
+                               "섞이지 않도록 먼저 등록된 정의(생성 카탈로그 → 씬 목록 순서)가 남습니다. " +
+                               "한쪽의 Item Id를 정리하세요.", definition);
+                return;
+            }
+
+            definitionsById.Add(definition.ItemId, definition);
+            registeredDefinitions.Add(definition);
         }
 
         // ---- 조회 ----
@@ -181,13 +257,47 @@ namespace Inventory
         /// 값 변경은 전부 메모리에서 끝낸 뒤 마지막에 딱 한 번 저장하므로, 저장이 실패하더라도 일부만
         /// 기록된 파일이 남지 않는다(기존 저장 파일이 그대로 유지된다).
         ///
-        /// 아이템 없이 재화만 주려면 <paramref name="item"/>에 null을 넘기면 된다.
+        /// 아이템 없이 재화만 주려면 <paramref name="item"/>에 null을 넘기면 된다. 아이템이 여러 칸이면
+        /// <see cref="ApplyRewards"/>를 쓴다 - 이쪽은 한 칸 전용이라 목록도 버퍼도 만들지 않는다.
         /// </summary>
         public void ApplyReward(int currencyAmount, ItemDefinition item, int itemCount = 1)
         {
             bool changed = ApplyCurrencyDelta(currencyAmount);
             // 비트 OR로 두 호출을 모두 실행한다 - ||를 쓰면 재화가 바뀐 순간 아이템 지급이 통째로 생략된다.
             changed |= ApplyItemDelta(item, itemCount);
+
+            if (changed) SaveAndNotify();
+        }
+
+        /// <summary>
+        /// 처치 보상 한 건(재화 + <b>아이템 여러 칸</b>)을 한 번의 처리로 적용한다. 드롭 슬롯이 여러 개
+        /// 성공해도 <b>저장은 1회, <see cref="InventoryChanged"/>도 1회</b>다 - 칸마다 AddItem을 부르면
+        /// 한 번의 처치가 파일 쓰기 서너 번과 화면 갱신 서너 번이 되고, 그 중간 상태(재화만 오른 화면)가
+        /// 실제로 한 프레임 그려진다.
+        ///
+        /// 값 변경은 전부 메모리에서 끝낸 뒤 마지막에 딱 한 번 저장하므로, 저장이 실패해도 일부만
+        /// 기록된 파일이 남지 않는다.
+        ///
+        /// <b>실제로 바뀐 것이 하나도 없으면 저장도 알림도 하지 않는다</b>(재화 0 + 유효한 아이템 0칸).
+        /// 같은 아이템이 여러 칸에 나뉘어 들어와도 수량은 정상 누적된다 - 누적은 저장 항목 하나에서만
+        /// 일어나므로(<see cref="ApplyItemDelta"/>) 슬롯이 갈라지지 않는다.
+        ///
+        /// null 정의나 0 이하 수량은 조용히 건너뛴다(보상 판정에서 이미 걸러진 값이라 정상 입력이다).
+        /// 다만 <b>카탈로그에 없는 정의는 기존과 똑같이 오류로 막는다</b> - 저장은 되는데 화면에 없는
+        /// 아이템이 생기는 편이 훨씬 찾기 어렵기 때문이다.
+        /// </summary>
+        public void ApplyRewards(int currencyAmount, IReadOnlyList<RewardItemStack> itemStacks)
+        {
+            bool changed = ApplyCurrencyDelta(currencyAmount);
+
+            if (itemStacks != null)
+            {
+                for (int i = 0; i < itemStacks.Count; i++)
+                {
+                    // 비트 OR로 모든 칸을 반드시 실행한다 - ||를 쓰면 앞의 칸이 성공한 순간 뒤가 생략된다.
+                    changed |= ApplyItemDelta(itemStacks[i].Definition, itemStacks[i].Count);
+                }
+            }
 
             if (changed) SaveAndNotify();
         }
@@ -269,7 +379,8 @@ namespace Inventory
                 // 카탈로그에 없는 아이템을 넣으면 저장은 되지만 인벤토리에 그려지지 않아 "사라진 것처럼"
                 // 보인다 - 조용히 넘어가지 않고 여기서 막는다.
                 Debug.LogError($"[InventoryManager] '{definition.ItemId}'가 Item Catalog에 없어 추가하지 않았습니다 - " +
-                               "Inspector의 Item Catalog에 이 정의를 등록하세요.", this);
+                               "Inspector의 Generated Item Catalog(Item.csv로 만든 아이템) 또는 Item Catalog 목록에 " +
+                               "이 정의를 등록하세요.", this);
                 return false;
             }
 
@@ -367,13 +478,14 @@ namespace Inventory
             AddItem(debugItem, debugItemCount);
         }
 
-        /// <summary>카탈로그의 모든 아이템을 1개씩 넣는다 - 여러 종류 표시와 빈 슬롯 처리를 한 번에 확인한다.</summary>
+        /// <summary>등록된 모든 아이템을 1개씩 넣는다(두 출처를 합친 결과) - 여러 종류 표시와 빈 슬롯
+        /// 처리를 한 번에 확인한다.</summary>
         [ContextMenu("Debug - Add One Of Every Item")]
         public void DebugAddOneOfEveryItem()
         {
-            for (int i = 0; i < itemCatalog.Count; i++)
+            for (int i = 0; i < registeredDefinitions.Count; i++)
             {
-                AddItem(itemCatalog[i], 1);
+                AddItem(registeredDefinitions[i], 1);
             }
         }
 

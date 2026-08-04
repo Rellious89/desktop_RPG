@@ -87,10 +87,46 @@ namespace Enemy
         /// <summary>퇴장이 끝난 슬롯이 다음 Standby로 재장전된 직후 발생.</summary>
         public event Action<TargetCombatController> StandbyRefilled;
 
+        /// <summary>
+        /// <b>Current였던 몬스터가 실제로 처치됐을 때 정확히 한 번</b> 발생한다. 인자는 처치된 그
+        /// 몬스터의 <see cref="MonsterDefinition"/>이며, <b>슬롯의 Definition이 승격/교체되기 전에</b>
+        /// 전달되므로 구독자는 "무엇을 처치했는가"를 확실히 알 수 있다.
+        ///
+        /// <b>처치가 확정되는 순간 동기적으로 발생한다</b>(<see cref="Target"/>의 처치 판정 콜스택 안,
+        /// <see cref="Target.AnyTargetDefeated"/> 직전). 승격처럼 LateUpdate로 미루지 않는 이유는 하나다 -
+        /// 그 사이에 <see cref="Suspend"/>나 던전 전환이 끼어들면 예약이 지워져 <b>실제로 있었던 처치의
+        /// 알림이 사라지기</b> 때문이다. 대신 구독자 코드가 타격 디스패치 한복판에서 실행되므로,
+        /// 여기서는 무거운 작업을 하지 말고 값만 받아 두는 편이 좋다.
+        ///
+        /// <b><see cref="Target.AnyTargetDefeated"/>를 대체하지 않는다.</b> 경험치/킬카운트/행동력처럼
+        /// "몬스터를 하나 처치했다"만 필요한 기존 구독자는 그대로 두고, 이 이벤트는 "어떤 몬스터를
+        /// 처치했는가"가 필요한 쪽(드롭 지급 등)만 쓴다.
+        ///
+        /// <b>Standby/Exiting이 처치 알림을 보내도 발생하지 않는다.</b> 대기열이 소유한 몬스터의 처치는
+        /// Current 하나뿐이며, 그 외의 알림은 예약 단계에서 걸러진다.
+        ///
+        /// <b>Definition을 모르는 경로에서는 발생하지 않는다.</b> 직렬화된 Profile Pool로 돌아가는 legacy
+        /// 구성이나 standalone 슬롯에는 가리킬 구체적인 몬스터가 없다 - 그때 null을 보내면 구독자마다
+        /// "무엇인지 모르는 처치"를 따로 처리해야 하므로 아예 보내지 않는다(큐 전이는 그대로 진행된다).
+        /// </summary>
+        public event Action<MonsterDefinition> MonsterDefeated;
+
         private TargetCombatController currentSlot;
         private TargetCombatController standbySlot;
         private TargetCombatController exitingSlot;
 
+        // 지금 각 <b>물리</b> 슬롯이 어떤 몬스터를 연기하고 있는지. 역할(Current/Standby/Exiting)이 아니라
+        // 슬롯에 붙여 두는 것이 핵심이다 - 승격은 역할만 바꾸므로, 슬롯을 기준으로 기억해 두면 Definition이
+        // 프로필과 함께 자동으로 따라가고 "역할이 바뀔 때 Definition도 옮겨 적는" 경로가 아예 없어진다.
+        private MonsterDefinition firstSlotDefinition;
+        private MonsterDefinition secondSlotDefinition;
+
+        // 던전 후보. 같은 MotionProfile을 쓰는 서로 다른 몬스터도 <b>각각</b> 후보로 남는다 - 프로필이
+        // 같다고 합쳐 버리면 어느 몬스터가 나왔는지가 사라져 드롭을 정할 수 없다.
+        private readonly List<MonsterDefinition> usableDefinitions = new List<MonsterDefinition>();
+
+        // 직렬화된 Profile Pool로 도는 legacy 경로의 후보. 위 목록과 <b>동시에 채워지지 않는다</b> -
+        // 둘 다 살아 있으면 재장전 때 어느 쪽을 봐야 하는지가 흐려진다.
         private readonly List<MonsterMotionProfile> usableProfiles = new List<MonsterMotionProfile>();
 
         private bool configured;
@@ -102,7 +138,8 @@ namespace Enemy
         // 초기 동기화가 대기열의 Start보다 먼저 오든 나중에 오든 결과가 같다.
         private bool suspended;
 
-        // 처치 알림(HitPoint 콜스택 안)에서 켜고 LateUpdate에서만 소비하는 예약 플래그.
+        // 처치 알림(HitPoint 콜스택 안)에서 켜고 LateUpdate에서만 소비하는 예약 플래그. 같은 처치가
+        // 두 번 들어오는 것을 막는 중복 가드이기도 하다.
         private bool promotionPending;
 
         private float exitStartTime;
@@ -125,12 +162,28 @@ namespace Enemy
         public TargetCombatController StandbyMonster => standbySlot;
         public TargetCombatController ExitingMonster => exitingSlot;
 
+        /// <summary>지금 전투 중인 슬롯이 연기하는 몬스터. 던전 경로가 아니거나 대기열이 접혀 있으면
+        /// null이다 - <b>추측하지 않는다</b>. 이 값은 언제나 <see cref="CurrentMonster"/>가 실제로 재생
+        /// 중인 <see cref="MonsterMotionProfile"/>의 출처와 일치한다.</summary>
+        public MonsterDefinition CurrentMonsterDefinition => GetSlotDefinition(currentSlot);
+
+        /// <summary>대기 중인 슬롯이 연기할 몬스터. 없으면 null이다.</summary>
+        public MonsterDefinition StandbyMonsterDefinition => GetSlotDefinition(standbySlot);
+
+        /// <summary>퇴장 연출 중인 슬롯이 연기하던 몬스터. 없으면 null이다.</summary>
+        public MonsterDefinition ExitingMonsterDefinition => GetSlotDefinition(exitingSlot);
+
         /// <summary>슬롯 검증을 통과해 실제로 대기열을 소유하고 있는지. false면 두 몬스터는 관리 대상이
         /// 아니며 기존 standalone 동작 그대로다.</summary>
         public bool IsConfigured => configured;
 
-        /// <summary>유효 후보만 남긴 프로필 풀 크기(0이면 각 슬롯의 현재 프로필을 유지한다).</summary>
+        /// <summary>유효 후보만 남긴 프로필 풀 크기(0이면 각 슬롯의 현재 프로필을 유지한다).
+        /// 던전 경로에서는 0이며, 그때의 후보 수는 <see cref="UsableDefinitionCount"/>가 알려준다.</summary>
         public int UsableProfileCount => usableProfiles.Count;
+
+        /// <summary>이번 던전의 몬스터 후보 수. <b>같은 MotionProfile을 쓰는 서로 다른 몬스터는 각각
+        /// 하나로 센다</b>. 던전 경로가 아니면 0이다.</summary>
+        public int UsableDefinitionCount => usableDefinitions.Count;
 
         /// <summary>필드 모드가 대기열을 접어둔 상태인지(마을). true인 동안 Current/Standby는 모두
         /// null이고, 두 슬롯은 비공격 역할로 비활성화돼 있으며, LateUpdate는 아무 일도 하지 않는다.</summary>
@@ -234,6 +287,11 @@ namespace Enemy
             configured = false;
             promotionPending = false;
 
+            // 소유권을 놓는 순간 두 슬롯은 더 이상 "이 던전의 몬스터"가 아니라 standalone이다. 배정과
+            // 던전 후보를 여기서 함께 비워, 다시 획득할 때(legacy 경로) 이전 던전의 몬스터가 섞이지 않게 한다.
+            ClearSlotDefinitions();
+            usableDefinitions.Clear();
+
             if (applicationQuitting || !gameObject.scene.isLoaded)
             {
                 currentSlot = null;
@@ -310,8 +368,11 @@ namespace Enemy
             exitingSlot = null;
 
             // 다음 던전이 자기 몬스터로 다시 채운다 - 접힌 상태에 이전 던전(또는 직렬화 풀)의 후보가
-            // 남아 있지 않게 여기서 비운다.
+            // 남아 있지 않게 여기서 비운다. 슬롯에 배정돼 있던 몬스터도 함께 지운다: 남겨 두면 다음
+            // 던전이 열리기 전에 CurrentMonsterDefinition을 읽는 쪽이 지난 전투의 몬스터를 보게 된다.
             usableProfiles.Clear();
+            usableDefinitions.Clear();
+            ClearSlotDefinitions();
 
             // 종료/씬 언로드 중에는 다른 오브젝트를 건드리지 않는다(ReleaseOwnership과 같은 규칙).
             if (applicationQuitting || !gameObject.scene.isLoaded) return;
@@ -344,9 +405,10 @@ namespace Enemy
         /// 넘기면 된다). 성공하면 접힘 상태가 풀리고 <b>정확히 하나</b>의 Current와 하나의 Standby가
         /// 만들어지며, 그 뒤의 승격/재장전/중복 보상 방지는 전부 기존 대기열 규칙 그대로다.
         ///
-        /// <b>런타임 풀은 이 던전의 몬스터로만 만든다.</b> 직렬화된 Profile Pool은 보지도 않고 섞이지도
-        /// 않는다 - 후보는 넘어온 <see cref="MonsterDefinition.MotionProfile"/> 중 재생 가능한 것뿐이며,
-        /// 유효 후보가 하나뿐이면 그 몬스터가 계속 반복 등장한다.
+        /// <b>런타임 후보는 이 던전의 몬스터로만 만든다.</b> 직렬화된 Profile Pool은 보지도 않고 섞이지도
+        /// 않는다 - 후보는 재생 가능한 프로필을 가진 <see cref="MonsterDefinition"/>이며, 유효 후보가
+        /// 하나뿐이면 그 몬스터가 계속 반복 등장한다. <b>겉모습(MotionProfile)이 같아도 서로 다른
+        /// 몬스터는 서로 다른 후보다</b> - 그래야 지금 서 있는 것이 어느 몬스터인지 끝까지 남는다.
         ///
         /// <b>실패하면 아무것도 열지 않는다(fail closed).</b> 슬롯 구성이 잘못됐거나 유효한 몬스터가
         /// 하나도 없으면 오류를 남기고 <b>접힌 상태로</b> false를 돌려준다 - 공격 가능한 Target이 하나도
@@ -377,7 +439,7 @@ namespace Enemy
                 return false;
             }
 
-            if (!TryBuildDungeonProfiles(monsters))
+            if (!TryBuildDungeonDefinitions(monsters))
             {
                 Debug.LogError($"[MonsterEncounterQueue] '{name}': 선택한 던전에 재생 가능한 Motion Profile을 가진 " +
                                "몬스터가 하나도 없습니다 - 대기열을 열지 않고 접힌 상태를 유지합니다(전투가 시작되지 않습니다).", this);
@@ -400,14 +462,15 @@ namespace Enemy
             if (!currentSlot.gameObject.activeSelf) currentSlot.gameObject.SetActive(true);
             if (!standbySlot.gameObject.activeSelf) standbySlot.gameObject.SetActive(true);
 
-            // 3) 프로필/체력/처치 상태/포즈를 이벤트 없이 준비한다. 유효 후보가 하나뿐이면 두 슬롯이
-            //    같은 프로필을 쓴다(같은 몬스터가 반복 등장하는 정상 동작이다).
-            MonsterMotionProfile currentProfile = PickNextProfile(null);
-            currentSlot.PrepareForEncounter(TargetEngagementRole.Standby, currentProfile);
+            // 3) 몬스터를 고르고, 그 몬스터의 프로필로 체력/처치 상태/포즈를 이벤트 없이 준비한다.
+            //    고르는 단위는 <b>언제나 MonsterDefinition</b>이고 프로필은 거기서 따라 나온다 - 순서를
+            //    반대로 하면(프로필을 고르고 몬스터를 되찾으면) 프로필을 공유하는 두 몬스터 중 어느 쪽인지
+            //    정할 수 없다. 유효 후보가 하나뿐이면 두 슬롯이 같은 몬스터를 쓴다(정상 동작이다).
+            MonsterDefinition currentDefinition = PickNextDefinition(null);
+            AssignSlotMonster(currentSlot, currentDefinition);
             ApplyCurrentPresentation(currentSlot, instant: true);
 
-            MonsterMotionProfile standbyProfile = PickNextProfile(currentProfile);
-            standbySlot.PrepareForEncounter(TargetEngagementRole.Standby, standbyProfile);
+            AssignSlotMonster(standbySlot, PickNextDefinition(currentDefinition));
             ApplyStandbyPresentation(standbySlot);
 
             // 4) 준비가 전부 끝난 뒤에야 소유권을 확정하고 정확히 하나를 Current로 올린다.
@@ -420,18 +483,30 @@ namespace Enemy
             return true;
         }
 
-        /// <summary>넘어온 던전 몬스터에서 재생 가능한 모션 프로필만 골라 런타임 풀을 다시 만든다.
-        /// null 정의/프로필 없음/중복/재생 불가는 걸러내고, 직렬화된 Profile Pool은 참조하지 않는다.</summary>
+        /// <summary>
+        /// 넘어온 던전 몬스터로 런타임 후보 목록을 다시 만든다. null 정의/프로필 없음/재생 불가는
+        /// 걸러내고, 직렬화된 Profile Pool은 참조하지도 섞이지도 않는다.
+        ///
+        /// <b>중복 제거는 오직 Definition 기준이다.</b> 같은 <see cref="MonsterMotionProfile"/>을 쓰는
+        /// 서로 다른 몬스터는 각각 후보로 남는다 - 예전에는 프로필로 합쳐서, 겉모습이 같은 두 몬스터 중
+        /// 어느 쪽이 나왔는지가 사라졌다(드롭도 이름도 정할 수 없게 된다). 같은 정의가 목록에 두 번
+        /// 적힌 경우만 한 번으로 줄인다.
+        /// </summary>
         /// <returns>유효 후보가 하나 이상 남았으면 true.</returns>
-        private bool TryBuildDungeonProfiles(IReadOnlyList<MonsterDefinition> monsters)
+        private bool TryBuildDungeonDefinitions(IReadOnlyList<MonsterDefinition> monsters)
         {
+            usableDefinitions.Clear();
+
+            // legacy 후보가 남아 있으면 재장전 때 두 목록이 섞인다 - 던전 경로가 열리는 순간 비운다.
             usableProfiles.Clear();
+
             if (monsters == null) return false;
 
             for (int i = 0; i < monsters.Count; i++)
             {
                 MonsterDefinition definition = monsters[i];
                 if (definition == null) continue;
+                if (usableDefinitions.Contains(definition)) continue; // 같은 정의를 두 번 적은 경우만 제외한다.
 
                 MonsterMotionProfile profile = definition.MotionProfile;
                 if (profile == null)
@@ -440,7 +515,6 @@ namespace Enemy
                                      "Profile이 없어 이번 던전 후보에서 제외합니다.", definition);
                     continue;
                 }
-                if (usableProfiles.Contains(profile)) continue; // 같은 프로필을 여러 몬스터가 써도 후보는 하나다.
                 if (!TargetCombatController.IsProfileUsable(profile))
                 {
                     Debug.LogWarning($"[MonsterEncounterQueue] '{name}': 몬스터 '{definition.MonsterId}'의 프로필 " +
@@ -448,10 +522,80 @@ namespace Enemy
                     continue;
                 }
 
-                usableProfiles.Add(profile);
+                usableDefinitions.Add(definition);
             }
 
-            return usableProfiles.Count > 0;
+            return usableDefinitions.Count > 0;
+        }
+
+        // -------------------------------------------------------------------------------------
+        // 슬롯 <-> 몬스터 연결
+        //
+        // Definition은 <b>물리 슬롯</b>에 붙어 있다. 역할은 두 슬롯 사이를 오가지만 슬롯이 연기하는
+        // 몬스터는 재장전할 때만 바뀌므로, 이렇게 두면 승격/퇴장에서 Definition을 따로 옮겨 적을 필요가
+        // 없고 프로필과 어긋날 수 있는 경로 자체가 사라진다.
+        // -------------------------------------------------------------------------------------
+
+        private MonsterDefinition GetSlotDefinition(TargetCombatController slot)
+        {
+            if (slot == null) return null;
+            if (slot == firstSlot) return firstSlotDefinition;
+            if (slot == secondSlot) return secondSlotDefinition;
+            return null;
+        }
+
+        private void SetSlotDefinition(TargetCombatController slot, MonsterDefinition definition)
+        {
+            if (slot == null) return;
+            if (slot == firstSlot) firstSlotDefinition = definition;
+            else if (slot == secondSlot) secondSlotDefinition = definition;
+        }
+
+        /// <summary>
+        /// 슬롯에 몬스터를 배정한다. <b>Definition을 먼저 기록하고 그 다음 프로필을 준비한다</b> -
+        /// 순서를 고정해 두면 준비 도중(프로필 적용 중)에 읽히는 값도 언제나 새 몬스터를 가리킨다.
+        /// 준비 자체는 이벤트 없는 경로라 처치/보상/경험치는 하나도 발생하지 않는다.
+        /// </summary>
+        private void AssignSlotMonster(TargetCombatController slot, MonsterDefinition definition)
+        {
+            if (slot == null) return;
+
+            SetSlotDefinition(slot, definition);
+            slot.PrepareForEncounter(
+                TargetEngagementRole.Standby, definition != null ? definition.MotionProfile : null);
+        }
+
+        /// <summary>두 물리 슬롯의 몬스터 배정을 모두 지운다. 대기열을 접거나 소유권을 놓을 때, 이전
+        /// 던전의 몬스터가 다음 전투로 새어 나가지 않게 하는 유일한 자리다.</summary>
+        private void ClearSlotDefinitions()
+        {
+            firstSlotDefinition = null;
+            secondSlotDefinition = null;
+        }
+
+        /// <summary>다음 등장에 쓸 몬스터를 고른다 - 가능하면 avoid(주로 지금 Current)와 다른 몬스터를
+        /// 균등 확률로 고르고, 유효 후보가 하나뿐이면 그 하나를 그대로 반복해서 쓴다. 후보가 없으면
+        /// null이다. <see cref="PickNextProfile"/>과 같은 규칙이며 고르는 단위만 다르다.</summary>
+        private MonsterDefinition PickNextDefinition(MonsterDefinition avoid)
+        {
+            if (usableDefinitions.Count == 0) return null;
+            if (usableDefinitions.Count == 1) return usableDefinitions[0];
+
+            int candidateCount = 0;
+            for (int i = 0; i < usableDefinitions.Count; i++)
+            {
+                if (usableDefinitions[i] != avoid) candidateCount++;
+            }
+            if (candidateCount == 0) return usableDefinitions[0];
+
+            int choice = UnityEngine.Random.Range(0, candidateCount);
+            for (int i = 0; i < usableDefinitions.Count; i++)
+            {
+                if (usableDefinitions[i] == avoid) continue;
+                if (choice == 0) return usableDefinitions[i];
+                choice--;
+            }
+            return usableDefinitions[0];
         }
 
         // -------------------------------------------------------------------------------------
@@ -474,6 +618,12 @@ namespace Enemy
             }
 
             BuildUsableProfiles();
+
+            // legacy 경로에는 가리킬 구체적인 몬스터가 없다. 배정과 던전 후보를 명시적으로 비워, 이전
+            // 던전의 몬스터가 이 경로로 새어 들어오지 않게 한다 - 이 상태에서는 MonsterDefeated도
+            // 발생하지 않는다(보낼 Definition이 없다).
+            ClearSlotDefinitions();
+            usableDefinitions.Clear();
 
             currentSlot = firstSlot;
             standbySlot = secondSlot;
@@ -660,14 +810,35 @@ namespace Enemy
         private void HandleSecondSlotDefeated(string targetId) => HandleSlotDefeated(secondSlot);
 
         /// <summary>지금 이 호출은 플레이어 타격의 HitPoint 디스패치 한복판이다(Target.Defeat이 동기
-        /// 호출한다). <b>여기서는 역할도 시각 상태도 절대 바꾸지 않는다</b> - 예약만 하고 실제 전환은
-        /// LateUpdate가 한다. 처치/보상 이벤트는 Target이 이미 정확히 한 번씩 보냈고, 이 관리자는 그
-        /// 흐름에 아무것도 더하거나 빼지 않는다.</summary>
+        /// 호출한다). <b>여기서는 역할도 시각 상태도 절대 바꾸지 않는다</b> - 실제 전환(승격/퇴장/재장전)은
+        /// 예약만 걸어 두고 LateUpdate가 한다. 처치/보상 이벤트는 Target이 이미 정확히 한 번씩 보냈고,
+        /// 이 관리자는 그 흐름에 아무것도 더하거나 빼지 않는다.
+        ///
+        /// <b><see cref="MonsterDefeated"/>만은 여기서 동기적으로 보낸다.</b> 전환과 함께 LateUpdate로
+        /// 미루면 그 사이에 <see cref="Suspend"/>/<see cref="OnDisable"/>/던전 전환이 끼어들 때 예약이
+        /// 지워지면서 <b>실제로 있었던 처치의 알림이 통째로 사라진다</b> - "Current 처치 1회당 정확히
+        /// 1회"가 깨진다. 알림은 처치가 확정된 이 순간에 보내고, 큐를 어떻게 정리할지는 그와 별개로
+        /// LateUpdate가 판단하게 나눠 둔다.
+        ///
+        /// <b>Current가 아닌 슬롯의 알림은 여기서 끝난다.</b> Standby/Exiting이 무슨 이유로 처치
+        /// 알림을 보내더라도 예약도 발행도 하지 않는다. 이미 예약된 상태에서 같은 처치가 한 번 더
+        /// 들어와도 <see cref="promotionPending"/>이 막는다 - 알림은 한 번뿐이다.
+        ///
+        /// <b>Definition을 모르는 경로에서는 아무것도 보내지 않는다.</b> legacy profilePool/standalone
+        /// 구성에는 가리킬 구체적인 몬스터가 없으므로, 큐 전이만 예약하고 알림은 건너뛴다.</summary>
         private void HandleSlotDefeated(TargetCombatController slot)
         {
             if (!configured || slot != currentSlot) return;
+            if (promotionPending) return;
 
+            // 중복 가드를 먼저 세운다 - 구독자가 이 안에서 무엇을 하든(Suspend, 던전 전환) 같은 처치가
+            // 다시 들어와 두 번째 알림이 나가지 않는다.
             promotionPending = true;
+
+            // 슬롯 배정은 이 시점에 아직 그대로다(승격은 LateUpdate에서 일어난다) - 그래서 여기서 읽은
+            // 값이 곧 "처치되기 직전의 Current"다.
+            MonsterDefinition defeatedDefinition = GetSlotDefinition(slot);
+            if (defeatedDefinition != null) MonsterDefeated?.Invoke(defeatedDefinition);
         }
 
         private void LateUpdate()
@@ -678,6 +849,7 @@ namespace Enemy
 
             if (promotionPending)
             {
+                // 알림(MonsterDefeated)은 처치 순간에 이미 나갔다 - 여기서는 역할/시각/슬롯 전환만 한다.
                 promotionPending = false;
                 PromoteStandby();
             }
@@ -693,7 +865,12 @@ namespace Enemy
         ///
         /// 역할 변경은 즉시(동기적으로) 공격 가능 레지스트리에 반영되므로, 이 LateUpdate가 끝난 시점에
         /// 새 Current는 이미 공격 가능하다 - 다음 프레임의 첫 입력이 정상 동작한다. 위치 이동
-        /// (promotionDuration)은 그와 무관하게 진행된다.</summary>
+        /// (promotionDuration)은 그와 무관하게 진행된다.
+        ///
+        /// <b>몬스터 배정은 여기서 손대지 않는다.</b> Definition은 역할이 아니라 물리 슬롯에 붙어 있으므로,
+        /// 승격한 슬롯은 자기 몬스터를 그대로 들고 Current가 되고 처치된 슬롯도 자기 몬스터를 들고
+        /// Exiting이 된다 - 옮겨 적는 코드가 없으니 프로필과 어긋날 수도 없다. 배정이 바뀌는 곳은
+        /// 재장전(<see cref="FinalizeExiting"/>)과 던전 시작뿐이다.</summary>
         private void PromoteStandby()
         {
             TargetCombatController defeated = currentSlot;
@@ -757,18 +934,32 @@ namespace Enemy
         }
 
         /// <summary>퇴장이 끝난(또는 강제로 마감된) 슬롯을 이벤트 없이 다음 Standby로 되돌린다 -
-        /// 프로필 교체 + 체력/처치 상태 복원 + 대기 알파/위치 적용까지 한 번에 처리한다.
-        /// <b>AnyTargetDefeated/OnDefeated/보상/경험치/킬카운트/행동력은 하나도 발생하지 않는다.</b></summary>
+        /// 몬스터 재배정 + 체력/처치 상태 복원 + 대기 알파/위치 적용까지 한 번에 처리한다.
+        /// <b>AnyTargetDefeated/OnDefeated/MonsterDefeated/보상/경험치/킬카운트/행동력은 하나도 발생하지
+        /// 않는다.</b>
+        ///
+        /// 재사용하는 슬롯의 Definition은 <b>프로필보다 먼저</b> 새 값으로 덮인다
+        /// (<see cref="AssignSlotMonster"/>) - 퇴장하던 몬스터가 다음 Standby의 이름으로 남는 순간이
+        /// 생기지 않는다. 던전 경로가 아니면 배정할 몬스터가 없으므로 명시적으로 비우고 legacy
+        /// 프로필 풀로 재장전한다.</summary>
         private void FinalizeExiting()
         {
             TargetCombatController slot = exitingSlot;
             exitingSlot = null;
             if (slot == null) return;
 
-            MonsterMotionProfile avoid = currentSlot != null ? currentSlot.MotionProfile : null;
-            MonsterMotionProfile next = PickNextProfile(avoid);
+            if (usableDefinitions.Count > 0)
+            {
+                AssignSlotMonster(slot, PickNextDefinition(GetSlotDefinition(currentSlot)));
+            }
+            else
+            {
+                SetSlotDefinition(slot, null);
 
-            slot.PrepareForEncounter(TargetEngagementRole.Standby, next); // 이벤트 없음
+                MonsterMotionProfile avoid = currentSlot != null ? currentSlot.MotionProfile : null;
+                slot.PrepareForEncounter(TargetEngagementRole.Standby, PickNextProfile(avoid)); // 이벤트 없음
+            }
+
             ApplyStandbyPresentation(slot);
 
             standbySlot = slot;

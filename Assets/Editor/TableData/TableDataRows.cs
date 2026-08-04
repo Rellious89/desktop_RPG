@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using Enemy;
-using Inventory;
 using UnityEngine;
 
 namespace TableDataEditor
@@ -30,12 +29,60 @@ namespace TableDataEditor
         public bool Enabled;
     }
 
+    /// <summary>
+    /// Item.csv 한 행. <b>item_id는 저장 파일의 키</b>라 다른 표의 id보다 무겁다 - 값을 다듬거나
+    /// 대체하는 경로는 어디에도 없고, 형식이 어긋나면 그 행 자체가 스냅샷에 들어가지 않는다.
+    /// </summary>
+    public sealed class ItemRow
+    {
+        public int Line;
+        public string Id = string.Empty;
+        public LocalizedEntryRef Name;
+
+        /// <summary>인벤토리 슬롯에 그릴 아이콘. 비어 있어도 된다(수량만 표시된다).</summary>
+        public Sprite Icon;
+
+        public int DisplayOrder;
+        public bool Enabled;
+    }
+
+    /// <summary>
+    /// 드롭 슬롯 하나가 실제로 채워진 경우의 값. <b>빈 슬롯은 아예 만들지 않는다</b> - "비었음"을
+    /// 나타내는 특별한 값을 두면 읽는 쪽마다 그 규칙을 다시 알아야 한다.
+    ///
+    /// 아이템은 에셋이 아니라 <see cref="ItemId"/> 문자열로 들고 있다. Rebuild가 Item을 Monster보다
+    /// 먼저 만들므로, 에셋 연결은 그때 만들어 둔 ItemDefinition으로 한 번에 한다(던전의 보상 목록과
+    /// 같은 방식이다).
+    /// </summary>
+    public struct MonsterDropRow
+    {
+        /// <summary>CSV에 적힌 그대로의 item_id. Item.csv에 있는 활성 행만 여기까지 온다.</summary>
+        public string ItemId;
+
+        /// <summary>백분율. 25는 25%, 0.5는 0.5%다. 0 초과 100 이하만 여기까지 온다.</summary>
+        public float ChancePercent;
+
+        /// <summary>한 번 드롭될 때의 개수. 1 이상만 여기까지 온다.</summary>
+        public int Count;
+    }
+
     /// <summary>Monster.csv 한 행.</summary>
     public sealed class MonsterRow
     {
         public int Line;
         public string Id = string.Empty;
         public LocalizedEntryRef Name;
+
+        /// <summary>
+        /// 묶음(분류)용 참조. 비어 있을 수 있으며, 값이 있으면 Monster.csv에 실제로 있는 다른 행의
+        /// monster_id다. <b>여기서 무엇도 상속하지 않는다</b> - base가 가리키는 행의 값이 이 행에
+        /// 자동으로 채워지는 일은 없고, 모든 칸은 각자의 행이 스스로 적는다.
+        /// </summary>
+        public string BaseMonsterId = string.Empty;
+
+        /// <summary>채워진 드롭 슬롯만 CSV에 적힌 슬롯 순서 그대로. 최대
+        /// <see cref="TableDataColumns.MonsterDropSlotCount"/>개다.</summary>
+        public readonly List<MonsterDropRow> Drops = new List<MonsterDropRow>();
 
         /// <summary>참조에 쓰는 world_id(앞뒤 공백을 다듬은 값). 비어 있을 수 있다.</summary>
         public string WorldId = string.Empty;
@@ -62,28 +109,32 @@ namespace TableDataEditor
         /// <summary>등장 몬스터 id를 CSV에 적힌 순서 그대로. 공백은 다듬은 값이다.</summary>
         public readonly List<string> MonsterIds = new List<string>();
 
-        /// <summary>보상 아이템 id를 CSV에 적힌 순서 그대로.</summary>
+        /// <summary>보상 아이템 id를 CSV에 적힌 순서 그대로. monster_ids와 마찬가지로 <b>Item.csv의
+        /// 행</b>을 가리키며, 실제 에셋 연결은 Rebuild가 그때 만든 ItemDefinition으로 한다 - 수동
+        /// 아이템 에셋은 임포터의 출력 대상이 아니다.</summary>
         public readonly List<string> RewardItemIds = new List<string>();
-
-        /// <summary><see cref="RewardItemIds"/>와 같은 순서로 찾아 둔 기존 ItemDefinition.
-        /// <b>읽기만 한다</b> - 임포터는 수동 아이템 에셋을 절대 고치지 않는다.</summary>
-        public readonly List<ItemDefinition> RewardItems = new List<ItemDefinition>();
 
         public int DisplayOrder;
         public bool Enabled;
     }
 
     /// <summary>
-    /// 파싱과 검증을 마친 세 표. Rebuild는 이 스냅샷만 보고 에셋을 만든다 - CSV를 다시 읽지 않으므로
+    /// 파싱과 검증을 마친 네 표. Rebuild는 이 스냅샷만 보고 에셋을 만든다 - CSV를 다시 읽지 않으므로
     /// "검증한 내용"과 "쓰는 내용"이 어긋날 수 없다.
+    ///
+    /// 목록의 순서는 <b>World → Item → Monster → Dungeon</b>이고, 이것이 검증과 생성 순서이기도 하다.
+    /// 뒤의 표가 앞의 표를 참조하므로(Dungeon은 Item과 Monster를 가리킨다), Item을 Monster보다 앞에
+    /// 두면 이후 단계에서 몬스터가 드롭 아이템을 가리키게 되어도 순서를 다시 뒤집을 필요가 없다.
     /// </summary>
     public sealed class TableDataSnapshot
     {
         public readonly List<WorldRow> Worlds = new List<WorldRow>();
+        public readonly List<ItemRow> Items = new List<ItemRow>();
         public readonly List<MonsterRow> Monsters = new List<MonsterRow>();
         public readonly List<DungeonRow> Dungeons = new List<DungeonRow>();
 
         public readonly Dictionary<string, WorldRow> WorldsById = new Dictionary<string, WorldRow>(StringComparer.Ordinal);
+        public readonly Dictionary<string, ItemRow> ItemsById = new Dictionary<string, ItemRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, MonsterRow> MonstersById = new Dictionary<string, MonsterRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, DungeonRow> DungeonsById = new Dictionary<string, DungeonRow>(StringComparer.Ordinal);
     }

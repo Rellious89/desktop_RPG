@@ -89,6 +89,48 @@ namespace TableDataEditor
         }
 
         /// <summary>
+        /// 백분율 칸. <b>25는 25%, 0.5는 0.5%</b>이며 0을 초과하고 100 이하여야 한다.
+        ///
+        /// InvariantCulture 고정에 지수 표기와 앞뒤 공백을 허용하지 않는다 - 지역 설정에 따라
+        /// 소수점이 <c>,</c>가 되는 파일을 조용히 읽으면 25.5가 255가 되는 식으로 값이 통째로 달라진다.
+        ///
+        /// <b>NaN / Infinity는 파싱은 되지만 오류다.</b> .NET의 실수 파서는 스타일과 무관하게 이 낱말들을
+        /// 받아 주므로, 여기서 명시적으로 걸러 내지 않으면 "확률이 NaN인 드롭"이 에셋까지 그대로 간다.
+        /// </summary>
+        public static bool TryReadPercent(
+            string file, int line, string column, string raw, TableDataDiagnosticLog log, out float value)
+        {
+            value = 0f;
+
+            if (!float.TryParse(
+                    raw, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+                    CultureInfo.InvariantCulture, out float parsed))
+            {
+                log.Error(file, line, column, raw ?? string.Empty,
+                    "백분율이 아닙니다 - 10진 소수만 허용하며(예: 25, 0.5) 공백/지수 표기/천 단위 구분 기호는 쓸 수 없습니다.");
+                return false;
+            }
+
+            if (float.IsNaN(parsed) || float.IsInfinity(parsed))
+            {
+                log.Error(file, line, column, raw ?? string.Empty,
+                    "백분율이 수가 아닙니다(NaN/Infinity) - 0 초과 100 이하의 실제 값을 적어야 합니다.");
+                return false;
+            }
+
+            if (parsed <= 0f || parsed > 100f)
+            {
+                log.Error(file, line, column, raw ?? string.Empty,
+                    "백분율은 0을 초과하고 100 이하여야 합니다 - 0은 '드롭되지 않음'이므로 슬롯을 비워 두고, " +
+                    "100은 '항상 드롭'입니다.");
+                return false;
+            }
+
+            value = parsed;
+            return true;
+        }
+
+        /// <summary>
         /// <c>|</c>로 구분한 ID 목록을 읽는다. 빈 값이면 아무것도 담지 않고 true를 돌려주므로,
         /// "목록이 비었다"는 경고는 목록의 의미를 아는 호출하는 쪽이 낸다.
         ///
