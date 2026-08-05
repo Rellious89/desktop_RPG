@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Monster_6
   m_EditorClassIdentifier: 
   monsterId: 6
+  baseMonsterId: 
   localizedName:
     m_TableReference:
       m_TableCollectionName: GUID:be2871dfcdd4c4e5481ce59a6786ddc2
@@ -25,7 +26,8 @@ MonoBehaviour:
   world: {fileID: 11400000, guid: 79144df9714ff41edad2ce9c6244bd91, type: 2}
   motionProfile: {fileID: 11400000, guid: 357fc874410294914a3a95033c0191af, type: 2}
   previewSprite: {fileID: 21300000, guid: a7ab74080a6184f759560913640cd639, type: 3}
-  maxDurability: 10
+  maxDurability: 30
+  drops: []
   displayOrder: 60
   references:
     version: 2

@@ -1,8 +1,8 @@
-monster_id,name_category,name_key,$monster_name,world_id,$world_name,motion_profile_key,preview_sprite_key,max_durability,base_monster_id,drop_item_id_1,$drop_item_name_1,drop_chance_1,drop_count_1,drop_item_id_2,$drop_item_name_2,drop_chance_2,drop_count_2,drop_item_id_3,$drop_item_name_3,drop_chance_3,drop_count_3,display_order,enabled,memo
-1,3,1,허수아비,2,판타지아,Scarecrow_MotionProfile,Portrait_Scarecrow,10,,,,,,,,,,,,,,10,1,허수아비
-2,3,2,스펙터,3,망자의 도시,Specter_MotionProfile,Portrait_Specter,10,,,,,,,,,,,,,,20,1,스펙터
-3,3,3,이교도,2,판타지아,VenomCultist_MotionProfile,Portrait_VenomCultist,10,,,,,,,,,,,,,,30,1,이교도
-4,3,4,늑대인간,1,애니멀랜드,Werewolf_MotionProfile,Portrait_Werewolf,10,,,,,,,,,,,,,,40,1,늑대인간
-5,3,5,하이에나라이더,1,애니멀랜드,HyenaRaider_MotionProfile,Portrait_HyenaRaider,10,,,,,,,,,,,,,,50,1,하이에나라이더
-6,3,6,두더지광부,1,애니멀랜드,MoleMiner_MotionProfile,Portrait_MoleMiner,10,,,,,,,,,,,,,,60,1,두더지광부
-7,3,7,돌골렘,2,판타지아,RockGolem_MotionProfile,Portrait_RockGolem,10,,,,,,,,,,,,,,70,1,돌골렘
+monster_id,base_monster_id,name_category,name_key,$monster_name,world_id,$world_name,motion_profile_key,preview_sprite_key,max_durability,drop_item_id_1,$drop_item_name_1,drop_chance_1,drop_count_1,drop_item_id_2,$drop_item_name_2,drop_chance_2,drop_count_2,drop_item_id_3,$drop_item_name_3,drop_chance_3,drop_count_3,display_order,enabled,memo
+1,,3,1,허수아비,2,판타지아,Scarecrow_MotionProfile,Portrait_Scarecrow,30,50000,더미아이템1,50,1,50001,더미아이템2,50,1,,,,,10,1,허수아비
+2,,3,2,스펙터,3,망자의 도시,Specter_MotionProfile,Portrait_Specter,30,50000,더미아이템1,50,1,50002,더미아이템3,50,1,,,,,20,1,스펙터
+3,,3,3,이교도,2,판타지아,VenomCultist_MotionProfile,Portrait_VenomCultist,30,50002,더미아이템3,40,1,50003,더미아이템4,30,1,50004,더미아이템5,30,1,30,1,이교도
+4,,3,4,늑대인간,1,애니멀랜드,Werewolf_MotionProfile,Portrait_Werewolf,30,,,,,,,,,,,,,40,1,늑대인간
+5,,3,5,하이에나라이더,1,애니멀랜드,HyenaRaider_MotionProfile,Portrait_HyenaRaider,30,,,,,,,,,,,,,50,1,하이에나라이더
+6,,3,6,두더지광부,1,애니멀랜드,MoleMiner_MotionProfile,Portrait_MoleMiner,30,,,,,,,,,,,,,60,1,두더지광부
+7,,3,7,돌골렘,2,판타지아,RockGolem_MotionProfile,Portrait_RockGolem,30,,,,,,,,,,,,,70,1,돌골렘

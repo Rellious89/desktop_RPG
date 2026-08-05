@@ -5565,10 +5565,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9085728b10424a2eba6d80a88f92f250, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  itemCatalog:
-  - {fileID: 11400000, guid: ff1bf8c71dea458e9520abc9e45293f9, type: 2}
-  - {fileID: 11400000, guid: 12de1b9b2b764ca6a174173e24d2fcf6, type: 2}
-  - {fileID: 11400000, guid: de09f5483cbf4b3c8e3c9d7c45150c30, type: 2}
+  generatedItemCatalog: {fileID: 11400000, guid: 749d57bd062ae47619e6dc1de90453fd, type: 2}
+  itemCatalog: []
   debugCurrencyAmount: 100
   debugItem: {fileID: 11400000, guid: ff1bf8c71dea458e9520abc9e45293f9, type: 2}
   debugItemCount: 1
@@ -5585,13 +5583,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   inventoryManager: {fileID: 1047247884}
+  encounterQueue: {fileID: 324107453}
   currencyPerDefeat: 100
-  itemCycle:
-  - {fileID: 11400000, guid: 12de1b9b2b764ca6a174173e24d2fcf6, type: 2}
-  - {fileID: 11400000, guid: ff1bf8c71dea458e9520abc9e45293f9, type: 2}
-  - {fileID: 11400000, guid: de09f5483cbf4b3c8e3c9d7c45150c30, type: 2}
-  itemCountPerDefeat: 2
   rewardToastFormat: "\uD68D\uB4DD: +{0} \uC7AC\uD654 / {1} x{2}"
+  multiRewardToastFormat: "\uD68D\uB4DD: +{0} \uC7AC\uD654 / {1}"
   currencyOnlyToastFormat: "\uD68D\uB4DD: +{0} \uC7AC\uD654"
 --- !u!1 &1064650506
 GameObject:

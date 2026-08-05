@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Monster_1
   m_EditorClassIdentifier: 
   monsterId: 1
+  baseMonsterId: 
   localizedName:
     m_TableReference:
       m_TableCollectionName: GUID:be2871dfcdd4c4e5481ce59a6786ddc2
@@ -25,7 +26,14 @@ MonoBehaviour:
   world: {fileID: 11400000, guid: 629d166772e154d9eb3f9e0e564074ae, type: 2}
   motionProfile: {fileID: 11400000, guid: d0fb5ba6f3c4443f79f4fe5befc54d4f, type: 2}
   previewSprite: {fileID: 21300000, guid: e25941fbc960446feb834982d6b914d7, type: 3}
-  maxDurability: 10
+  maxDurability: 30
+  drops:
+  - item: {fileID: 11400000, guid: 0abf78287f21a4ecfb20566c2b8b02ac, type: 2}
+    chancePercent: 50
+    count: 1
+  - item: {fileID: 11400000, guid: b3c0618c290864a7ebcc1c4918dbd725, type: 2}
+    chancePercent: 50
+    count: 1
   displayOrder: 10
   references:
     version: 2

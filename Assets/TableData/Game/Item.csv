@@ -1,4 +1,6 @@
-item_id,name_category,name_key,$item_name,icon_key,display_order,enabled,memo
-1,,,빨간 포션,,10,1,체력 회복 계열 자리 - 아이콘/이름은 데이터 준비 후 채운다
-2,,,파란 포션,,20,1,마나 회복 계열 자리 - 아이콘/이름은 데이터 준비 후 채운다
-3,,,노란 포션,,30,1,보조 효과 계열 자리 - 아이콘/이름은 데이터 준비 후 채운다
+item_id,name_category,name_key,$item_name,icon_key,$item_type,display_order,enabled,memo
+50000,4,1,더미아이템1,,consumable,10,1,
+50001,4,2,더미아이템2,,consumable,20,1,
+50002,4,3,더미아이템3,,consumable,30,1,
+50003,4,4,더미아이템4,,consumable,40,1,
+50004,4,5,더미아이템5,,consumable,50,1,
