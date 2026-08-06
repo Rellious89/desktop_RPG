@@ -51,6 +51,16 @@ namespace Character
         GameObject HitEffectPrefab { get; }
         Vector2 HitEffectOffset { get; }
         float HitEffectScale { get; }
+
+        /// <summary>true면 이 공격이 <see cref="HitEffectJitter"/>로 타격 이펙트의 랜덤 출력 범위를
+        /// 직접 정한다. false면 맞는 쪽(HitEffectSpawner)에 설정된 기본 범위를 그대로 쓴다 - 지터 0도
+        /// 정당한 값이라 값만으로는 "지정 안 함"을 표현할 수 없어서 이 플래그로 구분한다.</summary>
+        bool OverrideHitEffectJitter { get; }
+
+        /// <summary>타격 이펙트가 흩어지는 범위(월드 유닛, X/Y 각각 ±값). <see cref="OverrideHitEffectJitter"/>가
+        /// false면 이 값은 쓰이지 않는다.</summary>
+        Vector2 HitEffectJitter { get; }
+
         AudioClip HitSound { get; }
 
         /// <summary>Cast Frame에서 발사할 발사체 prefab. null이면 이 공격에는 발사체가 없고, 발사체 관련

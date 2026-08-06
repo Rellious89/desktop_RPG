@@ -548,7 +548,11 @@ namespace Enemy
             damageNumberSpawner.Spawn(cue.Damage, damageNumberCenter, damageNumberPresentation);
             // Hit Effect는 공격 모션(AttackMotionDefinition)이 단독으로 소유한다 - prefab이 비어 있으면
             // "이 공격에는 타격 이펙트가 없다"는 뜻이고, 스포너가 대신 채워 넣는 기본 이펙트는 없다.
-            hitEffectSpawner.Spawn(cue.EffectPrefab, offsetOverride: cue.EffectOffset, scaleOverride: cue.EffectScale);
+            // Jitter만 예외로 "공격이 직접 정하거나(Override 켬), 맞는 이 몬스터의 기본값에 맡기거나"를
+            // 고를 수 있다 - 몬스터 덩치에 맞춘 기본 범위를 대부분 그대로 쓰되, 특정 공격만 넓게/좁게
+            // 흩뿌리고 싶을 때가 있기 때문이다. Override가 꺼져 있으면 null을 넘겨 스포너가 자기 값을 쓴다.
+            hitEffectSpawner.Spawn(cue.EffectPrefab, offsetOverride: cue.EffectOffset, scaleOverride: cue.EffectScale,
+                jitterOverride: cue.OverrideEffectJitter ? cue.EffectJitter : (Vector2?)null);
 
             ReceiveImpact?.Invoke();
         }

@@ -1747,6 +1747,27 @@ namespace CharacterEditor
             EditorGUILayout.PropertyField(attackObject.FindProperty("hitEffectPrefab"), new GUIContent("Effect Prefab"));
             EditorGUILayout.PropertyField(attackObject.FindProperty("hitEffectOffset"), new GUIContent("Effect Offset"));
             EditorGUILayout.PropertyField(attackObject.FindProperty("hitEffectScale"), new GUIContent("Effect Scale"));
+
+            // Jitter는 "이 공격이 직접 정한다 / 맞는 몬스터의 기본값에 맡긴다" 두 상태가 있고, 값 0도
+            // 정당한 값(랜덤 없이 정확히 한 점)이라 토글 없이는 둘을 구분할 수 없다.
+            SerializedProperty overrideJitter = attackObject.FindProperty("overrideHitEffectJitter");
+            EditorGUILayout.PropertyField(overrideJitter,
+                new GUIContent("Override Jitter", "끄면 맞는 몬스터의 HitEffectSpawner에 설정된 Spawn Jitter를 그대로 씁니다."));
+            using (new EditorGUI.DisabledScope(!overrideJitter.boolValue))
+            {
+                EditorGUILayout.PropertyField(attackObject.FindProperty("hitEffectJitter"),
+                    new GUIContent("Effect Jitter", "이펙트가 흩어지는 범위(X/Y 각각 ±값). Preview의 주황색 점선 사각형으로 확인합니다."));
+                RegisterTextInputPointerDown(GUILayoutUtility.GetLastRect());
+            }
+            if (!overrideJitter.boolValue)
+            {
+                Vector2? monsterJitter = GetPreviewMonsterJitter();
+                string note = monsterJitter.HasValue
+                    ? $"기본값 사용 - 몬스터 설정 ±{monsterJitter.Value.x:0.###}, ±{monsterJitter.Value.y:0.###}"
+                    : "기본값 사용 - 열려 있는 씬에서 몬스터를 찾지 못해 범위를 표시할 수 없습니다";
+                EditorGUILayout.LabelField(" ", note, EditorStyles.miniLabel);
+            }
+
             EditorGUILayout.PropertyField(attackObject.FindProperty("hitSound"), new GUIContent("Hit Sound"));
 
             EditorGUILayout.Space(6f);
@@ -2388,30 +2409,34 @@ namespace CharacterEditor
                     projectileTarget, worldToScreen);
             }
 
-            bool exactCast = attack != null && attack.Attack != null
-                && GetFrameIndex(attack, time, false) == Mathf.Clamp(attack.Attack.CastFrameIndex, 0, attack.Frames.Length - 1);
-            if (exactCast)
-            {
-                GameObject castPrefab = attack.Attack.CastEffectPrefab;
-                Sprite castEffectSprite = castPrefab != null ? castPrefab.GetComponentInChildren<SpriteRenderer>()?.sprite : null;
-                if (castEffectSprite != null)
-                {
-                    Vector2 castEffectOffset = attack.Attack.CastEffectOffset;
-                    float castEffectScale = attack.Attack.CastEffectScale;
-                    DrawSprite(castEffectSprite, previewZoom * Mathf.Max(0.01f, castEffectScale), characterAnchor + WorldToScreen(castEffectOffset, worldToScreen), Color.white);
-                }
-            }
-
+            // Receive Point 강조와 "HIT FRAME" 라벨은 예전처럼 정확히 그 프레임일 때만 켠다 - 이건
+            // 연출이 아니라 편집 보조 표시라서 이펙트 재생 구간 내내 떠 있으면 안 된다.
             bool exactHit = attack != null && GetFrameIndex(attack, time, false) == Mathf.Clamp(attack.HitFrame, 0, attack.Frames.Length - 1);
-            if (exactHit && attack.Attack != null)
+
+            // Cast/Hit Effect Preview: 런타임과 같은 규칙으로 "그 프레임에 도달한 순간부터 이펙트 자신의
+            // 길이만큼" 재생한다. 예전에는 정확히 그 프레임일 때만 프리팹의 SpriteRenderer에 꽂힌 그림
+            // 한 장을 그려서, 6프레임짜리 이펙트도 0번 프레임이 한 순간 스쳐 지나갈 뿐이었다 - 이펙트가
+            // 실제로 어떻게 터지는지 에디터에서 볼 수 없었다.
+            if (attack?.Attack != null && attack.Frames.Length > 0)
             {
-                GameObject prefab = attack.Attack.HitEffectPrefab;
-                Sprite effectSprite = prefab != null ? prefab.GetComponentInChildren<SpriteRenderer>()?.sprite : null;
-                if (effectSprite != null)
+                float fps = Mathf.Max(0.01f, attack.Fps);
+
+                float castStartTime = Mathf.Clamp(attack.Attack.CastFrameIndex, 0, attack.Frames.Length - 1) / fps;
+                DrawEffectPreview(attack.Attack.CastEffectPrefab, time - castStartTime, attack.Attack.CastEffectScale,
+                    characterAnchor + WorldToScreen(attack.Attack.CastEffectOffset, worldToScreen), previewZoom);
+
+                float effectHitTime = Mathf.Clamp(attack.HitFrame, 0, attack.Frames.Length - 1) / fps;
+                Vector2 hitEffectAnchor = receivePoint + WorldToScreen(attack.Attack.HitEffectOffset, worldToScreen);
+                DrawEffectPreview(attack.Attack.HitEffectPrefab, time - effectHitTime, attack.Attack.HitEffectScale,
+                    hitEffectAnchor, previewZoom);
+
+                // 랜덤 출력 범위 가이드는 이펙트 재생 여부와 무관하게 항상 띄운다 - Effect Offset처럼
+                // 타임라인 위치를 맞추지 않고도 X/Y를 편집하며 바로 확인할 수 있어야 하기 때문이다
+                // (Launch Point/발사체 경로를 항상 그리는 것과 같은 규칙).
+                if (attack.Attack.HitEffectPrefab != null)
                 {
-                    Vector2 effectOffset = attack.Attack.HitEffectOffset;
-                    float effectScale = attack.Attack.HitEffectScale;
-                    DrawSprite(effectSprite, previewZoom * Mathf.Max(0.01f, effectScale), receivePoint + WorldToScreen(effectOffset, worldToScreen), Color.white);
+                    Vector2? jitterRange = ResolveEffectiveHitEffectJitter(attack.Attack);
+                    if (jitterRange.HasValue) DrawJitterRangeGuide(hitEffectAnchor, jitterRange.Value, worldToScreen);
                 }
             }
 
@@ -2854,12 +2879,28 @@ namespace CharacterEditor
             if (main == null) return 0f;
             PreviewMotion attack = main.Kind == PreviewMotionKind.Attack ? main : opponent != null && opponent.Kind == PreviewMotionKind.Attack ? opponent : null;
             PreviewMotion hit = main.Kind == PreviewMotionKind.Hit ? main : opponent != null && opponent.Kind == PreviewMotionKind.Hit ? opponent : null;
+
+            // 타임라인은 "공격 모션이 끝날 때"가 아니라 "화면에서 마지막 연출이 사라질 때"까지 덮어야
+            // 한다 - 공격 모션(3프레임 @18fps = 0.167초)보다 타격 이펙트(예: 6프레임 @12fps = 0.5초)가
+            // 훨씬 길 수 있어서, 이걸 반영하지 않으면 폭발이 한창일 때 타임라인이 끝나 끝까지 스크럽할
+            // 수 없다. Cast Effect도 같은 이유로 함께 본다.
+            float presentationEnd = 0f;
+            if (attack?.Attack != null && attack.Frames.Length > 0)
+            {
+                float fps = Mathf.Max(0.01f, attack.Fps);
+                float castTime = Mathf.Clamp(attack.Attack.CastFrameIndex, 0, attack.Frames.Length - 1) / fps;
+                float hitEffectTime = Mathf.Clamp(attack.HitFrame, 0, attack.Frames.Length - 1) / fps;
+                presentationEnd = Mathf.Max(
+                    castTime + GetEffectPreviewDuration(attack.Attack.CastEffectPrefab),
+                    hitEffectTime + GetEffectPreviewDuration(attack.Attack.HitEffectPrefab));
+            }
+
             if (attack != null && hit != null)
             {
                 float hitTime = Mathf.Clamp(attack.HitFrame, 0, Mathf.Max(0, attack.Frames.Length - 1)) / Mathf.Max(0.01f, attack.Fps);
-                return Mathf.Max(attack.Duration, hitTime + hit.Duration);
+                return Mathf.Max(Mathf.Max(attack.Duration, hitTime + hit.Duration), presentationEnd);
             }
-            return Mathf.Max(main.Duration, opponent?.Duration ?? 0f);
+            return Mathf.Max(Mathf.Max(main.Duration, opponent?.Duration ?? 0f), presentationEnd);
         }
 
         private void RestartPreview()
@@ -3173,6 +3214,117 @@ namespace CharacterEditor
             const float size = 5f;
             EditorGUI.DrawRect(new Rect(anchor.x - size, anchor.y - 1f, size * 2f, 2f), color);
             EditorGUI.DrawRect(new Rect(anchor.x - 1f, anchor.y - size, 2f, size * 2f), color);
+        }
+
+        // 몬스터의 기본 Jitter 조회 캐시 - 씬 탐색을 OnGUI마다 반복하지 않기 위한 것이다.
+        private HitEffectSpawner cachedMonsterHitEffectSpawner;
+        private double monsterHitEffectSpawnerLookupTime = -999d;
+
+        /// <summary>Hit Effect의 랜덤 출력 범위를 몬스터 기본값에 맡겼을 때 그 값을 보여주기 위한 조회.
+        /// 이 값은 프로필 에셋이 아니라 <b>씬에 놓인 몬스터의 HitEffectSpawner</b>에 있으므로 열려 있는
+        /// 씬에서 찾는다 - 씬에 몬스터가 없으면 null이고, 그때는 범위를 표시하지 않는다(0으로 표시하면
+        /// "랜덤 없음"과 구분되지 않아 오히려 잘못된 정보가 된다).
+        ///
+        /// FindObjectsOfType은 OnGUI마다 돌리기엔 비싸므로 찾은 결과를 캐시하고 1초에 한 번만 갱신한다 -
+        /// 인스펙터에서 몬스터 값을 바꿔도 곧 반영된다.</summary>
+        private Vector2? GetPreviewMonsterJitter()
+        {
+            const double refreshInterval = 1d;
+            double now = EditorApplication.timeSinceStartup;
+            if (cachedMonsterHitEffectSpawner == null || now - monsterHitEffectSpawnerLookupTime > refreshInterval)
+            {
+                monsterHitEffectSpawnerLookupTime = now;
+                cachedMonsterHitEffectSpawner = ResolveMonsterHitEffectSpawner();
+            }
+
+            return cachedMonsterHitEffectSpawner != null ? cachedMonsterHitEffectSpawner.DefaultJitterRange : (Vector2?)null;
+        }
+
+        private static HitEffectSpawner ResolveMonsterHitEffectSpawner()
+        {
+            // 비활성 포함 - 대기 중인 몬스터(Monster_Standby)만 있을 수도 있다.
+            var controllers = UnityEngine.Object.FindObjectsOfType<TargetCombatController>(true);
+            for (int i = 0; i < controllers.Length; i++)
+            {
+                var spawner = controllers[i].GetComponent<HitEffectSpawner>();
+                if (spawner != null) return spawner;
+            }
+            return null;
+        }
+
+        /// <summary>이번 공격이 실제로 쓰게 될 Hit Effect 랜덤 범위. Override가 켜져 있으면 공격이 정한
+        /// 값, 아니면 몬스터 기본값이다(런타임 HitEffectSpawner.ResolveJitterRange와 같은 판단).</summary>
+        private Vector2? ResolveEffectiveHitEffectJitter(AttackMotionDefinition attack)
+        {
+            if (attack == null) return null;
+            if (attack.OverrideHitEffectJitter) return attack.HitEffectJitter;
+            return GetPreviewMonsterJitter();
+        }
+
+        /// <summary>Hit Effect가 흩어질 수 있는 범위를 점선 사각형으로 그린다. 실제 랜덤값을 그리지
+        /// 않는 이유는 프리뷰가 결정론적이어야 하기 때문이다 - 같은 스크럽 위치에서 매번 다른 자리에
+        /// 이펙트가 찍히면 Offset을 눈으로 맞출 수 없다. 대신 "이 안에서 튄다"를 범위로 보여준다.
+        /// 범위가 0이면(랜덤 없음) 그릴 사각형이 없으므로 아무것도 그리지 않는다.</summary>
+        private static void DrawJitterRangeGuide(Vector2 anchor, Vector2 jitterRange, float worldToScreen)
+        {
+            if (jitterRange.x <= 0f && jitterRange.y <= 0f) return;
+
+            float halfWidth = jitterRange.x * worldToScreen;
+            float halfHeight = jitterRange.y * worldToScreen;
+            Vector3 topLeft = new Vector3(anchor.x - halfWidth, anchor.y - halfHeight);
+            Vector3 topRight = new Vector3(anchor.x + halfWidth, anchor.y - halfHeight);
+            Vector3 bottomRight = new Vector3(anchor.x + halfWidth, anchor.y + halfHeight);
+            Vector3 bottomLeft = new Vector3(anchor.x - halfWidth, anchor.y + halfHeight);
+
+            Color oldColor = Handles.color;
+            Handles.color = new Color(1f, 0.62f, 0.2f, 0.85f);
+            const float dashSize = 4f;
+            Handles.DrawDottedLine(topLeft, topRight, dashSize);
+            Handles.DrawDottedLine(topRight, bottomRight, dashSize);
+            Handles.DrawDottedLine(bottomRight, bottomLeft, dashSize);
+            Handles.DrawDottedLine(bottomLeft, topLeft, dashSize);
+            Handles.color = oldColor;
+        }
+
+        /// <summary>IHitEffectPlayback을 구현하지 않아 자기 길이를 알려주지 못하는 이펙트 프리팹을
+        /// 프리뷰에서 얼마 동안 보여줄지. HitEffectSpawner가 그런 prefab에 쓰는 폴백 회수 시간(기본
+        /// defaultDuration)과 같은 의미다 - 런타임과 프리뷰가 서로 다른 시간을 쓰지 않도록 맞춰둔다.</summary>
+        private const float EffectPreviewFallbackDuration = 0.15f;
+
+        /// <summary>이펙트 프리팹을 "재생 시작 후 elapsed초" 상태로 그린다. 재생이 끝났거나(elapsed가
+        /// 이펙트 길이 이상) 아직 시작 전이면(elapsed &lt; 0) 아무것도 그리지 않는다. 배율/앵커 규칙은
+        /// 기존 Cast/Hit Effect 표시와 동일하게 유지한다(previewZoom * Effect Scale).</summary>
+        private static void DrawEffectPreview(GameObject prefab, float elapsed, float scale, Vector2 anchor, float previewZoom)
+        {
+            if (prefab == null || elapsed < 0f) return;
+
+            Sprite sprite = GetEffectPreviewSprite(prefab, elapsed);
+            if (sprite == null) return;
+
+            DrawSprite(sprite, previewZoom * Mathf.Max(0.01f, scale), anchor, Color.white);
+        }
+
+        /// <summary>런타임이 그 시점에 보여줄 Sprite를 그대로 되묻는다 - 프레임 선택 규칙을 에디터가
+        /// 따로 구현하지 않으므로(이펙트 컴포넌트의 GetFrameAt이 단일 소스다) 프리뷰와 런타임이
+        /// 어긋날 수 없다. 재생 컴포넌트가 아예 없는 prefab은 길이를 알 수 없으므로 폴백 시간 동안
+        /// 프리팹에 꽂힌 그림 한 장을 보여준다.</summary>
+        private static Sprite GetEffectPreviewSprite(GameObject prefab, float elapsed)
+        {
+            var playback = prefab.GetComponentInChildren<IHitEffectPlayback>(true);
+            if (playback != null) return playback.GetFrameAt(elapsed);
+
+            if (elapsed >= EffectPreviewFallbackDuration) return null;
+            return prefab.GetComponentInChildren<SpriteRenderer>(true)?.sprite;
+        }
+
+        /// <summary>이펙트 프리팹이 스스로 보고하는 재생 길이(초). 타임라인이 이펙트가 끝나기 전에
+        /// 잘리지 않도록 프리뷰 전체 길이를 계산할 때 쓴다.</summary>
+        private static float GetEffectPreviewDuration(GameObject prefab)
+        {
+            if (prefab == null) return 0f;
+
+            var playback = prefab.GetComponentInChildren<IHitEffectPlayback>(true);
+            return playback != null ? Mathf.Max(0f, playback.Duration) : EffectPreviewFallbackDuration;
         }
 
         /// <summary>발사체 경로/시작점을 항상 표시하고, Cast~Hit 구간에는 프리팹의 현재 Sprite를 런타임과

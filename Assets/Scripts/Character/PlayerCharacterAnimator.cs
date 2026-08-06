@@ -884,7 +884,7 @@ namespace Character
             flashOnCue.Flash();
             // 이동은 "실제 타격"에만 반응한다 - 키 입력이나 충전 진행으로는 절대 발동하지 않는다.
             if (attackMovement != null && attackMovement.isActiveAndEnabled) attackMovement.PlayAttackMove();
-            HitPoint?.Invoke(new AttackHitCue(basicAttackPower, activeMotion.HitSound, activeMotion.HitEffectPrefab, activeMotion.HitEffectOffset, activeMotion.HitEffectScale)); // 이 호출이 처치를 유발하면 Target.HasAttackableTarget이 여기서 이미 false로 바뀌어 있을 수 있다.
+            HitPoint?.Invoke(new AttackHitCue(basicAttackPower, activeMotion.HitSound, activeMotion.HitEffectPrefab, activeMotion.HitEffectOffset, activeMotion.HitEffectScale, activeMotion.OverrideHitEffectJitter, activeMotion.HitEffectJitter)); // 이 호출이 처치를 유발하면 Target.HasAttackableTarget이 여기서 이미 false로 바뀌어 있을 수 있다.
 
             if (activeMotion.UseAccumulatedInput)
             {

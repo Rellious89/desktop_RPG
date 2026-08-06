@@ -25,12 +25,24 @@ namespace Common
     /// 인스턴스를 prefab별로 풀링한다(DamageNumberSpawner와 같은 이유) - 원래 아무 제한 없이 매
     /// 타격마다 새로 Instantiate/Destroy했는데, 연타가 이어지면 그만큼 GC 압박과 엔진 쪽 오브젝트
     /// 생성/파괴 비용이 쌓여 메인 스레드가 순간적으로 멎을 수 있었다 - 이게 전역 키보드 후크/WndProc
-    /// 응답을 늦춰 키 입력 중 마우스가 끊기는 것처럼 보이는 원인 중 하나였다. minSpawnInterval
-    /// 만으로는 빈도만 줄일 뿐 Instantiate/Destroy 자체의 비용은 그대로 남아서, DamageNumberSpawner와
-    /// 동일하게 풀링으로 바꾼다. 이펙트 prefab에 HitEffectPop이 있으면 그 컴포넌트의 재생 완료 콜백을
-    /// 통해 풀로 반환하고, 없으면 스포너가 직접 코루틴으로 duration 후 반환한다. 풀로 돌아올 때마다
-    /// 위치/회전/로컬 스케일/알파를 프리팹 고유 기본값으로 되돌려서, HitEffectPop이 없는 prefab을
+    /// 응답을 늦춰 키 입력 중 마우스가 끊기는 것처럼 보이는 원인 중 하나였다. 한때는 최소 생성 간격
+    /// (minSpawnInterval)으로 빈도까지 줄였지만, 그건 빈도만 낮출 뿐 Instantiate/Destroy 자체의 비용은
+    /// 그대로 남기면서 "빠른 두 번째 타격은 이펙트가 조용히 사라지는" 연출 손실만 만들었다 - 비용 문제는
+    /// DamageNumberSpawner와 동일한 풀링으로 해결됐으므로 그 제한은 걷어냈다. 풀로 돌아올 때마다
+    /// 위치/회전/로컬 스케일/알파를 프리팹 고유 기본값으로 되돌려서, 재생 컴포넌트가 없는 prefab을
     /// 나중에 붙이더라도 재사용 사이에 상태가 누적되지 않는다.
+    ///
+    /// <b>이펙트의 수명은 이 스포너가 정하지 않는다.</b> prefab에 <see cref="IHitEffectPlayback"/>
+    /// 구현체가 있으면 그 이펙트가 마지막 프레임까지 재생한 뒤 보내오는 완료 통보를 기다렸다가 회수한다 -
+    /// 그래서 6프레임짜리 폭발이든 20프레임짜리 폭발이든 중간에 잘리지 않는다. 예전에는 스포너의
+    /// defaultDuration(0.15초)으로 일괄 회수했는데, 그 값은 원래 아트가 없던 시절 HitEffectPop 더미
+    /// 연출의 재생 속도를 잡으라고 둔 것이라 실제 스프라이트시트 이펙트의 클립 길이와 맞을 이유가
+    /// 없었다(0.5초짜리 폭발이 6프레임 중 2프레임만 나오고 사라지던 원인). 이제 defaultDuration은
+    /// 재생 컴포넌트가 아예 없는 prefab에만 쓰는 폴백이다.
+    ///
+    /// 이전 이펙트가 아직 재생 중인데 다음 이펙트가 생성되는 것은 정상이며 막지 않는다 - 인스턴스가
+    /// prefab별로 풀링되므로 겹쳐서 여러 개가 동시에 떠 있어도 서로 간섭하지 않고, 풀이 모자라면 그때만
+    /// 추가로 만든다. 겹침이 연출상 어색한지는 작업자가 데이터로 조절할 부분이지 코드가 제한할 부분이 아니다.
     /// </summary>
     public class HitEffectSpawner : MonoBehaviour
     {
@@ -46,29 +58,30 @@ namespace Common
         [Tooltip("이펙트가 생성될 실제 지점. 비워두면 이 오브젝트의 Transform 기준 fallbackOffset 위치를 대신 쓴다.")]
         [SerializeField] private Transform impactPoint;
 
-        [Tooltip("impactPoint 로컬 좌표 기준 좌우 랜덤 범위(units) - impactPoint의 스케일이 그대로 반영되므로 화면 고정 오프셋이 아니다.")]
+        [Tooltip("이 대상이 맞을 때 이펙트가 흩어지는 좌우 기본 범위(units) - impactPoint의 스케일이 그대로 " +
+                 "반영되므로 화면 고정 오프셋이 아니다. 공격 모션에서 Override Jitter를 켜면 그 공격에는 " +
+                 "이 값 대신 공격이 정한 범위가 쓰인다.")]
         [SerializeField] private float spawnJitterX = 0.08f;
-        [Tooltip("impactPoint 로컬 좌표 기준 상하 랜덤 범위(units) - impactPoint의 스케일이 그대로 반영되므로 화면 고정 오프셋이 아니다.")]
+        [Tooltip("이 대상이 맞을 때 이펙트가 흩어지는 상하 기본 범위(units) - impactPoint의 스케일이 그대로 " +
+                 "반영되므로 화면 고정 오프셋이 아니다. 공격 모션에서 Override Jitter를 켜면 그 공격에는 " +
+                 "이 값 대신 공격이 정한 범위가 쓰인다.")]
         [SerializeField] private float spawnJitterY = 0.08f;
 
         [Tooltip("impactPoint가 비어 있을 때 이 오브젝트 기준으로 사용할 오프셋(월드 유닛).")]
         [SerializeField] private Vector2 fallbackOffset = new Vector2(0f, 0.3f);
 
-        [Header("수명")]
-        [Tooltip("이펙트 인스턴스를 재생 후 정리하기까지 걸리는 시간(초). 0.1~0.2 권장, 기본값 0.15.")]
+        [Header("수명 (폴백 전용)")]
+        [Tooltip("IHitEffectPlayback 구현체(HitEffectPop / HitEffectSpriteAnimation 등)가 붙어 있지 않아 " +
+                 "재생 종료를 스스로 알리지 못하는 prefab에만 쓰는 회수 시간(초). 재생 컴포넌트가 있는 " +
+                 "이펙트는 이 값을 무시하고 자기 클립 길이만큼 온전히 재생한 뒤 사라지므로, 이펙트가 " +
+                 "중간에 잘린다면 이 값이 아니라 그 이펙트의 프레임 수/FPS를 확인해야 한다.")]
         [SerializeField] private float defaultDuration = 0.15f;
-
-        [Header("연타 제한")]
-        [Tooltip("이 시간(초)보다 짧은 간격으로는 새 이펙트를 생성하지 않는다. 빠른 연타 시 Instantiate가 과도하게 쌓이는 것을 막는다.")]
-        [SerializeField] private float minSpawnInterval = 0.05f;
 
         [Header("풀")]
         [Tooltip("prewarmEffectPrefab 기준으로 미리 만들어두고 재사용할 이펙트 인스턴스 개수. 연타 중 동시에 재생 중일 수 있는 최대 개수보다 넉넉하게 잡는다.")]
         [SerializeField] private int poolSize = 8;
 
         private const float FallbackDuration = 0.15f;
-
-        private float lastSpawnTime = -999f;
 
         // StageVisualRootController.CombatFxRoot를 그대로 가져와서 쓴다 - 모든 HitEffectSpawner
         // 인스턴스(몬스터마다 하나씩)가 같은 컨테이너를 공유하므로 별도 Inspector 와이어링이 필요 없다.
@@ -79,13 +92,23 @@ namespace Common
         private readonly Dictionary<GameObject, Queue<GameObject>> poolsByPrefab = new Dictionary<GameObject, Queue<GameObject>>();
         private readonly Dictionary<GameObject, GameObject> prefabByInstance = new Dictionary<GameObject, GameObject>();
 
-        // 프리팹 고유의 기본 로컬 스케일 - 풀 반환 시 이 값으로 되돌려서 HitEffectPop이 없는(자체적으로
+        // 프리팹 고유의 기본 로컬 스케일 - 풀 반환 시 이 값으로 되돌려서 재생 컴포넌트가 없는(자체적으로
         // localScale을 매 프레임 재설정하지 않는) prefab이 나중에 붙어도 재사용 사이에 스케일이 누적되지 않는다.
         private readonly Dictionary<GameObject, Vector3> originalLocalScaleByInstance = new Dictionary<GameObject, Vector3>();
+
+        // 완료 통보로 받은 재생 컴포넌트에서 "풀에 등록된 인스턴스 루트"로 되짚기 위한 표. 재생 컴포넌트가
+        // 자식에 붙어 있어도 회수 대상은 항상 풀이 알고 있는 루트여야 하므로, 생성 시점에 한 번만 맺어둔다.
+        private readonly Dictionary<IHitEffectPlayback, GameObject> instanceByPlayback = new Dictionary<IHitEffectPlayback, GameObject>();
+
+        // 매 Spawn마다 메서드 그룹을 넘기면 그때마다 델리게이트가 새로 할당된다 - 연타 중 GC 압박을
+        // 피하려고 풀링까지 도입한 컴포넌트이므로 콜백도 한 번만 만들어 재사용한다.
+        // (System을 using하면 이 파일의 Random이 UnityEngine.Random과 모호해지므로 정규화해서 쓴다.)
+        private System.Action<IHitEffectPlayback> returnPlaybackToPool;
 
         private void Awake()
         {
             combatFxRoot = StageVisualRootController.Instance != null ? StageVisualRootController.Instance.CombatFxRoot : null;
+            returnPlaybackToPool = ReturnPlaybackToPool;
 
             if (prewarmEffectPrefab == null) return;
 
@@ -112,33 +135,50 @@ namespace Common
             instance.SetActive(false);
             prefabByInstance[instance] = prefab;
             originalLocalScaleByInstance[instance] = instance.transform.localScale;
+
+            // 비활성 상태로 대기하므로 includeInactive가 필수다.
+            var playback = instance.GetComponentInChildren<IHitEffectPlayback>(true);
+            if (playback != null) instanceByPlayback[playback] = instance;
+
             return instance;
         }
 
         /// <summary>
         /// prefab이 지정한 이펙트를 생성한다. prefab이 null이면 "이 연출에는 이펙트가 없다"는 뜻이라
         /// 조용히 아무것도 하지 않는다 - 대신 재생할 기본 이펙트는 없다. duration이 비정상(0 이하,
-        /// NaN 등)이어도 예외 없이 안전하게 보정한다. minSpawnInterval 안에 들어오는 추가 요청은
-        /// 조용히 무시한다(데미지/피격 반응 등 다른 처리에는 영향 없음).
+        /// NaN 등)이어도 예외 없이 안전하게 보정한다. 요청은 아무리 촘촘히 들어와도 전부 생성한다 -
+        /// 이전 이펙트가 아직 재생 중인지는 보지 않는다(겹치는 연출이 어색한지는 데이터로 조절할 부분이다).
         ///
         /// offsetOverride: impactPoint가 있으면 그 로컬 좌표계 기준(TransformPoint) 추가 오프셋, 없으면
         /// fallbackOffset에 그대로 더하는 월드 오프셋 - 공격 모션 데이터의 Effect Offset을 그대로 전달한다.
         /// scaleOverride: 0 이하면 "지정 안 함"으로 보고 prefab 원본 배율을 그대로 쓴다. 0보다 크면
-        /// HitEffectPop이 있는 prefab은 그 재생 애니메이션의 배율에 곱해서 적용하고, 없는 prefab은
-        /// 인스턴스 원본 로컬 스케일에 곱해서 즉시 적용한다(둘 다 풀 반환 시 원본 스케일로 복원된다).
+        /// 재생 컴포넌트가 있는 prefab은 그 재생이 배율에 곱해서 적용하고, 없는 prefab은 인스턴스 원본
+        /// 로컬 스케일에 곱해서 즉시 적용한다(둘 다 풀 반환 시 원본 스케일로 복원된다).
+        ///
+        /// jitterOverride: null이면 이 스포너에 설정된 Spawn Jitter(= 맞는 쪽 덩치에 맞춰 잡아둔 기본
+        /// 범위)를 쓰고, 값이 있으면 그 공격이 직접 정한 범위를 쓴다. 0,0도 정당한 값(= 랜덤 없이 정확히
+        /// 한 점)이라 "지정 안 함"을 0으로 표현할 수 없어서 Nullable로 받는다.
+        ///
+        /// durationOverride는 재생 컴포넌트가 없는 prefab에만 의미가 있다 - 있는 이펙트는 자기 길이를
+        /// 알고 있으므로 여기서 넘긴 값이 그 재생을 자르거나 늘리지 않는다.
         /// </summary>
-        public void Spawn(GameObject prefab, float durationOverride = 0f, Vector2 offsetOverride = default, float scaleOverride = 0f)
+        public void Spawn(GameObject prefab, float durationOverride = 0f, Vector2 offsetOverride = default,
+            float scaleOverride = 0f, Vector2? jitterOverride = null)
         {
-            if (prefab == null) return; // 이 연출에는 이펙트가 없다 - 쿨다운도 소모하지 않는다.
-            if (Time.time - lastSpawnTime < minSpawnInterval) return;
-
-            lastSpawnTime = Time.time;
+            if (prefab == null) return; // 이 연출에는 이펙트가 없다.
 
             float duration = durationOverride > 0f ? durationOverride : defaultDuration;
             if (!(duration > 0f) || float.IsNaN(duration) || float.IsInfinity(duration))
             {
                 duration = FallbackDuration; // 비정상 duration은 안전한 기본값으로 보정한다.
             }
+
+            // 이 타격에 실제로 쓸 랜덤 범위 - 공격이 직접 정했으면 그 값, 아니면 이 스포너의 기본값.
+            Vector2 jitterRange = ResolveJitterRange(jitterOverride);
+            Vector3 jitter = new Vector3(
+                Random.Range(-jitterRange.x, jitterRange.x),
+                Random.Range(-jitterRange.y, jitterRange.y),
+                0f);
 
             Vector3 baseOffset = new Vector3(offsetOverride.x, offsetOverride.y, 0f);
             Vector3 spawnPosition;
@@ -148,15 +188,13 @@ namespace Common
                 // 현재 스케일/위치가 그대로 반영되므로, Stage 배율이 바뀌거나 StageVisualRoot가
                 // 이동해도 지터 범위가 피격체 크기/위치에 비례해서 자연스럽게 따라간다(화면/월드
                 // 고정 오프셋이 아니다). offsetOverride도 같은 로컬 좌표계에서 더해진다.
-                Vector3 localJitter = new Vector3(
-                    Random.Range(-spawnJitterX, spawnJitterX),
-                    Random.Range(-spawnJitterY, spawnJitterY),
-                    0f);
-                spawnPosition = impactPoint.TransformPoint(baseOffset + localJitter);
+                spawnPosition = impactPoint.TransformPoint(baseOffset + jitter);
             }
             else
             {
-                spawnPosition = transform.position + (Vector3)fallbackOffset + baseOffset;
+                // impactPoint가 없으면 기준이 될 로컬 좌표계 자체가 없으므로 지터도 월드 유닛으로
+                // 그대로 더한다 - 이 경로에서는 Stage 배율에 비례하지 않는다.
+                spawnPosition = transform.position + (Vector3)fallbackOffset + baseOffset + jitter;
             }
 
             Queue<GameObject> pool = GetOrCreatePool(prefab);
@@ -182,22 +220,39 @@ namespace Common
             instance.SetActive(true);
 
             float effectiveScale = scaleOverride > 0f ? scaleOverride : 1f;
-            var pop = instance.GetComponent<HitEffectPop>();
-            if (pop != null)
+            IHitEffectPlayback playback = instance.GetComponentInChildren<IHitEffectPlayback>(true);
+            if (playback != null)
             {
+                // 수명은 이펙트 자신이 안다 - 스포너는 재생을 시작시키고 완료 통보만 기다린다.
                 // Play()가 SetActive(true) 직후 OnEnable이 시작한 기본(Destroy 모드) 재생을 즉시
                 // 취소하고 풀 반환 모드로 바꿔치기한다.
-                pop.Play(duration, ReturnToPool, effectiveScale);
+                playback.Play(effectiveScale, returnPlaybackToPool);
             }
             else
             {
-                // HitEffectPop이 없는 prefab은 재생 종료를 스스로 알릴 방법이 없으니 스포너가 직접 타이머로 회수한다.
+                // 재생 컴포넌트가 없는 prefab(예: ParticleSystem)은 종료를 스스로 알릴 방법이 없으니
+                // 스포너가 직접 타이머로 회수한다 - defaultDuration이 쓰이는 유일한 경로다.
                 if (originalLocalScaleByInstance.TryGetValue(instance, out Vector3 baseScale))
                 {
                     instanceTransform.localScale = baseScale * effectiveScale;
                 }
                 StartCoroutine(ReturnToPoolAfterDelay(instance, duration));
             }
+        }
+
+        /// <summary>이 스포너에 설정된 기본 랜덤 출력 범위(X/Y 각각 ±값). 공격이 Jitter를 직접 정하지
+        /// 않았을 때 쓰이는 값이며, 모션 에디터가 "기본값을 쓰면 이만큼 흩어진다"는 가이드를 그릴 때도
+        /// 이 값을 읽는다.</summary>
+        public Vector2 DefaultJitterRange => new Vector2(Mathf.Abs(spawnJitterX), Mathf.Abs(spawnJitterY));
+
+        /// <summary>공격이 범위를 직접 정했으면 그 값을, 아니면 이 스포너의 기본값을 쓴다. 음수는
+        /// Random.Range(-x, x)에서 의미가 없으므로 절댓값으로 보정한다.</summary>
+        private Vector2 ResolveJitterRange(Vector2? jitterOverride)
+        {
+            if (!jitterOverride.HasValue) return DefaultJitterRange;
+
+            Vector2 range = jitterOverride.Value;
+            return new Vector2(Mathf.Abs(range.x), Mathf.Abs(range.y));
         }
 
         /// <summary>
@@ -218,9 +273,15 @@ namespace Common
                 : transform.position + (Vector3)fallbackOffset + baseOffset;
         }
 
-        private void ReturnToPool(HitEffectPop pop)
+        /// <summary>이펙트가 "다 재생했다"고 알려올 때 호출된다. 재생 컴포넌트가 자식에 붙어 있을 수도
+        /// 있으므로 그 컴포넌트의 gameObject가 아니라 풀에 등록된 인스턴스 루트를 회수한다.</summary>
+        private void ReturnPlaybackToPool(IHitEffectPlayback playback)
         {
-            ReturnInstanceToPool(pop.gameObject);
+            if (playback == null) return;
+            if (instanceByPlayback.TryGetValue(playback, out GameObject instance))
+            {
+                ReturnInstanceToPool(instance);
+            }
         }
 
         private IEnumerator ReturnToPoolAfterDelay(GameObject instance, float duration)
@@ -235,10 +296,10 @@ namespace Common
 
             instance.SetActive(false);
 
-            // 재사용 상태를 프리팹 고유 기본값으로 복원한다 - HitEffectPop이 있는 prefab은 재생 중
-            // 매 프레임 스스로 되돌리지만(PlayRoutine이 t=0부터 다시 덮어씀), 앞으로 붙을 수 있는
-            // HitEffectPop 없는 prefab(예: ParticleSystem)은 스스로 되돌린다는 보장이 없으므로 여기서
-            // 한 번 더 명시적으로 리셋해 재사용 사이에 위치/회전/스케일/알파가 누적되지 않게 한다.
+            // 재사용 상태를 프리팹 고유 기본값으로 복원한다 - 재생 컴포넌트가 있는 prefab은 Play()가
+            // 처음부터 다시 덮어쓰지만, 앞으로 붙을 수 있는 재생 컴포넌트 없는 prefab(예: ParticleSystem)은
+            // 스스로 되돌린다는 보장이 없으므로 여기서 한 번 더 명시적으로 리셋해 재사용 사이에
+            // 위치/회전/스케일/알파가 누적되지 않게 한다.
             Transform instanceTransform = instance.transform;
             instanceTransform.localPosition = Vector3.zero;
             instanceTransform.localRotation = Quaternion.identity;

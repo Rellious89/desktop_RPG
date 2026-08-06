@@ -313,6 +313,14 @@ namespace Field
                 return;
             }
 
+            // 전환 연출이 있으면 그쪽에 맡긴다 - 연출이 끝난 뒤 같은 TryReturnToTown이 호출되므로
+            // 거부 규칙과 로그는 어느 경로로 가든 동일하다. 연출이 없으면 예전처럼 곧바로 전달한다.
+            if (FieldTransitionSequencer.Instance != null
+                && FieldTransitionSequencer.Instance.TryPlayReturnToTown())
+            {
+                return;
+            }
+
             // 거부 사유는 매니저가 로그로 남기므로 결과를 여기서 다시 해석하지 않는다.
             fieldModeManager.TryReturnToTown();
         }

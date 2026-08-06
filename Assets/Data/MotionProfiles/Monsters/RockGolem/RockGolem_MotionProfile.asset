@@ -56,5 +56,5 @@ MonoBehaviour:
     damageNumberSortingOrder: 10
   preview:
     actorOffset: {x: 0.6, y: 0}
-    receivePointOffset: {x: 0, y: 0.35}
+    receivePointOffset: {x: -0.09, y: 0.83}
     actorScale: 1.4

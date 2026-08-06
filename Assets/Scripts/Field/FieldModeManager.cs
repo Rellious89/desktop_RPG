@@ -146,6 +146,16 @@ namespace Field
 
         private void HandleDungeonEnterRequested(DungeonDefinition dungeon)
         {
+            // 전환 연출이 있으면 <b>언제</b> 전환할지는 그쪽이 정한다 - 연출이 끝난 뒤 이 클래스의
+            // TryEnterDungeon을 그대로 부르므로, 전환 규칙(프레임 잠금/재진입 금지/거부 시 무변경)은
+            // 어느 경로로 오든 똑같이 적용된다. 연출이 없으면(씬에 시퀀서가 없거나 꺼져 있으면)
+            // 예전처럼 이 자리에서 곧바로 전환한다 - 연출은 이동의 전제 조건이 아니다.
+            if (FieldTransitionSequencer.Instance != null
+                && FieldTransitionSequencer.Instance.TryPlayEnterDungeon(dungeon))
+            {
+                return;
+            }
+
             // 거부는 이 아래에서 로그로 남으므로 여기서는 결과를 다시 해석하지 않는다.
             TryEnterDungeon(dungeon);
         }

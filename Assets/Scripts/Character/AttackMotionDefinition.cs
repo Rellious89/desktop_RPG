@@ -98,6 +98,16 @@ namespace Character
         [Min(0.01f)]
         [SerializeField] private float hitEffectScale = 1f;
 
+        [Tooltip("이 공격만 타격 이펙트의 랜덤 출력 범위를 직접 정한다. 끄면 맞는 몬스터의 " +
+                 "HitEffectSpawner에 설정된 Spawn Jitter를 그대로 쓴다(몬스터 덩치에 맞춰 잡아둔 기본값). " +
+                 "0도 의미 있는 값이라(= 항상 정확히 한 점에 맞음) 값만으로는 '지정 안 함'과 구분할 수 없어 " +
+                 "이 토글로 구분한다.")]
+        [SerializeField] private bool overrideHitEffectJitter;
+
+        [Tooltip("Hit Effect가 튀는 범위(월드 유닛). X/Y 각각 ±값 사이에서 균등 랜덤으로 흩어진다 - " +
+                 "0,0이면 랜덤 없이 Effect Offset 지점에 정확히 생성된다. Override 토글이 켜져 있을 때만 쓰인다.")]
+        [SerializeField] private Vector2 hitEffectJitter;
+
         [Tooltip("이 공격의 Hit Frame에서 사용할 사운드. 비어 있으면 이 공격에는 타격음이 없다 " +
                  "(씬에서 대신 재생해주는 기본 Hit 클립은 없다).")]
         [SerializeField] private AudioClip hitSound;
@@ -137,6 +147,10 @@ namespace Character
         public GameObject HitEffectPrefab => hitEffectPrefab;
         public Vector2 HitEffectOffset => hitEffectOffset;
         public float HitEffectScale => Mathf.Max(0.01f, hitEffectScale);
+        public bool OverrideHitEffectJitter => overrideHitEffectJitter;
+        /// <summary>음수 범위는 의미가 없으므로(Random.Range(-x, x)에서 부호가 무의미) 절댓값으로 보정해
+        /// 돌려준다 - 인스펙터에 -0.2가 들어와도 ±0.2로 동작한다.</summary>
+        public Vector2 HitEffectJitter => new Vector2(Mathf.Abs(hitEffectJitter.x), Mathf.Abs(hitEffectJitter.y));
         public AudioClip HitSound => hitSound;
 
         public GameObject ProjectilePrefab => projectilePrefab;

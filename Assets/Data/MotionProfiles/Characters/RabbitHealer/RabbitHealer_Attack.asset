@@ -25,6 +25,11 @@ MonoBehaviour:
   hitFrameIndex: 1
   endFrameDuration: 0.12
   queueExpireTimeout: 0.15
+  useAccumulatedInput: 0
+  requiredInputsToStrike: 10
+  noInputGraceTime: 0.5
+  chargeDecayDuration: 1
+  carryOverflowInputs: 1
   castFrameIndex: 0
   castEffectPrefab: {fileID: 0}
   castEffectOffset: {x: 0, y: 0}
