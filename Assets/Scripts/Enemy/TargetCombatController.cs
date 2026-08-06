@@ -32,6 +32,12 @@ namespace Enemy
     /// 알파 Fade는 스케일/위치/회전과 완전히 분리된 별도 코루틴(fadeRoutine)이 SpriteRenderer의
     /// color.a만 건드리며, hitPhase 기반의 자세 전환 로직과는 서로 간섭하지 않는다.
     ///
+    /// 처치 순간에는 자세/알파 외에 사망 이펙트(Defeat Presentation)를 한 번 생성한다 - <b>이 이펙트만은
+    /// 이 몬스터의 상태를 따라가지 않는다</b>. 죽은 몬스터는 곧바로 퇴장하고 다음 몬스터가 그 자리로
+    /// 밀려오는데(2슬롯 교대), 이펙트가 몬스터에 붙어 있으면 그 움직임을 따라가 연출이 어긋나기
+    /// 때문이다. HitEffectSpawner가 CombatFxRoot 아래에 생성 시점 위치 스냅샷으로 만들어주므로
+    /// 죽은 자리에서 끝까지 재생된 뒤 사라진다.
+    ///
     /// <b>모션 제작 데이터의 원천은 MonsterMotionProfile 하나뿐이다.</b> Base Idle/Idle Event/Hit/
     /// Defeat 프레임, Hit Reaction 수치, Damage Number 연출값이 전부 프로필 에셋에 있고, 이 컴포넌트는
     /// 그 값을 읽어 재생만 한다 - 같은 값을 씬 Inspector에 다시 직렬화해두는 fallback 경로는 없다.
@@ -75,6 +81,23 @@ namespace Enemy
                  "배치된 현재 Transform 위치/스케일을 그대로 쓴다 - 프로필이 랜덤 리젠으로 바뀌면 배치가 " +
                  "어긋나므로 연결하는 것을 권장한다.")]
         [SerializeField] private CombatStageLayout stageLayout;
+
+        [Header("Defeat Presentation")]
+        [Tooltip("이 몬스터가 처치될 때 한 번 재생할 이펙트 prefab. 비어 있으면 이 몬스터에는 사망 " +
+                 "이펙트가 없다(기존처럼 페이드아웃만 한다) - 대신 재생해주는 기본 이펙트는 없다.\n\n" +
+                 "지금은 몬스터마다 다르게 두지 않고 두 슬롯에 같은 공용 이펙트를 넣어 쓰는 단계다. " +
+                 "몬스터별로 달라져야 하면 나중에 Monster Motion Profile 쪽으로 올린다.")]
+        [SerializeField] private GameObject defeatEffectPrefab;
+
+        [Tooltip("피격 지점(Hit Effect Spawner의 Impact Point) 기준으로 더할 위치. 0,0이면 그 지점에 " +
+                 "정확히 생성된다 - 몬스터 중앙에 띄우려면 0,0 그대로 두고, 머리 위 같은 다른 자리에 " +
+                 "띄우려면 Y를 올린다. 몬스터마다 키가 달라 공용 이펙트에서도 이 값만은 슬롯별로 " +
+                 "따로 잡을 수 있게 여기(씬 컴포넌트)에 둔다.")]
+        [SerializeField] private Vector2 defeatEffectOffset;
+
+        [Tooltip("사망 이펙트의 배율. prefab 원본 크기에 곱해진다.")]
+        [Min(0.01f)]
+        [SerializeField] private float defeatEffectScale = 1f;
 
         [Header("Random Respawn Profile Test")]
         [Tooltip("켜면 리젠이 시작될 때 respawnProfilePool 중 현재 motionProfile을 제외한 다른 프로필로 " +
@@ -567,7 +590,29 @@ namespace Enemy
             hitPhase = HitPhase.Defeated;
             ApplyDefeatPose();
 
+            SpawnDefeatEffect();
+
             StartFade(toOriginal: false, duration: target.DefeatFadeDuration);
+        }
+
+        /// <summary>처치 순간에 사망 이펙트를 한 번 생성한다(<see cref="Target.Defeat"/>가 처치당 정확히
+        /// 한 번만 알려주므로 여기서 별도 중복 방지가 필요 없다).
+        ///
+        /// <b>이펙트는 이 몬스터를 따라가지 않는다.</b> HitEffectSpawner가 인스턴스를 피격 대상의 자식이
+        /// 아니라 CombatFxRoot 아래에 만들고 생성 시점 위치를 스냅샷으로 쓰기 때문이다 - 죽은 몬스터가
+        /// 곧바로 퇴장하고 다음 몬스터가 그 자리로 밀려와도, 이펙트는 죽은 그 자리에서 자기 길이만큼
+        /// 온전히 재생된 뒤 사라진다(이 프로젝트의 2슬롯 교대 방식에서 반드시 필요한 성질이다).
+        ///
+        /// 지터는 명시적으로 0을 넘긴다 - 스포너의 기본 지터(피격 이펙트가 매번 조금씩 흩어지게 하는 값)를
+        /// 그대로 쓰면 사망 이펙트가 죽을 때마다 다른 자리에 떠서 위치를 맞출 수 없다.</summary>
+        private void SpawnDefeatEffect()
+        {
+            if (defeatEffectPrefab == null || hitEffectSpawner == null) return;
+
+            hitEffectSpawner.Spawn(defeatEffectPrefab,
+                offsetOverride: defeatEffectOffset,
+                scaleOverride: defeatEffectScale,
+                jitterOverride: Vector2.zero);
         }
 
         /// <summary>Defeat 프레임(motionProfile.Defeat)이 있으면 그 첫 프레임을 즉시 보여준다 - 페이드아웃
