@@ -20,6 +20,11 @@ namespace Common
 
         private bool subscribed;
 
+        /// <summary>이 라벨이 가리키는 Table/Key 참조. 같은 문구를 다른 곳에서도 써야 할 때
+        /// (예: 메뉴 버튼의 Hover 툴팁) 문구를 중복 저작하지 않고 이 참조를 그대로 재사용한다.
+        /// 라벨이 비활성이어도 참조 자체는 유효하므로, 꺼 둔 라벨에서도 읽을 수 있다.</summary>
+        public LocalizedTextReference TextReference => text;
+
         private void Reset()
         {
             target = GetComponent<TextMeshProUGUI>();
