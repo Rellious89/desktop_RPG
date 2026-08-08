@@ -30,6 +30,27 @@ namespace TableDataEditor
     }
 
     /// <summary>
+    /// Currency.csv 한 행. <b>currency_id는 저장 파일과 밸런스 테이블이 공유하는 키</b>라
+    /// <see cref="ItemRow.Id"/>와 같은 무게를 가진다 - 값을 다듬거나 대체하는 경로는 어디에도 없고,
+    /// 형식이 어긋나면 그 행 자체가 스냅샷에 들어가지 않는다.
+    ///
+    /// <b>보유 잔액은 여기에 없다.</b> 표가 말하는 것은 "이 게임에 어떤 재화가 있는가"이고, 얼마를
+    /// 갖고 있는지는 저장 데이터의 몫이다.
+    /// </summary>
+    public sealed class CurrencyRow
+    {
+        public int Line;
+        public string Id = string.Empty;
+        public LocalizedEntryRef Name;
+
+        /// <summary>재화를 표시할 때 쓰는 아이콘. 비어 있어도 된다(경고만 남는다).</summary>
+        public Sprite Icon;
+
+        public int DisplayOrder;
+        public bool Enabled;
+    }
+
+    /// <summary>
     /// Item.csv 한 행. <b>item_id는 저장 파일의 키</b>라 다른 표의 id보다 무겁다 - 값을 다듬거나
     /// 대체하는 경로는 어디에도 없고, 형식이 어긋나면 그 행 자체가 스냅샷에 들어가지 않는다.
     /// </summary>
@@ -59,8 +80,9 @@ namespace TableDataEditor
         /// <summary>CSV에 적힌 그대로의 item_id. Item.csv에 있는 활성 행만 여기까지 온다.</summary>
         public string ItemId;
 
-        /// <summary>백분율. 25는 25%, 0.5는 0.5%다. 0 초과 100 이하만 여기까지 온다.</summary>
-        public float ChancePercent;
+        /// <summary>만분율 확률. 10000이 100%, 1이 0.01%다. <b>1 이상 10000 이하만 여기까지 온다</b> -
+        /// 0(떨어지지 않는 칸)은 경고를 남기고 슬롯 자체를 만들지 않는다.</summary>
+        public int ChanceBasisPoints;
 
         /// <summary>한 번 드롭될 때의 개수. 1 이상만 여기까지 온다.</summary>
         public int Count;
@@ -83,6 +105,23 @@ namespace TableDataEditor
         /// <summary>채워진 드롭 슬롯만 CSV에 적힌 슬롯 순서 그대로. 최대
         /// <see cref="TableDataColumns.MonsterDropSlotCount"/>개다.</summary>
         public readonly List<MonsterDropRow> Drops = new List<MonsterDropRow>();
+
+        /// <summary>
+        /// 처치 재화 보상의 재화 id. 비어 있으면 <b>이 몬스터는 표에서 재화를 지정하지 않은 것</b>이며,
+        /// 그때 <see cref="CurrencyAmountMin"/>/<see cref="CurrencyAmountMax"/>는 둘 다 0이다(CSV의 금액
+        /// 칸도 비어 있어야 한다 - 0을 적어 두는 것도 오류다).
+        ///
+        /// 값이 있으면 <b>Currency.csv에 실제로 있는 활성 행</b>을 가리켜야 한다 - 비교는 다듬지 않은
+        /// 값끼리의 Ordinal 완전 일치이고, 없는 재화나 enabled=0인 재화를 가리키면 오류다
+        /// (<see cref="TableDataSnapshot.CurrenciesById"/>로 조회한다).
+        /// </summary>
+        public string CurrencyId = string.Empty;
+
+        /// <summary>재화 보상의 최소 금액. 0 이상이며 <see cref="CurrencyAmountMax"/> 이하만 여기까지 온다.</summary>
+        public int CurrencyAmountMin;
+
+        /// <summary>재화 보상의 최대 금액. <see cref="CurrencyAmountMin"/> 이상만 여기까지 온다(같아도 된다).</summary>
+        public int CurrencyAmountMax;
 
         /// <summary>참조에 쓰는 world_id(앞뒤 공백을 다듬은 값). 비어 있을 수 있다.</summary>
         public string WorldId = string.Empty;
@@ -119,21 +158,28 @@ namespace TableDataEditor
     }
 
     /// <summary>
-    /// 파싱과 검증을 마친 네 표. Rebuild는 이 스냅샷만 보고 에셋을 만든다 - CSV를 다시 읽지 않으므로
+    /// 파싱과 검증을 마친 다섯 표. Rebuild는 이 스냅샷만 보고 에셋을 만든다 - CSV를 다시 읽지 않으므로
     /// "검증한 내용"과 "쓰는 내용"이 어긋날 수 없다.
     ///
-    /// 목록의 순서는 <b>World → Item → Monster → Dungeon</b>이고, 이것이 검증과 생성 순서이기도 하다.
-    /// 뒤의 표가 앞의 표를 참조하므로(Dungeon은 Item과 Monster를 가리킨다), Item을 Monster보다 앞에
-    /// 두면 이후 단계에서 몬스터가 드롭 아이템을 가리키게 되어도 순서를 다시 뒤집을 필요가 없다.
+    /// 목록의 순서는 <b>World → Currency → Item → Monster → Dungeon</b>이고, 이것이 검증과 생성
+    /// 순서이기도 하다. 뒤의 표가 앞의 표를 참조하므로(Monster는 Currency와 Item을, Dungeon은 Item과
+    /// Monster를 가리킨다), 가리켜지는 표가 언제나 먼저 온다. Currency를 Item보다 앞에 둔 것은 재화가
+    /// 무엇도 참조하지 않는 가장 바깥 표라서다 - 아이템/몬스터가 재화를 가리키게 되어도 순서를 다시
+    /// 뒤집을 필요가 없다.
+    ///
+    /// <b>모든 id 사전은 <see cref="StringComparer.Ordinal"/>이다.</b> 대소문자도 문화권 규칙도
+    /// 끼어들지 않는 정확한 문자열 비교여야, CSV에 적힌 id와 조회에 쓰는 id가 같다는 것이 보장된다.
     /// </summary>
     public sealed class TableDataSnapshot
     {
         public readonly List<WorldRow> Worlds = new List<WorldRow>();
+        public readonly List<CurrencyRow> Currencies = new List<CurrencyRow>();
         public readonly List<ItemRow> Items = new List<ItemRow>();
         public readonly List<MonsterRow> Monsters = new List<MonsterRow>();
         public readonly List<DungeonRow> Dungeons = new List<DungeonRow>();
 
         public readonly Dictionary<string, WorldRow> WorldsById = new Dictionary<string, WorldRow>(StringComparer.Ordinal);
+        public readonly Dictionary<string, CurrencyRow> CurrenciesById = new Dictionary<string, CurrencyRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, ItemRow> ItemsById = new Dictionary<string, ItemRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, MonsterRow> MonstersById = new Dictionary<string, MonsterRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, DungeonRow> DungeonsById = new Dictionary<string, DungeonRow>(StringComparer.Ordinal);

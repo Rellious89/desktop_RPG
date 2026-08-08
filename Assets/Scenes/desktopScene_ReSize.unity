@@ -6636,9 +6636,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   inventoryManager: {fileID: 1047247884}
   encounterQueue: {fileID: 324107453}
-  currencyPerDefeat: 100
   rewardToastFormat: "\uD68D\uB4DD: +{0} \uC7AC\uD654 / {1} x{2}"
-  multiRewardToastFormat: "\uD68D\uB4DD: +{0} \uC7AC\uD654 / {1}"
+  itemOnlyToastFormat: "\uD68D\uB4DD: {0} x{1}"
   currencyOnlyToastFormat: "\uD68D\uB4DD: +{0} \uC7AC\uD654"
 --- !u!1 &1064650506
 GameObject:
@@ -13367,6 +13366,10 @@ PrefabInstance:
     - target: {fileID: 1495163592227329003, guid: b3c66522a7c464577b0f6d6d86a367f9, type: 3}
       propertyPath: m_SizeDelta.x
       value: -600
+      objectReference: {fileID: 0}
+    - target: {fileID: 1495163592227329003, guid: b3c66522a7c464577b0f6d6d86a367f9, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -130.99991
       objectReference: {fileID: 0}
     - target: {fileID: 4630418190012664964, guid: b3c66522a7c464577b0f6d6d86a367f9, type: 3}
       propertyPath: m_SizeDelta.x

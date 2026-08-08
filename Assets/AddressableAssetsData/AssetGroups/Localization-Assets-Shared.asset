@@ -37,6 +37,11 @@ MonoBehaviour:
     m_ReadOnly: 1
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f88e328a513a14716bedb0c25ad47841
+    m_Address: Assets/Localization/Tables/05_Currency/05_Currency Shared Data.asset
+    m_ReadOnly: 1
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 1
   m_Settings: {fileID: 11400000, guid: 2dbb1b816adf1433b94a701ee70d6da1, type: 2}
   m_SchemaSet:

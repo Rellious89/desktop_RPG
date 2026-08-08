@@ -29,11 +29,14 @@ MonoBehaviour:
   maxDurability: 30
   drops:
   - item: {fileID: 11400000, guid: 0abf78287f21a4ecfb20566c2b8b02ac, type: 2}
-    chancePercent: 50
+    chanceBasisPoints: 5000
     count: 1
   - item: {fileID: 11400000, guid: b3c0618c290864a7ebcc1c4918dbd725, type: 2}
-    chancePercent: 50
+    chanceBasisPoints: 5000
     count: 1
+  currency: {fileID: 11400000, guid: 25530e3cfd6944ca4873f62520cd7d22, type: 2}
+  currencyAmountMin: 50
+  currencyAmountMax: 100
   displayOrder: 10
   references:
     version: 2

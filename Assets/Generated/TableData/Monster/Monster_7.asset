@@ -28,6 +28,9 @@ MonoBehaviour:
   previewSprite: {fileID: 21300000, guid: 295443ec2fe1b44b5bf48cff106c3ece, type: 3}
   maxDurability: 30
   drops: []
+  currency: {fileID: 11400000, guid: 25530e3cfd6944ca4873f62520cd7d22, type: 2}
+  currencyAmountMin: 50
+  currencyAmountMax: 100
   displayOrder: 70
   references:
     version: 2

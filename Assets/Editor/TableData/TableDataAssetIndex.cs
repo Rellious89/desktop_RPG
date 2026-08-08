@@ -49,10 +49,17 @@ namespace TableDataEditor
         private readonly Dictionary<string, List<string>> itemIconPathsByName =
             new Dictionary<string, List<string>>(StringComparer.Ordinal);
 
+        /// <summary>같은 것을 <see cref="TableDataPaths.CurrencyIconRoot"/> 안에서만 모은 목록.</summary>
+        private readonly Dictionary<string, List<string>> currencyIconPathsByName =
+            new Dictionary<string, List<string>>(StringComparer.Ordinal);
+
         private readonly Dictionary<string, List<Sprite>> resolvedSprites =
             new Dictionary<string, List<Sprite>>(StringComparer.Ordinal);
 
         private readonly Dictionary<string, List<Sprite>> resolvedItemIcons =
+            new Dictionary<string, List<Sprite>>(StringComparer.Ordinal);
+
+        private readonly Dictionary<string, List<Sprite>> resolvedCurrencyIcons =
             new Dictionary<string, List<Sprite>>(StringComparer.Ordinal);
 
         private SpriteDataProviderFactories spriteDataProviderFactories;
@@ -61,6 +68,7 @@ namespace TableDataEditor
         private bool manualItemsBuilt;
         private bool spriteNamesBuilt;
         private bool itemIconNamesBuilt;
+        private bool currencyIconNamesBuilt;
 
         // ---- MonsterMotionProfile ----
 
@@ -149,14 +157,47 @@ namespace TableDataEditor
             if (itemIconNamesBuilt) return;
             itemIconNamesBuilt = true;
 
-            if (!AssetDatabase.IsValidFolder(TableDataPaths.ItemIconRoot)) return;
+            EnsureIconNames(TableDataPaths.ItemIconRoot, itemIconPathsByName);
+        }
 
-            foreach (string guid in AssetDatabase.FindAssets("t:Sprite", new[] { TableDataPaths.ItemIconRoot }))
+        // ---- 재화 아이콘 ----
+
+        /// <summary>
+        /// <c>icon_key</c>를 <see cref="TableDataPaths.CurrencyIconRoot"/> <b>안에서만</b> 찾는다.
+        /// 판정 규칙은 <see cref="FindItemIcon"/>과 글자 그대로 같고 탐색 범위만 다르다 - 전역 탐색은
+        /// 어디에서도 하지 않는다.
+        ///
+        /// <b>폴더가 아직 없으면 "0개"다.</b> 없는 폴더를 오류로 만들지 않는 이유는, 아이콘을 한 장도
+        /// 쓰지 않는 프로젝트에서는 폴더가 생길 이유가 없기 때문이다 - icon_key가 비어 있는 행은 그대로
+        /// 통과하고(호출하는 쪽이 경고만 남긴다), 이름을 적었는데 폴더가 없으면 그때 비로소 "찾지
+        /// 못했다"가 된다. 임포터는 이 폴더를 만들지 않는다.
+        /// </summary>
+        public AssetLookupResult FindCurrencyIcon(string spriteName, out Sprite sprite, out int count)
+        {
+            EnsureCurrencyIconNames();
+            return ResolveSpriteByName(spriteName, currencyIconPathsByName, resolvedCurrencyIcons, out sprite, out count);
+        }
+
+        private void EnsureCurrencyIconNames()
+        {
+            if (currencyIconNamesBuilt) return;
+            currencyIconNamesBuilt = true;
+
+            EnsureIconNames(TableDataPaths.CurrencyIconRoot, currencyIconPathsByName);
+        }
+
+        /// <summary>아이콘 루트 한 곳의 Sprite 이름을 모은다. 폴더가 없으면 아무것도 담지 않는다 -
+        /// 루트마다 같은 코드를 두면 한쪽만 고쳐져 "아이템은 되는데 재화는 안 되는" 차이가 생긴다.</summary>
+        private void EnsureIconNames(string root, Dictionary<string, List<string>> target)
+        {
+            if (!AssetDatabase.IsValidFolder(root)) return;
+
+            foreach (string guid in AssetDatabase.FindAssets("t:Sprite", new[] { root }))
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 if (string.IsNullOrEmpty(path)) continue;
 
-                CollectSpriteNames(path, itemIconPathsByName);
+                CollectSpriteNames(path, target);
             }
         }
 

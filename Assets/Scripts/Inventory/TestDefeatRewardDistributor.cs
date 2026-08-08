@@ -1,7 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Text;
 using Common;
 using Dungeon;
 using Enemy;
@@ -18,14 +15,21 @@ namespace Inventory
     /// 알려주므로 무엇을 떨어뜨려야 하는지 알 수 없다. 경험치/킬카운트/행동력/오디오는 지금도 그 이벤트를
     /// 쓰고 있고, 이 컴포넌트가 구독을 옮겼다고 해서 그쪽 의미나 횟수는 전혀 달라지지 않는다.
     ///
-    /// <b>고정 순환 지급이 아니다.</b> 예전에는 등록한 아이템을 순서대로 하나씩 돌려 줬지만, 지금은
-    /// Monster.csv의 드롭 슬롯 최대 3개를 <b>각각 독립으로</b> 판정한다 - 여러 칸이 동시에 성공할 수 있고,
-    /// 하나도 성공하지 않을 수도 있다. 재화만 여전히 고정값이다.
+    /// <b>아이템 판정은 처치 1회당 난수 한 번이다.</b> 드롭 슬롯 최대 3개가 0~9999의 <b>누적 구간</b>을
+    /// 앞에서부터 나눠 가지며(단위는 만분율, 10000 = 100%), 뽑힌 값이 들어간 구간 하나만 지급된다 -
+    /// 그래서 한 번의 처치가 주는 아이템은 <b>최대 한 종류</b>이고, 남은 구간에 들어가면 아무것도 나오지
+    /// 않는다. 지급 개수는 <b>뽑힌 그 슬롯의 개수</b>이며, 뽑히지 않은 슬롯의 개수는 절대 더하지 않는다.
     ///
-    /// <b>지급은 처치 1회당 정확히 한 덩어리다.</b> 성공한 칸을 전부 모아
+    /// <b>재화는 몬스터가 정한다.</b> 고정 지급액은 없다 - 몬스터에 쓸 수 있는
+    /// <see cref="MonsterDefinition.Currency"/>가 연결되어 있지 않으면 0이고, 연결되어 있으면
+    /// Min~Max(양 끝 포함) 사이의 금액을 준다. 아이템이 나왔는지와 무관하다.
+    ///
+    /// <b>지급은 처치 1회당 정확히 한 덩어리다.</b> 아이템(있어도 한 칸)과 재화를 함께
     /// <see cref="InventoryManager.ApplyRewards"/>에 한 번만 넘기므로, 저장도 화면 갱신도 토스트도
-    /// 처치당 한 번뿐이다. 이 이벤트는 처치 판정 콜스택 안에서 동기적으로 오므로 여기서 무거운 일을
-    /// 하지 않는다 - 판정은 순수 계산이고 I/O는 저장 1회뿐이다.
+    /// 처치당 한 번뿐이다. 받은 것이 하나도 없으면 ApplyRewards가 아무것도 바꾸지 않으므로 저장도
+    /// 알림도 일어나지 않고, 토스트도 띄우지 않는다("+0 재화"를 보여 주지 않는다). 이 이벤트는 처치
+    /// 판정 콜스택 안에서 동기적으로 오므로 여기서 무거운 일을 하지 않는다 - 판정은 순수 계산이고
+    /// I/O는 저장 1회뿐이다.
     ///
     /// <b>행동력과 독립적이다.</b> 행동력 소비는 CharacterRoster가 자기 구독에서 따로 처리하므로,
     /// 행동력이 0이 되는 마지막 처치에서도 보상은 그대로 지급된다(둘은 서로의 결과를 보지 않는다).
@@ -41,29 +45,72 @@ namespace Inventory
                  "찾지 못하면 보상이 전혀 지급되지 않으므로 오류를 남긴다.")]
         [SerializeField] private MonsterEncounterQueue encounterQueue;
 
-        [Header("Reward")]
-        [Tooltip("몬스터를 한 번 처치할 때마다 지급할 재화. 아이템 드롭과 무관하게 항상 지급된다.")]
-        [Min(0)]
-        [SerializeField] private int currencyPerDefeat = 100;
-
         [Header("Toast")]
-        [Tooltip("아이템이 정확히 하나 나왔을 때의 문구. {0}=재화, {1}=아이템 이름, {2}=아이템 수량.")]
+        [Tooltip("아이템과 재화를 함께 얻었을 때의 문구. {0}=재화, {1}=아이템 이름, {2}=아이템 수량.")]
         [SerializeField] private string rewardToastFormat = "획득: +{0} 재화 / {1} x{2}";
 
-        [Tooltip("아이템이 둘 이상 나왔을 때의 문구. {0}=재화, {1}=아이템 요약(쉼표로 이어 붙인 목록). " +
+        [Tooltip("아이템만 얻었을 때의 문구(재화 0). {0}=아이템 이름, {1}=아이템 수량. " +
                  "위 문구와 자리표시자 수가 달라 따로 둔다.")]
-        [SerializeField] private string multiRewardToastFormat = "획득: +{0} 재화 / {1}";
+        [SerializeField] private string itemOnlyToastFormat = "획득: {0} x{1}";
 
-        [Tooltip("아이템이 하나도 나오지 않은 경우의 문구. {0}=재화.")]
+        [Tooltip("재화만 얻었을 때의 문구. {0}=재화.")]
         [SerializeField] private string currencyOnlyToastFormat = "획득: +{0} 재화";
 
-        /// <summary>실제 게임이 쓰는 난수원. 판정 함수는 이것을 <b>인자로 받으므로</b>, 검증은 같은
-        /// 함수에 결정적인 값을 넣어 확인할 수 있다(판정 코드에 테스트 전용 분기를 두지 않는다).</summary>
-        private static readonly Func<float> UnityRoll = () => UnityEngine.Random.value;
+        /// <summary>
+        /// 0 이상 <paramref name="exclusiveMax"/> 미만의 정수를 하나 돌려주는 난수원.
+        ///
+        /// <b>경계는 long으로 주고받는다.</b> 재화 금액이 0~<see cref="int.MaxValue"/>인 몬스터는 양 끝을
+        /// 포함하는 구간의 크기가 2^31이라 int에 담기지 않는다 - 경계를 int로 두면 그 한 칸(최댓값)이
+        /// 영원히 나오지 않는다. 여기 오는 값의 상한은 <see cref="MaxExclusiveBound"/>다.
+        ///
+        /// 판정 함수들이 이것을 <b>인자로 받으므로</b>, 검증은 같은 함수에 정해진 값을 넣어 확인할 수
+        /// 있다(판정 코드에 테스트 전용 분기를 두지 않는다). 프로젝트 전체에 난수 프레임워크를 두지
+        /// 않고 이 파일 안에서만 쓰는 작은 약속으로 남긴다.
+        /// </summary>
+        public delegate long RandomBelow(long exclusiveMax);
 
-        /// <summary>드롭 슬롯 최대 개수(Monster.csv의 고정 3세트). 결과 목록의 초기 크기이자,
-        /// <see cref="RollDrops"/>가 <b>실제로 판정하는 칸 수의 상한</b>이다.</summary>
+        /// <summary>난수원에 요청할 수 있는 가장 큰 경계. 2^31이며, 재화 범위가 0~int.MaxValue일 때의
+        /// 구간 크기(양 끝 포함)와 같다.</summary>
+        public const long MaxExclusiveBound = (long)int.MaxValue + 1L;
+
+        /// <summary>실제 게임이 쓰는 난수원.</summary>
+        private static readonly RandomBelow UnityRollBelow = RollUnityRandomBelow;
+
+        /// <summary>
+        /// 실제 게임의 난수 한 번. <c>Random.Range(int, int)</c>는 위끝을 포함하지 않으므로 결과는
+        /// 언제나 0 이상 <paramref name="exclusiveMax"/> 미만이다 - <c>Random.value</c>(실수)는 쓰지 않는다.
+        ///
+        /// <b>경계가 int에 담기면 요청은 딱 한 번</b>이다(아이템 판정의 0~9999가 여기에 해당한다).
+        ///
+        /// int로 담기지 않는 경계는 <b>2^31 하나뿐</b>이다 - 재화 구간의 크기는 <c>max - min + 1</c>이고
+        /// min은 0 이상, max는 int.MaxValue 이하라 2^31을 넘을 수 없기 때문이다. 그 경우에만 16비트와
+        /// 15비트 두 번을 이어 붙여 31비트를 만든다: 두 조각 모두 2의 거듭제곱 범위라 곱이 정확히 2^31이
+        /// 되고, 버리는 값도 실수 연산도 없어 <b>균등</b>하다(0과 2^31-1이 모두 나온다).
+        /// </summary>
+        public static long RollUnityRandomBelow(long exclusiveMax)
+        {
+            if (exclusiveMax <= 1L) return 0L;
+            if (exclusiveMax <= int.MaxValue) return UnityEngine.Random.Range(0, (int)exclusiveMax);
+
+            const int highExclusive = 1 << 16;
+            const int lowExclusive = 1 << 15;
+
+            long high = UnityEngine.Random.Range(0, highExclusive);
+            long low = UnityEngine.Random.Range(0, lowExclusive);
+            long value = (high << 15) | low;
+
+            // 여기 올 수 있는 경계는 2^31뿐이라 이 자름은 실제로는 일어나지 않는다. 약속을 벗어난
+            // 요청이 와도 범위 밖 값을 돌려주지 않도록 남겨 두는 방어다.
+            return value < exclusiveMax ? value : exclusiveMax - 1L;
+        }
+
+        /// <summary>드롭 슬롯 최대 개수(Monster.csv의 고정 3세트). <see cref="SelectDropIndex"/>가
+        /// <b>실제로 살펴보는 칸 수의 상한</b>이며, 4번째 이후 칸은 확률에 더해지지도 않는다.</summary>
         private const int DropSlotCapacity = 3;
+
+        /// <summary>아이템 판정 난수의 범위. 0 이상 10000 미만(0~9999)이며, 슬롯 확률의 단위인
+        /// 만분율과 같은 눈금을 쓴다 - <b>백분율 실수로 바꾸는 곳은 어디에도 없다</b>.</summary>
+        public const int ItemRollRange = MonsterDefinition.DropEntry.ChanceBasisPointsScale;
 
         // 지금 실제로 구독 중인 큐. 구독한 그 인스턴스에서만 해제하므로 이중 구독도, 남은 구독도 없다.
         private MonsterEncounterQueue subscribedQueue;
@@ -144,118 +191,176 @@ namespace Inventory
 
             // 이번 처치의 결과는 이 호출만의 지역 값이다. 멤버 버퍼를 재사용하면, 지급 도중
             // InventoryChanged 구독자가 동기적으로 또 다른 처치 흐름을 일으켰을 때 안쪽 호출이 버퍼를
-            // 비워 바깥 호출의 토스트가 엉뚱한 내용이 된다 - 칸이 최대 셋뿐이라 매번 새로 만든다.
-            var rewards = new List<InventoryManager.RewardItemStack>(DropSlotCapacity);
-            RollDrops(defeatedMonster != null ? defeatedMonster.Drops : null, UnityRoll, rewards);
+            // 비워 바깥 호출의 토스트가 엉뚱한 내용이 된다.
+            DefeatReward reward = BuildReward(defeatedMonster, UnityRollBelow);
 
-            // 재화와 성공한 아이템을 한 덩어리로 적용한다 - 저장도 InventoryChanged도 여기서 한 번뿐이다.
-            inventory.ApplyRewards(currencyPerDefeat, rewards);
+            // 재화와 아이템(있어도 한 칸)을 한 덩어리로 적용한다 - 처치당 ApplyRewards는 여기 한 번뿐이고,
+            // 실제로 바뀐 것이 없으면 그쪽이 저장도 알림도 하지 않는다(빈 보상에 저장이 일어나지 않는다).
+            inventory.ApplyRewards(reward.Currency, ToRewardStacks(reward));
 
-            ShowRewardToast(rewards);
+            // 아무것도 얻지 못한 처치에 "+0 재화"를 띄우지 않는다 - 실제로 받은 것이 있을 때만 알린다.
+            if (!reward.IsEmpty) ShowRewardToast(reward);
+        }
+
+        /// <summary>보상 결과를 <see cref="InventoryManager.ApplyRewards"/>가 받는 목록으로 바꾼다.
+        /// 아이템이 없으면 <b>null</b>을 돌려준다 - 빈 목록을 만들어 넘길 이유가 없다.</summary>
+        private static List<InventoryManager.RewardItemStack> ToRewardStacks(DefeatReward reward)
+        {
+            if (!reward.HasItem) return null;
+
+            return new List<InventoryManager.RewardItemStack>(1)
+            {
+                new InventoryManager.RewardItemStack(reward.Item, reward.ItemCount),
+            };
         }
 
         /// <summary>
-        /// 드롭 슬롯을 <b>각각 독립으로</b> 판정해 성공한 칸만 <paramref name="results"/>에 담는다.
-        /// 부작용이 없는 순수 계산이며 <see cref="UnityEngine.Random"/>을 직접 부르지 않는다 - 난수원을
-        /// 인자로 받으므로 같은 함수에 정해진 값을 넣어 결과를 확인할 수 있다.
+        /// 처치 1회의 보상 결과. 아이템은 <b>있어도 한 종류</b>이고, 재화는 그것과 무관하게 정해진다.
+        /// </summary>
+        public readonly struct DefeatReward
+        {
+            public DefeatReward(ItemDefinition item, int itemCount, int currency)
+            {
+                Item = item;
+                ItemCount = itemCount;
+                Currency = currency;
+            }
+
+            /// <summary>뽑힌 슬롯의 아이템. 아무 구간에도 들어가지 않았으면 null이다.</summary>
+            public ItemDefinition Item { get; }
+
+            /// <summary><b>뽑힌 그 슬롯</b>의 개수. 다른 슬롯의 개수는 절대 더하지 않는다.</summary>
+            public int ItemCount { get; }
+
+            /// <summary>이번 처치의 재화 금액. 재화 지정이 없으면 0이다.</summary>
+            public int Currency { get; }
+
+            public bool HasItem => Item != null && ItemCount > 0;
+
+            public bool HasCurrency => Currency > 0;
+
+            /// <summary>실제로 받은 것이 하나도 없는지. 토스트를 띄울지 여부가 여기에 달려 있다.</summary>
+            public bool IsEmpty => !HasItem && !HasCurrency;
+
+            public static DefeatReward None => default;
+        }
+
+        /// <summary>
+        /// 처치 1회의 보상을 정한다. 부작용이 없는 순수 계산이며 <see cref="UnityEngine.Random"/>을
+        /// 직접 부르지 않는다 - 난수원을 인자로 받으므로 같은 함수에 정해진 값을 넣어 결과를 확인할 수 있다.
+        ///
+        /// <b>아이템 난수는 정확히 한 번</b> 뽑는다. 드롭 슬롯이 하나도 없어도 뽑는 것은 의도적이다 -
+        /// "몇 번 뽑았는가"가 데이터에 따라 달라지면 같은 난수원으로 같은 결과를 재현할 수 없다.
+        /// 재화 난수는 <b>필요할 때만</b> 뽑는다(지정이 없거나 고정 금액이면 뽑지 않는다).
+        /// </summary>
+        public static DefeatReward BuildReward(MonsterDefinition monster, RandomBelow roll)
+        {
+            if (monster == null) return DefeatReward.None;
+
+            long itemRoll = roll != null ? roll(ItemRollRange) : -1L;
+            int index = SelectDropIndex(monster.Drops, itemRoll);
+
+            ItemDefinition item = null;
+            int count = 0;
+            if (index >= 0)
+            {
+                MonsterDefinition.DropEntry selected = monster.Drops[index];
+                item = selected.Item;
+                count = selected.Count;
+            }
+
+            return new DefeatReward(item, count, RollCurrency(monster, roll));
+        }
+
+        /// <summary>
+        /// 뽑힌 값 <paramref name="roll"/>(0 이상 <see cref="ItemRollRange"/> 미만)이 어느 슬롯의
+        /// <b>누적 구간</b>에 들어가는지 돌려준다. 아무 구간에도 들어가지 않으면 -1이며, 그것이
+        /// "아이템 없음"이다.
+        ///
+        /// 슬롯은 앞에서부터 자기 확률(만분율)만큼의 구간을 차지한다 - 3000과 2000이면 0~2999가 첫째,
+        /// 3000~4999가 둘째이고 5000~9999는 아무것도 나오지 않는다. 합이 10000이면 빈 구간이 없다.
+        /// <b>구간에 들어가는 순간 멈춘다</b>: 한 번의 처치가 주는 아이템은 최대 한 종류다.
         ///
         /// <b>앞에서부터 최대 <see cref="DropSlotCapacity"/>칸까지만 본다.</b> Monster.csv가 고정 3세트인
         /// 것과 별개로 <b>런타임도 같은 상한을 스스로 지킨다</b> - 손으로 만들었거나 잘못 편집돼 4칸 이상을
-        /// 가진 MonsterDefinition이 오면 넘치는 칸은 <b>난수도 뽑지 않고 그대로 무시</b>한다(지급되지
-        /// 않는다). 데이터 한쪽이 오염돼도 지급 규칙이 조용히 늘어나지 않게 하기 위함이다.
+        /// 가진 MonsterDefinition이 오면 넘치는 칸은 확률에 더해지지도, 뽑히지도 않는다.
         ///
-        /// 판정 규칙:
-        /// <list type="bullet">
-        /// <item>빈 칸/아이템 없는 칸/확률이 0 이하인 칸은 <b>난수를 뽑지 않고</b> 건너뛴다.</item>
-        /// <item>확률이 100 이상이면 <b>난수를 뽑지 않고</b> 항상 성공한다(항상 주는 보상이 난수에 걸리지 않는다).</item>
-        /// <item>그 밖에는 확률을 <b>먼저</b> 0~1 문턱값으로 바꾼 뒤 <c>roll() &lt; 문턱값</c>으로 본다.
-        /// 25는 25%, 0.5는 0.5%다.</item>
-        /// </list>
-        ///
-        /// <b>비교는 난수와 같은 영역(0~1)에서 한다.</b> <c>roll * 100 &lt; 확률</c>처럼 난수 쪽을 키우면
-        /// 곱셈이 만든 오차 때문에 경계값의 판정이 1 ULP 차이로 뒤집힌다(0.5%에서 roll 0.005가 성공으로
-        /// 새는 식이다). 확률을 한 번 나눠 문턱값으로 만들어 두면 <c>0.5f / 100f</c>와 <c>0.005f</c>가
-        /// 같은 float이 되어 경계가 정확히 배타적으로 갈린다.
-        ///
-        /// <b>같은 아이템이 여러 칸에서 성공하면 한 칸으로 합친다.</b> 합치는 기준은 ItemId이고, 순서는
-        /// <b>처음 성공한 칸의 자리</b>를 유지한다 - 같은 입력이면 결과 목록의 순서와 수량이 언제나 같다.
-        /// 인벤토리 자체도 같은 id를 하나로 누적하지만, 여기서 미리 합쳐 두면 토스트 문구에 같은 아이템이
-        /// 두 번 나오지 않는다.
+        /// 아이템이 없거나 확률이 유효 범위(1~10000)를 벗어난 칸은 <b>구간을 차지하지 않는다</b> -
+        /// 그런 칸이 뒤 슬롯의 구간을 밀어내지 않게 하기 위함이다. 범위 밖의 난수값은 -1로 답한다
+        /// (망가진 난수원이 첫 슬롯을 공짜로 뽑아 주지 않게 한다).
         /// </summary>
-        public static void RollDrops(
-            IReadOnlyList<MonsterDefinition.DropEntry> drops,
-            Func<float> roll,
-            List<InventoryManager.RewardItemStack> results)
+        public static int SelectDropIndex(IReadOnlyList<MonsterDefinition.DropEntry> drops, long roll)
         {
-            if (results == null) return;
-            if (drops == null || roll == null) return;
+            if (drops == null) return -1;
+            if (roll < 0L || roll >= ItemRollRange) return -1;
 
-            // 슬롯 수 상한은 <b>여기서도</b> 지킨다. 임포터가 만드는 에셋은 언제나 3칸 이하지만, 사람이
-            // 손으로 만들었거나 잘못 편집된 MonsterDefinition에는 4칸 이상이 들어 있을 수 있다 - 그것을
-            // 그대로 돌리면 표에 없는 보상이 조용히 지급된다. 넘치는 칸은 난수도 뽑지 않고 무시한다.
             int slotCount = Mathf.Min(drops.Count, DropSlotCapacity);
+            int cumulative = 0;
 
             for (int i = 0; i < slotCount; i++)
             {
                 MonsterDefinition.DropEntry drop = drops[i];
+
+                // IsValid가 아이템 유무와 1~10000 범위를 함께 본다. 확률 0인 칸은 여기서 걸러진다.
                 if (drop == null || !drop.IsValid) continue;
 
-                ItemDefinition item = drop.Item;
-                if (item == null) continue;
-
-                float chance = drop.ChancePercent;
-                if (chance <= 0f) continue;
-
-                if (chance < 100f)
-                {
-                    float threshold = chance / 100f;
-                    if (roll() >= threshold) continue;
-                }
-
-                Accumulate(results, item, drop.Count);
+                cumulative += drop.ChanceBasisPoints;
+                if (roll < cumulative) return i;
             }
+
+            return -1;
         }
 
-        /// <summary>같은 ItemId가 이미 있으면 수량만 더하고, 없으면 뒤에 새 칸으로 붙인다(첫 등장 순서 유지).</summary>
-        private static void Accumulate(
-            List<InventoryManager.RewardItemStack> results, ItemDefinition item, int count)
+        /// <summary>
+        /// 이번 처치의 재화 금액. <b>아이템이 나왔는지와 아무 상관이 없다.</b>
+        ///
+        /// <b>지급의 근거는 연결된 <see cref="CurrencyDefinition"/> 하나뿐이다.</b>
+        /// <see cref="MonsterDefinition.HasCurrencyReward"/>가 false면 - 참조가 비었든, 가리키는 정의가
+        /// 쓸 수 없는 상태든 - 0이고 <b>난수를 뽑지 않는다</b>. id 문자열만 보고 지급을 허가하는 경로는
+        /// 존재하지 않으므로, "표에 없는 재화"가 지급되는 상태를 만들 수 없다.
+        ///
+        /// 연결이 있으면 Min~Max <b>양 끝을 포함</b>하는 금액을 준다 - 둘이 같으면 고정 금액이라
+        /// 역시 난수를 뽑지 않는다.
+        ///
+        /// <b>재화 종류는 아직 하나뿐이다.</b> 어떤 재화를 가리키든 지금은 <b>기존의 그 하나뿐인 잔액</b>
+        /// (SaveData.currency)으로 지급된다 - 재화별 저장소는 아직 없다. 종류가 늘어날 때 무엇을
+        /// 지급해야 하는지는 이 참조가 이미 정확히 말해 주므로, 그때 고칠 곳은 저장 쪽 하나다.
+        /// </summary>
+        public static int RollCurrency(MonsterDefinition monster, RandomBelow roll)
         {
-            if (count <= 0) return;
+            if (monster == null || !monster.HasCurrencyReward) return 0;
 
-            string itemId = item.ItemId;
-            for (int i = 0; i < results.Count; i++)
-            {
-                if (results[i].Definition == null) continue;
-                if (!string.Equals(results[i].Definition.ItemId, itemId, StringComparison.Ordinal)) continue;
+            int min = monster.CurrencyAmountMin;
+            int max = monster.CurrencyAmountMax;
+            if (max <= min) return min;
+            if (roll == null) return min;
 
-                results[i] = new InventoryManager.RewardItemStack(
-                    results[i].Definition, results[i].Count + count);
-                return;
-            }
+            // 양 끝을 포함해야 하므로 구간의 크기는 (max - min + 1)이다. min이 0 이상, max가 int.MaxValue
+            // 이하라 이 값은 최대 2^31이며 <b>int에는 담기지 않는다</b> - 경계를 int로 좁히면 그 한 칸,
+            // 즉 최댓값이 영원히 나오지 않는다. 그래서 요청도 계산도 long으로 한다.
+            long span = (long)max - min + 1L;
 
-            results.Add(new InventoryManager.RewardItemStack(item, count));
+            // 난수원이 약속을 어겨도 지급액이 Min~Max 밖으로 나가지 않게 long 상태에서 한 번 더 막는다.
+            long offset = roll(span);
+            if (offset < 0L) offset = 0L;
+            if (offset > span - 1L) offset = span - 1L;
+
+            // 여기서 amount는 min 이상 max 이하임이 증명되었다(offset이 0~span-1이고 min+span-1 == max).
+            // int로 좁히는 것은 그 뒤다.
+            long amount = min + offset;
+            return (int)amount;
         }
 
-        /// <summary>처치 1회당 정확히 한 번만 호출된다 - 성공한 칸이 몇 개든 문구는 하나다.
-        /// 아이템 수에 따라 자리표시자 수가 다른 문구를 골라 쓴다(3자리 문구에 목록을 넣어 형식 오류가
-        /// 나지 않게 한다). ToastManager가 없는 구성에서도 값을 확인할 수 있도록 그때는 로그로 남긴다.</summary>
-        private void ShowRewardToast(List<InventoryManager.RewardItemStack> rewards)
+        /// <summary>
+        /// 처치 1회당 <b>많아야 한 번</b> 호출된다(빈 보상에는 호출되지 않는다). 받은 것의 조합에 따라
+        /// 자리표시자 수가 다른 문구를 골라 쓴다 - 아이템+재화 / 아이템만 / 재화만 셋을 각각 두는 이유는
+        /// 자리표시자 수가 맞지 않는 문구에 값을 넣으면 형식 오류가 나기 때문이다.
+        /// ToastManager가 없는 구성에서도 값을 확인할 수 있도록 그때는 로그로 남긴다.
+        /// </summary>
+        private void ShowRewardToast(DefeatReward reward)
         {
-            string message;
-
-            if (rewards.Count == 0)
-            {
-                message = string.Format(currencyOnlyToastFormat, currencyPerDefeat);
-            }
-            else if (rewards.Count == 1)
-            {
-                message = string.Format(
-                    rewardToastFormat, currencyPerDefeat, DescribeName(rewards[0]), rewards[0].Count);
-            }
-            else
-            {
-                message = string.Format(multiRewardToastFormat, currencyPerDefeat, DescribeAll(rewards));
-            }
+            string message = BuildToastMessage(reward);
+            if (string.IsNullOrEmpty(message)) return;
 
             if (ToastManager.Instance != null)
             {
@@ -266,23 +371,24 @@ namespace Inventory
             Debug.Log($"[TestDefeatRewardDistributor] {message} (ToastManager가 없어 로그로만 표시합니다)");
         }
 
-        private static string DescribeName(InventoryManager.RewardItemStack stack)
+        /// <summary>토스트 문구 한 줄. 받은 것이 없으면 빈 문자열이며, 그때는 아무것도 띄우지 않는다.</summary>
+        private string BuildToastMessage(DefeatReward reward)
         {
-            return stack.Definition != null ? stack.Definition.DisplayName : string.Empty;
-        }
+            string itemName = reward.HasItem ? DescribeName(reward.Item) : string.Empty;
 
-        private static string DescribeAll(List<InventoryManager.RewardItemStack> rewards)
-        {
-            var builder = new StringBuilder();
-            for (int i = 0; i < rewards.Count; i++)
+            if (reward.HasItem && reward.HasCurrency)
             {
-                if (builder.Length > 0) builder.Append(", ");
-                builder.Append(DescribeName(rewards[i]))
-                    .Append(" x")
-                    .Append(rewards[i].Count.ToString(CultureInfo.InvariantCulture));
+                return string.Format(rewardToastFormat, reward.Currency, itemName, reward.ItemCount);
             }
 
-            return builder.ToString();
+            if (reward.HasItem) return string.Format(itemOnlyToastFormat, itemName, reward.ItemCount);
+
+            return reward.HasCurrency ? string.Format(currencyOnlyToastFormat, reward.Currency) : string.Empty;
+        }
+
+        private static string DescribeName(ItemDefinition item)
+        {
+            return item != null ? item.DisplayName : string.Empty;
         }
 
         private InventoryManager ResolveInventory()

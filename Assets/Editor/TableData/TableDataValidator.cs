@@ -24,7 +24,7 @@ namespace TableDataEditor
 
         public TableDataDiagnosticLog Log { get; }
 
-        /// <summary>네 표가 모두 읽힌 경우의 파싱 결과. 파일/헤더 단계에서 실패하면 null이다.</summary>
+        /// <summary>다섯 표가 모두 읽힌 경우의 파싱 결과. 파일/헤더 단계에서 실패하면 null이다.</summary>
         public TableDataSnapshot Snapshot { get; }
 
         public TableDataAssetIndex Assets { get; }
@@ -41,23 +41,24 @@ namespace TableDataEditor
         public bool CanRebuild => !HasErrors && Snapshot != null;
 
         public string Summary =>
-            $"World {Snapshot?.Worlds.Count ?? 0} / Item {Snapshot?.Items.Count ?? 0} / " +
+            $"World {Snapshot?.Worlds.Count ?? 0} / Currency {Snapshot?.Currencies.Count ?? 0} / " +
+            $"Item {Snapshot?.Items.Count ?? 0} / " +
             $"Monster {Snapshot?.Monsters.Count ?? 0} / " +
             $"Dungeon {Snapshot?.Dungeons.Count ?? 0} 행, 오류 {ErrorCount}건, 경고 {WarningCount}건";
     }
 
     /// <summary>
-    /// CSV 네 장을 읽고 <b>모든</b> 문제를 모아 보고한다. <b>에셋도 폴더도 CSV도 만들지 않고 고치지도
+    /// CSV 다섯 장을 읽고 <b>모든</b> 문제를 모아 보고한다. <b>에셋도 폴더도 CSV도 만들지 않고 고치지도
     /// 않는다</b> - Validate는 순수하게 읽기만 하는 동작이라, 사람이 결과를 보고 판단할 때까지
     /// 프로젝트 상태가 한 글자도 바뀌지 않는다.
     ///
-    /// <b>첫 오류에서 멈추지 않는다.</b> World → Item → Monster → Dungeon 순서로 끝까지 읽고, 참조
-    /// 무결성까지 검사한 뒤 한 번에 돌려준다. 순서가 정해져 있는 이유는 뒤의 표가 앞의 표를 참조하기
-    /// 때문이다(Monster는 World를, Dungeon은 World / Monster / Item을 가리킨다). Item을 Monster보다
-    /// 앞에 둔 것은 이후 단계에서 몬스터가 드롭 아이템을 가리키게 되어도 순서를 뒤집지 않게 하기 위함이다.
+    /// <b>첫 오류에서 멈추지 않는다.</b> World → Currency → Item → Monster → Dungeon 순서로 끝까지
+    /// 읽고, 참조 무결성까지 검사한 뒤 한 번에 돌려준다. 순서가 정해져 있는 이유는 뒤의 표가 앞의 표를
+    /// 참조하기 때문이다(Monster는 World / Currency / Item을, Dungeon은 World / Monster / Item을
+    /// 가리킨다). 가리켜지는 표가 언제나 먼저 읽히므로, 참조를 확인할 때 스냅샷은 이미 완성되어 있다.
     ///
     /// 파일/헤더 단계에서 실패한 표는 행 검증을 건너뛴다 - 헤더가 어긋난 채 행을 읽으면 엉뚱한 칸을
-    /// 가리키는 오류가 쏟아져 진짜 원인이 묻히기 때문이다. 그래도 나머지 두 표는 계속 읽는다.
+    /// 가리키는 오류가 쏟아져 진짜 원인이 묻히기 때문이다. 그래도 나머지 표는 계속 읽는다.
     /// </summary>
     public static class TableDataValidator
     {
@@ -69,6 +70,8 @@ namespace TableDataEditor
 
             CsvTable worldTable = TableDataCsvReader.Read(
                 TableDataPaths.WorldCsvPath, TableDataPaths.WorldCsvFileName, TableDataColumns.World, log);
+            CsvTable currencyTable = TableDataCsvReader.Read(
+                TableDataPaths.CurrencyCsvPath, TableDataPaths.CurrencyCsvFileName, TableDataColumns.Currency, log);
             CsvTable itemTable = TableDataCsvReader.Read(
                 TableDataPaths.ItemCsvPath, TableDataPaths.ItemCsvFileName, TableDataColumns.Item, log);
             CsvTable monsterTable = TableDataCsvReader.Read(
@@ -77,12 +80,13 @@ namespace TableDataEditor
                 TableDataPaths.DungeonCsvPath, TableDataPaths.DungeonCsvFileName, TableDataColumns.Dungeon, log);
 
             var snapshot = new TableDataSnapshot();
-            bool allTablesRead = worldTable != null && itemTable != null
+            bool allTablesRead = worldTable != null && currencyTable != null && itemTable != null
                                  && monsterTable != null && dungeonTable != null;
 
             try
             {
                 if (worldTable != null) ValidateWorlds(worldTable, snapshot, log);
+                if (currencyTable != null) ValidateCurrencies(currencyTable, snapshot, assets, log);
                 if (itemTable != null) ValidateItems(itemTable, snapshot, assets, log);
                 if (monsterTable != null) ValidateMonsters(monsterTable, snapshot, assets, log);
                 if (dungeonTable != null) ValidateDungeons(dungeonTable, snapshot, assets, log);
@@ -153,6 +157,122 @@ namespace TableDataEditor
 
                 snapshot.Worlds.Add(row);
                 snapshot.WorldsById[row.Id] = row;
+            }
+        }
+
+        // ---- Currency ----
+
+        /// <summary>
+        /// Currency.csv 한 장. 규칙은 Item.csv와 거의 같다 - id 형식/중복, 이름 참조, 아이콘, 순서.
+        /// 다른 점은 두 가지다. 첫째, <b>이름이 필수</b>다: 재화는 화면에 금액과 함께 이름이나
+        /// 아이콘으로만 나타나므로, 활성 재화에 이름이 없으면 사람이 무엇을 얻었는지 알 수 없다
+        /// (World / Dungeon과 같은 판정이다). 둘째, <b>아이콘은 완전한 선택 항목</b>이라 못 찾거나
+        /// 여럿이어도 경고에 그친다(<see cref="ReadCurrencyIcon"/> 참고) - 아이콘 한 장 때문에 재화
+        /// 표 전체가 반영되지 못하는 일을 만들지 않는다.
+        ///
+        /// <b>currency_id는 다듬지 않는다.</b> 저장 데이터와 Monster.csv가 함께 쓰는 키라,
+        /// <see cref="TableDataFieldRules.TryReadRequiredId"/>가 앞뒤 공백이 붙은 값을 형식 오류로
+        /// 걸러 낸다 - 소문자화도 공백 제거도 어디에서도 하지 않는다.
+        /// </summary>
+        private static void ValidateCurrencies(
+            CsvTable table, TableDataSnapshot snapshot, TableDataAssetIndex assets, TableDataDiagnosticLog log)
+        {
+            string file = table.FileName;
+            var displayOrders = new Dictionary<int, int>();
+
+            foreach (CsvRecord record in table.Records)
+            {
+                int line = record.Line;
+                var row = new CurrencyRow { Line = line };
+
+                string idRaw = table.Get(record, TableDataColumns.CurrencyId);
+                bool idOk = TableDataFieldRules.TryReadRequiredId(
+                    file, line, TableDataColumns.CurrencyId, idRaw, log, out string id);
+                row.Id = id;
+
+                if (idOk && snapshot.CurrenciesById.TryGetValue(id, out CurrencyRow existing))
+                {
+                    log.Error(file, line, TableDataColumns.CurrencyId, id,
+                        $"currency_id가 {existing.Line}행과 중복됩니다 - 먼저 나온 행만 사용됩니다.");
+                    idOk = false;
+                }
+
+                if (TableDataFieldRules.TryReadEnabled(
+                        file, line, TableDataColumns.Enabled, table.Get(record, TableDataColumns.Enabled), log, out bool enabled))
+                {
+                    row.Enabled = enabled;
+                }
+
+                if (TableDataFieldRules.TryReadInt(
+                        file, line, TableDataColumns.DisplayOrder, table.Get(record, TableDataColumns.DisplayOrder), log, out int order))
+                {
+                    row.DisplayOrder = order;
+                    TableDataFieldRules.CheckDuplicateDisplayOrder(file, line, order, displayOrders, log);
+                }
+
+                row.Name = ReadLocalizedName(
+                    table, record, file, line, row.Enabled, nameRequiredWhenEnabled: true, log);
+
+                ReadCurrencyIcon(table, record, file, line, assets, row, log);
+
+                // memo는 사람이 읽는 칸이라 검증하지 않는다.
+
+                if (!idOk) continue;
+
+                snapshot.Currencies.Add(row);
+                snapshot.CurrenciesById[row.Id] = row;
+            }
+        }
+
+        /// <summary>
+        /// 재화 아이콘 한 칸. <b>재화 아이콘은 처음부터 끝까지 선택 항목이라, 세 가지 실패가 모두
+        /// 경고다</b> - 비어 있든, 이름을 적었는데 찾지 못하든, 같은 이름이 여럿이라 정할 수 없든
+        /// 결과는 같다: 아이콘을 비워 두고(<see cref="CurrencyRow.Icon"/>는 null) 넘어가며,
+        /// Validate도 Rebuild도 이 때문에 멈추지 않는다. <b>정확히 하나를 찾은 경우에만</b> 아이콘을
+        /// 연결한다.
+        ///
+        /// <b>아이템 아이콘(<see cref="ReadIcon"/>)과 일부러 다르다.</b> 그쪽은 못 찾은 이름을 오류로
+        /// 막는데, 재화는 아이콘이 아직 한 장도 없는 상태에서 표부터 만들어 나가는 중이라 같은 규칙을
+        /// 적용하면 아이콘 한 장이 없다는 이유로 재화 표 전체가 반영되지 못한다. 아이콘이 빠진 것은
+        /// 화면에서 바로 보이는 종류의 문제이고, 경고는 그대로 남으므로 놓치지도 않는다.
+        ///
+        /// <b>폴더가 없는 것 자체도 문제가 아니다.</b> 아이콘을 쓰지 않는 동안에는
+        /// <see cref="TableDataPaths.CurrencyIconRoot"/>가 없는 것이 정상이고, 그때는 어떤 이름도
+        /// 찾을 수 없으므로 "0개" 경고가 된다.
+        /// </summary>
+        private static void ReadCurrencyIcon(
+            CsvTable table, CsvRecord record, string file, int line,
+            TableDataAssetIndex assets, CurrencyRow row, TableDataDiagnosticLog log)
+        {
+            string key = table.Get(record, TableDataColumns.IconKey);
+
+            if (string.IsNullOrEmpty(key))
+            {
+                log.Warning(file, line, TableDataColumns.IconKey, key,
+                    "icon_key가 비어 있습니다 - 재화가 아이콘 없이 금액과 이름만으로 표시됩니다(선택 항목).");
+                return;
+            }
+
+            AssetLookupResult result = assets.FindCurrencyIcon(key, out Sprite icon, out int count);
+            switch (result)
+            {
+                case AssetLookupResult.Found:
+                    row.Icon = icon;
+                    return;
+
+                case AssetLookupResult.Ambiguous:
+                    log.Warning(file, line, TableDataColumns.IconKey, key,
+                        $"'{TableDataPaths.CurrencyIconRoot}' 아래에 이름이 정확히 '{key}'인 Sprite가 {count}개 있어 " +
+                        "어느 것을 쓸지 정할 수 없습니다 - 아이콘 없이 생성합니다(선택 항목). " +
+                        "아이콘을 붙이려면 이름을 하나로 만드세요.");
+                    return;
+
+                default:
+                    log.Warning(file, line, TableDataColumns.IconKey, key,
+                        $"'{TableDataPaths.CurrencyIconRoot}' 아래에서 이름이 정확히 '{key}'인 Sprite를 찾지 못했습니다(0개) - " +
+                        "아이콘 없이 생성합니다(선택 항목). 재화 아이콘은 이 폴더에서만 찾습니다 - " +
+                        "붙이려면 그 이름의 Sprite를 여기에 두세요(폴더가 없다면 만들어야 합니다).");
+                    return;
             }
         }
 
@@ -329,7 +449,15 @@ namespace TableDataEditor
                 // 여기서는 값의 형식만 보고, 실재 여부는 표를 다 읽은 뒤 CheckBaseReferences가 본다.
                 row.BaseMonsterId = ReadBaseMonsterId(table, record, file, line, log);
 
-                ReadDrops(table, record, file, line, snapshot, row, log);
+                // 보상 칸은 MonsterRewardRules가 읽는다. 칸을 이름으로만 넘기므로 표의 칸 순서와
+                // 무관하고, 규칙만 따로 테스트할 수 있다.
+                string GetCell(string column) => table.Get(record, column);
+                MonsterRewardRules.ReadDrops(file, line, GetCell, snapshot, row, log);
+                MonsterRewardRules.ReadCurrency(file, line, GetCell, row, log);
+
+                // 재화 id의 <b>실재</b>는 규칙이 아니라 표 사이의 참조라서 여기서 본다 - Currency.csv가
+                // Monster.csv보다 먼저 읽히므로 스냅샷은 이 시점에 이미 완성되어 있다.
+                CheckCurrencyReference(file, snapshot, row, log);
 
                 if (!idOk) continue;
 
@@ -338,6 +466,40 @@ namespace TableDataEditor
             }
 
             CheckBaseReferences(file, snapshot, log);
+        }
+
+        /// <summary>
+        /// 처치 재화 보상이 가리키는 재화가 <b>Currency.csv에 실제로 있는 활성 행</b>인지 본다.
+        /// <see cref="MonsterRewardRules.ReadCurrency"/>는 세 칸의 <b>형식과 짝</b>만 보고, 표 사이의
+        /// 참조는 여기가 본다 - 규칙 시험이 Currency 표 없이도 돌 수 있게 나눠 둔 것이다.
+        ///
+        /// 비교는 <b>다듬지 않은 값끼리의 Ordinal 완전 일치</b>다. 'jewel'과 'Jewel'은 다른 재화이고,
+        /// 공백이 붙은 값은 애초에 형식 검사에서 걸러졌으므로 여기까지 오지 않는다.
+        ///
+        /// <b>enabled=0인 재화를 가리키는 것도 오류다.</b> 던전이 비활성 몬스터/아이템을 가리킬 수 없는
+        /// 것과 같은 이유다 - 카탈로그에 없는 재화를 지급하면 화면에 이름도 아이콘도 없는 보상이 나온다.
+        /// 몬스터 자신이 enabled=0이어도 마찬가지로 본다: 비활성 행의 잘못된 참조를 통과시키면 다시
+        /// 켜는 순간 조용히 깨진다.
+        /// </summary>
+        private static void CheckCurrencyReference(
+            string file, TableDataSnapshot snapshot, MonsterRow row, TableDataDiagnosticLog log)
+        {
+            if (string.IsNullOrEmpty(row.CurrencyId)) return;
+
+            if (!snapshot.CurrenciesById.TryGetValue(row.CurrencyId, out CurrencyRow currency))
+            {
+                log.Error(file, row.Line, TableDataColumns.CurrencyId, row.CurrencyId,
+                    $"{TableDataPaths.CurrencyCsvFileName}에 없는 currency_id입니다 - " +
+                    "처치 재화 보상은 그 표에 실제로 있는 행만 가리킬 수 있습니다(대소문자를 구분합니다).");
+                return;
+            }
+
+            if (!currency.Enabled)
+            {
+                log.Error(file, row.Line, TableDataColumns.CurrencyId, row.CurrencyId,
+                    $"enabled=0인 재화({TableDataPaths.CurrencyCsvFileName} {currency.Line}행)를 지급합니다 - " +
+                    "처치 보상에는 활성 재화만 넣을 수 있습니다.");
+            }
         }
 
         /// <summary>
@@ -387,126 +549,6 @@ namespace TableDataEditor
                     $"{TableDataPaths.MonsterCsvFileName}에 없는 monster_id입니다 - " +
                     "base_monster_id는 이 표에 실제로 있는 행만 가리킬 수 있습니다.");
                 row.BaseMonsterId = string.Empty;
-            }
-        }
-
-        /// <summary>
-        /// 드롭 슬롯 3세트를 읽는다. 슬롯 하나는 <b>세 칸이 한 덩어리</b>라서, 셋 다 비어 있거나 셋 다
-        /// 채워져 있어야 한다 - item_id 없이 확률만 적힌 칸은 "적었는데 아무 일도 일어나지 않는" 값이고,
-        /// item_id만 있고 확률이 없는 칸은 드롭되지 않는 드롭이라 둘 다 오류로 잡는다.
-        ///
-        /// 슬롯이 잘못된 경우 <b>그 슬롯만</b> 버린다. 같은 행의 다른 슬롯은 정상이면 그대로 살아 있고,
-        /// 오류가 하나라도 있으면 Rebuild 자체가 멈추므로 반쪽짜리 에셋이 만들어지지는 않는다.
-        /// </summary>
-        private static void ReadDrops(
-            CsvTable table, CsvRecord record, string file, int line,
-            TableDataSnapshot snapshot, MonsterRow row, TableDataDiagnosticLog log)
-        {
-            var seenItemIds = new Dictionary<string, int>(StringComparer.Ordinal);
-
-            for (int slot = 1; slot <= TableDataColumns.MonsterDropSlotCount; slot++)
-            {
-                string itemColumn = TableDataColumns.DropItemId(slot);
-                string chanceColumn = TableDataColumns.DropChance(slot);
-                string countColumn = TableDataColumns.DropCount(slot);
-
-                string itemRaw = table.Get(record, itemColumn);
-                string chanceRaw = table.Get(record, chanceColumn);
-                string countRaw = table.Get(record, countColumn);
-
-                if (string.IsNullOrEmpty(itemRaw))
-                {
-                    // 아이템이 없는 슬롯은 비어 있어야 한다. 확률/개수만 남아 있으면 지우다 만 흔적이다.
-                    if (!string.IsNullOrEmpty(chanceRaw))
-                    {
-                        log.Error(file, line, chanceColumn, chanceRaw,
-                            $"{itemColumn}이 비어 있는데 확률만 적혀 있습니다 - 슬롯을 쓰려면 아이템을 적고, " +
-                            "쓰지 않으려면 세 칸을 모두 비우세요.");
-                    }
-
-                    if (!string.IsNullOrEmpty(countRaw))
-                    {
-                        log.Error(file, line, countColumn, countRaw,
-                            $"{itemColumn}이 비어 있는데 개수만 적혀 있습니다 - 슬롯을 쓰려면 아이템을 적고, " +
-                            "쓰지 않으려면 세 칸을 모두 비우세요.");
-                    }
-
-                    continue;
-                }
-
-                bool slotOk = true;
-
-                if (!TableDataFieldRules.IsValidId(itemRaw))
-                {
-                    log.Error(file, line, itemColumn, itemRaw,
-                        $"drop item_id 형식이 맞지 않습니다 - {TableDataFieldRules.IdPatternText} 를 만족해야 합니다.");
-                    slotOk = false;
-                }
-                else if (!snapshot.ItemsById.TryGetValue(itemRaw, out ItemRow item))
-                {
-                    log.Error(file, line, itemColumn, itemRaw,
-                        $"{TableDataPaths.ItemCsvFileName}에 없는 item_id입니다.");
-                    slotOk = false;
-                }
-                else if (!item.Enabled)
-                {
-                    log.Error(file, line, itemColumn, itemRaw,
-                        $"enabled=0인 아이템({TableDataPaths.ItemCsvFileName} {item.Line}행)을 드롭합니다 - " +
-                        "드롭 목록에는 활성 아이템만 넣을 수 있습니다.");
-                    slotOk = false;
-                }
-
-                float chance = 0f;
-                if (string.IsNullOrEmpty(chanceRaw))
-                {
-                    log.Error(file, line, chanceColumn, chanceRaw,
-                        $"{itemColumn}이 채워진 슬롯에는 확률이 필요합니다 - 0 초과 100 이하의 백분율을 적으세요.");
-                    slotOk = false;
-                }
-                else if (!TableDataFieldRules.TryReadPercent(file, line, chanceColumn, chanceRaw, log, out chance))
-                {
-                    slotOk = false;
-                }
-
-                int count = 0;
-                if (string.IsNullOrEmpty(countRaw))
-                {
-                    log.Error(file, line, countColumn, countRaw,
-                        $"{itemColumn}이 채워진 슬롯에는 개수가 필요합니다 - 1 이상의 정수를 적으세요.");
-                    slotOk = false;
-                }
-                else if (!TableDataFieldRules.TryReadInt(file, line, countColumn, countRaw, log, out count))
-                {
-                    slotOk = false;
-                }
-                else if (count < 1)
-                {
-                    log.Error(file, line, countColumn, countRaw,
-                        "드롭 개수는 1 이상이어야 합니다 - 0개를 주는 슬롯은 세 칸을 모두 비우세요.");
-                    slotOk = false;
-                }
-
-                // 같은 아이템을 두 슬롯에 나눠 적는 것 자체는 동작한다(확률이 다른 두 번의 판정이 된다).
-                // 다만 대부분은 복사한 뒤 고치는 것을 잊은 경우라 경고로 알린다.
-                if (seenItemIds.TryGetValue(itemRaw, out int firstSlot))
-                {
-                    log.Warning(file, line, itemColumn, itemRaw,
-                        $"{firstSlot}번 슬롯과 같은 아이템입니다 - 확률 판정이 두 번 일어납니다. " +
-                        "의도한 것이 아니라면 한쪽을 비우세요.");
-                }
-                else
-                {
-                    seenItemIds[itemRaw] = slot;
-                }
-
-                if (!slotOk) continue;
-
-                row.Drops.Add(new MonsterDropRow
-                {
-                    ItemId = itemRaw,
-                    ChancePercent = chance,
-                    Count = count,
-                });
             }
         }
 
@@ -830,6 +872,8 @@ namespace TableDataEditor
         {
             var worlds = TableDataAssetIndex.LoadGeneratedById<WorldDefinition>(
                 TableDataPaths.WorldOutputFolder, w => w.WorldId);
+            var currencies = TableDataAssetIndex.LoadGeneratedById<CurrencyDefinition>(
+                TableDataPaths.CurrencyOutputFolder, c => c.CurrencyId);
             var items = TableDataAssetIndex.LoadGeneratedById<ItemDefinition>(
                 TableDataPaths.ItemOutputFolder, i => i.ItemId);
             var monsters = TableDataAssetIndex.LoadGeneratedById<MonsterDefinition>(
@@ -838,6 +882,7 @@ namespace TableDataEditor
                 TableDataPaths.DungeonOutputFolder, d => d.DungeonId);
 
             CheckDuplicateGenerated(worlds, TableDataPaths.WorldCsvFileName, TableDataColumns.WorldId, log);
+            CheckDuplicateGenerated(currencies, TableDataPaths.CurrencyCsvFileName, TableDataColumns.CurrencyId, log);
             CheckDuplicateGenerated(items, TableDataPaths.ItemCsvFileName, TableDataColumns.ItemId, log);
             CheckDuplicateGenerated(monsters, TableDataPaths.MonsterCsvFileName, TableDataColumns.MonsterId, log);
             CheckDuplicateGenerated(dungeons, TableDataPaths.DungeonCsvFileName, TableDataColumns.DungeonId, log);
@@ -847,6 +892,13 @@ namespace TableDataEditor
                 CheckOutputPath<WorldDefinition>(
                     TableDataPaths.WorldAssetPath(row.Id), row.Id, w => w.WorldId,
                     TableDataPaths.WorldCsvFileName, row.Line, TableDataColumns.WorldId, row.Id, log);
+            }
+
+            foreach (CurrencyRow row in snapshot.Currencies)
+            {
+                CheckOutputPath<CurrencyDefinition>(
+                    TableDataPaths.CurrencyAssetPath(row.Id), row.Id, c => c.CurrencyId,
+                    TableDataPaths.CurrencyCsvFileName, row.Line, TableDataColumns.CurrencyId, row.Id, log);
             }
 
             foreach (ItemRow row in snapshot.Items)
@@ -874,6 +926,10 @@ namespace TableDataEditor
                 TableDataPaths.WorldCatalogAssetPath, null, null,
                 TableDataPaths.WorldCsvFileName, TableDataDiagnostic.FileLevelRow,
                 TableDataColumns.FilePseudoColumn, TableDataPaths.WorldCatalogAssetName, log);
+            CheckOutputPath<CurrencyCatalog>(
+                TableDataPaths.CurrencyCatalogAssetPath, null, null,
+                TableDataPaths.CurrencyCsvFileName, TableDataDiagnostic.FileLevelRow,
+                TableDataColumns.FilePseudoColumn, TableDataPaths.CurrencyCatalogAssetName, log);
             CheckOutputPath<ItemCatalog>(
                 TableDataPaths.ItemCatalogAssetPath, null, null,
                 TableDataPaths.ItemCsvFileName, TableDataDiagnostic.FileLevelRow,
@@ -948,6 +1004,10 @@ namespace TableDataEditor
             ReportOrphans(
                 TableDataAssetIndex.LoadGeneratedById<WorldDefinition>(TableDataPaths.WorldOutputFolder, w => w.WorldId),
                 snapshot.WorldsById.Keys, TableDataPaths.WorldCsvFileName, TableDataColumns.WorldId, log);
+
+            ReportOrphans(
+                TableDataAssetIndex.LoadGeneratedById<CurrencyDefinition>(TableDataPaths.CurrencyOutputFolder, c => c.CurrencyId),
+                snapshot.CurrenciesById.Keys, TableDataPaths.CurrencyCsvFileName, TableDataColumns.CurrencyId, log);
 
             ReportOrphans(
                 TableDataAssetIndex.LoadGeneratedById<ItemDefinition>(TableDataPaths.ItemOutputFolder, i => i.ItemId),

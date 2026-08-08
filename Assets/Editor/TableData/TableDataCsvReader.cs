@@ -6,7 +6,7 @@ using System.IO;
 namespace TableDataEditor
 {
     /// <summary>
-    /// CSV 네 장의 <b>컬럼 이름</b>. CSV는 이 이름을 그대로 써야 한다 -
+    /// CSV 다섯 장의 <b>컬럼 이름</b>. CSV는 이 이름을 그대로 써야 한다 -
     /// 헤더가 어긋나면 값을 추측해 읽지 않고 오류로 멈춘다.
     /// </summary>
     public static class TableDataColumns
@@ -34,6 +34,17 @@ namespace TableDataEditor
             ItemId, NameCategory, NameKey, IconKey, DisplayOrder, Enabled, Memo,
         };
 
+        // Currency.csv
+        //
+        // 사람이 읽는 재화 이름은 <c>$currency_name</c>이라는 참조 컬럼으로 따로 두며, 여기 넣지 않는다 -
+        // 넣으면 필수 컬럼이 되고 임포터가 값을 읽는 칸처럼 보인다. currency_id 컬럼 이름은
+        // Monster.csv의 참조 칸과 <b>같은 상수</b>를 쓴다(아래 Monster.csv 절에 정의) - 두 표가 같은
+        // 이름을 가리켜야 참조가 성립하므로, 이름을 두 번 적어 두면 한쪽만 고쳐질 수 있다.
+        public static readonly string[] Currency =
+        {
+            CurrencyId, NameCategory, NameKey, IconKey, DisplayOrder, Enabled, Memo,
+        };
+
         // Monster.csv
         public const string MonsterId = "monster_id";
         public const string BaseMonsterId = "base_monster_id";
@@ -53,6 +64,15 @@ namespace TableDataEditor
 
         public static string DropCount(int slot) => "drop_count_" + slot;
 
+        /// <summary>처치 재화 보상 세 칸. <b>세 칸이 한 덩어리</b>다 - id가 비면 금액 두 칸도 비어야 하고,
+        /// id가 있으면 금액 두 칸이 모두 있어야 한다. 사람이 읽는 재화 이름은 <c>$currency_name</c>이라는
+        /// 참조 컬럼으로 따로 두며, 임포터는 그 칸을 읽지 않는다.</summary>
+        public const string CurrencyId = "currency_id";
+
+        public const string CurrencyAmountMin = "currency_amount_min";
+
+        public const string CurrencyAmountMax = "currency_amount_max";
+
         public static readonly string[] Monster = BuildMonsterColumns();
 
         private static string[] BuildMonsterColumns()
@@ -71,6 +91,11 @@ namespace TableDataEditor
                 columns.Add(DropChance(slot));
                 columns.Add(DropCount(slot));
             }
+
+            // $currency_name도 $drop_item_name_n과 같은 작업자용 참조 컬럼이라 여기 넣지 않는다.
+            columns.Add(CurrencyId);
+            columns.Add(CurrencyAmountMin);
+            columns.Add(CurrencyAmountMax);
 
             columns.Add(DisplayOrder);
             columns.Add(Enabled);
@@ -109,7 +134,7 @@ namespace TableDataEditor
     /// 여기 책임이고, 값의 의미는 보지 않는다.
     ///
     /// <b>여기서 실패하면 그 파일의 행 검증은 하지 않는다.</b> 헤더가 틀린 채로 행을 읽으면 엉뚱한
-    /// 컬럼을 가리키는 오류가 수백 개 쏟아져 진짜 원인이 묻히기 때문이다. 대신 나머지 두 파일은
+    /// 컬럼을 가리키는 오류가 수백 개 쏟아져 진짜 원인이 묻히기 때문이다. 대신 나머지 파일은
     /// 계속 읽는다 - Validate의 목적은 한 번에 모든 문제를 보여주는 것이다.
     ///
     /// <b><c>$</c>로 시작하는 헤더는 작업자용 참조 컬럼</b>이라 알려진 컬럼이 아니어도 통과시킨다

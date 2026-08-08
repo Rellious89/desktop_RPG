@@ -354,15 +354,33 @@ namespace Inventory
             InventoryChanged?.Invoke();
         }
 
-        /// <summary>메모리의 재화 값만 바꾼다(저장/알림 없음). 실제로 값이 달라졌으면 true.</summary>
+        /// <summary>
+        /// 메모리의 재화 값만 바꾼다(저장/알림 없음). 실제로 값이 달라졌으면 true.
+        ///
+        /// <b>덧셈은 반드시 long으로 한다.</b> int로 더하면 잔액 1에 int.MaxValue를 더하는 순간 값이
+        /// 음수로 넘쳐 <see cref="ApplyCurrencyValue"/>가 그것을 "0 아래"로 보고 <b>잔액을 0으로
+        /// 만들어 저장</b>한다 - 보상을 받았는데 가진 것이 사라지는, 되돌릴 수 없는 손실이다.
+        /// 보상 표(Monster.csv)가 금액으로 int.MaxValue까지 허용하므로 이것은 도달 가능한 값이다.
+        /// </summary>
         private bool ApplyCurrencyDelta(int amount)
         {
-            return amount != 0 && ApplyCurrencyValue(SaveSystem.Data.currency + amount);
+            return amount != 0 && ApplyCurrencyValue((long)SaveSystem.Data.currency + amount);
         }
 
-        private bool ApplyCurrencyValue(int value)
+        /// <summary>
+        /// 재화 값을 확정한다. 받은 값을 <b>[0, int.MaxValue]로 자른 뒤에</b> int로 좁힌다 - 자르기
+        /// 전에 좁히면 넘친 값이 그대로 들어온다.
+        ///
+        /// 매개변수가 long인 것은 위로 넘치는 쪽을 표현할 수 있어야 하기 때문이다.
+        /// <see cref="SetCurrency"/>가 넘기는 int는 그대로 확장되므로 기존 동작은 달라지지 않는다
+        /// (음수는 여전히 0으로 잘린다).
+        /// </summary>
+        private bool ApplyCurrencyValue(long value)
         {
-            int clamped = Mathf.Max(0, value);
+            int clamped = value <= 0L ? 0
+                : value >= int.MaxValue ? int.MaxValue
+                : (int)value;
+
             if (clamped == SaveSystem.Data.currency) return false;
 
             SaveSystem.Data.currency = clamped;
@@ -409,13 +427,31 @@ namespace Inventory
             SaveAndNotify();
         }
 
+        /// <summary>
+        /// 실제 파일 쓰기를 대신 처리할 함수. <b>평소에는 null이고, 그때는 <see cref="SaveSystem.Save"/>가
+        /// 그대로 불린다</b> - 게임 동작에는 아무 영향이 없다.
+        ///
+        /// 오직 시험만 이 자리를 잠시 갈아 끼운다. <see cref="SaveSystem"/>은 정적 클래스라 저장 경로를
+        /// 주입할 자리가 없고, 그 경로는 실제 게임과 <b>같은</b>
+        /// <see cref="Application.persistentDataPath"/>를 가리킨다 - 그래서 시험이 저장 경로를 그대로
+        /// 실행하면 <b>사람이 실제로 플레이한 저장 파일을 덮어쓴다</b>. 저장이 "몇 번" 일어나는지는
+        /// 묶음 지급의 핵심 성질이라 반드시 확인해야 하므로, 파일을 건드리지 않고 그 횟수를 셀 수 있는
+        /// 최소한의 자리를 여기 하나만 둔다(비공개라 게임 코드에서는 보이지 않는다).
+        /// </summary>
+        private static Func<bool> saveOverride;
+
+        private static bool PersistToDisk()
+        {
+            return saveOverride != null ? saveOverride() : SaveSystem.Save();
+        }
+
         /// <summary>인벤토리가 실제로 바뀐 뒤에만 호출한다 - 저장은 이 경로 하나뿐이라 매 프레임이나
         /// 입력마다 파일을 쓰는 경로가 존재하지 않는다.</summary>
         private void SaveAndNotify()
         {
             entryCacheDirty = true;
 
-            if (!SaveSystem.Save())
+            if (!PersistToDisk())
             {
                 Debug.LogError("[InventoryManager] 인벤토리를 저장하지 못했습니다 - 이번 실행에는 적용되지만 " +
                                "앱을 다시 켜면 이전 값으로 돌아갑니다.", this);

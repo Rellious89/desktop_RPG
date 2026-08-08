@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using CommonEditor;
+using Dungeon;
 
 namespace TableDataEditor
 {
@@ -88,41 +89,45 @@ namespace TableDataEditor
             return false;
         }
 
+        /// <summary>확률의 단위. <b>10000이 100%</b>이고 1은 0.01%다(만분율, basis points).
+        /// 런타임 클래스의 상수를 그대로 쓴다 - CSV의 단위와 에셋의 단위는 같은 하나여야 한다.</summary>
+        public const int BasisPointsScale = MonsterDefinition.DropEntry.ChanceBasisPointsScale;
+
         /// <summary>
-        /// 백분율 칸. <b>25는 25%, 0.5는 0.5%</b>이며 0을 초과하고 100 이하여야 한다.
+        /// 확률 칸. <b>만분율 10진 정수</b>만 받는다 - 0 이상 <see cref="BasisPointsScale"/> 이하이며,
+        /// 10000이 100%, 1이 0.01%다.
         ///
-        /// InvariantCulture 고정에 지수 표기와 앞뒤 공백을 허용하지 않는다 - 지역 설정에 따라
-        /// 소수점이 <c>,</c>가 되는 파일을 조용히 읽으면 25.5가 255가 되는 식으로 값이 통째로 달라진다.
+        /// <b>소수도 지수도 부호도 공백도 받지 않는다.</b> 0.5 같은 값을 반올림해 통과시키면 CSV에 적힌
+        /// 값과 에셋의 확률이 달라지고, 지역 설정에 따라 소수점이 <c>,</c>가 되는 파일을 조용히 읽으면
+        /// 값이 통째로 달라진다 - 표기가 하나뿐이면 그런 경로 자체가 없다. NaN/Infinity 같은 낱말도
+        /// 정수 파서가 애초에 받지 않는다.
         ///
-        /// <b>NaN / Infinity는 파싱은 되지만 오류다.</b> .NET의 실수 파서는 스타일과 무관하게 이 낱말들을
-        /// 받아 주므로, 여기서 명시적으로 걸러 내지 않으면 "확률이 NaN인 드롭"이 에셋까지 그대로 간다.
+        /// <b>0은 형식 오류가 아니다.</b> "지금은 떨어지지 않는 칸"이라는 뜻이며, 그 판단(경고와 제외)은
+        /// 슬롯의 의미를 아는 호출하는 쪽이 한다.
         /// </summary>
-        public static bool TryReadPercent(
-            string file, int line, string column, string raw, TableDataDiagnosticLog log, out float value)
+        public static bool TryReadBasisPoints(
+            string file, int line, string column, string raw, TableDataDiagnosticLog log, out int value)
         {
-            value = 0f;
+            value = 0;
+            string text = raw ?? string.Empty;
 
-            if (!float.TryParse(
-                    raw, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
-                    CultureInfo.InvariantCulture, out float parsed))
+            if (!int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out int parsed))
             {
-                log.Error(file, line, column, raw ?? string.Empty,
-                    "백분율이 아닙니다 - 10진 소수만 허용하며(예: 25, 0.5) 공백/지수 표기/천 단위 구분 기호는 쓸 수 없습니다.");
+                // 음수는 "정수가 아니다"보다 "범위를 벗어났다"가 원인에 가까우므로 따로 안내한다.
+                bool negative = text.Length > 1 && text[0] == '-'
+                    && int.TryParse(text.Substring(1), NumberStyles.None, CultureInfo.InvariantCulture, out _);
+
+                log.Error(file, line, column, text, negative
+                    ? $"확률은 0 이상 {BasisPointsScale} 이하여야 합니다 - 음수는 쓸 수 없습니다."
+                    : $"확률은 만분율 정수여야 합니다 - 0 이상 {BasisPointsScale} 이하의 10진 정수만 " +
+                      "허용하며(10000 = 100%, 1 = 0.01%) 소수점/지수 표기/부호/공백은 쓸 수 없습니다.");
                 return false;
             }
 
-            if (float.IsNaN(parsed) || float.IsInfinity(parsed))
+            if (parsed > BasisPointsScale)
             {
-                log.Error(file, line, column, raw ?? string.Empty,
-                    "백분율이 수가 아닙니다(NaN/Infinity) - 0 초과 100 이하의 실제 값을 적어야 합니다.");
-                return false;
-            }
-
-            if (parsed <= 0f || parsed > 100f)
-            {
-                log.Error(file, line, column, raw ?? string.Empty,
-                    "백분율은 0을 초과하고 100 이하여야 합니다 - 0은 '드롭되지 않음'이므로 슬롯을 비워 두고, " +
-                    "100은 '항상 드롭'입니다.");
+                log.Error(file, line, column, text,
+                    $"확률이 {BasisPointsScale}(=100%)을 넘습니다 - 만분율이므로 100%보다 큰 값은 있을 수 없습니다.");
                 return false;
             }
 

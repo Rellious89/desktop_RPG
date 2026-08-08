@@ -45,8 +45,14 @@ namespace TableDataEditor
         // 한쪽만 고쳐진 채로 "검사는 통과했는데 쓰다가 죽는" 상태가 생기지 않게 한다.
         private const string DropsField = "drops";
         private const string DropItemField = "item";
-        private const string DropChanceField = "chancePercent";
+        private const string DropChanceField = "chanceBasisPoints";
         private const string DropCountField = "count";
+
+        // 처치 재화 보상 칸. 드롭과 같은 이유로 상수를 한 곳에 둔다. 재화는 <b>id 문자열이 아니라
+        // CurrencyDefinition 참조</b>다 - 검증을 통과한 Currency.csv 행으로 만든 에셋만 여기 들어온다.
+        private const string CurrencyField = "currency";
+        private const string CurrencyAmountMinField = "currencyAmountMin";
+        private const string CurrencyAmountMaxField = "currencyAmountMax";
 
         public static TableDataRebuildResult Rebuild()
         {
@@ -69,6 +75,10 @@ namespace TableDataEditor
                 TableDataPaths.WorldOutputFolder, w => w.WorldId,
                 snapshot.Worlds.ConvertAll(r => r.Id), TableDataPaths.WorldAssetPath,
                 TableDataPaths.WorldCsvFileName, TableDataColumns.WorldId, result);
+            var currencyAssets = ResolveTargets<CurrencyDefinition>(
+                TableDataPaths.CurrencyOutputFolder, c => c.CurrencyId,
+                snapshot.Currencies.ConvertAll(r => r.Id), TableDataPaths.CurrencyAssetPath,
+                TableDataPaths.CurrencyCsvFileName, TableDataColumns.CurrencyId, result);
             var itemAssets = ResolveTargets<ItemDefinition>(
                 TableDataPaths.ItemOutputFolder, i => i.ItemId,
                 snapshot.Items.ConvertAll(r => r.Id), TableDataPaths.ItemAssetPath,
@@ -83,6 +93,7 @@ namespace TableDataEditor
                 TableDataPaths.DungeonCsvFileName, TableDataColumns.DungeonId, result);
 
             var worldCatalog = ResolveSingleton<WorldCatalog>(TableDataPaths.WorldCatalogAssetPath, result);
+            var currencyCatalog = ResolveSingleton<CurrencyCatalog>(TableDataPaths.CurrencyCatalogAssetPath, result);
             var itemCatalog = ResolveSingleton<ItemCatalog>(TableDataPaths.ItemCatalogAssetPath, result);
             var monsterCatalog = ResolveSingleton<MonsterCatalog>(TableDataPaths.MonsterCatalogAssetPath, result);
             var dungeonCatalog = ResolveSingleton<DungeonCatalog>(TableDataPaths.DungeonCatalogAssetPath, result);
@@ -90,16 +101,18 @@ namespace TableDataEditor
             AssetDatabase.StartAssetEditing();
             try
             {
-                // World -> Item -> Monster -> Dungeon 순서로 채운다. 뒤의 것이 앞의 것을 참조하므로, 참조할
-                // 대상은 이미 메모리에 만들어져 있어야 한다(여기서는 다시 로드하지 않고 위에서 만든 인스턴스를
-                // 쓴다). Item을 Monster보다 앞에 둔 것은 이후 단계에서 몬스터가 드롭 아이템을 가리키게 되어도
-                // 이 순서를 다시 뒤집지 않게 하기 위함이다.
+                // World -> Currency -> Item -> Monster -> Dungeon 순서로 채운다. 뒤의 것이 앞의 것을
+                // 참조하므로, 참조할 대상은 이미 메모리에 만들어져 있어야 한다(여기서는 다시 로드하지 않고
+                // 위에서 만든 인스턴스를 쓴다). Currency와 Item을 Monster보다 앞에 둔 것은 이후 단계에서
+                // 몬스터가 재화/드롭 아이템 에셋을 가리키게 되어도 이 순서를 다시 뒤집지 않게 하기 위함이다.
                 foreach (WorldRow row in snapshot.Worlds) WriteWorld(worldAssets[row.Id], row);
+                foreach (CurrencyRow row in snapshot.Currencies) WriteCurrency(currencyAssets[row.Id], row);
                 foreach (ItemRow row in snapshot.Items) WriteItem(itemAssets[row.Id], row);
-                foreach (MonsterRow row in snapshot.Monsters) WriteMonster(monsterAssets[row.Id], row, worldAssets, itemAssets);
+                foreach (MonsterRow row in snapshot.Monsters) WriteMonster(monsterAssets[row.Id], row, worldAssets, currencyAssets, itemAssets);
                 foreach (DungeonRow row in snapshot.Dungeons) WriteDungeon(dungeonAssets[row.Id], row, worldAssets, monsterAssets, itemAssets);
 
                 WriteCatalog(worldCatalog, "worlds", SortForCatalog(snapshot.Worlds, r => r.Enabled, r => r.DisplayOrder, r => r.Id, worldAssets));
+                WriteCatalog(currencyCatalog, "currencies", SortForCatalog(snapshot.Currencies, r => r.Enabled, r => r.DisplayOrder, r => r.Id, currencyAssets));
                 WriteCatalog(itemCatalog, "items", SortForCatalog(snapshot.Items, r => r.Enabled, r => r.DisplayOrder, r => r.Id, itemAssets));
                 WriteCatalog(monsterCatalog, "monsters", SortForCatalog(snapshot.Monsters, r => r.Enabled, r => r.DisplayOrder, r => r.Id, monsterAssets));
                 WriteCatalog(dungeonCatalog, "dungeons", SortForCatalog(snapshot.Dungeons, r => r.Enabled, r => r.DisplayOrder, r => r.Id, dungeonAssets));
@@ -116,6 +129,7 @@ namespace TableDataEditor
 
             // 카탈로그는 목록 검사 결과를 캐시하므로, 방금 바꾼 내용으로 다시 검사하게 표시한다.
             worldCatalog.MarkDirty();
+            currencyCatalog.MarkDirty();
             itemCatalog.MarkDirty();
             monsterCatalog.MarkDirty();
             dungeonCatalog.MarkDirty();
@@ -131,6 +145,7 @@ namespace TableDataEditor
             EnsureFolder("Assets", "Generated");
             EnsureFolder(TableDataPaths.GeneratedRoot, "TableData");
             EnsureFolder(TableDataPaths.OutputRoot, "World");
+            EnsureFolder(TableDataPaths.OutputRoot, "Currency");
             EnsureFolder(TableDataPaths.OutputRoot, "Item");
             EnsureFolder(TableDataPaths.OutputRoot, "Monster");
             EnsureFolder(TableDataPaths.OutputRoot, "Dungeon");
@@ -230,6 +245,22 @@ namespace TableDataEditor
         }
 
         /// <summary>
+        /// currency_id도 item_id와 같은 무게의 키라, CSV에 적힌 값을 <b>한 글자도 바꾸지 않고</b> 쓴다
+        /// (검증이 다듬지 않은 값을 그대로 통과시켰으므로 그대로 쓴다). 잔액은 여기서 쓰지 않는다 -
+        /// <see cref="CurrencyDefinition"/>에는 잔액 칸 자체가 없고, 표가 정하는 것은 표시 정보뿐이다.
+        /// </summary>
+        private static void WriteCurrency(CurrencyDefinition asset, CurrencyRow row)
+        {
+            var serialized = new SerializedObject(asset);
+            serialized.FindProperty("currencyId").stringValue = row.Id;
+            serialized.FindProperty("displayOrder").intValue = row.DisplayOrder;
+            serialized.FindProperty("icon").objectReferenceValue = row.Icon;
+            ApplyLocalizedName(serialized.FindProperty("localizedName"), row.Name);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(asset);
+        }
+
+        /// <summary>
         /// item_id는 <b>저장 파일의 키</b>라 여기서 쓰는 값이 CSV에 적힌 것과 한 글자도 달라서는 안 된다
         /// (검증이 다듬지 않은 값을 그대로 통과시켰으므로 그대로 쓴다). 사람이 손으로 채우던
         /// <c>displayName</c>은 임포터의 관심사가 아니라 건드리지 않는다 - 이름의 원천은 localizedName이다.
@@ -252,7 +283,8 @@ namespace TableDataEditor
         /// </summary>
         private static void WriteMonster(
             MonsterDefinition asset, MonsterRow row,
-            Dictionary<string, WorldDefinition> worlds, Dictionary<string, ItemDefinition> items)
+            Dictionary<string, WorldDefinition> worlds, Dictionary<string, CurrencyDefinition> currencies,
+            Dictionary<string, ItemDefinition> items)
         {
             var serialized = new SerializedObject(asset);
             serialized.FindProperty("monsterId").stringValue = row.Id;
@@ -264,7 +296,7 @@ namespace TableDataEditor
             serialized.FindProperty("world").objectReferenceValue = Lookup(worlds, row.WorldId);
             ApplyLocalizedName(serialized.FindProperty("localizedName"), row.Name);
 
-            SerializedProperty dropList = serialized.FindProperty("drops");
+            SerializedProperty dropList = serialized.FindProperty(DropsField);
             dropList.arraySize = row.Drops.Count;
             for (int i = 0; i < row.Drops.Count; i++)
             {
@@ -273,9 +305,20 @@ namespace TableDataEditor
 
                 // 배열을 늘리면 Unity가 바로 앞 칸을 복사해 넣기도 하므로 세 칸을 모두 덮어쓴다.
                 element.FindPropertyRelative(DropItemField).objectReferenceValue = Lookup(items, drop.ItemId);
-                element.FindPropertyRelative(DropChanceField).floatValue = drop.ChancePercent;
+                element.FindPropertyRelative(DropChanceField).intValue = drop.ChanceBasisPoints;
                 element.FindPropertyRelative(DropCountField).intValue = drop.Count;
             }
+
+            // 재화 보상은 세 칸을 <b>언제나</b> 함께 쓴다. CSV에서 지웠는데 에셋에 예전 참조나 금액이
+            // 남아 있으면 "표에 없는 재화"가 계속 지급되므로, 지정이 없는 행에는 빈 참조와 0을 적어 둔다.
+            //
+            // 참조는 <b>방금 이 Rebuild가 만든 CurrencyDefinition</b>에서 찾는다(프로젝트를 뒤지지 않는다).
+            // row.CurrencyId가 Currency.csv에 실재하는 활성 행인지는 Validate가 이미 확인했고 하나라도
+            // 어긋나면 여기까지 오지 못하므로, 조회가 빗나가는 것은 정상 흐름에 없다 - 그래도 Lookup이
+            // null을 돌려주면 그대로 비워 둔다(있지도 않은 재화를 가리키는 참조를 만들지 않는다).
+            serialized.FindProperty(CurrencyField).objectReferenceValue = Lookup(currencies, row.CurrencyId);
+            serialized.FindProperty(CurrencyAmountMinField).intValue = row.CurrencyAmountMin;
+            serialized.FindProperty(CurrencyAmountMaxField).intValue = row.CurrencyAmountMax;
 
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(asset);
@@ -394,17 +437,48 @@ namespace TableDataEditor
         {
             bool ok = true;
             ok &= VerifyFields<WorldDefinition>(log, "worldId", "localizedName", "displayOrder");
+            ok &= VerifyFields<CurrencyDefinition>(log, "currencyId", "localizedName", "icon", "displayOrder");
             ok &= VerifyFields<ItemDefinition>(log, "itemId", "localizedName", "icon", "displayOrder");
             ok &= VerifyFields<MonsterDefinition>(log, "monsterId", "baseMonsterId", "localizedName", "world",
-                "motionProfile", "previewSprite", "maxDurability", DropsField, "displayOrder");
+                "motionProfile", "previewSprite", "maxDurability", DropsField,
+                CurrencyField, CurrencyAmountMinField, CurrencyAmountMaxField, "displayOrder");
+            ok &= VerifyMonsterCurrencyIsAReference(log);
             ok &= VerifyDropEntryFields(log);
             ok &= VerifyFields<DungeonDefinition>(log, "dungeonId", "dungeonName", "world", "representativeSprite",
                 "monsters", "rewardItems", "displayOrder");
             ok &= VerifyFields<WorldCatalog>(log, "worlds");
+            ok &= VerifyFields<CurrencyCatalog>(log, "currencies");
             ok &= VerifyFields<ItemCatalog>(log, "items");
             ok &= VerifyFields<MonsterCatalog>(log, "monsters");
             ok &= VerifyFields<DungeonCatalog>(log, "dungeons");
             return ok;
+        }
+
+        /// <summary>
+        /// 재화 칸이 <b>참조 칸</b>인지 확인한다. 이름만 보는 것으로는 부족하다 - 같은 이름이 문자열
+        /// 칸으로 되돌아가 있으면 <c>objectReferenceValue</c>에 넣은 값이 조용히 버려져, 재화를 지정한
+        /// 몬스터가 아무것도 주지 않는 에셋으로 만들어진다. 확률 칸의 타입을 보는 것과 같은 이유다.
+        /// </summary>
+        private static bool VerifyMonsterCurrencyIsAReference(TableDataDiagnosticLog log)
+        {
+            var probe = ScriptableObject.CreateInstance<MonsterDefinition>();
+            try
+            {
+                SerializedProperty currency = new SerializedObject(probe).FindProperty(CurrencyField);
+
+                // 칸이 없는 경우는 VerifyFields가 이미 보고했다.
+                if (currency == null || currency.propertyType == SerializedPropertyType.ObjectReference) return true;
+
+                log.Error(RuntimeSchemaPseudoFile, TableDataDiagnostic.FileLevelRow,
+                    CurrencyField, nameof(MonsterDefinition),
+                    $"{nameof(MonsterDefinition)}의 '{CurrencyField}'가 참조 칸이 아닙니다({currency.propertyType}) - " +
+                    $"재화는 {nameof(CurrencyDefinition)}을 가리키는 참조여야 합니다(id 문자열이 아닙니다).");
+                return false;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(probe);
+            }
         }
 
         /// <summary>
@@ -434,6 +508,18 @@ namespace TableDataEditor
                         field, nameof(MonsterDefinition.DropEntry),
                         $"{nameof(MonsterDefinition.DropEntry)}에 직렬화 필드 '{field}'가 없습니다 - " +
                         "런타임 클래스가 바뀌었으니 임포터를 함께 고쳐야 합니다.");
+                    ok = false;
+                }
+
+                // 확률 칸은 이름뿐 아니라 <b>타입</b>까지 본다. 예전처럼 실수 칸으로 되돌아가 있으면
+                // 정수를 쓰는 이 임포터가 값을 넣지 못한 채 지나가, 확률이 0인 드롭이 만들어진다.
+                SerializedProperty chance = element.FindPropertyRelative(DropChanceField);
+                if (chance != null && chance.propertyType != SerializedPropertyType.Integer)
+                {
+                    log.Error(RuntimeSchemaPseudoFile, TableDataDiagnostic.FileLevelRow,
+                        DropChanceField, nameof(MonsterDefinition.DropEntry),
+                        $"{nameof(MonsterDefinition.DropEntry)}의 '{DropChanceField}'가 정수 칸이 아닙니다" +
+                        $"({chance.propertyType}) - 확률은 만분율 정수여야 합니다.");
                     ok = false;
                 }
 

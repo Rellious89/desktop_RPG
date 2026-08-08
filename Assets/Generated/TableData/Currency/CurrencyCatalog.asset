@@ -9,11 +9,8 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 845ea9da59dc34907828cebab179119c, type: 3}
-  m_Name: RecoveryBalanceTable
+  m_Script: {fileID: 11500000, guid: d60f0ffdcf994648befaf9b3ed6a99d6, type: 3}
+  m_Name: CurrencyCatalog
   m_EditorClassIdentifier: 
-  recoveryId: default
-  currencyId: jewel
-  costPerMissingStamina: 100
-  secondsPerStamina: 30
-  maxSlots: 3
+  currencies:
+  - {fileID: 11400000, guid: 25530e3cfd6944ca4873f62520cd7d22, type: 2}

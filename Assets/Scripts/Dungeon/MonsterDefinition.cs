@@ -34,11 +34,17 @@ namespace Dungeon
         [Serializable]
         public sealed class DropEntry
         {
+            /// <summary>확률의 단위. <b>10000이 100%</b>이고 1은 0.01%다(만분율, basis points).
+            /// CSV의 drop_chance_n도 같은 단위의 정수이며, 임포터가 이 상수를 그대로 쓴다 -
+            /// 단위를 두 곳에 적어 두면 한쪽만 바뀌었을 때 확률이 조용히 100배 달라진다.</summary>
+            public const int ChanceBasisPointsScale = 10000;
+
             [Tooltip("드롭될 아이템 정의. Monster.csv의 drop_item_id_n이 가리키는 Item.csv 행에서 만들어진다.")]
             [SerializeField] private ItemDefinition item;
 
-            [Tooltip("드롭 확률(백분율). 25는 25%, 0.5는 0.5%다. 0 초과 100 이하만 들어온다.")]
-            [SerializeField] private float chancePercent;
+            [Tooltip("드롭 확률(만분율). 10000이 100%, 1이 0.01%다. 1 이상 10000 이하만 들어온다 - " +
+                     "확률 0인 슬롯은 임포터가 아예 항목으로 만들지 않는다.")]
+            [SerializeField] private int chanceBasisPoints;
 
             [Tooltip("한 번 드롭될 때의 개수. 1 이상만 들어온다.")]
             [SerializeField] private int count = 1;
@@ -46,14 +52,17 @@ namespace Dungeon
             /// <summary>드롭될 아이템. 정의가 사라졌으면 null이며, 읽는 쪽이 그 경우를 처리한다.</summary>
             public ItemDefinition Item => item;
 
-            /// <summary>백분율 확률. <b>0~1 비율이 아니다</b> - 25는 25%다.</summary>
-            public float ChancePercent => chancePercent;
+            /// <summary>만분율 확률. <b>백분율도 0~1 비율도 아니다</b> - 10000이 100%, 1이 0.01%다.
+            /// 저장되는 값은 이 정수 하나뿐이다.</summary>
+            public int ChanceBasisPoints => chanceBasisPoints;
 
             /// <summary>드롭 개수. 최소 1을 보장한다 - 0개짜리 드롭이 목록에 남아 있지 않게 한다.</summary>
             public int Count => Mathf.Max(1, count);
 
-            /// <summary>실제로 쓸 수 있는 칸인지. 아이템이 비었거나 확률이 범위를 벗어나면 false다.</summary>
-            public bool IsValid => item != null && chancePercent > 0f && chancePercent <= 100f;
+            /// <summary>실제로 쓸 수 있는 칸인지. 아이템이 비었거나 확률이 1~10000을 벗어나면 false다
+            /// (0은 "떨어지지 않는 칸"이라 유효한 항목이 아니다).</summary>
+            public bool IsValid =>
+                item != null && chanceBasisPoints >= 1 && chanceBasisPoints <= ChanceBasisPointsScale;
         }
 
         private static readonly DropEntry[] EmptyDrops = new DropEntry[0];
@@ -96,6 +105,29 @@ namespace Dungeon
                  "빈 슬롯은 아예 항목으로 만들지 않는다.")]
         [SerializeField] private List<DropEntry> drops = new List<DropEntry>();
 
+        [Header("Currency Reward")]
+        // 재화를 <b>id 문자열이 아니라 정의 에셋으로</b> 가리킨다. 예전에는 Monster.csv의 currency_id를
+        // 문자열로 복사해 두었는데, 그러면 "표에 없는 재화"를 적어 두고도 에셋만 보면 알 수 없었다 -
+        // 임포터가 Currency.csv에서 검증한 행으로만 이 참조를 채우므로, 참조가 있다는 것 자체가
+        // "그 재화가 실제로 있고 활성이다"라는 뜻이 된다.
+        //
+        // <b>그래도 재화를 여러 종류로 나누어 보관하지는 않는다.</b> 지금 게임의 잔액은
+        // SaveData.currency 하나뿐이고, 유효한 참조는 어느 재화를 가리키든 <b>그 하나뿐인 잔액</b>으로
+        // 지급된다. 여기에 재화별 저장소를 만들지 않는 것은 의도적이며, 종류가 늘어날 때 무엇을
+        // 지급해야 하는지는 이 참조가 이미 정확히 말해 준다.
+        [Tooltip("처치 재화 보상으로 줄 재화(선택). Monster.csv의 currency_id가 가리키는 " +
+                 "CurrencyDefinition이 임포터에 의해 연결된다. 비어 있으면 이 몬스터는 표에서 재화 " +
+                 "보상을 지정하지 않은 것이다.")]
+        [SerializeField] private CurrencyDefinition currency;
+
+        [Tooltip("재화 보상의 최소 금액. 재화가 비어 있으면 0이다.")]
+        [Min(0)]
+        [SerializeField] private int currencyAmountMin;
+
+        [Tooltip("재화 보상의 최대 금액. 최소 금액 이상이며, 같으면 고정 금액이다.")]
+        [Min(0)]
+        [SerializeField] private int currencyAmountMax;
+
         [Header("Ordering")]
         [Tooltip("몬스터를 정렬할 때 쓰는 순서 값. 작을수록 앞이다 - 이 값 자체가 목록을 만들지는 않으며, " +
                  "던전 상세의 표시 순서는 DungeonDefinition의 Monsters 작성 순서가 결정한다.")]
@@ -126,6 +158,38 @@ namespace Dungeon
         /// <b>확률 판정은 여기서 하지 않는다</b> - 언제 굴릴지는 보상을 처리하는 쪽이 정한다.</summary>
         public IReadOnlyList<DropEntry> Drops =>
             drops != null ? (IReadOnlyList<DropEntry>)drops : EmptyDrops;
+
+        /// <summary>
+        /// 처치 재화 보상으로 줄 재화의 정의. 지정하지 않았거나 <b>가리키는 정의 자체가 쓸 수 없는
+        /// 상태(식별자가 빈 정의)</b>면 null이다 - 반쯤 유효한 참조를 돌려주면 읽는 쪽마다 다시 검사해야
+        /// 하고, 그중 하나라도 빠뜨리면 id 없는 재화가 지급된다.
+        ///
+        /// <b>이 참조가 유일한 근거다.</b> 재화 id 문자열을 따로 보관하지 않으므로, "표에는 없는데 에셋에는
+        /// 남아 있는 재화"라는 상태가 존재할 수 없다.
+        /// </summary>
+        public CurrencyDefinition Currency => currency != null && currency.IsValid ? currency : null;
+
+        /// <summary>
+        /// 처치 재화 보상의 재화 식별자. 지정하지 않았으면 빈 문자열이다.
+        ///
+        /// <b>값은 연결된 정의에서 그대로 온다.</b> 여기서 다듬거나 소문자로 바꾸거나 다른 값으로
+        /// 대체하는 경로는 없다 - <see cref="CurrencyDefinition.CurrencyId"/>가 이미 "적힌 그대로"를
+        /// 보장하므로, 그 위에 규칙을 하나 더 얹으면 두 값이 달라질 수 있다.
+        ///
+        /// <b>재화별 저장소는 여전히 없다.</b> 지금 게임의 잔액은 SaveData.currency 하나뿐이라, 유효한
+        /// 참조는 어느 재화를 가리키든 <b>그 하나뿐인 잔액</b>으로 지급된다.
+        /// </summary>
+        public string CurrencyId => Currency != null ? Currency.CurrencyId : string.Empty;
+
+        /// <summary>재화 보상이 지정되어 있는지 여부. <b>쓸 수 있는 정의가 연결되어 있을 때만</b> true다 -
+        /// 금액 두 칸은 이것이 true일 때만 의미가 있다.</summary>
+        public bool HasCurrencyReward => Currency != null;
+
+        /// <summary>재화 보상의 최소 금액. 음수가 되지 않게 0으로 막는다.</summary>
+        public int CurrencyAmountMin => Mathf.Max(0, currencyAmountMin);
+
+        /// <summary>재화 보상의 최대 금액. 최소 금액보다 작아지지 않게 막는다 - 두 값이 같으면 고정 금액이다.</summary>
+        public int CurrencyAmountMax => Mathf.Max(CurrencyAmountMin, currencyAmountMax);
 
         /// <summary>몬스터 이름 참조. 표시하는 쪽이 구독해서 현재 Locale 문자열을 받는다.
         /// <b>절대 null을 돌려주지 않는다</b> - 참조가 비어 있을 수는 있어도 객체 자체는 항상 있다.</summary>
