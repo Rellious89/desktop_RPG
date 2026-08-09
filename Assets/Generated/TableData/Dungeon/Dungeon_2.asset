@@ -28,6 +28,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 7d7b2be59499e458ebc51a62bb25e1d5, type: 2}
   - {fileID: 11400000, guid: f1c479ab5d0554bd682c233ea9353d28, type: 2}
   - {fileID: 11400000, guid: 8589e8a46793f40a18fc028b8c128a79, type: 2}
+  - {fileID: 11400000, guid: 8daf2b2fd616f49e9ac1505f2a26a95e, type: 2}
   rewardItems: []
   displayOrder: 20
   references:

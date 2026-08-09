@@ -46,6 +46,10 @@ MonoBehaviour:
     m_Localized: RockGolem
     m_Metadata:
       m_Items: []
+  - m_Id: 2511456611328000
+    m_Localized: Goblin(T)
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

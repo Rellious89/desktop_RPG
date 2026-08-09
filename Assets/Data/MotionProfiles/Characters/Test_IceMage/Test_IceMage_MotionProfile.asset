@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4a8746ce2a8483a8d6a1b3f4ef0c912, type: 3}
+  m_Name: Test_IceMage_MotionProfile
+  m_EditorClassIdentifier: 
+  displayName: Test_IceMage
+  resourceFolderPath: Assets/Art/Character/Test_IceMage
+  baseIdle:
+    displayName: Base Idle
+    editorDescription: 
+    frames:
+    - {fileID: 21300000, guid: 8dbdeb8445b7b4c7cb3cbba5fd124a3d, type: 3}
+    - {fileID: 21300000, guid: 12d6400f7365a426cb8fcaceae3d8d3d, type: 3}
+    - {fileID: 21300000, guid: 82114c6ad15d6438da13eec9daa6a9e5, type: 3}
+    - {fileID: 21300000, guid: dc7ff462fdf1a41c0837cdbfc2a05265, type: 3}
+    animationFps: 6
+  idleEvents: []
+  idleEventCheckInterval: 4
+  idleEventChance: 0.5
+  tier1Pool: {fileID: 11400000, guid: 6791d151810114594a9d038bad2df5e9, type: 2}
+  tier2Pool: {fileID: 0}
+  tier3Pool: {fileID: 0}
+  attackMovement:
+    moveDistance: 0.2
+    moveOutDuration: 0.14
+    moveBackDuration: 0.05
+  chargeMovement:
+    enableChargeMovement: 1
+    chargeMoveDistance: -0.08
+    chargeMoveInDuration: 0.1
+    chargeMoveReturnDuration: 0.18
+  preview:
+    characterOffset: {x: 0, y: 0}
+    receivePointOffset: {x: 0, y: 0.35}
+    characterScale: 1

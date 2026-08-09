@@ -6,3 +6,4 @@ monster_id,base_monster_id,name_category,name_key,$monster_name,world_id,$world_
 5,,3,5,하이에나라이더,1,애니멀랜드,HyenaRaider_MotionProfile,Portrait_HyenaRaider,30,,,,,,,,,,,,,jewel,주얼,50,100,50,1,하이에나라이더
 6,,3,6,두더지광부,1,애니멀랜드,MoleMiner_MotionProfile,Portrait_MoleMiner,30,,,,,,,,,,,,,jewel,주얼,50,100,60,1,두더지광부
 7,,3,7,돌골렘,2,판타지아,RockGolem_MotionProfile,Portrait_RockGolem,30,,,,,,,,,,,,,jewel,주얼,50,100,70,1,돌골렘
+8,,3,8,고블린(T),2,판타지아,Test_Gblin_MotionProfile,,30,50002,더미아이템3,4000,1,50003,더미아이템4,3000,1,50004,더미아이템5,3000,1,jewel,주얼,50,100,80,1,테스트용 고블린

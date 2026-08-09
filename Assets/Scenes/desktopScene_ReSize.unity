@@ -9880,7 +9880,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 2
-  m_Sprite: {fileID: 21300000, guid: f4122e8ab5ef4aec98b110a9a1a65540, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 66372d3e67f9f41bfbf382f011c3f441, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -11241,8 +11241,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   outlineMaterial: {fileID: 2100000, guid: 28fe963341404f3494b9547affafbe5c, type: 2}
   outlineEnabled: 1
-  outlineColor: {r: 0.8867924, g: 0.8867924, b: 0.8867924, a: 0.85}
-  outlineWidth: 2
+  outlineColor: {r: 0, g: 0, b: 0, a: 0.85}
+  outlineWidth: 1
 --- !u!114 &1900000011
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11262,6 +11262,8 @@ MonoBehaviour:
   - definition: {fileID: 11400000, guid: 2bb964cc0650423f809a2eae6b992ce2, type: 2}
   - definition: {fileID: 11400000, guid: b94859fe830b4ef4a6c04cf4e5fb62eb, type: 2}
   - definition: {fileID: 11400000, guid: 7e3199f48eeb4a7cb8570429b5e254f9, type: 2}
+  - definition: {fileID: 11400000, guid: 829166e6860874821b8a0289ac0df6db, type: 2}
+  - definition: {fileID: 11400000, guid: 737d4c5e053534506a14e4bddb6928c3, type: 2}
   runtimeActor: {fileID: 1959120555}
   defaultCharacter: {fileID: 11400000, guid: 6a26af04782f43e7aecb5da3ad0e773c, type: 2}
   staminaCostPerDefeat: 1
