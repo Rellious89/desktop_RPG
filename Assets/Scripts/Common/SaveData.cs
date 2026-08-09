@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace Common
 {
@@ -16,6 +17,42 @@ namespace Common
     [Serializable]
     public class SaveData
     {
+        /// <summary>지금 코드가 쓰고 읽는 저장 형식 번호. 형식을 바꿀 때(필드 의미 변경, 값 이동,
+        /// 단위 변경처럼 <b>예전 파일을 그대로 읽으면 틀리는</b> 변경) 이 값을 1 올리고
+        /// <see cref="SaveMigrationRunner"/>에 그 한 단계를 등록한다. 필드를 새로 <i>추가</i>하기만
+        /// 할 때는 올리지 않는다 - JsonUtility가 없는 필드를 기본값으로 채우므로 예전 파일이 그대로
+        /// 유효하다.</summary>
+        public const int CurrentSaveVersion = 1;
+
+        /// <summary>버전 필드가 아예 없던 시절의 저장 파일 번호. 파일 안에 <c>saveVersion</c> 항목이
+        /// 없으면(빈 객체 <c>{}</c> 포함) 그 파일은 이 버전이다 - 없는 것 자체가 곧 표식이라
+        /// 예전 파일에 뭔가를 덧붙일 필요가 없다.</summary>
+        public const int UnversionedSaveVersion = 0;
+
+        /// <summary>버전을 아직/영영 알 수 없음(빈 내용이거나 JSON이 깨졌을 때). 파일에 기록되는 값이
+        /// 아니라 <see cref="SaveVersionProbe"/>의 반환값 자리를 채우는 표식이다.</summary>
+        public const int UnknownSaveVersion = -1;
+
+        /// <summary>이 문서가 기록될 당시의 저장 형식 번호.
+        ///
+        /// <b>불러올 때 이 필드를 믿으면 안 된다.</b> 버전 필드가 없던 예전 파일을 역직렬화하면
+        /// JsonUtility가 여기에 아래 기본값(= 현재 버전)을 넣어 버려서, v0 파일이 "이미 최신"으로
+        /// 보인다. 그래서 파일의 진짜 버전은 <see cref="SaveVersionProbe"/>가 <b>역직렬화 전에</b>
+        /// 원문에서 직접 읽고, <see cref="SaveMigrationRunner"/>가 그 값을 이 필드에 덮어쓴다.
+        /// 기본값이 현재 버전인 이유는 새 게임(파일 없음)이 곧 최신 형식이기 때문이다.</summary>
+        public int saveVersion = CurrentSaveVersion;
+
+        /// <summary>저장할 때마다 1씩 오르는 일련번호. 같은 버전 안에서 어느 쪽이 더 나중 문서인지
+        /// 가르는 값이며, 시계가 뒤로 가도(수동 변경, 기기 이동) 순서가 뒤집히지 않는다는 점에서
+        /// <see cref="lastSavedAtUtc"/>보다 믿을 수 있다. 예전 파일에는 이 항목이 없으므로 0으로
+        /// 읽히고, 그것이 곧 "몇 번 저장됐는지 모름"이다.</summary>
+        public long saveRevision = 0;
+
+        /// <summary>마지막 저장 시각(UTC). 회복 슬롯의 시각 필드와 <b>같은 서식</b>인 ISO-8601 왕복
+        /// 문자열("o", InvariantCulture)이며, 비어 있으면 "모름"이다 - 저장 파일 안에서 시각을 적는
+        /// 방법이 하나뿐이어야 읽는 쪽이 필드마다 다른 규칙을 기억하지 않는다.</summary>
+        public string lastSavedAtUtc;
+
         public int currentLevel = 1;
         public int currentExp = 0;
         public int totalKillCount = 0;
@@ -73,6 +110,81 @@ namespace Common
             {
                 data.recoverySlots.Add(new RecoverySlotSaveState());
             }
+        }
+
+        /// <summary><see cref="lastSavedAtUtc"/>가 쓰는 시각 서식. 회복 슬롯의 시각 필드와 같다.</summary>
+        public const string TimestampFormat = "o";
+
+        /// <summary>
+        /// 파일에 쓰기 <b>직전에</b> 메타데이터를 찍고, 찍기 전 값을 돌려준다. 저장 형식 번호를 현재
+        /// 값으로 맞추고, 일련번호를 1 올리고, 시각을 기록한다.
+        ///
+        /// <b>반환값을 버리지 말 것.</b> 쓰기가 실패하면 호출부는 그 값을
+        /// <see cref="RestoreMetadata"/>에 넘겨 메모리 상태를 되돌려야 한다 - 되돌리지 않으면 디스크에
+        /// 있는 문서보다 메모리 쪽 일련번호가 앞서게 되고, "파일과 메모리 중 어느 쪽이 최신인가"를
+        /// 일련번호로 가리는 곳이 전부 틀린 답을 얻는다.
+        /// </summary>
+        /// <param name="nowUtc">기록할 시각. 시계를 직접 읽지 않고 받는 이유는 시험이 고정된 값을 넣어
+        /// 결과를 확인할 수 있게 하기 위함이다. Kind가 Local이면 UTC로 바꾸고, 지정되지 않았으면 이미
+        /// UTC인 것으로 본다.</param>
+        public static SaveMetadataSnapshot MarkSaved(SaveData data, DateTime nowUtc)
+        {
+            if (data == null) return default;
+
+            SaveMetadataSnapshot before = SaveMetadataSnapshot.Capture(data);
+
+            data.saveVersion = CurrentSaveVersion;
+            if (data.saveRevision < 0) data.saveRevision = 0;
+            if (data.saveRevision < long.MaxValue) data.saveRevision++;
+            data.lastSavedAtUtc = FormatTimestamp(nowUtc);
+
+            return before;
+        }
+
+        /// <summary>저장이 실패했을 때 <see cref="MarkSaved"/>가 찍기 전 메타데이터로 되돌린다.
+        /// 저장 <b>내용</b>은 되돌리지 않는다 - 실패한 것은 기록일 뿐 플레이어의 진행이 아니다.</summary>
+        public static void RestoreMetadata(SaveData data, SaveMetadataSnapshot snapshot)
+        {
+            if (data == null) return;
+
+            data.saveVersion = snapshot.SaveVersion;
+            data.saveRevision = snapshot.SaveRevision;
+            data.lastSavedAtUtc = snapshot.LastSavedAtUtc;
+        }
+
+        /// <summary>시각을 <see cref="lastSavedAtUtc"/> 서식(ISO-8601 UTC 왕복 문자열)으로 만든다.</summary>
+        public static string FormatTimestamp(DateTime value)
+        {
+            DateTime utc;
+            if (value.Kind == DateTimeKind.Local) utc = value.ToUniversalTime();
+            else if (value.Kind == DateTimeKind.Unspecified) utc = DateTime.SpecifyKind(value, DateTimeKind.Utc);
+            else utc = value;
+
+            return utc.ToString(TimestampFormat, CultureInfo.InvariantCulture);
+        }
+    }
+
+    /// <summary>
+    /// 저장 직전 메타데이터의 사본. 쓰기가 실패했을 때 <see cref="SaveData.RestoreMetadata"/>로 되돌리기
+    /// 위한 것이며, 진행 데이터는 담지 않는다(되돌릴 이유가 없다).
+    /// </summary>
+    public readonly struct SaveMetadataSnapshot
+    {
+        public int SaveVersion { get; }
+        public long SaveRevision { get; }
+        public string LastSavedAtUtc { get; }
+
+        private SaveMetadataSnapshot(int saveVersion, long saveRevision, string lastSavedAtUtc)
+        {
+            SaveVersion = saveVersion;
+            SaveRevision = saveRevision;
+            LastSavedAtUtc = lastSavedAtUtc;
+        }
+
+        public static SaveMetadataSnapshot Capture(SaveData data)
+        {
+            if (data == null) return default;
+            return new SaveMetadataSnapshot(data.saveVersion, data.saveRevision, data.lastSavedAtUtc);
         }
     }
 
