@@ -12,6 +12,10 @@
 [`character-sprite-and-animator-rules.md`](./character-sprite-and-animator-rules.md)를 우선한다.
 세계관의 자유는 해당 그래픽·애니메이션 규격을 무시할 근거가 되지 않는다.
 
+새 캐릭터·몬스터를 설정하거나 기존 Actor의 디자인·애니메이션을 변경할 때는
+[`character-production-package-rules.md`](./character-production-package-rules.md)에 따라 Actor별 제작 패키지를
+생성하거나 갱신한다. 채팅에만 남은 설정과 생성 입력은 정식 제작 기준으로 사용하지 않는다.
+
 ## 1. 한 문장 세계관
 
 > 여러 세계에서 사용자의 데스크탑으로 넘어온 모험가들이 이세계 용병단을 결성하고, 데스크탑을

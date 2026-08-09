@@ -1,0 +1,38 @@
+{
+  "aliases": {
+    "BlackCatMage": "CatMage",
+    "CopperAxeBarbarian": "Barbarian",
+    "LeafGlaiveElf": "ElfGuardian"
+  },
+  "overrides": {
+    "StagGroveWarden": { "type": "Player", "lifecycle": "Hold", "world": "ANIMAL-LAND-01", "profile": "Hold Actor" },
+    "CatMage": { "world": "ANIMAL-LAND-01" },
+    "CatKnight": { "world": "ANIMAL-LAND-01" },
+    "RabbitHealer": { "world": "ANIMAL-LAND-01" },
+    "Barbarian": { "world": "FANTASIA" },
+    "ElfArcher": { "world": "FANTASIA" },
+    "ElfGuardian": { "world": "FANTASIA" }
+  },
+  "plannedActors": [
+    { "id": "DogShieldWarrior", "displayName": "강아지 방패전사", "type": "Player", "world": "ANIMAL-LAND-01", "lifecycle": "Hold", "sourcePath": "ProjectDocs/WorldBuilding/ANIMAL-LAND-01-world-expansion-draft.md", "notes": "Existing concept on hold", "approval": "Concept hold" },
+    { "id": "FoxArcher", "displayName": "여우 궁수", "type": "Player", "world": "ANIMAL-LAND-01", "lifecycle": "Candidate", "sourcePath": "ProjectDocs/WorldBuilding/ANIMAL-LAND-01-world-expansion-draft.md", "approval": "Concept candidate" },
+    { "id": "DragonWarrior", "displayName": "용인 전사", "type": "Player", "world": "ANIMAL-LAND-01", "lifecycle": "Candidate", "sourcePath": "ProjectDocs/WorldBuilding/ANIMAL-LAND-01-world-expansion-draft.md", "approval": "Concept candidate" },
+    { "id": "LionBannerCaptain", "displayName": "사자 군기대장", "type": "Player", "tier": "Player candidate", "world": "ANIMAL-LAND-01" }, { "id": "BearPawMonk", "displayName": "곰 발톱수도사", "type": "Player", "tier": "Player candidate", "world": "ANIMAL-LAND-01" }, { "id": "BoarHammerVanguard", "displayName": "멧돼지 철퇴선봉", "type": "Player", "tier": "Player candidate", "world": "ANIMAL-LAND-01" }, { "id": "SquirrelSlingScout", "displayName": "다람쥐 투석정찰병", "type": "Player", "tier": "Player candidate", "world": "ANIMAL-LAND-01" }, { "id": "RaccoonRelicScout", "displayName": "너구리 유물정찰가", "type": "Player", "tier": "Player candidate", "world": "ANIMAL-LAND-01" }, { "id": "RamWardCleric", "displayName": "숫양 결계사제", "type": "Player", "tier": "Player candidate", "world": "ANIMAL-LAND-01" }, { "id": "HedgehogNeedleDuelist", "displayName": "고슴도치 침결투가", "type": "Player", "tier": "Player candidate", "world": "ANIMAL-LAND-01" }, { "id": "BadgerForgeWarden", "displayName": "오소리 대장수호자", "type": "Player", "tier": "Player candidate", "world": "ANIMAL-LAND-01" }, { "id": "ElephantBellKeeper", "displayName": "코끼리 성종지기", "type": "Player", "tier": "Player candidate", "world": "ANIMAL-LAND-01" },
+    { "id": "WeaselCutpurse", "displayName": "족제비 소매치기", "type": "Enemy", "tier": "Normal", "world": "ANIMAL-LAND-01" }, { "id": "RatLootRunner", "displayName": "쥐 약탈운반병", "type": "Enemy", "tier": "Normal", "world": "ANIMAL-LAND-01" }, { "id": "SkunkMireBrewer", "displayName": "스컹크 오물연금술사", "type": "Enemy", "tier": "Normal", "world": "ANIMAL-LAND-01" }, { "id": "BaboonStoneSlinger", "displayName": "개코원숭이 투석병", "type": "Enemy", "tier": "Normal", "world": "ANIMAL-LAND-01" }, { "id": "MonitorLizardAmbusher", "displayName": "왕도마뱀 매복병", "type": "Enemy", "tier": "Normal", "world": "ANIMAL-LAND-01" }, { "id": "WolverineRipper", "displayName": "울버린 난동병", "type": "Enemy", "tier": "Normal", "world": "ANIMAL-LAND-01" }, { "id": "WildcatBandit", "displayName": "들고양이 산적", "type": "Enemy", "tier": "Normal", "world": "ANIMAL-LAND-01" }, { "id": "JackalGraveRaider", "displayName": "자칼 무덤약탈자", "type": "Enemy", "tier": "Normal", "world": "ANIMAL-LAND-01" },
+    { "id": "RhinoSiegeBreaker", "displayName": "코뿔소 공성파괴자", "type": "Enemy", "tier": "Elite", "world": "ANIMAL-LAND-01" }, { "id": "CobraHexPriest", "displayName": "코브라 주술사", "type": "Enemy", "tier": "Elite", "world": "ANIMAL-LAND-01" }, { "id": "MoleTunnelForeman", "displayName": "두더지 굴착감독", "type": "Enemy", "tier": "Elite", "world": "ANIMAL-LAND-01" }, { "id": "HyenaPackMaster", "displayName": "하이에나 무리감독", "type": "Enemy", "tier": "Elite", "world": "ANIMAL-LAND-01" },
+    { "id": "WhiteTigerWarlord", "displayName": "백호 군벌", "type": "Enemy", "tier": "Boss", "world": "ANIMAL-LAND-01" }, { "id": "IronjawCrocodileLord", "displayName": "강철턱 악어영주", "type": "Enemy", "tier": "Boss", "world": "ANIMAL-LAND-01" }, { "id": "MoleVaultBaron", "displayName": "두더지 광맥남작", "type": "Enemy", "tier": "Boss", "world": "ANIMAL-LAND-01" }
+  ],
+  "profiles": {
+    "Player Basic": {
+      "required": ["baseIdle", "tier1", "tier2"],
+      "optional": ["idleVariant", "tier3", "portrait", "master"]
+    },
+    "Passive Enemy": {
+      "required": ["baseIdle", "hitHold", "hitRecovery"],
+      "optional": ["death", "portrait", "master"]
+    },
+    "Test Actor": { "required": [], "optional": [] },
+    "Concept Actor": { "required": [], "optional": [] },
+    "Hold Actor": { "required": ["baseIdle", "tier1", "tier2"], "optional": ["idleVariant", "tier3", "portrait", "master"] }
+  }
+}

@@ -9,13 +9,28 @@
 `ProjectDocs/DesignRules/attack-animation-rules.md`를 우선한다. 캐릭터·몬스터의 출신 세계와 역할은
 `ProjectDocs/DesignRules/world-setting-rules.md`를 먼저 따른다. 이 문서와 충돌하면 세 규칙 문서가 정답이다.
 
+Actor별 설정과 제작 이력은
+[`character-production-package-rules.md`](../DesignRules/character-production-package-rules.md)의 폴더 구조와 승인
+게이트를 반드시 따른다. Brief, Master, Motion과 실제 생성 입력을 채팅이나 임시 이미지 폴더에만 남기지 않는다.
+
 ## 0. 이번 채널에서 확정할 것
 
-각 Actor마다 아래 세 가지 패키지만 만든다.
+각 Actor마다 아래 세 가지 제작 내용이 필요하며, 실제 파일은 Actor별 제작 패키지에 저장한다.
 
 1. **Character Brief**: 역할, 성격, 실루엣, 체격, 장비, 팔레트와 금지 요소
 2. **Master Design**: 한 방향의 기준 캐릭터 이미지와 고정 디자인 명세
 3. **Motion Brief**: 애니메이션별 목적, 키포즈, 루프 구조, 타격 포즈와 금지 변형
+
+최소 파일 구조:
+
+```text
+00_package-index.md
+01_character-brief.md 또는 01_monster-brief.md
+02_perfectpixel-input.md
+03_master-measurements.md
+04_motion-{id}.md
+Prototypes/{attempt}/README.md
+```
 
 이번 단계에서 여러 장의 최종 Unity 프레임을 완성하려고 하지 않는다. 생성된 이미지는 디자인 기준 또는
 PerfectPixel 참조 이미지이며, 최종 프레임은 PerfectPixel 이후 개별 512×512 RGBA PNG로 정리한다.
