@@ -6,7 +6,7 @@ using System.IO;
 namespace TableDataEditor
 {
     /// <summary>
-    /// CSV 다섯 장의 <b>컬럼 이름</b>. CSV는 이 이름을 그대로 써야 한다 -
+    /// CSV 여덟 장의 <b>컬럼 이름</b>. CSV는 이 이름을 그대로 써야 한다 -
     /// 헤더가 어긋나면 값을 추측해 읽지 않고 오류로 멈춘다.
     /// </summary>
     public static class TableDataColumns
@@ -113,6 +113,52 @@ namespace TableDataEditor
         {
             DungeonId, NameCategory, NameKey, WorldId, RepresentativeSpriteKey, MonsterIds,
             RewardItemIds, DisplayOrder, Enabled, Memo,
+        };
+
+        // Character.csv
+        //
+        // motion_profile_key는 Monster.csv와 <b>같은 상수</b>를 쓴다 - 가리키는 에셋의 타입만 다르고
+        // (CharacterMotionProfile / MonsterMotionProfile) 칸의 뜻은 "이름이 정확히 이것인 모션 프로필"로
+        // 같다. 사람이 읽는 캐릭터 이름은 <c>$character_name</c>이라는 참조 컬럼으로 따로 둔다.
+        public const string CharacterId = "character_id";
+
+        /// <summary>초상화 칸. 비어 있으면 런타임이 Base Idle 첫 프레임을 대신 쓴다(선택 항목).</summary>
+        public const string PortraitKey = "portrait_key";
+
+        /// <summary>기본 최대 체력. <b>빈 칸이 정상</b>이며 "아직 정하지 않았다"는 뜻이다 -
+        /// 0이나 1로 채워 넣지 않는다.</summary>
+        public const string BaseMaxHealth = "base_max_health";
+
+        public const string MaxStamina = "max_stamina";
+
+        public static readonly string[] Character =
+        {
+            CharacterId, NameCategory, NameKey, MotionProfileKey, PortraitKey, BaseMaxHealth,
+            MaxStamina, DisplayOrder, Enabled, Memo,
+        };
+
+        // Skill.csv
+        public const string SkillId = "skill_id";
+        public const string DescriptionCategory = "description_category";
+        public const string DescriptionKey = "description_key";
+        public const string SkillType = "skill_type";
+        public const string BehaviorKey = "behavior_key";
+
+        public static readonly string[] Skill =
+        {
+            SkillId, NameCategory, NameKey, DescriptionCategory, DescriptionKey, IconKey,
+            SkillType, BehaviorKey, DisplayOrder, Enabled, Memo,
+        };
+
+        // CharacterSkill.csv
+        //
+        // character_id / skill_id는 Character.csv / Skill.csv의 상수를 <b>그대로</b> 쓴다 - 두 표가 같은
+        // 이름을 가리켜야 참조가 성립하므로 이름을 두 번 적어 두지 않는다.
+        public const string RequiredCharacterLevel = "required_character_level";
+
+        public static readonly string[] CharacterSkill =
+        {
+            CharacterId, SkillId, RequiredCharacterLevel, DisplayOrder, Enabled, Memo,
         };
 
         /// <summary>

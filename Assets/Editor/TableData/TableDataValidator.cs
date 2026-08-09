@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using Character;
 using Dungeon;
 using Inventory;
+using Skill;
 using UnityEditor;
 using UnityEngine;
 
@@ -24,7 +26,7 @@ namespace TableDataEditor
 
         public TableDataDiagnosticLog Log { get; }
 
-        /// <summary>다섯 표가 모두 읽힌 경우의 파싱 결과. 파일/헤더 단계에서 실패하면 null이다.</summary>
+        /// <summary>여덟 표가 모두 읽힌 경우의 파싱 결과. 파일/헤더 단계에서 실패하면 null이다.</summary>
         public TableDataSnapshot Snapshot { get; }
 
         public TableDataAssetIndex Assets { get; }
@@ -44,27 +46,58 @@ namespace TableDataEditor
             $"World {Snapshot?.Worlds.Count ?? 0} / Currency {Snapshot?.Currencies.Count ?? 0} / " +
             $"Item {Snapshot?.Items.Count ?? 0} / " +
             $"Monster {Snapshot?.Monsters.Count ?? 0} / " +
-            $"Dungeon {Snapshot?.Dungeons.Count ?? 0} 행, 오류 {ErrorCount}건, 경고 {WarningCount}건";
+            $"Dungeon {Snapshot?.Dungeons.Count ?? 0} / " +
+            $"Character {Snapshot?.Characters.Count ?? 0} / " +
+            $"Skill {Snapshot?.Skills.Count ?? 0} / " +
+            $"CharacterSkill {Snapshot?.CharacterSkills.Count ?? 0} 행, 오류 {ErrorCount}건, 경고 {WarningCount}건";
     }
 
     /// <summary>
-    /// CSV 다섯 장을 읽고 <b>모든</b> 문제를 모아 보고한다. <b>에셋도 폴더도 CSV도 만들지 않고 고치지도
+    /// CSV 여덟 장을 읽고 <b>모든</b> 문제를 모아 보고한다. <b>에셋도 폴더도 CSV도 만들지 않고 고치지도
     /// 않는다</b> - Validate는 순수하게 읽기만 하는 동작이라, 사람이 결과를 보고 판단할 때까지
     /// 프로젝트 상태가 한 글자도 바뀌지 않는다.
     ///
-    /// <b>첫 오류에서 멈추지 않는다.</b> World → Currency → Item → Monster → Dungeon 순서로 끝까지
-    /// 읽고, 참조 무결성까지 검사한 뒤 한 번에 돌려준다. 순서가 정해져 있는 이유는 뒤의 표가 앞의 표를
-    /// 참조하기 때문이다(Monster는 World / Currency / Item을, Dungeon은 World / Monster / Item을
-    /// 가리킨다). 가리켜지는 표가 언제나 먼저 읽히므로, 참조를 확인할 때 스냅샷은 이미 완성되어 있다.
+    /// <b>첫 오류에서 멈추지 않는다.</b> World → Currency → Item → Monster → Dungeon → Character →
+    /// Skill → CharacterSkill 순서로 끝까지 읽고, 참조 무결성까지 검사한 뒤 한 번에 돌려준다. 순서가
+    /// 정해져 있는 이유는 뒤의 표가 앞의 표를 참조하기 때문이다(Monster는 World / Currency / Item을,
+    /// Dungeon은 World / Monster / Item을, CharacterSkill은 Character / Skill을 가리킨다).
+    /// 가리켜지는 표가 언제나 먼저 읽히므로, 참조를 확인할 때 스냅샷은 이미 완성되어 있다.
     ///
     /// 파일/헤더 단계에서 실패한 표는 행 검증을 건너뛴다 - 헤더가 어긋난 채 행을 읽으면 엉뚱한 칸을
     /// 가리키는 오류가 쏟아져 진짜 원인이 묻히기 때문이다. 그래도 나머지 표는 계속 읽는다.
     /// </summary>
     public static class TableDataValidator
     {
-        /// <summary>메뉴와 테스트가 함께 쓰는 진입점. 부작용이 전혀 없다.</summary>
+        /// <summary>
+        /// ID가 비어 있는 생성 에셋을 진단에 적을 때 쓰는 표기. 빈 문자열을 그대로 찍으면 진단이
+        /// "value ''"가 되어 무엇이 문제인지 읽을 수 없다.
+        /// </summary>
+        public const string EmptyIdLabel = "(빈 ID)";
+
+        /// <summary>메뉴와 테스트가 함께 쓰는 진입점. 부작용이 전혀 없다.
+        /// 생성 에셋 쪽 점검까지 <b>여덟 도메인 전부</b>를 본다(기존 동작 그대로).</summary>
         public static TableDataValidationResult Validate()
         {
+            return Validate(TableDataRebuildScope.All);
+        }
+
+        /// <summary>
+        /// <paramref name="outputScope"/>는 <b>생성 에셋 쪽 점검의 범위만</b> 정한다.
+        ///
+        /// <b>CSV 입력 검증은 범위와 무관하게 언제나 여덟 표 전부다.</b> 파일/헤더/행/값/표 사이의
+        /// 참조와 Localization·Motion Profile·Sprite 같은 <b>입력 자산</b> 조회는 하나도 줄어들지
+        /// 않는다 - 범위를 좁혔다고 검사가 느슨해지면 "좁게 돌렸더니 통과했다"는 상태가 생긴다.
+        ///
+        /// 좁아지는 것은 <see cref="CheckOutputConflicts"/>와 <see cref="CheckOrphans"/>뿐이며,
+        /// 이 둘은 <see cref="GeneratedOutputFolders"/>가 돌려주는 폴더만 로드한다. 범위 밖 도메인의
+        /// 생성 폴더에는 <see cref="TableDataAssetIndex.LoadGeneratedById{T}"/>도
+        /// <see cref="AssetDatabase.LoadAssetAtPath{T}"/>도 부르지 않는다 - 그래야 "targeted Rebuild는
+        /// 기존 다섯 도메인의 생성 에셋을 로드조차 하지 않는다"가 말이 아니라 코드가 된다.
+        /// </summary>
+        public static TableDataValidationResult Validate(TableDataRebuildScope outputScope)
+        {
+            TableDataRebuildScopes.EnsureSupported(outputScope, nameof(outputScope));
+
             var log = new TableDataDiagnosticLog();
             var assets = new TableDataAssetIndex();
 
@@ -78,10 +111,18 @@ namespace TableDataEditor
                 TableDataPaths.MonsterCsvPath, TableDataPaths.MonsterCsvFileName, TableDataColumns.Monster, log);
             CsvTable dungeonTable = TableDataCsvReader.Read(
                 TableDataPaths.DungeonCsvPath, TableDataPaths.DungeonCsvFileName, TableDataColumns.Dungeon, log);
+            CsvTable characterTable = TableDataCsvReader.Read(
+                TableDataPaths.CharacterCsvPath, TableDataPaths.CharacterCsvFileName, TableDataColumns.Character, log);
+            CsvTable skillTable = TableDataCsvReader.Read(
+                TableDataPaths.SkillCsvPath, TableDataPaths.SkillCsvFileName, TableDataColumns.Skill, log);
+            CsvTable characterSkillTable = TableDataCsvReader.Read(
+                TableDataPaths.CharacterSkillCsvPath, TableDataPaths.CharacterSkillCsvFileName,
+                TableDataColumns.CharacterSkill, log);
 
             var snapshot = new TableDataSnapshot();
             bool allTablesRead = worldTable != null && currencyTable != null && itemTable != null
-                                 && monsterTable != null && dungeonTable != null;
+                                 && monsterTable != null && dungeonTable != null
+                                 && characterTable != null && skillTable != null && characterSkillTable != null;
 
             try
             {
@@ -90,13 +131,16 @@ namespace TableDataEditor
                 if (itemTable != null) ValidateItems(itemTable, snapshot, assets, log);
                 if (monsterTable != null) ValidateMonsters(monsterTable, snapshot, assets, log);
                 if (dungeonTable != null) ValidateDungeons(dungeonTable, snapshot, assets, log);
+                if (characterTable != null) ValidateCharacters(characterTable, snapshot, assets, log);
+                if (skillTable != null) ValidateSkills(skillTable, snapshot, assets, log);
+                if (characterSkillTable != null) ValidateCharacterSkills(characterSkillTable, snapshot, log);
 
                 // 출력 쪽 충돌과 orphan은 표가 다 읽힌 뒤에만 의미가 있다. 절반만 읽힌 상태에서 orphan을
                 // 세면 "CSV에서 사라졌다"가 아니라 "아직 못 읽었다"를 보고하게 된다.
                 if (allTablesRead)
                 {
-                    CheckOutputConflicts(snapshot, log);
-                    CheckOrphans(snapshot, log);
+                    CheckOutputConflicts(snapshot, log, outputScope);
+                    CheckOrphans(snapshot, log, outputScope);
                 }
             }
             catch (OperationCanceledException e)
@@ -735,6 +779,386 @@ namespace TableDataEditor
             }
         }
 
+        // ---- Character ----
+
+        /// <summary>
+        /// Character.csv 한 장. 다른 표와 다른 점이 세 가지 있다.
+        ///
+        /// 첫째, <b>id 형식이 이 표에서만 넓다</b>. 표준 ID 형식 외에 기존 캐릭터 여섯 개의
+        /// PascalCase id를 예외로 인정한다(<see cref="TableDataFieldRules.IsValidCharacterId"/>) -
+        /// 그 id들은 이미 저장 데이터가 쓰고 있어 바꿀 수 없기 때문이다. <b>전역 ID 정규식은 손대지
+        /// 않는다</b>: 다른 표는 조금도 헐거워지지 않으며, 여섯 개에 없는 PascalCase는 여기서도 오류다.
+        ///
+        /// 둘째, <b>같은 id를 가진 수동 CharacterDefinition은 충돌이 아니다</b>. Item.csv가 수동
+        /// ItemDefinition과의 id 겹침을 오류로 막는 것과 <b>일부러 다르다</b> - 지금은 생성 에셋과
+        /// Assets/Data 이하의 수동 에셋이 같은 id로 함께 존재하는 것이 정상 상태이고(로스터는 여전히
+        /// 수동 에셋을 쓴다), 그것을 오류로 막으면 표를 만들자마자 모든 행이 실패한다.
+        ///
+        /// 셋째, <b>모션 프로필은 활성 여부와 무관하게 필수</b>다. 프로필이 없는 캐릭터는 화면에 세울
+        /// 수 없고, 그 상태를 나중에 켜는 순간 조용히 깨지기 때문이다.
+        /// </summary>
+        private static void ValidateCharacters(
+            CsvTable table, TableDataSnapshot snapshot, TableDataAssetIndex assets, TableDataDiagnosticLog log)
+        {
+            string file = table.FileName;
+            var displayOrders = new Dictionary<int, int>();
+
+            foreach (CsvRecord record in table.Records)
+            {
+                int line = record.Line;
+                var row = new CharacterRow { Line = line };
+
+                string idRaw = table.Get(record, TableDataColumns.CharacterId);
+                bool idOk = TableDataFieldRules.TryReadRequiredCharacterId(
+                    file, line, TableDataColumns.CharacterId, idRaw, log, out string id);
+                row.Id = id;
+
+                if (idOk && snapshot.CharactersById.TryGetValue(id, out CharacterRow existing))
+                {
+                    log.Error(file, line, TableDataColumns.CharacterId, id,
+                        $"character_id가 {existing.Line}행과 중복됩니다 - 먼저 나온 행만 사용됩니다.");
+                    idOk = false;
+                }
+
+                if (TableDataFieldRules.TryReadEnabled(
+                        file, line, TableDataColumns.Enabled, table.Get(record, TableDataColumns.Enabled), log, out bool enabled))
+                {
+                    row.Enabled = enabled;
+                }
+
+                if (TableDataFieldRules.TryReadIntAtLeast(
+                        file, line, TableDataColumns.DisplayOrder, table.Get(record, TableDataColumns.DisplayOrder),
+                        0, log, out int order))
+                {
+                    row.DisplayOrder = order;
+                    TableDataFieldRules.CheckDuplicateDisplayOrder(file, line, order, displayOrders, log);
+                }
+
+                // 캐릭터 이름은 World / Currency / Dungeon과 같은 판정이다 - 활성 캐릭터에 이름이 없으면
+                // 목록에서 무엇을 고르는지 알 수 없다.
+                row.Name = ReadLocalizedName(
+                    table, record, file, line, row.Enabled, nameRequiredWhenEnabled: true, log);
+
+                ReadCharacterMotionProfile(table, record, file, line, assets, row, log);
+                ReadPortrait(table, record, file, line, assets, row, log);
+
+                if (TableDataFieldRules.TryReadOptionalIntAtLeast(
+                        file, line, TableDataColumns.BaseMaxHealth, table.Get(record, TableDataColumns.BaseMaxHealth),
+                        1, log, out bool hasHealth, out int health))
+                {
+                    row.HasBaseMaxHealth = hasHealth;
+                    row.BaseMaxHealth = health;
+                }
+
+                if (TableDataFieldRules.TryReadIntAtLeast(
+                        file, line, TableDataColumns.MaxStamina, table.Get(record, TableDataColumns.MaxStamina),
+                        1, log, out int stamina))
+                {
+                    row.MaxStamina = stamina;
+                }
+
+                // memo는 사람이 읽는 칸이라 검증하지 않는다.
+
+                if (!idOk) continue;
+
+                snapshot.Characters.Add(row);
+                snapshot.CharactersById[row.Id] = row;
+            }
+        }
+
+        /// <summary>
+        /// 캐릭터의 모션 프로필 한 칸. 이름이 정확히 일치하는 <see cref="CharacterMotionProfile"/>을
+        /// 찾고, <b>찾은 뒤에 재생 가능한지까지 본다</b> - 판정은 런타임과 <b>같은 규칙</b>
+        /// (<see cref="CharacterMotionProfile.IsPlayable"/>)을 그대로 쓴다. 여기서 별도 기준을 세우면
+        /// "임포트는 통과했는데 로스터가 목록에서 빼 버리는" 캐릭터가 생긴다.
+        /// </summary>
+        private static void ReadCharacterMotionProfile(
+            CsvTable table, CsvRecord record, string file, int line,
+            TableDataAssetIndex assets, CharacterRow row, TableDataDiagnosticLog log)
+        {
+            string key = table.Get(record, TableDataColumns.MotionProfileKey);
+
+            if (string.IsNullOrEmpty(key))
+            {
+                log.Error(file, line, TableDataColumns.MotionProfileKey, key,
+                    "motion_profile_key는 필수입니다 - 모션 데이터의 원천이 없으면 이 캐릭터는 화면에 세울 수 없습니다.");
+                return;
+            }
+
+            AssetLookupResult result = assets.FindCharacterMotionProfile(key, out CharacterMotionProfile profile, out int count);
+            switch (result)
+            {
+                case AssetLookupResult.Found:
+                    if (!CharacterMotionProfile.IsPlayable(profile))
+                    {
+                        log.Error(file, line, TableDataColumns.MotionProfileKey, key,
+                            $"'{key}'에 재생 가능한 Base Idle 프레임이 없습니다 - 런타임(CharacterRoster)이 " +
+                            "이 캐릭터를 목록에서 제외하므로, 표에서 먼저 막습니다.");
+                        return;
+                    }
+
+                    row.MotionProfile = profile;
+                    return;
+
+                case AssetLookupResult.Ambiguous:
+                    log.Error(file, line, TableDataColumns.MotionProfileKey, key,
+                        $"이름이 정확히 '{key}'인 CharacterMotionProfile이 {count}개 있습니다 - " +
+                        "어느 것을 쓸지 정할 수 없으니 에셋 이름을 하나로 만드세요.");
+                    return;
+
+                default:
+                    log.Error(file, line, TableDataColumns.MotionProfileKey, key,
+                        $"이름이 정확히 '{key}'인 CharacterMotionProfile 에셋을 찾지 못했습니다(0개). " +
+                        "몬스터용 MonsterMotionProfile은 여기에 쓸 수 없습니다.");
+                    return;
+            }
+        }
+
+        /// <summary>
+        /// 초상화 한 칸. <b>비어 있는 것이 정상</b>이며 그때는 런타임이 Base Idle 첫 프레임을 대신
+        /// 쓴다(<see cref="Character.CharacterDefinition.Portrait"/>의 기존 폴백). 판정은 몬스터의
+        /// preview_sprite_key와 같다 - 빈 칸은 경고, <b>이름을 적었는데 찾지 못한 것은 오류</b>다
+        /// (사람이 이름을 적었다는 것은 그 그림을 쓰겠다는 뜻이므로 조용히 비우지 않는다).
+        /// </summary>
+        private static void ReadPortrait(
+            CsvTable table, CsvRecord record, string file, int line,
+            TableDataAssetIndex assets, CharacterRow row, TableDataDiagnosticLog log)
+        {
+            string key = table.Get(record, TableDataColumns.PortraitKey);
+
+            if (string.IsNullOrEmpty(key))
+            {
+                log.Warning(file, line, TableDataColumns.PortraitKey, key,
+                    "portrait_key가 비어 있습니다 - 런타임이 Motion Profile의 Base Idle 첫 프레임을 대신 씁니다(선택 항목).");
+                return;
+            }
+
+            ResolveSprite(assets, file, line, TableDataColumns.PortraitKey, key, log, out Sprite sprite);
+            row.Portrait = sprite;
+        }
+
+        // ---- Skill ----
+
+        /// <summary>
+        /// Skill.csv 한 장. <b>행이 하나도 없는 것이 정상 상태</b>다 - 아직 정한 스킬이 없다는 뜻이며,
+        /// 빈 표는 오류도 경고도 아니다(헤더만 맞으면 통과한다).
+        ///
+        /// id 예외는 <b>없다</b> - 캐릭터와 달리 스킬은 새로 만드는 데이터라 표준 ID 형식만 쓴다.
+        /// </summary>
+        private static void ValidateSkills(
+            CsvTable table, TableDataSnapshot snapshot, TableDataAssetIndex assets, TableDataDiagnosticLog log)
+        {
+            string file = table.FileName;
+            var displayOrders = new Dictionary<int, int>();
+
+            foreach (CsvRecord record in table.Records)
+            {
+                int line = record.Line;
+                var row = new SkillRow { Line = line };
+
+                string idRaw = table.Get(record, TableDataColumns.SkillId);
+                bool idOk = TableDataFieldRules.TryReadRequiredId(
+                    file, line, TableDataColumns.SkillId, idRaw, log, out string id);
+                row.Id = id;
+
+                if (idOk && snapshot.SkillsById.TryGetValue(id, out SkillRow existing))
+                {
+                    log.Error(file, line, TableDataColumns.SkillId, id,
+                        $"skill_id가 {existing.Line}행과 중복됩니다 - 먼저 나온 행만 사용됩니다.");
+                    idOk = false;
+                }
+
+                if (TableDataFieldRules.TryReadEnabled(
+                        file, line, TableDataColumns.Enabled, table.Get(record, TableDataColumns.Enabled), log, out bool enabled))
+                {
+                    row.Enabled = enabled;
+                }
+
+                if (TableDataFieldRules.TryReadIntAtLeast(
+                        file, line, TableDataColumns.DisplayOrder, table.Get(record, TableDataColumns.DisplayOrder),
+                        0, log, out int order))
+                {
+                    row.DisplayOrder = order;
+                    TableDataFieldRules.CheckDuplicateDisplayOrder(file, line, order, displayOrders, log);
+                }
+
+                row.Name = ReadLocalizedName(
+                    table, record, file, line, row.Enabled, nameRequiredWhenEnabled: true, log);
+
+                // 설명은 처음부터 끝까지 선택 항목이다 - 둘 다 비어 있으면 아무것도 알리지 않는다.
+                row.Description = ReadOptionalLocalizedPair(
+                    table, record, file, line,
+                    TableDataColumns.DescriptionCategory, TableDataColumns.DescriptionKey, log);
+
+                ReadSkillIcon(table, record, file, line, assets, row, log);
+
+                if (TableDataFieldRules.TryReadOptionalLowercaseKey(
+                        file, line, TableDataColumns.SkillType, table.Get(record, TableDataColumns.SkillType),
+                        log, out string skillType))
+                {
+                    row.SkillType = skillType;
+                }
+
+                if (TableDataFieldRules.TryReadOptionalLowercaseKey(
+                        file, line, TableDataColumns.BehaviorKey, table.Get(record, TableDataColumns.BehaviorKey),
+                        log, out string behaviorKey))
+                {
+                    row.BehaviorKey = behaviorKey;
+                }
+
+                if (!idOk) continue;
+
+                snapshot.Skills.Add(row);
+                snapshot.SkillsById[row.Id] = row;
+            }
+        }
+
+        /// <summary>
+        /// 스킬 아이콘 한 칸. <b>선택 항목</b>이라 비어 있으면 경고에 그치고, 이름을 적었는데 찾지
+        /// 못하면 오류다(초상화와 같은 판정). 아이콘 전용 폴더를 두지 않고 프로젝트 전체에서 이름으로
+        /// 찾는 이유는, 스킬 아이콘의 자리가 아직 정해지지 않았기 때문이다 - 폴더를 먼저 정해 두면
+        /// 그 폴더가 규칙이 되어 버린다.
+        /// </summary>
+        private static void ReadSkillIcon(
+            CsvTable table, CsvRecord record, string file, int line,
+            TableDataAssetIndex assets, SkillRow row, TableDataDiagnosticLog log)
+        {
+            string key = table.Get(record, TableDataColumns.IconKey);
+
+            if (string.IsNullOrEmpty(key))
+            {
+                log.Warning(file, line, TableDataColumns.IconKey, key,
+                    "icon_key가 비어 있습니다 - 스킬이 아이콘 없이 이름만으로 표시됩니다(선택 항목).");
+                return;
+            }
+
+            ResolveSprite(assets, file, line, TableDataColumns.IconKey, key, log, out Sprite sprite);
+            row.Icon = sprite;
+        }
+
+        // ---- CharacterSkill ----
+
+        /// <summary>
+        /// CharacterSkill.csv 한 장. <b>행이 하나도 없는 것이 정상 상태</b>다.
+        ///
+        /// 이 표는 스스로 무엇도 정의하지 않고 <b>두 표를 잇기만</b> 한다 - 그래서 모든 행의 양쪽 id가
+        /// Character.csv / Skill.csv에 실재해야 하며, 없는 id를 가리키면 오류다. 활성 관계는 활성
+        /// 캐릭터와 활성 스킬만 가리킬 수 있다(던전이 비활성 몬스터를 가리킬 수 없는 것과 같은 규칙).
+        ///
+        /// <b>여기서 아무것도 열어 주지 않는다.</b> required_character_level은 형식만 확인하고 그대로
+        /// 옮긴다 - 그 값으로 스킬을 여닫는 규칙은 이 단계에 없다.
+        /// </summary>
+        private static void ValidateCharacterSkills(
+            CsvTable table, TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            string file = table.FileName;
+            var displayOrders = new Dictionary<int, int>();
+
+            foreach (CsvRecord record in table.Records)
+            {
+                int line = record.Line;
+                var row = new CharacterSkillRow { Line = line };
+
+                bool characterOk = TableDataFieldRules.TryReadRequiredCharacterId(
+                    file, line, TableDataColumns.CharacterId, table.Get(record, TableDataColumns.CharacterId),
+                    log, out string characterId);
+                row.CharacterId = characterId;
+
+                bool skillOk = TableDataFieldRules.TryReadRequiredId(
+                    file, line, TableDataColumns.SkillId, table.Get(record, TableDataColumns.SkillId),
+                    log, out string skillId);
+                row.SkillId = skillId;
+
+                bool pairOk = characterOk && skillOk;
+                if (pairOk)
+                {
+                    row.PairId = CharacterSkillDefinition.BuildPairId(characterId, skillId);
+
+                    if (snapshot.CharacterSkillsByPairId.TryGetValue(row.PairId, out CharacterSkillRow existing))
+                    {
+                        log.Error(file, line, TableDataColumns.SkillId, skillId,
+                            $"'{characterId}' + '{skillId}' 짝이 {existing.Line}행과 중복됩니다 - " +
+                            "먼저 나온 행만 사용됩니다.");
+                        pairOk = false;
+                    }
+                }
+
+                if (TableDataFieldRules.TryReadEnabled(
+                        file, line, TableDataColumns.Enabled, table.Get(record, TableDataColumns.Enabled), log, out bool enabled))
+                {
+                    row.Enabled = enabled;
+                }
+
+                if (TableDataFieldRules.TryReadIntAtLeast(
+                        file, line, TableDataColumns.DisplayOrder, table.Get(record, TableDataColumns.DisplayOrder),
+                        0, log, out int order))
+                {
+                    row.DisplayOrder = order;
+                    TableDataFieldRules.CheckDuplicateDisplayOrder(file, line, order, displayOrders, log);
+                }
+
+                // 상한은 두지 않는다 - 레벨의 최대치를 정하는 것은 이 표의 일이 아니다.
+                if (TableDataFieldRules.TryReadIntAtLeast(
+                        file, line, TableDataColumns.RequiredCharacterLevel,
+                        table.Get(record, TableDataColumns.RequiredCharacterLevel), 1, log, out int level))
+                {
+                    row.RequiredCharacterLevel = level;
+                }
+
+                CheckCharacterSkillReferences(file, snapshot, characterOk, skillOk, row, log);
+
+                if (!pairOk) continue;
+
+                snapshot.CharacterSkills.Add(row);
+                snapshot.CharacterSkillsByPairId[row.PairId] = row;
+            }
+        }
+
+        /// <summary>
+        /// 관계의 양쪽이 실제로 있는 행을 가리키는지 본다. 형식 검사에서 이미 걸린 쪽은 다시 보지
+        /// 않는다 - 같은 칸에 오류를 두 번 쌓으면 원인이 무엇인지 흐려진다.
+        ///
+        /// <b>비활성 관계도 참조는 검사한다.</b> 잘못된 참조를 통과시키면 다시 켜는 순간 조용히 깨지기
+        /// 때문이다. 다만 "활성인데 비활성 대상을 가리킨다"는 판정은 활성 관계에만 적용한다.
+        /// </summary>
+        private static void CheckCharacterSkillReferences(
+            string file, TableDataSnapshot snapshot, bool characterOk, bool skillOk,
+            CharacterSkillRow row, TableDataDiagnosticLog log)
+        {
+            if (characterOk)
+            {
+                if (!snapshot.CharactersById.TryGetValue(row.CharacterId, out CharacterRow character))
+                {
+                    log.Error(file, row.Line, TableDataColumns.CharacterId, row.CharacterId,
+                        $"{TableDataPaths.CharacterCsvFileName}에 없는 character_id입니다 - " +
+                        "관계는 그 표에 실제로 있는 행만 가리킬 수 있습니다(대소문자를 구분합니다).");
+                }
+                else if (row.Enabled && !character.Enabled)
+                {
+                    log.Error(file, row.Line, TableDataColumns.CharacterId, row.CharacterId,
+                        $"enabled=0인 캐릭터({TableDataPaths.CharacterCsvFileName} {character.Line}행)를 가리킵니다 - " +
+                        "활성 관계는 활성 캐릭터만 가리킬 수 있습니다.");
+                }
+            }
+
+            if (!skillOk) return;
+
+            if (!snapshot.SkillsById.TryGetValue(row.SkillId, out SkillRow skill))
+            {
+                log.Error(file, row.Line, TableDataColumns.SkillId, row.SkillId,
+                    $"{TableDataPaths.SkillCsvFileName}에 없는 skill_id입니다 - " +
+                    "관계는 그 표에 실제로 있는 행만 가리킬 수 있습니다(대소문자를 구분합니다).");
+                return;
+            }
+
+            if (row.Enabled && !skill.Enabled)
+            {
+                log.Error(file, row.Line, TableDataColumns.SkillId, row.SkillId,
+                    $"enabled=0인 스킬({TableDataPaths.SkillCsvFileName} {skill.Line}행)을 가리킵니다 - " +
+                    "활성 관계는 활성 스킬만 가리킬 수 있습니다.");
+            }
+        }
+
         // ---- 공용 칸 읽기 ----
 
         /// <summary>
@@ -792,6 +1216,45 @@ namespace TableDataEditor
                 log.Warning(file, line, emptyColumn, emptyValue,
                     "name_category와 name_key 중 한쪽만 채워져 있어 이름 참조를 비웁니다.");
             }
+
+            return LocalizedEntryRef.None;
+        }
+
+        /// <summary>
+        /// 카테고리/키 두 칸을 <b>처음부터 끝까지 선택 항목으로</b> 읽는다. 둘 다 비어 있으면 아무것도
+        /// 알리지 않고 빈 참조를 돌려준다 - "설명을 아직 쓰지 않았다"는 정상적인 상태이므로 경고조차
+        /// 남기지 않는다. <b>한쪽만 채워진 것은 오류</b>다: 참조를 만들 수 없는데도 사람이 무언가를
+        /// 적었다는 뜻이라 조용히 비우면 그 의도가 사라진다. 둘 다 있으면 실재 여부까지 검사한다.
+        ///
+        /// 이름 칸(<see cref="ReadLocalizedName"/>)과 나눠 둔 이유는 판정이 다르기 때문이다 - 이름은
+        /// 표마다 필수/선택이 갈리고 반쪽 입력에 경고를 쓰기도 하지만, 설명은 어느 표에서도 필수가
+        /// 아니다.
+        /// </summary>
+        private static LocalizedEntryRef ReadOptionalLocalizedPair(
+            CsvTable table, CsvRecord record, string file, int line,
+            string categoryColumn, string keyColumn, TableDataDiagnosticLog log)
+        {
+            string categoryRaw = table.Get(record, categoryColumn);
+            string keyRaw = table.Get(record, keyColumn);
+
+            bool hasCategory = !string.IsNullOrEmpty(categoryRaw);
+            bool hasKey = !string.IsNullOrEmpty(keyRaw);
+
+            if (!hasCategory && !hasKey) return LocalizedEntryRef.None;
+
+            if (hasCategory && hasKey)
+            {
+                TableDataFieldRules.TryResolveLocalizedEntry(
+                    file, line, categoryColumn, categoryRaw, keyColumn, keyRaw, log, out LocalizedEntryRef entry);
+                return entry;
+            }
+
+            string emptyColumn = hasCategory ? keyColumn : categoryColumn;
+            string emptyValue = hasCategory ? keyRaw : categoryRaw;
+
+            log.Error(file, line, emptyColumn, emptyValue,
+                $"{categoryColumn}와 {keyColumn}는 함께 있어야 합니다 - 한쪽만으로는 참조를 만들 수 없습니다" +
+                "(둘 다 비워 두는 것은 정상입니다).");
 
             return LocalizedEntryRef.None;
         }
@@ -864,84 +1327,224 @@ namespace TableDataEditor
         // ---- 출력 쪽 사전 점검 ----
 
         /// <summary>
+        /// 이 범위가 <b>생성 에셋을 로드해도 되는 폴더</b>. 출력 쪽 점검은 여기 있는 폴더만 만진다 -
+        /// 목록을 한 곳에서만 만들어야 "범위 밖 도메인은 로드하지 않는다"가 두 검사(충돌/orphan)에서
+        /// 어긋날 수 없다.
+        ///
+        /// <b>입력 자산은 여기 들어오지 않는다.</b> 수동 MonsterMotionProfile / CharacterMotionProfile /
+        /// Sprite / 수동 ItemDefinition 조회는 범위와 무관하게 그대로 일어난다 - 그것들은 표가
+        /// <b>읽는 입력</b>이지 임포터가 <b>쓰는 출력</b>이 아니다.
+        /// </summary>
+        public static IReadOnlyList<string> GeneratedOutputFolders(TableDataRebuildScope outputScope)
+        {
+            TableDataRebuildScopes.EnsureSupported(outputScope, nameof(outputScope));
+
+            var folders = new List<string>();
+
+            if (TableDataRebuildScopes.IncludesLegacyDomains(outputScope))
+            {
+                folders.Add(TableDataPaths.WorldOutputFolder);
+                folders.Add(TableDataPaths.CurrencyOutputFolder);
+                folders.Add(TableDataPaths.ItemOutputFolder);
+                folders.Add(TableDataPaths.MonsterOutputFolder);
+                folders.Add(TableDataPaths.DungeonOutputFolder);
+            }
+
+            folders.Add(TableDataPaths.CharacterOutputFolder);
+            folders.Add(TableDataPaths.SkillOutputFolder);
+            folders.Add(TableDataPaths.CharacterSkillOutputFolder);
+            return folders;
+        }
+
+        /// <summary>
+        /// <see cref="GeneratedOutputFolders"/>를 한 번만 펼쳐 둔 집합. 출력 쪽 점검은 이 집합을
+        /// <b>실제로 물어보고</b> 도메인마다 열지 말지를 정한다 - 범위 판정을 두 번 적어 두면
+        /// (한 번은 목록을 만들 때, 한 번은 검사에서 다시) 둘이 어긋나도 아무도 알 수 없고,
+        /// "목록에 있는 폴더만 연다"는 설명이 코드로 확인되지 않는 말이 된다.
+        /// </summary>
+        private static HashSet<string> SelectedOutputFolders(TableDataRebuildScope outputScope)
+        {
+            return new HashSet<string>(GeneratedOutputFolders(outputScope), StringComparer.Ordinal);
+        }
+
+        /// <summary>이 폴더를 열어도 되는지. 판정의 근거는 오직 선택된 폴더 집합이다.</summary>
+        private static bool InScope(HashSet<string> selected, string outputFolder)
+        {
+            return selected.Contains(outputFolder);
+        }
+
+        /// <summary>
         /// Rebuild가 실제로 건드릴 경로를 <b>쓰기 전에</b> 확인한다. 같은 ID를 가진 생성 에셋이 둘 이상
         /// 있거나, 쓰려는 경로가 다른 종류의 에셋에 이미 점유되어 있으면 여기서 오류로 잡는다 -
         /// 절반쯤 쓴 뒤에 실패해서 프로젝트가 어중간한 상태로 남는 것을 막기 위함이다.
+        ///
+        /// <b>범위 밖 도메인은 한 번도 로드하지 않는다.</b> 폴더 조회도, 경로 점유 확인도 건너뛴다 -
+        /// 이번 Rebuild가 그 경로에 아무것도 쓰지 않으므로 확인할 충돌 자체가 없다. 어느 도메인을 열지는
+        /// <see cref="SelectedOutputFolders"/>에게만 묻는다.
         /// </summary>
-        private static void CheckOutputConflicts(TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        private static void CheckOutputConflicts(
+            TableDataSnapshot snapshot, TableDataDiagnosticLog log, TableDataRebuildScope outputScope)
         {
-            var worlds = TableDataAssetIndex.LoadGeneratedById<WorldDefinition>(
-                TableDataPaths.WorldOutputFolder, w => w.WorldId);
-            var currencies = TableDataAssetIndex.LoadGeneratedById<CurrencyDefinition>(
-                TableDataPaths.CurrencyOutputFolder, c => c.CurrencyId);
-            var items = TableDataAssetIndex.LoadGeneratedById<ItemDefinition>(
-                TableDataPaths.ItemOutputFolder, i => i.ItemId);
-            var monsters = TableDataAssetIndex.LoadGeneratedById<MonsterDefinition>(
-                TableDataPaths.MonsterOutputFolder, m => m.MonsterId);
-            var dungeons = TableDataAssetIndex.LoadGeneratedById<DungeonDefinition>(
-                TableDataPaths.DungeonOutputFolder, d => d.DungeonId);
+            HashSet<string> selected = SelectedOutputFolders(outputScope);
 
-            CheckDuplicateGenerated(worlds, TableDataPaths.WorldCsvFileName, TableDataColumns.WorldId, log);
-            CheckDuplicateGenerated(currencies, TableDataPaths.CurrencyCsvFileName, TableDataColumns.CurrencyId, log);
-            CheckDuplicateGenerated(items, TableDataPaths.ItemCsvFileName, TableDataColumns.ItemId, log);
-            CheckDuplicateGenerated(monsters, TableDataPaths.MonsterCsvFileName, TableDataColumns.MonsterId, log);
-            CheckDuplicateGenerated(dungeons, TableDataPaths.DungeonCsvFileName, TableDataColumns.DungeonId, log);
-
-            foreach (WorldRow row in snapshot.Worlds)
+            if (InScope(selected, TableDataPaths.WorldOutputFolder))
             {
-                CheckOutputPath<WorldDefinition>(
-                    TableDataPaths.WorldAssetPath(row.Id), row.Id, w => w.WorldId,
-                    TableDataPaths.WorldCsvFileName, row.Line, TableDataColumns.WorldId, row.Id, log);
+                CheckDuplicateGenerated(
+                    TableDataAssetIndex.LoadGeneratedById<WorldDefinition>(
+                        TableDataPaths.WorldOutputFolder, w => w.WorldId),
+                    TableDataPaths.WorldCsvFileName, TableDataColumns.WorldId, log);
+
+                foreach (WorldRow row in snapshot.Worlds)
+                {
+                    CheckOutputPath<WorldDefinition>(
+                        TableDataPaths.WorldAssetPath(row.Id), row.Id, w => w.WorldId,
+                        TableDataPaths.WorldCsvFileName, row.Line, TableDataColumns.WorldId, row.Id, log);
+                }
+
+                CheckOutputPath<WorldCatalog>(
+                    TableDataPaths.WorldCatalogAssetPath, null, null,
+                    TableDataPaths.WorldCsvFileName, TableDataDiagnostic.FileLevelRow,
+                    TableDataColumns.FilePseudoColumn, TableDataPaths.WorldCatalogAssetName, log);
             }
 
-            foreach (CurrencyRow row in snapshot.Currencies)
+            if (InScope(selected, TableDataPaths.CurrencyOutputFolder))
             {
-                CheckOutputPath<CurrencyDefinition>(
-                    TableDataPaths.CurrencyAssetPath(row.Id), row.Id, c => c.CurrencyId,
-                    TableDataPaths.CurrencyCsvFileName, row.Line, TableDataColumns.CurrencyId, row.Id, log);
+                CheckDuplicateGenerated(
+                    TableDataAssetIndex.LoadGeneratedById<CurrencyDefinition>(
+                        TableDataPaths.CurrencyOutputFolder, c => c.CurrencyId),
+                    TableDataPaths.CurrencyCsvFileName, TableDataColumns.CurrencyId, log);
+
+                foreach (CurrencyRow row in snapshot.Currencies)
+                {
+                    CheckOutputPath<CurrencyDefinition>(
+                        TableDataPaths.CurrencyAssetPath(row.Id), row.Id, c => c.CurrencyId,
+                        TableDataPaths.CurrencyCsvFileName, row.Line, TableDataColumns.CurrencyId, row.Id, log);
+                }
+
+                CheckOutputPath<CurrencyCatalog>(
+                    TableDataPaths.CurrencyCatalogAssetPath, null, null,
+                    TableDataPaths.CurrencyCsvFileName, TableDataDiagnostic.FileLevelRow,
+                    TableDataColumns.FilePseudoColumn, TableDataPaths.CurrencyCatalogAssetName, log);
             }
 
-            foreach (ItemRow row in snapshot.Items)
+            if (InScope(selected, TableDataPaths.ItemOutputFolder))
             {
-                CheckOutputPath<ItemDefinition>(
-                    TableDataPaths.ItemAssetPath(row.Id), row.Id, i => i.ItemId,
-                    TableDataPaths.ItemCsvFileName, row.Line, TableDataColumns.ItemId, row.Id, log);
+                CheckDuplicateGenerated(
+                    TableDataAssetIndex.LoadGeneratedById<ItemDefinition>(
+                        TableDataPaths.ItemOutputFolder, i => i.ItemId),
+                    TableDataPaths.ItemCsvFileName, TableDataColumns.ItemId, log);
+
+                foreach (ItemRow row in snapshot.Items)
+                {
+                    CheckOutputPath<ItemDefinition>(
+                        TableDataPaths.ItemAssetPath(row.Id), row.Id, i => i.ItemId,
+                        TableDataPaths.ItemCsvFileName, row.Line, TableDataColumns.ItemId, row.Id, log);
+                }
+
+                CheckOutputPath<ItemCatalog>(
+                    TableDataPaths.ItemCatalogAssetPath, null, null,
+                    TableDataPaths.ItemCsvFileName, TableDataDiagnostic.FileLevelRow,
+                    TableDataColumns.FilePseudoColumn, TableDataPaths.ItemCatalogAssetName, log);
             }
 
-            foreach (MonsterRow row in snapshot.Monsters)
+            if (InScope(selected, TableDataPaths.MonsterOutputFolder))
             {
-                CheckOutputPath<MonsterDefinition>(
-                    TableDataPaths.MonsterAssetPath(row.Id), row.Id, m => m.MonsterId,
-                    TableDataPaths.MonsterCsvFileName, row.Line, TableDataColumns.MonsterId, row.Id, log);
+                CheckDuplicateGenerated(
+                    TableDataAssetIndex.LoadGeneratedById<MonsterDefinition>(
+                        TableDataPaths.MonsterOutputFolder, m => m.MonsterId),
+                    TableDataPaths.MonsterCsvFileName, TableDataColumns.MonsterId, log);
+
+                foreach (MonsterRow row in snapshot.Monsters)
+                {
+                    CheckOutputPath<MonsterDefinition>(
+                        TableDataPaths.MonsterAssetPath(row.Id), row.Id, m => m.MonsterId,
+                        TableDataPaths.MonsterCsvFileName, row.Line, TableDataColumns.MonsterId, row.Id, log);
+                }
+
+                CheckOutputPath<MonsterCatalog>(
+                    TableDataPaths.MonsterCatalogAssetPath, null, null,
+                    TableDataPaths.MonsterCsvFileName, TableDataDiagnostic.FileLevelRow,
+                    TableDataColumns.FilePseudoColumn, TableDataPaths.MonsterCatalogAssetName, log);
             }
 
-            foreach (DungeonRow row in snapshot.Dungeons)
+            if (InScope(selected, TableDataPaths.DungeonOutputFolder))
             {
-                CheckOutputPath<DungeonDefinition>(
-                    TableDataPaths.DungeonAssetPath(row.Id), row.Id, d => d.DungeonId,
-                    TableDataPaths.DungeonCsvFileName, row.Line, TableDataColumns.DungeonId, row.Id, log);
+                CheckDuplicateGenerated(
+                    TableDataAssetIndex.LoadGeneratedById<DungeonDefinition>(
+                        TableDataPaths.DungeonOutputFolder, d => d.DungeonId),
+                    TableDataPaths.DungeonCsvFileName, TableDataColumns.DungeonId, log);
+
+                foreach (DungeonRow row in snapshot.Dungeons)
+                {
+                    CheckOutputPath<DungeonDefinition>(
+                        TableDataPaths.DungeonAssetPath(row.Id), row.Id, d => d.DungeonId,
+                        TableDataPaths.DungeonCsvFileName, row.Line, TableDataColumns.DungeonId, row.Id, log);
+                }
+
+                CheckOutputPath<DungeonCatalog>(
+                    TableDataPaths.DungeonCatalogAssetPath, null, null,
+                    TableDataPaths.DungeonCsvFileName, TableDataDiagnostic.FileLevelRow,
+                    TableDataColumns.FilePseudoColumn, TableDataPaths.DungeonCatalogAssetName, log);
             }
 
-            CheckOutputPath<WorldCatalog>(
-                TableDataPaths.WorldCatalogAssetPath, null, null,
-                TableDataPaths.WorldCsvFileName, TableDataDiagnostic.FileLevelRow,
-                TableDataColumns.FilePseudoColumn, TableDataPaths.WorldCatalogAssetName, log);
-            CheckOutputPath<CurrencyCatalog>(
-                TableDataPaths.CurrencyCatalogAssetPath, null, null,
-                TableDataPaths.CurrencyCsvFileName, TableDataDiagnostic.FileLevelRow,
-                TableDataColumns.FilePseudoColumn, TableDataPaths.CurrencyCatalogAssetName, log);
-            CheckOutputPath<ItemCatalog>(
-                TableDataPaths.ItemCatalogAssetPath, null, null,
-                TableDataPaths.ItemCsvFileName, TableDataDiagnostic.FileLevelRow,
-                TableDataColumns.FilePseudoColumn, TableDataPaths.ItemCatalogAssetName, log);
-            CheckOutputPath<MonsterCatalog>(
-                TableDataPaths.MonsterCatalogAssetPath, null, null,
-                TableDataPaths.MonsterCsvFileName, TableDataDiagnostic.FileLevelRow,
-                TableDataColumns.FilePseudoColumn, TableDataPaths.MonsterCatalogAssetName, log);
-            CheckOutputPath<DungeonCatalog>(
-                TableDataPaths.DungeonCatalogAssetPath, null, null,
-                TableDataPaths.DungeonCsvFileName, TableDataDiagnostic.FileLevelRow,
-                TableDataColumns.FilePseudoColumn, TableDataPaths.DungeonCatalogAssetName, log);
+            if (InScope(selected, TableDataPaths.CharacterOutputFolder))
+            {
+                CheckDuplicateGenerated(
+                    TableDataAssetIndex.LoadGeneratedById<CharacterDefinition>(
+                        TableDataPaths.CharacterOutputFolder, c => c.CharacterId),
+                    TableDataPaths.CharacterCsvFileName, TableDataColumns.CharacterId, log);
+
+                foreach (CharacterRow row in snapshot.Characters)
+                {
+                    CheckOutputPath<CharacterDefinition>(
+                        TableDataPaths.CharacterAssetPath(row.Id), row.Id, c => c.CharacterId,
+                        TableDataPaths.CharacterCsvFileName, row.Line, TableDataColumns.CharacterId, row.Id, log);
+                }
+
+                CheckOutputPath<CharacterCatalog>(
+                    TableDataPaths.CharacterCatalogAssetPath, null, null,
+                    TableDataPaths.CharacterCsvFileName, TableDataDiagnostic.FileLevelRow,
+                    TableDataColumns.FilePseudoColumn, TableDataPaths.CharacterCatalogAssetName, log);
+            }
+
+            if (InScope(selected, TableDataPaths.SkillOutputFolder))
+            {
+                CheckDuplicateGenerated(
+                    TableDataAssetIndex.LoadGeneratedById<SkillDefinition>(
+                        TableDataPaths.SkillOutputFolder, s => s.SkillId),
+                    TableDataPaths.SkillCsvFileName, TableDataColumns.SkillId, log);
+
+                foreach (SkillRow row in snapshot.Skills)
+                {
+                    CheckOutputPath<SkillDefinition>(
+                        TableDataPaths.SkillAssetPath(row.Id), row.Id, s => s.SkillId,
+                        TableDataPaths.SkillCsvFileName, row.Line, TableDataColumns.SkillId, row.Id, log);
+                }
+
+                CheckOutputPath<SkillCatalog>(
+                    TableDataPaths.SkillCatalogAssetPath, null, null,
+                    TableDataPaths.SkillCsvFileName, TableDataDiagnostic.FileLevelRow,
+                    TableDataColumns.FilePseudoColumn, TableDataPaths.SkillCatalogAssetName, log);
+            }
+
+            if (!InScope(selected, TableDataPaths.CharacterSkillOutputFolder)) return;
+
+            CheckDuplicateGenerated(
+                TableDataAssetIndex.LoadGeneratedById<CharacterSkillDefinition>(
+                    TableDataPaths.CharacterSkillOutputFolder, r => r.PairId),
+                TableDataPaths.CharacterSkillCsvFileName, TableDataColumns.CharacterId, log);
+
+            foreach (CharacterSkillRow row in snapshot.CharacterSkills)
+            {
+                CheckOutputPath<CharacterSkillDefinition>(
+                    TableDataPaths.CharacterSkillAssetPath(row.PairId), row.PairId, r => r.PairId,
+                    TableDataPaths.CharacterSkillCsvFileName, row.Line, TableDataColumns.CharacterId, row.PairId, log);
+            }
+
+            CheckOutputPath<CharacterSkillCatalog>(
+                TableDataPaths.CharacterSkillCatalogAssetPath, null, null,
+                TableDataPaths.CharacterSkillCsvFileName, TableDataDiagnostic.FileLevelRow,
+                TableDataColumns.FilePseudoColumn, TableDataPaths.CharacterSkillCatalogAssetName, log);
         }
 
         private static void CheckDuplicateGenerated<T>(
@@ -952,7 +1555,11 @@ namespace TableDataEditor
             {
                 if (pair.Value.Count <= 1) continue;
 
-                log.Error(file, TableDataDiagnostic.FileLevelRow, idColumn, pair.Key,
+                // ID가 빈 그룹도 여기까지 온다(생성 폴더 조회가 버리지 않는다). 빈 값을 그대로 찍으면
+                // 진단이 "value ''"가 되어 무엇을 말하는지 알 수 없으므로 orphan과 같은 표기를 쓴다.
+                string id = string.IsNullOrEmpty(pair.Key) ? EmptyIdLabel : pair.Key;
+
+                log.Error(file, TableDataDiagnostic.FileLevelRow, idColumn, id,
                     $"생성 폴더에 같은 ID를 가진 {typeof(T).Name} 에셋이 {pair.Value.Count}개 있습니다 - " +
                     "어느 것을 재사용할지 정할 수 없으니 하나만 남기세요.");
             }
@@ -999,27 +1606,71 @@ namespace TableDataEditor
         ///
         /// "행"이 존재하지 않으므로 행 번호는 0으로, 값에는 <b>에셋이 실제로 들고 있는 ID</b>를 적는다.
         /// </summary>
-        private static void CheckOrphans(TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        private static void CheckOrphans(
+            TableDataSnapshot snapshot, TableDataDiagnosticLog log, TableDataRebuildScope outputScope)
         {
-            ReportOrphans(
-                TableDataAssetIndex.LoadGeneratedById<WorldDefinition>(TableDataPaths.WorldOutputFolder, w => w.WorldId),
-                snapshot.WorldsById.Keys, TableDataPaths.WorldCsvFileName, TableDataColumns.WorldId, log);
+            HashSet<string> selected = SelectedOutputFolders(outputScope);
 
-            ReportOrphans(
-                TableDataAssetIndex.LoadGeneratedById<CurrencyDefinition>(TableDataPaths.CurrencyOutputFolder, c => c.CurrencyId),
-                snapshot.CurrenciesById.Keys, TableDataPaths.CurrencyCsvFileName, TableDataColumns.CurrencyId, log);
+            if (InScope(selected, TableDataPaths.WorldOutputFolder))
+            {
+                ReportOrphans(
+                    TableDataAssetIndex.LoadGeneratedById<WorldDefinition>(TableDataPaths.WorldOutputFolder, w => w.WorldId),
+                    snapshot.WorldsById.Keys, TableDataPaths.WorldCsvFileName, TableDataColumns.WorldId, log);
+            }
 
-            ReportOrphans(
-                TableDataAssetIndex.LoadGeneratedById<ItemDefinition>(TableDataPaths.ItemOutputFolder, i => i.ItemId),
-                snapshot.ItemsById.Keys, TableDataPaths.ItemCsvFileName, TableDataColumns.ItemId, log);
+            if (InScope(selected, TableDataPaths.CurrencyOutputFolder))
+            {
+                ReportOrphans(
+                    TableDataAssetIndex.LoadGeneratedById<CurrencyDefinition>(TableDataPaths.CurrencyOutputFolder, c => c.CurrencyId),
+                    snapshot.CurrenciesById.Keys, TableDataPaths.CurrencyCsvFileName, TableDataColumns.CurrencyId, log);
+            }
 
-            ReportOrphans(
-                TableDataAssetIndex.LoadGeneratedById<MonsterDefinition>(TableDataPaths.MonsterOutputFolder, m => m.MonsterId),
-                snapshot.MonstersById.Keys, TableDataPaths.MonsterCsvFileName, TableDataColumns.MonsterId, log);
+            if (InScope(selected, TableDataPaths.ItemOutputFolder))
+            {
+                ReportOrphans(
+                    TableDataAssetIndex.LoadGeneratedById<ItemDefinition>(TableDataPaths.ItemOutputFolder, i => i.ItemId),
+                    snapshot.ItemsById.Keys, TableDataPaths.ItemCsvFileName, TableDataColumns.ItemId, log);
+            }
 
-            ReportOrphans(
-                TableDataAssetIndex.LoadGeneratedById<DungeonDefinition>(TableDataPaths.DungeonOutputFolder, d => d.DungeonId),
-                snapshot.DungeonsById.Keys, TableDataPaths.DungeonCsvFileName, TableDataColumns.DungeonId, log);
+            if (InScope(selected, TableDataPaths.MonsterOutputFolder))
+            {
+                ReportOrphans(
+                    TableDataAssetIndex.LoadGeneratedById<MonsterDefinition>(TableDataPaths.MonsterOutputFolder, m => m.MonsterId),
+                    snapshot.MonstersById.Keys, TableDataPaths.MonsterCsvFileName, TableDataColumns.MonsterId, log);
+            }
+
+            if (InScope(selected, TableDataPaths.DungeonOutputFolder))
+            {
+                ReportOrphans(
+                    TableDataAssetIndex.LoadGeneratedById<DungeonDefinition>(TableDataPaths.DungeonOutputFolder, d => d.DungeonId),
+                    snapshot.DungeonsById.Keys, TableDataPaths.DungeonCsvFileName, TableDataColumns.DungeonId, log);
+            }
+
+            // 캐릭터 쪽 세 도메인도 <b>같은 규칙</b>이다 - 자기 출력 폴더 안만 보고, 지우지 않으며,
+            // 카탈로그에서만 빠진다. 새 도메인이라고 자동 삭제를 도입하지 않은 이유는 그것이 되돌릴 수
+            // 없는 동작이기 때문이다: 씬이나 프리팹이 그 에셋을 이미 참조하고 있으면 삭제는 참조를
+            // 끊고 GUID를 영원히 없앤다. 무엇이 남았는지는 경고로 다 보이므로 놓치지도 않는다.
+            if (InScope(selected, TableDataPaths.CharacterOutputFolder))
+            {
+                ReportOrphans(
+                    TableDataAssetIndex.LoadGeneratedById<CharacterDefinition>(TableDataPaths.CharacterOutputFolder, c => c.CharacterId),
+                    snapshot.CharactersById.Keys, TableDataPaths.CharacterCsvFileName, TableDataColumns.CharacterId, log);
+            }
+
+            if (InScope(selected, TableDataPaths.SkillOutputFolder))
+            {
+                ReportOrphans(
+                    TableDataAssetIndex.LoadGeneratedById<SkillDefinition>(TableDataPaths.SkillOutputFolder, s => s.SkillId),
+                    snapshot.SkillsById.Keys, TableDataPaths.SkillCsvFileName, TableDataColumns.SkillId, log);
+            }
+
+            if (InScope(selected, TableDataPaths.CharacterSkillOutputFolder))
+            {
+                ReportOrphans(
+                    TableDataAssetIndex.LoadGeneratedById<CharacterSkillDefinition>(TableDataPaths.CharacterSkillOutputFolder, r => r.PairId),
+                    snapshot.CharacterSkillsByPairId.Keys, TableDataPaths.CharacterSkillCsvFileName,
+                    TableDataColumns.CharacterId, log);
+            }
         }
 
         private static void ReportOrphans<T>(
@@ -1034,7 +1685,7 @@ namespace TableDataEditor
 
                 foreach (T asset in pair.Value)
                 {
-                    string id = string.IsNullOrEmpty(pair.Key) ? "(빈 ID)" : pair.Key;
+                    string id = string.IsNullOrEmpty(pair.Key) ? EmptyIdLabel : pair.Key;
                     log.Warning(file, TableDataDiagnostic.FileLevelRow, idColumn, id,
                         $"생성 에셋 '{AssetDatabase.GetAssetPath(asset)}'의 ID가 CSV에 없습니다 - " +
                         "자동으로 지우지 않으며 카탈로그에서만 빠집니다. 필요 없으면 직접 삭제하세요.");

@@ -1,3 +1,4 @@
+using Common;
 using UnityEngine;
 
 namespace Character
@@ -14,6 +15,15 @@ namespace Character
     ///
     /// <b>진행 상태(레벨/현재 행동력)도 여기에 없다.</b> 그 값들은 SaveData.characters에 저장되며,
     /// 이 에셋은 그 상태의 기본값(Max Stamina)과 표시용 정보만 제공한다.
+    ///
+    /// <b>표에서 만들어지는 칸이 뒤에 붙어 있다.</b> Character.csv 임포터가 채우는
+    /// <see cref="LocalizedName"/> / <see cref="BaseMaxHealth"/> / <see cref="DisplayOrder"/>는
+    /// 기존 칸 <b>뒤에</b> 추가한 것이라, 이미 저장돼 있는 수동 에셋은 그대로 읽힌다(없는 칸은 Unity가
+    /// 기본값으로 채운다). <b>기존 칸의 이름과 의미는 하나도 바뀌지 않았다</b> -
+    /// <see cref="DisplayName"/>이 무엇을 돌려주는지도 그대로다. 로컬라이즈 이름은 <b>아직 어떤 UI도
+    /// 읽지 않는</b> 정적 데이터이며, 표시 경로를 그쪽으로 옮기는 것은 이 단계의 범위가 아니다 -
+    /// 두 경로를 동시에 살려 두고 어느 쪽이 진짜인지 모르는 상태를 만들지 않기 위해, 연결은 한 번에
+    /// 한다.
     /// </summary>
     [CreateAssetMenu(fileName = "CharacterDefinition", menuName = "Character/Character Definition")]
     public class CharacterDefinition : ScriptableObject
@@ -40,6 +50,25 @@ namespace Character
         [Tooltip("이 캐릭터의 최대 행동력. 현재 행동력은 저장 데이터가 들고 있고, 이 값은 그 상한이다.")]
         [Min(1)]
         [SerializeField] private int maxStamina = 5;
+
+        [Header("Localization")]
+        [Tooltip("표에서 지정한 캐릭터 이름. 카테고리 번호 + 숫자 키로 가리킨다. " +
+                 "지금은 어떤 UI도 읽지 않는 정적 데이터이며, Display Name의 동작을 바꾸지 않는다.")]
+        [SerializeField] private LocalizedTextReference localizedName = new LocalizedTextReference();
+
+        [Header("Health")]
+        [Tooltip("이 캐릭터의 기본 최대 체력. <b>선택 항목</b>이라 지정하지 않을 수 있고, 지정하지 " +
+                 "않은 상태와 '0으로 지정한 상태'는 다르다 - 값이 있는지는 Has Base Max Health가 " +
+                 "말한다. 체력 규칙 자체는 아직 없다.")]
+        [SerializeField] private bool hasBaseMaxHealth;
+
+        [Min(1)]
+        [SerializeField] private int baseMaxHealth = 1;
+
+        [Header("Ordering")]
+        [Tooltip("캐릭터를 정렬할 때 쓰는 순서 값. 작을수록 앞이다 - 이 값 자체가 목록을 만들지는 " +
+                 "않으며, 목록의 순서는 CharacterCatalog의 작성 순서가 결정한다.")]
+        [SerializeField] private int displayOrder;
 
         public string CharacterId => string.IsNullOrWhiteSpace(characterId) ? name : characterId;
 
@@ -70,5 +99,27 @@ namespace Character
                 return idleFrames != null && idleFrames.Length > 0 ? idleFrames[0] : null;
             }
         }
+
+        /// <summary>표에서 지정한 캐릭터 이름 참조. <b>절대 null을 돌려주지 않는다</b> - 참조가 비어
+        /// 있을 수는 있어도 객체 자체는 항상 있다(<see cref="Inventory.CurrencyDefinition"/>와 같은
+        /// 규칙). <b>이 값은 <see cref="DisplayName"/>에 끼어들지 않는다</b> - 표시 이름의 경로를
+        /// 바꾸는 것은 이 단계의 범위가 아니다.</summary>
+        public LocalizedTextReference LocalizedName =>
+            localizedName ?? (localizedName = new LocalizedTextReference());
+
+        /// <summary>이름의 Table/Key가 지정되어 있는지 여부(번역 값의 존재를 보장하지는 않는다).</summary>
+        public bool HasLocalizedName => localizedName != null && localizedName.HasReference;
+
+        /// <summary>기본 최대 체력이 <b>지정되어 있는지</b>. 지정하지 않은 것과 작은 값을 지정한 것은
+        /// 다른 상태이며, 표의 빈 칸은 언제나 "지정하지 않음"으로 들어온다 - 빈 칸을 0이나 1로 바꿔
+        /// 채우면 "아직 정하지 않았다"가 데이터에서 사라진다.</summary>
+        public bool HasBaseMaxHealth => hasBaseMaxHealth;
+
+        /// <summary>기본 최대 체력. <b>지정하지 않았으면 0</b>이므로 값을 쓰기 전에 반드시
+        /// <see cref="HasBaseMaxHealth"/>를 먼저 본다 - 0을 "체력 0"으로 읽으면 안 된다.</summary>
+        public int BaseMaxHealth => hasBaseMaxHealth ? Mathf.Max(1, baseMaxHealth) : 0;
+
+        /// <summary>정렬용 순서 값. 작을수록 앞이며, 지정하지 않으면 0이다.</summary>
+        public int DisplayOrder => displayOrder;
     }
 }

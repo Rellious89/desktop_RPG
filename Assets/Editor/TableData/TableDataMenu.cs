@@ -34,16 +34,36 @@ namespace TableDataEditor
         [MenuItem(MenuRoot + "Rebuild", priority = 101)]
         public static void Rebuild()
         {
-            TableDataRebuildResult result = TableDataRebuilder.Rebuild();
+            Run(TableDataRebuildScope.All, "Rebuild", TableDataPaths.OutputRoot);
+        }
+
+        /// <summary>
+        /// Character / Skill / CharacterSkill 세 표만 다시 만든다. <b>검사는 여덟 표 전부를 그대로</b>
+        /// 하고, 쓰기만 이 세 폴더 안으로 좁힌다 - 캐릭터 표를 손보는 동안 기존 다섯 도메인의 생성
+        /// 에셋 파일이 다시 쓰이지 않게 하기 위한 것이다.
+        /// </summary>
+        [MenuItem(MenuRoot + "Rebuild (Character / Skill / CharacterSkill only)", priority = 102)]
+        public static void RebuildCharacterTables()
+        {
+            Run(TableDataRebuildScope.CharacterSkillTables,
+                "Rebuild (Character / Skill / CharacterSkill)",
+                TableDataPaths.CharacterOutputFolder + ", " +
+                TableDataPaths.SkillOutputFolder + ", " +
+                TableDataPaths.CharacterSkillOutputFolder);
+        }
+
+        private static void Run(TableDataRebuildScope scope, string label, string outputDescription)
+        {
+            TableDataRebuildResult result = TableDataRebuilder.Rebuild(scope);
             TableDataValidationResult validation = result.Validation;
 
             TableDataValidator.LogToConsole(
-                validation, result.Wrote ? "[Table Data] Rebuild" : "[Table Data] Rebuild 중단");
+                validation, result.Wrote ? $"[Table Data] {label}" : $"[Table Data] {label} 중단");
 
             if (!result.Wrote)
             {
                 EditorUtility.DisplayDialog(
-                    "Table Data - Rebuild 중단",
+                    $"Table Data - {label} 중단",
                     $"{TableDataValidator.DescribeCounts(validation)}\n\n" +
                     "오류가 있어 에셋을 하나도 만들거나 고치지 않았습니다.\n" +
                     "Console에서 원인을 확인하고 CSV를 고친 뒤 다시 실행하세요.",
@@ -51,14 +71,14 @@ namespace TableDataEditor
                 return;
             }
 
-            Debug.Log($"[Table Data] Rebuild 완료 - 새로 만든 에셋 {result.CreatedCount}개, " +
-                      $"갱신한 에셋 {result.UpdatedCount}개. 출력 경로: {TableDataPaths.OutputRoot}");
+            Debug.Log($"[Table Data] {label} 완료 - 새로 만든 에셋 {result.CreatedCount}개, " +
+                      $"갱신한 에셋 {result.UpdatedCount}개. 출력 경로: {outputDescription}");
 
             EditorUtility.DisplayDialog(
-                "Table Data - Rebuild 완료",
+                $"Table Data - {label} 완료",
                 $"{validation.Summary}\n\n" +
                 $"새로 만든 에셋 {result.CreatedCount}개, 갱신한 에셋 {result.UpdatedCount}개\n" +
-                $"출력 경로: {TableDataPaths.OutputRoot}",
+                $"출력 경로: {outputDescription}",
                 "확인");
         }
     }

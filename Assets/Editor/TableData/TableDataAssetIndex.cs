@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Character;
 using Enemy;
 using Inventory;
 using UnityEditor;
@@ -38,6 +39,9 @@ namespace TableDataEditor
         private readonly Dictionary<string, List<MonsterMotionProfile>> motionProfiles =
             new Dictionary<string, List<MonsterMotionProfile>>(StringComparer.Ordinal);
 
+        private readonly Dictionary<string, List<CharacterMotionProfile>> characterMotionProfiles =
+            new Dictionary<string, List<CharacterMotionProfile>>(StringComparer.Ordinal);
+
         private readonly Dictionary<string, List<ItemDefinition>> manualItemsById =
             new Dictionary<string, List<ItemDefinition>>(StringComparer.Ordinal);
 
@@ -65,6 +69,7 @@ namespace TableDataEditor
         private SpriteDataProviderFactories spriteDataProviderFactories;
 
         private bool motionProfilesBuilt;
+        private bool characterMotionProfilesBuilt;
         private bool manualItemsBuilt;
         private bool spriteNamesBuilt;
         private bool itemIconNamesBuilt;
@@ -90,6 +95,37 @@ namespace TableDataEditor
                 if (asset == null) continue;
 
                 Append(motionProfiles, asset.name, asset);
+            }
+        }
+
+        // ---- CharacterMotionProfile ----
+
+        /// <summary>
+        /// <c>motion_profile_key</c>가 가리키는 <b>캐릭터</b> 모션 프로필을 이름 완전 일치로 찾는다.
+        /// 판정 규칙은 <see cref="FindMotionProfile"/>과 글자 그대로 같고 타입만 다르다 -
+        /// <see cref="MonsterMotionProfile"/>과 <see cref="CharacterMotionProfile"/>은 서로 다른
+        /// ScriptableObject라 한 사전에 섞을 수 없고, 섞으면 몬스터 프로필 이름을 적은 캐릭터 행이
+        /// 통과해 버린다.
+        /// </summary>
+        public AssetLookupResult FindCharacterMotionProfile(
+            string assetName, out CharacterMotionProfile profile, out int count)
+        {
+            EnsureCharacterMotionProfiles();
+            return Resolve(characterMotionProfiles, assetName, out profile, out count);
+        }
+
+        private void EnsureCharacterMotionProfiles()
+        {
+            if (characterMotionProfilesBuilt) return;
+            characterMotionProfilesBuilt = true;
+
+            foreach (string guid in AssetDatabase.FindAssets("t:CharacterMotionProfile"))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                var asset = AssetDatabase.LoadAssetAtPath<CharacterMotionProfile>(path);
+                if (asset == null) continue;
+
+                Append(characterMotionProfiles, asset.name, asset);
             }
         }
 
@@ -363,6 +399,15 @@ namespace TableDataEditor
         ///
         /// 키는 <b>에셋이 실제로 들고 있는 ID</b>다(파일 이름이 아니다). 같은 ID가 둘 이상이면
         /// 목록에 그대로 담아 두고, 어느 쪽을 재사용할지는 호출하는 쪽이 오류로 처리한다.
+        ///
+        /// <b>ID가 빈 에셋도 버리지 않는다.</b> 빈 문자열을 키로 하는 그룹에 그대로 담는다 -
+        /// <see cref="SkillDefinition.SkillId"/>나
+        /// <see cref="CharacterSkillDefinition.PairId"/>는 값이 없으면 빈 문자열을 돌려주므로(파일
+        /// 이름으로 대체하지 않는다), 여기서 조용히 걸러 내면 그런 에셋이 생성 폴더에 남아 있어도
+        /// 아무도 알려 주지 않는다. 카탈로그에는 어차피 들어가지 못하고 CSV에도 대응하는 행이 없으니,
+        /// <b>orphan 경고로 사람 눈에 보이는 것</b>이 이 함수가 해야 할 일이다.
+        /// (<see cref="Character.CharacterDefinition.CharacterId"/>처럼 빈 값일 때 에셋 이름을
+        /// 돌려주는 타입은 애초에 빈 키가 나오지 않으므로 이 변경의 영향을 받지 않는다.)
         /// </summary>
         public static Dictionary<string, List<T>> LoadGeneratedById<T>(string folder, Func<T, string> idSelector)
             where T : ScriptableObject
@@ -378,7 +423,7 @@ namespace TableDataEditor
                 if (asset == null) continue;
 
                 string id = idSelector(asset) ?? string.Empty;
-                Append(map, id, asset);
+                AppendAllowingEmptyKey(map, id, asset);
             }
 
             return map;
@@ -408,14 +453,31 @@ namespace TableDataEditor
             return count == 1 ? AssetLookupResult.Found : AssetLookupResult.Ambiguous;
         }
 
+        /// <summary>
+        /// 이름/키가 있는 조회용 사전에 담는다. <b>빈 키는 버린다</b> - 이름이 없는 Sprite나 ID가 없는
+        /// 수동 ItemDefinition은 CSV의 어떤 값과도 짝지을 수 없어서, 담아 두면 "빈 키로 조회"라는
+        /// 있을 수 없는 경로만 생긴다.
+        /// </summary>
         private static void Append<TValue>(Dictionary<string, List<TValue>> map, string key, TValue value)
         {
             if (string.IsNullOrEmpty(key)) return;
 
-            if (!map.TryGetValue(key, out List<TValue> list))
+            AppendAllowingEmptyKey(map, key, value);
+        }
+
+        /// <summary>
+        /// 생성 폴더 목록 전용. <b>빈 키를 하나의 그룹으로 보존한다</b> - 여기서는 "키가 없다"가
+        /// 버릴 이유가 아니라 <b>보고할 사실</b>이기 때문이다(<see cref="LoadGeneratedById{T}"/> 참고).
+        /// </summary>
+        private static void AppendAllowingEmptyKey<TValue>(
+            Dictionary<string, List<TValue>> map, string key, TValue value)
+        {
+            string normalized = key ?? string.Empty;
+
+            if (!map.TryGetValue(normalized, out List<TValue> list))
             {
                 list = new List<TValue>();
-                map[key] = list;
+                map[normalized] = list;
             }
 
             list.Add(value);

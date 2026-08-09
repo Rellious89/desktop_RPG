@@ -20,12 +20,18 @@ namespace TableDataEditor
         public const string ItemCsvFileName = "Item.csv";
         public const string MonsterCsvFileName = "Monster.csv";
         public const string DungeonCsvFileName = "Dungeon.csv";
+        public const string CharacterCsvFileName = "Character.csv";
+        public const string SkillCsvFileName = "Skill.csv";
+        public const string CharacterSkillCsvFileName = "CharacterSkill.csv";
 
         public const string WorldCsvPath = InputRoot + "/" + WorldCsvFileName;
         public const string CurrencyCsvPath = InputRoot + "/" + CurrencyCsvFileName;
         public const string ItemCsvPath = InputRoot + "/" + ItemCsvFileName;
         public const string MonsterCsvPath = InputRoot + "/" + MonsterCsvFileName;
         public const string DungeonCsvPath = InputRoot + "/" + DungeonCsvFileName;
+        public const string CharacterCsvPath = InputRoot + "/" + CharacterCsvFileName;
+        public const string SkillCsvPath = InputRoot + "/" + SkillCsvFileName;
+        public const string CharacterSkillCsvPath = InputRoot + "/" + CharacterSkillCsvFileName;
 
         /// <summary>
         /// <c>icon_key</c>가 가리키는 아이콘을 찾는 <b>유일한</b> 폴더. 프로젝트 전체에서 이름으로 찾지
@@ -56,6 +62,20 @@ namespace TableDataEditor
         public const string MonsterOutputFolder = OutputRoot + "/Monster";
         public const string DungeonOutputFolder = OutputRoot + "/Dungeon";
 
+        /// <summary>
+        /// 캐릭터/스킬/관계 세 표의 출력 폴더. <b>기존 다섯 도메인과 나란한 형제 폴더</b>이며 서로의
+        /// 안쪽을 절대 건드리지 않는다 - 어떤 정리 동작도 자기 폴더 밖으로 나가지 않는다는 것이 코드로
+        /// 보이는 자리가 여기다.
+        ///
+        /// <b>수동 CharacterDefinition은 여전히 Assets/Data 이하에 있고, 임포터의 출력 대상이 아니다.</b>
+        /// 같은 character_id를 가진 생성 에셋과 수동 에셋이 당분간 함께 존재하는 것은 정상이며 충돌
+        /// 오류가 아니다 - 로스터가 무엇을 쓰는지는 이번 단계에서 바꾸지 않는다.
+        /// </summary>
+        public const string CharacterOutputFolder = OutputRoot + "/Character";
+
+        public const string SkillOutputFolder = OutputRoot + "/Skill";
+        public const string CharacterSkillOutputFolder = OutputRoot + "/CharacterSkill";
+
         /// <summary>생성 에셋 파일 이름의 고정 접두사. 원본 ID를 그대로 뒤에 붙인다 - <b>ID 자체는
         /// 절대 바꾸지 않는다</b>. ID가 <see cref="TableDataFieldRules.IdPatternText"/>(양의 정수 또는
         /// snake_case)만 허용되므로 접두사와 합쳐도 파일 이름은 항상 안전하고, 서로 다른 ID가 같은
@@ -66,12 +86,18 @@ namespace TableDataEditor
         public const string ItemAssetPrefix = "Item_";
         public const string MonsterAssetPrefix = "Monster_";
         public const string DungeonAssetPrefix = "Dungeon_";
+        public const string CharacterAssetPrefix = "Character_";
+        public const string SkillAssetPrefix = "Skill_";
+        public const string CharacterSkillAssetPrefix = "CharacterSkill_";
 
         public const string WorldCatalogAssetName = "WorldCatalog";
         public const string CurrencyCatalogAssetName = "CurrencyCatalog";
         public const string ItemCatalogAssetName = "ItemCatalog";
         public const string MonsterCatalogAssetName = "MonsterCatalog";
         public const string DungeonCatalogAssetName = "DungeonCatalog";
+        public const string CharacterCatalogAssetName = "CharacterCatalog";
+        public const string SkillCatalogAssetName = "SkillCatalog";
+        public const string CharacterSkillCatalogAssetName = "CharacterSkillCatalog";
 
         public static string WorldAssetPath(string worldId)
         {
@@ -100,6 +126,28 @@ namespace TableDataEditor
             return DungeonOutputFolder + "/" + DungeonAssetPrefix + dungeonId + ".asset";
         }
 
+        /// <summary>캐릭터 생성 에셋의 경로. <b>CSV에 적힌 character_id를 한 글자도 바꾸지 않고</b>
+        /// 파일 이름에 붙인다 - 캐릭터 id는 표준 ID(양의 정수 / snake_case)이거나 기존 6종의 legacy
+        /// PascalCase라, 둘 다 파일 이름에 그대로 쓸 수 있는 글자만으로 이루어져 있다.</summary>
+        public static string CharacterAssetPath(string characterId)
+        {
+            return CharacterOutputFolder + "/" + CharacterAssetPrefix + characterId + ".asset";
+        }
+
+        public static string SkillAssetPath(string skillId)
+        {
+            return SkillOutputFolder + "/" + SkillAssetPrefix + skillId + ".asset";
+        }
+
+        /// <summary>관계 생성 에셋의 경로. 파일 이름은 <c>CharacterSkill_&lt;character_id&gt;__&lt;skill_id&gt;</c>
+        /// 이며, 구분자가 밑줄 두 개인 이유는
+        /// <see cref="Skill.CharacterSkillDefinition.PairIdSeparator"/>에 적어 두었다 - 서로 다른 짝이
+        /// 같은 파일 이름이 되는 경우가 없다.</summary>
+        public static string CharacterSkillAssetPath(string pairId)
+        {
+            return CharacterSkillOutputFolder + "/" + CharacterSkillAssetPrefix + pairId + ".asset";
+        }
+
         public static string WorldCatalogAssetPath => WorldOutputFolder + "/" + WorldCatalogAssetName + ".asset";
 
         public static string CurrencyCatalogAssetPath => CurrencyOutputFolder + "/" + CurrencyCatalogAssetName + ".asset";
@@ -109,5 +157,13 @@ namespace TableDataEditor
         public static string MonsterCatalogAssetPath => MonsterOutputFolder + "/" + MonsterCatalogAssetName + ".asset";
 
         public static string DungeonCatalogAssetPath => DungeonOutputFolder + "/" + DungeonCatalogAssetName + ".asset";
+
+        public static string CharacterCatalogAssetPath =>
+            CharacterOutputFolder + "/" + CharacterCatalogAssetName + ".asset";
+
+        public static string SkillCatalogAssetPath => SkillOutputFolder + "/" + SkillCatalogAssetName + ".asset";
+
+        public static string CharacterSkillCatalogAssetPath =>
+            CharacterSkillOutputFolder + "/" + CharacterSkillCatalogAssetName + ".asset";
     }
 }

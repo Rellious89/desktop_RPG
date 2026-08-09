@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Character;
 using Enemy;
 using UnityEngine;
 
@@ -158,14 +159,94 @@ namespace TableDataEditor
     }
 
     /// <summary>
-    /// 파싱과 검증을 마친 다섯 표. Rebuild는 이 스냅샷만 보고 에셋을 만든다 - CSV를 다시 읽지 않으므로
+    /// Character.csv 한 행. <b>character_id는 저장 데이터(SaveData.characters)의 키</b>라
+    /// <see cref="ItemRow.Id"/>와 같은 무게를 가진다 - 값을 다듬거나 대체하는 경로는 어디에도 없다.
+    ///
+    /// <b>진행 상태는 여기에 없다.</b> 표가 말하는 것은 "이 게임에 어떤 캐릭터가 있는가"이고,
+    /// 레벨과 현재 행동력은 저장 데이터의 몫이다.
+    /// </summary>
+    public sealed class CharacterRow
+    {
+        public int Line;
+        public string Id = string.Empty;
+        public LocalizedEntryRef Name;
+
+        /// <summary>이 캐릭터의 모션 데이터 원천. 활성/비활성과 무관하게 <b>필수</b>이며, 재생 가능한
+        /// Base Idle이 있는 것까지 확인한 프로필만 여기까지 온다.</summary>
+        public CharacterMotionProfile MotionProfile;
+
+        /// <summary>직접 지정한 초상화. 비어 있으면 런타임이 Base Idle 첫 프레임을 대신 쓴다.</summary>
+        public Sprite Portrait;
+
+        /// <summary>기본 최대 체력을 <b>표에서 지정했는지</b>. false면 <see cref="BaseMaxHealth"/>는 0이며,
+        /// 그것은 "체력 0"이 아니라 "아직 정하지 않았다"는 뜻이다.</summary>
+        public bool HasBaseMaxHealth;
+
+        public int BaseMaxHealth;
+
+        public int MaxStamina = 1;
+        public int DisplayOrder;
+        public bool Enabled;
+    }
+
+    /// <summary>
+    /// Skill.csv 한 행. <b>동작에 관한 값은 하나도 없다</b> - 분류 키와 동작 키는 문자열일 뿐이고,
+    /// 그것을 실제 동작으로 바꾸는 코드는 이 단계에 존재하지 않는다.
+    /// </summary>
+    public sealed class SkillRow
+    {
+        public int Line;
+        public string Id = string.Empty;
+        public LocalizedEntryRef Name;
+
+        /// <summary>설명 참조. <b>선택 항목</b>이라 해석되지 않은 채로 남을 수 있다.</summary>
+        public LocalizedEntryRef Description;
+
+        public Sprite Icon;
+
+        /// <summary>분류 키. 비어 있을 수 있고, 값이 있으면 소문자 키 형식을 만족한다.</summary>
+        public string SkillType = string.Empty;
+
+        /// <summary>동작 키. 비어 있을 수 있고, 값이 있으면 소문자 키 형식을 만족한다.</summary>
+        public string BehaviorKey = string.Empty;
+
+        public int DisplayOrder;
+        public bool Enabled;
+    }
+
+    /// <summary>
+    /// CharacterSkill.csv 한 행 - "이 캐릭터가 이 스킬을 가진다"는 관계 하나.
+    ///
+    /// <b>양쪽 id는 반드시 표에 실재해야 한다.</b> Character.csv와 Skill.csv가 이 표보다 먼저 읽히므로,
+    /// 참조를 확인할 때 스냅샷은 이미 완성되어 있다.
+    /// </summary>
+    public sealed class CharacterSkillRow
+    {
+        public int Line;
+        public string CharacterId = string.Empty;
+        public string SkillId = string.Empty;
+
+        /// <summary>두 id를 이은 관계 키. 중복 검사와 생성 에셋 이름에 쓴다.</summary>
+        public string PairId = string.Empty;
+
+        /// <summary>표에 적힌 필요 캐릭터 레벨. 1 이상만 여기까지 오며 <b>상한은 없다</b>.</summary>
+        public int RequiredCharacterLevel = 1;
+
+        public int DisplayOrder;
+        public bool Enabled;
+    }
+
+    /// <summary>
+    /// 파싱과 검증을 마친 여덟 표. Rebuild는 이 스냅샷만 보고 에셋을 만든다 - CSV를 다시 읽지 않으므로
     /// "검증한 내용"과 "쓰는 내용"이 어긋날 수 없다.
     ///
-    /// 목록의 순서는 <b>World → Currency → Item → Monster → Dungeon</b>이고, 이것이 검증과 생성
-    /// 순서이기도 하다. 뒤의 표가 앞의 표를 참조하므로(Monster는 Currency와 Item을, Dungeon은 Item과
-    /// Monster를 가리킨다), 가리켜지는 표가 언제나 먼저 온다. Currency를 Item보다 앞에 둔 것은 재화가
+    /// 목록의 순서는 <b>World → Currency → Item → Monster → Dungeon → Character → Skill →
+    /// CharacterSkill</b>이고, 이것이 검증과 생성 순서이기도 하다. 뒤의 표가 앞의 표를 참조하므로
+    /// (Monster는 Currency와 Item을, Dungeon은 Item과 Monster를, CharacterSkill은 Character와 Skill을
+    /// 가리킨다), 가리켜지는 표가 언제나 먼저 온다. Currency를 Item보다 앞에 둔 것은 재화가
     /// 무엇도 참조하지 않는 가장 바깥 표라서다 - 아이템/몬스터가 재화를 가리키게 되어도 순서를 다시
-    /// 뒤집을 필요가 없다.
+    /// 뒤집을 필요가 없다. 캐릭터 쪽 세 표를 <b>뒤에 붙인</b> 것도 같은 이유다 - 이 셋은 앞의 다섯 표를
+    /// 하나도 참조하지 않으므로, 앞의 순서를 건드리지 않고 그대로 이어 붙일 수 있다.
     ///
     /// <b>모든 id 사전은 <see cref="StringComparer.Ordinal"/>이다.</b> 대소문자도 문화권 규칙도
     /// 끼어들지 않는 정확한 문자열 비교여야, CSV에 적힌 id와 조회에 쓰는 id가 같다는 것이 보장된다.
@@ -177,11 +258,25 @@ namespace TableDataEditor
         public readonly List<ItemRow> Items = new List<ItemRow>();
         public readonly List<MonsterRow> Monsters = new List<MonsterRow>();
         public readonly List<DungeonRow> Dungeons = new List<DungeonRow>();
+        public readonly List<CharacterRow> Characters = new List<CharacterRow>();
+        public readonly List<SkillRow> Skills = new List<SkillRow>();
+        public readonly List<CharacterSkillRow> CharacterSkills = new List<CharacterSkillRow>();
 
         public readonly Dictionary<string, WorldRow> WorldsById = new Dictionary<string, WorldRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, CurrencyRow> CurrenciesById = new Dictionary<string, CurrencyRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, ItemRow> ItemsById = new Dictionary<string, ItemRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, MonsterRow> MonstersById = new Dictionary<string, MonsterRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, DungeonRow> DungeonsById = new Dictionary<string, DungeonRow>(StringComparer.Ordinal);
+
+        public readonly Dictionary<string, CharacterRow> CharactersById =
+            new Dictionary<string, CharacterRow>(StringComparer.Ordinal);
+
+        public readonly Dictionary<string, SkillRow> SkillsById =
+            new Dictionary<string, SkillRow>(StringComparer.Ordinal);
+
+        /// <summary>관계는 <b>짝</b>이 키다 - 한 캐릭터가 여러 스킬을, 한 스킬이 여러 캐릭터를 가질 수
+        /// 있으므로 어느 한쪽 id로는 행을 특정할 수 없다.</summary>
+        public readonly Dictionary<string, CharacterSkillRow> CharacterSkillsByPairId =
+            new Dictionary<string, CharacterSkillRow>(StringComparer.Ordinal);
     }
 }

@@ -31,6 +31,80 @@ namespace TableDataEditor
         }
 
         /// <summary>
+        /// 소문자 키 형식. ID 형식에서 <b>숫자만으로 이루어진 형태를 뺀</b> 것으로, 소문자로 시작하고
+        /// 소문자/숫자와 밑줄 구분만 쓴다. 분류 키(<c>skill_type</c>)나 동작 키(<c>behavior_key</c>)처럼
+        /// "사람이 읽는 낱말"이어야 하는 칸에 쓴다 - 이런 칸에 <c>1</c> 같은 값이 들어가면 나중에
+        /// 그 키를 무엇으로 읽어야 할지 알 수 없다.
+        /// </summary>
+        public const string LowercaseKeyPatternText = "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$";
+
+        private static readonly Regex LowercaseKeyPattern =
+            new Regex(LowercaseKeyPatternText, RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// <b>Character.csv 전용</b>으로 예외를 인정하는 기존 캐릭터 id 여섯 개. 이 id들은 저장
+        /// 데이터와 씬의 로스터가 이미 쓰고 있는 값이라 <b>한 글자도 바꿀 수 없다</b> - snake_case로
+        /// 고치는 순간 기존 저장 항목과의 연결이 끊긴다.
+        ///
+        /// <b>여기 적힌 여섯 개만 예외다.</b> 다른 PascalCase는 전부 형식 오류이며(테스트용
+        /// <c>IceMage</c> / <c>Leopard</c>도 포함된다), 이 목록이 늘어나는 일도 없어야 한다 - 새로
+        /// 만드는 캐릭터는 표준 ID 형식을 쓴다. 예외를 표준 규칙 쪽에 넣지 않고 이 표에만 두는 이유는,
+        /// <see cref="IdPatternText"/>를 조금이라도 느슨하게 만들면 다섯 개 기존 표의 id 검사가 함께
+        /// 헐거워지기 때문이다.
+        /// </summary>
+        public static readonly string[] LegacyCharacterIds =
+        {
+            "Barbarian", "CatKnight", "CatMage", "ElfArcher", "ElfGuardian", "RabbitHealer",
+        };
+
+        private static readonly HashSet<string> LegacyCharacterIdSet =
+            new HashSet<string>(LegacyCharacterIds, StringComparer.Ordinal);
+
+        /// <summary>소문자 키 형식을 만족하는지. 빈 값은 false다(비어도 되는지는 호출하는 쪽이 정한다).</summary>
+        public static bool IsValidLowercaseKey(string value)
+        {
+            return !string.IsNullOrEmpty(value) && LowercaseKeyPattern.IsMatch(value);
+        }
+
+        /// <summary>
+        /// Character.csv의 id로 쓸 수 있는 값인지. <b>표준 ID이거나, 예외로 인정한 기존 여섯 개
+        /// 중 하나</b>여야 한다. 비교는 <see cref="StringComparer.Ordinal"/> 완전 일치이며
+        /// <b>값을 다듬거나 대소문자를 맞추지 않는다</b> - 'catknight'는 'CatKnight'가 아니다.
+        /// </summary>
+        public static bool IsValidCharacterId(string value)
+        {
+            return IsValidId(value) || (!string.IsNullOrEmpty(value) && LegacyCharacterIdSet.Contains(value));
+        }
+
+        /// <summary>
+        /// Character.csv의 필수 id 칸을 읽는다. 규칙은 <see cref="TryReadRequiredId"/>와 같고
+        /// 허용 집합만 <see cref="IsValidCharacterId"/>로 넓다 - <b>값은 어떤 경우에도 고치지 않는다</b>.
+        /// </summary>
+        public static bool TryReadRequiredCharacterId(
+            string file, int line, string column, string raw, TableDataDiagnosticLog log, out string id)
+        {
+            id = raw ?? string.Empty;
+
+            if (id.Length == 0)
+            {
+                log.Error(file, line, column, id, "필수 ID가 비어 있습니다.");
+                return false;
+            }
+
+            if (!IsValidCharacterId(id))
+            {
+                log.Error(file, line, column, id,
+                    $"character_id 형식이 맞지 않습니다 - {IdPatternText} 를 만족하거나, " +
+                    "기존 캐릭터 id(" + string.Join(", ", LegacyCharacterIds) + ") 중 하나와 " +
+                    "정확히 같아야 합니다(대소문자를 구분하며 앞뒤 공백은 쓸 수 없습니다). " +
+                    "값은 자동으로 고치지 않습니다.");
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// 필수 ID 칸을 읽는다. 비어 있으면 오류, 형식이 다르면 오류이며 <b>값을 다듬지 않는다</b> -
         /// 앞뒤 공백이 있는 ID는 형식 오류로 걸린다(공백을 떼고 통과시키면 CSV와 에셋의 ID가 달라진다).
         /// </summary>
@@ -86,6 +160,68 @@ namespace TableDataEditor
             log.Error(file, line, column, raw ?? string.Empty,
                 "정수가 아닙니다 - 부호 없는/있는 10진 정수만 허용하며 공백이나 천 단위 구분 기호는 쓸 수 없습니다.");
             value = 0;
+            return false;
+        }
+
+        /// <summary>
+        /// 하한이 있는 정수 칸. 정수로 읽히지 않거나 하한보다 작으면 <b>둘 다 오류</b>이며, 값을
+        /// 하한으로 끌어올려 통과시키지 않는다 - 보정해 넘기면 CSV에 적힌 값과 에셋의 값이 달라진다
+        /// (Monster.csv의 max_durability가 경고 후 런타임 보정에 맡기는 것과 <b>다른</b> 판정이다.
+        /// 그쪽은 이미 그 규칙으로 쓰이고 있어 바꾸지 않았고, 새로 만드는 칸은 처음부터 오류로 막는다).
+        /// </summary>
+        public static bool TryReadIntAtLeast(
+            string file, int line, string column, string raw, int minimum,
+            TableDataDiagnosticLog log, out int value)
+        {
+            if (!TryReadInt(file, line, column, raw, log, out value)) return false;
+
+            if (value >= minimum) return true;
+
+            log.Error(file, line, column, raw ?? string.Empty,
+                $"{minimum} 이상이어야 합니다 - 값을 자동으로 올려 통과시키지 않습니다.");
+            value = 0;
+            return false;
+        }
+
+        /// <summary>
+        /// 비어 있어도 되는 정수 칸. <b>빈 칸과 값이 있는 칸은 서로 다른 상태</b>라, 빈 칸을 0으로
+        /// 바꿔 읽지 않고 <paramref name="hasValue"/>로 구분해 돌려준다 - "아직 정하지 않았다"가
+        /// 데이터에서 사라지지 않게 하기 위함이다. 값이 있으면 하한 검사까지 한다.
+        /// </summary>
+        public static bool TryReadOptionalIntAtLeast(
+            string file, int line, string column, string raw, int minimum,
+            TableDataDiagnosticLog log, out bool hasValue, out int value)
+        {
+            hasValue = false;
+            value = 0;
+
+            if (string.IsNullOrEmpty(raw)) return true;
+
+            if (!TryReadIntAtLeast(file, line, column, raw, minimum, log, out value)) return false;
+
+            hasValue = true;
+            return true;
+        }
+
+        /// <summary>
+        /// 비어 있어도 되는 소문자 키 칸. 비어 있으면 빈 문자열을 돌려주고 아무것도 알리지 않는다 -
+        /// "아직 분류를 정하지 않았다"는 정상적인 상태다. 값이 있으면
+        /// <see cref="LowercaseKeyPatternText"/>를 정확히 만족해야 하며, <b>대소문자를 맞추거나 공백을
+        /// 떼어 통과시키지 않는다</b>.
+        /// </summary>
+        public static bool TryReadOptionalLowercaseKey(
+            string file, int line, string column, string raw, TableDataDiagnosticLog log, out string key)
+        {
+            key = raw ?? string.Empty;
+            if (key.Length == 0) return true;
+
+            if (IsValidLowercaseKey(key)) return true;
+
+            log.Error(file, line, column, key,
+                $"키 형식이 맞지 않습니다 - {LowercaseKeyPatternText} 를 정확히 만족해야 합니다" +
+                "(소문자로 시작하고 소문자/숫자와 밑줄 구분만 쓰며, 숫자만으로 이루어질 수 없고 " +
+                "앞뒤 공백도 쓸 수 없습니다). 값은 자동으로 고치지 않습니다.");
+            key = string.Empty;
             return false;
         }
 
