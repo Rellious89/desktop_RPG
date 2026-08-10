@@ -11,7 +11,8 @@
     "RabbitHealer": { "world": "ANIMAL-LAND-01" },
     "Barbarian": { "world": "FANTASIA" },
     "ElfArcher": { "world": "FANTASIA" },
-    "ElfGuardian": { "world": "FANTASIA" }
+    "ElfGuardian": { "world": "FANTASIA" },
+    "Werewolf": { "allowRepeatedHitRecovery": true, "hitRecoveryReason": "리소스 퀄리티 문제로 Hold와 Recovery에 같은 프레임을 의도적으로 사용" }
   },
   "plannedActors": [
     { "id": "DogShieldWarrior", "displayName": "강아지 방패전사", "type": "Player", "world": "ANIMAL-LAND-01", "lifecycle": "Hold", "sourcePath": "ProjectDocs/WorldBuilding/ANIMAL-LAND-01-world-expansion-draft.md", "notes": "Existing concept on hold", "approval": "Concept hold" },

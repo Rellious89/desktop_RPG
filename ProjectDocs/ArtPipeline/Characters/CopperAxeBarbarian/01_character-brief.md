@@ -1,7 +1,16 @@
 # CopperAxeBarbarian — Character Brief
 
-> 상태: C형 2등신 + B형 장비 가독성의 PerfectPixel 재시험 후보
-> 작업명이며 최종 캐릭터 이름은 Master Design 승인 전 변경할 수 있다.
+> 상태: 기존 생산 Master v1 복구 완료 / C형+B형 이미지는 향후 V2 재시험 후보
+> 작업명과 기존 캐릭터 정체성은 유지하며 V2 후보는 별도 승인 전까지 v1을 대체하지 않는다.
+
+## Approved Legacy Master
+
+```text
+Assets/Art/Character/Barbarian/master/Barbarian-master-v1.png
+```
+
+데스크탑 keybuddy 생산 폴더에서 복구한 현행 런타임 계보의 Master다. 아래 C형+B형 설계는 기존 v1을
+무효화하지 않는 향후 V2 후보 기준이다.
 
 ## 기본 정보
 

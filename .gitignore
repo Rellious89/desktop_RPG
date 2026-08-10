@@ -61,6 +61,14 @@ sysinfo.txt
 *.unitypackage
 *.app
 
+# Local production tracker app bundle (source files only; signatures stay local)
+!Tools/ActorProductionTracker/Actor Production Tracker.app/
+!Tools/ActorProductionTracker/Actor Production Tracker.app/Contents/
+!Tools/ActorProductionTracker/Actor Production Tracker.app/Contents/Info.plist
+!Tools/ActorProductionTracker/Actor Production Tracker.app/Contents/MacOS/
+!Tools/ActorProductionTracker/Actor Production Tracker.app/Contents/MacOS/ActorProductionTracker
+Tools/ActorProductionTracker/Actor Production Tracker.app/Contents/_CodeSignature/
+
 # Crashlytics generated file
 crashlytics-build.properties
 

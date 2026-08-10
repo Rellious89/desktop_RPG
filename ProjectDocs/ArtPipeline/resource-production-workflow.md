@@ -300,11 +300,12 @@ PerfectPixel에서는 애니메이션 단위로 여러 프레임을 생성한다
 
 1. Player 1종 Character Brief 승인
 2. Player Master Design 및 측정값 승인
-3. Player Idle, Idle Variant, Tier 1, Tier 2 Motion Brief 승인
+3. Player Idle, Idle Variant, 기본 공격 A와 기본 공격 B Motion Brief 승인
 4. Enemy 1종 Character Brief와 Master Design 승인
 5. Enemy Idle, Hit Hold/Recovery Motion Brief 승인
 6. PerfectPixel 생성·후보정·Unity 연결
 7. 50/100/150 Stage 배율, 접지, HitPoint, ImpactPoint 검증 후 다음 Actor 착수
 
 현재 규칙상 `CommittedSkill`은 미구현이므로, 1차 생산의 Tier 2를 독립적인 스킬 상태머신 전제로
-설계하지 않는다. 현행 콤보 풀에서 재생 가능한 공격 리소스로 설계한다.
+설계하지 않는다. 공격 A/B는 모두 현행 기본 공격 구조로 재생하며 Tier 1 풀은 A, Tier 2 풀은 A+B로
+구성한다. 최종 출시 단계의 Tier 3 풀은 A+B+C를 목표로 한다.

@@ -1,5 +1,8 @@
 # RabbitHealer — Character Sheet
 
+> Legacy source sheet. 현재 제작 진입점은 [`00_package-index.md`](./00_package-index.md)이며, 정리된 설정은
+> [`01_character-brief.md`](./01_character-brief.md)를 사용한다.
+
 - Display name: 토끼힐러 / RabbitHealer
 - Type: character · World: `ANIMAL-LAND-01` v1
 - Aliases: None

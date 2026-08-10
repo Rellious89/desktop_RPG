@@ -1,6 +1,6 @@
 # BlackCatMage — Character Brief
 
-> 상태: `Low Companion v1` Master 재생성 대기. 고밀도 비교 실험은 종료했다.
+> 상태: 기존 생산 Master v1 복구 완료. 고밀도 비교 실험은 종료했다.
 
 ## 정체성
 
@@ -55,6 +55,15 @@ ProjectDocs/ArtPipeline/Characters/CopperAxeBarbarian/Prototypes/class-lineup-03
 | B–C 후보 | `Assets/Art/Character/BlackCatMage/master/BlackCatMage-master-bc-v1.png` | 비교 기록. 현행 Low Companion v1과 다른 마감 밀도 |
 | Lineup-aligned 후보 | `Assets/Art/Character/BlackCatMage/master/BlackCatMage-master-lineup-v1.png` | 비교 기록. 현행 Low Companion v1과 다른 마감 밀도 |
 | Low Companion v1 | `Assets/Art/Character/BlackCatMage/master/BlackCatMage-master-low-v2.png` | 새 생산 후보. 생성 후 PerfectPixel Idle로 검증 |
+
+## Approved Legacy Master
+
+```text
+Assets/Art/Character/CatMage/master/CatMage-master-v1.png
+```
+
+데스크탑 keybuddy 생산 폴더에서 복구한 현행 런타임 계보의 Master다. 위 표의 과거 경로들은 파일이 현재
+작업 트리에 없으므로 비교 이력으로만 유지한다.
 
 ## 아직 확정하지 않은 것
 

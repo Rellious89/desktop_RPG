@@ -1,0 +1,17 @@
+#!/bin/zsh
+
+set -u
+
+project_root="/Users/rellious/Rell_Dev/desktopRPG/desktop_RPG"
+tracker_dir="${project_root}/Tools/ActorProductionTracker"
+log_file="${TMPDIR:-/tmp}/actor-production-tracker.log"
+scan_command="node '${tracker_dir}/scan.mjs'"
+
+if ! /bin/zsh -lic "${scan_command}" >"${log_file}" 2>&1; then
+  /usr/bin/open "${log_file}"
+  exit 1
+fi
+
+if [[ "${ACTOR_TRACKER_NO_OPEN:-0}" != "1" ]]; then
+  /usr/bin/open "${tracker_dir}/dashboard.html"
+fi

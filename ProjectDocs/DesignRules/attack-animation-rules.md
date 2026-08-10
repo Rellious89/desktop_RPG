@@ -37,6 +37,27 @@ Idle
 - 콤보 티어별 공격 모션은 `ComboTierAttackPool` 에셋을 통해 선택한다. Tier 3 풀은 비어 있을 경우 Tier 2 → Tier 1 순으로 폴백하고, Tier 2는 Tier 1로 폴백한다.
 - `PlayerCharacterAnimator`의 레거시 `attack` 필드는 Tier 1 풀을 아직 연결하지 않은 기존 씬의 하위 호환용이다. 새 리소스는 `tier1Pool`/`tier2Pool` 에셋에 등록한다.
 
+#### 공격 모션 Tier의 의미와 누적 풀 규칙
+
+Tier는 공격의 강도나 스킬 등급이 아니라 **현재 기본 공격에서 선택할 수 있는 서로 다른 공격 모션의 누적
+개수**를 뜻한다. 각 모션은 같은 기본 공격의 시각적 변형이며, Tier가 올라갈 때 새 모션 한 종류를 추가한다.
+
+```text
+Tier 1 Pool = Attack A
+Tier 2 Pool = Attack A + Attack B
+Tier 3 Pool = Attack A + Attack B + Attack C
+```
+
+- Attack A/B/C는 모두 기본 공격이며 하나가 다른 하나보다 강하다는 뜻이 아니다.
+- 각 모션은 캐릭터의 전투 방식 안에서 준비·타격·복귀 자세만 다르게 만든다.
+- 최종 출시 품질 목표는 플레이어 캐릭터당 기본 공격 모션 3종, 즉 Tier 3 풀까지다.
+- 현재 제작 단계에서는 일부 캐릭터만 Tier 2까지 시험하며 Tier 3를 필수 공백으로 취급하지 않는다.
+- `ComboTierAttackPool`은 하위 모션을 자동으로 합치지 않는다. 따라서 Tier 2 에셋에 A와 B를 모두, Tier 3
+  에셋에 A/B/C를 모두 직접 등록한다.
+- 풀 안에서는 현재 구현대로 모션을 균등 랜덤 선택하며 직전 모션과 같은 결과도 허용한다.
+- 상위 풀이 비어 있을 때만 기존 폴백 규칙(Tier 3 → Tier 2 → Tier 1)을 사용한다.
+- 공격 B/C를 강공격, 필살기 또는 `CommittedSkill` 전제로 설계하지 않는다.
+
 #### `queueExpireTimeout` 동작 (시간값 점검 결과 반영)
 
 - 입력 큐(`pendingAttacks`)는 단순 카운터다. **입력 하나하나에 개별 만료시간을 두지 않는다.**

@@ -1,7 +1,8 @@
 window.ACTOR_PRODUCTION_DATA = {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "readOnly": true,
   "root": ".",
+  "scanRevision": "b332b864d789",
   "profiles": {
     "Player Basic": {
       "required": [
@@ -50,13 +51,57 @@ window.ACTOR_PRODUCTION_DATA = {
       ]
     }
   },
+  "recommendations": [
+    {
+      "id": "Barbarian",
+      "score": 110,
+      "reasons": [
+        "필수 애니메이션 공백: Attack B (Tier 2)"
+      ],
+      "immediateAction": "필수 애니메이션 프레임 제작",
+      "followUp": "Attack B (Tier 2) 프레임"
+    },
+    {
+      "id": "CatMage",
+      "score": 110,
+      "reasons": [
+        "필수 애니메이션 공백: Attack B (Tier 2)"
+      ],
+      "immediateAction": "필수 애니메이션 프레임 제작",
+      "followUp": "Attack B (Tier 2) 프레임"
+    },
+    {
+      "id": "RabbitHealer",
+      "score": 110,
+      "reasons": [
+        "필수 애니메이션 공백: Attack B (Tier 2)"
+      ],
+      "immediateAction": "필수 애니메이션 프레임 제작",
+      "followUp": "Attack B (Tier 2) 프레임"
+    }
+  ],
+  "stageCounts": {
+    "Candidate": 26,
+    "Brief": 7,
+    "Master": 0,
+    "Animation": 3,
+    "Unity": 0,
+    "Ready": 3,
+    "Hold": 2,
+    "Test": 3
+  },
   "summary": {
     "total": 44,
     "active": 13,
     "animationRequirementsReady": 10,
     "withRequiredGaps": 3,
-    "packageComplete": 0,
-    "runtimeConnected": 13,
+    "packageComplete": 5,
+    "runtimeConnected": 10,
+    "attackPoolsConnected": 3,
+    "activePlayers": 6,
+    "enemyRuntimeReady": 7,
+    "enemyMotionQualityReady": 7,
+    "activeEnemies": 7,
     "candidate": 26,
     "test": 3,
     "hold": 2,
@@ -93,6 +138,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
@@ -100,6 +146,7 @@ window.ACTOR_PRODUCTION_DATA = {
         "missingRequired": [],
         "missingOptional": []
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {},
       "packageChecklist": {
         "index": false,
@@ -107,16 +154,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": null,
+        "attackPools": null,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -150,12 +244,59 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
         "observed": [],
         "missingRequired": [],
         "missingOptional": []
+      },
+      "attackPoolAudit": {
+        "requiredTiers": [],
+        "connected": true,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
       },
       "assetMotionCounts": {},
       "packageChecklist": {
@@ -164,16 +305,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": false,
+        "attackPools": true,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": false,
+            "attackPools": true,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -199,6 +387,181 @@ window.ACTOR_PRODUCTION_DATA = {
         "plannedPaths": []
       },
       "evidence": {
+        "anyImage": [
+          {
+            "path": "Assets/Art/Character/Barbarian/attack/Barbarian-attack-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Barbarian/attack/Barbarian-attack-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Barbarian/attack/Barbarian-attack-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Barbarian/idle_a/Barbarian-idle_a-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Barbarian/idle_a/Barbarian-idle_a-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Barbarian/idle_a/Barbarian-idle_a-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Barbarian/idle_a/Barbarian-idle_a-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Barbarian/idle_b/Barbarian-idle_b-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Barbarian/idle_b/Barbarian-idle_b-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Barbarian/idle_b/Barbarian-idle_b-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Barbarian/idle_b/Barbarian-idle_b-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Barbarian/idle/Barbarian-idle-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Barbarian/idle/Barbarian-idle-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Barbarian/idle/Barbarian-idle-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Barbarian/idle/Barbarian-idle-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Barbarian/master/Barbarian-master-v1.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": null
+          }
+        ],
         "tier1": [
           {
             "path": "Assets/Art/Character/Barbarian/attack/Barbarian-attack-00.png",
@@ -369,6 +732,16 @@ window.ACTOR_PRODUCTION_DATA = {
               "pivot": "(0.5, 0.1)"
             }
           }
+        ],
+        "master": [
+          {
+            "path": "Assets/Art/Character/Barbarian/master/Barbarian-master-v1.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": null
+          }
         ]
       },
       "observations": [],
@@ -377,26 +750,29 @@ window.ACTOR_PRODUCTION_DATA = {
       ],
       "assetType": "Player",
       "package": {
-        "index": null,
+        "index": "ProjectDocs/ArtPipeline/Characters/CopperAxeBarbarian/00_package-index.md",
         "brief": "ProjectDocs/ArtPipeline/Characters/CopperAxeBarbarian/01_character-brief.md",
-        "perfectPixel": "ProjectDocs/ArtPipeline/Characters/CopperAxeBarbarian/05_perfectpixel-attempt-log.md",
-        "measurements": null,
+        "perfectPixel": "ProjectDocs/ArtPipeline/Characters/CopperAxeBarbarian/02_perfectpixel-input.md",
+        "measurements": "ProjectDocs/ArtPipeline/Characters/CopperAxeBarbarian/03_master-measurements.md",
         "motionDocs": [
           "ProjectDocs/ArtPipeline/Characters/CopperAxeBarbarian/04_motion-idle.md",
-          "ProjectDocs/ArtPipeline/Characters/CopperAxeBarbarian/04_motion-idle_a.md"
+          "ProjectDocs/ArtPipeline/Characters/CopperAxeBarbarian/04_motion-idle_a.md",
+          "ProjectDocs/ArtPipeline/Characters/CopperAxeBarbarian/04_motion-tier1.md",
+          "ProjectDocs/ArtPipeline/Characters/CopperAxeBarbarian/04_motion-tier2.md"
         ],
         "prototypes": true,
         "masterFiles": [
           "ProjectDocs/ArtPipeline/Characters/CopperAxeBarbarian/References/CopperAxeBarbarian-master-input-v2-padded.png",
           "ProjectDocs/ArtPipeline/Characters/CopperAxeBarbarian/References/CopperAxeBarbarian-master-input-v3-c-hybrid-512.png"
         ],
-        "status": "Unknown"
+        "status": "Master Approved"
       },
       "definitionId": "Barbarian",
       "type": "Player",
       "lifecycle": "Active",
       "world": "FANTASIA",
       "profile": "Player Basic",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [
           "baseIdle",
@@ -410,8 +786,10 @@ window.ACTOR_PRODUCTION_DATA = {
           "master"
         ],
         "observed": [
+          "anyImage",
           "baseIdle",
           "idleVariant",
+          "master",
           "tier1"
         ],
         "missingRequired": [
@@ -419,32 +797,140 @@ window.ACTOR_PRODUCTION_DATA = {
         ],
         "missingOptional": [
           "tier3",
-          "portrait",
-          "master"
+          "portrait"
         ]
       },
+      "attackPoolAudit": {
+        "requiredTiers": [
+          "tier1",
+          "tier2"
+        ],
+        "connected": false,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": "931938485082748e18ea6c383e6cd1fd",
+            "poolPath": "Assets/Data/MotionProfiles/Characters/Barbarian/Barbarian_Tier1AttackPool.asset",
+            "referenced": true,
+            "motionCount": 1,
+            "playableCount": 1,
+            "motions": [
+              {
+                "guid": "c1c9674c1f825493abe3aae9c8870663",
+                "path": "Assets/Data/MotionProfiles/Characters/Barbarian/Barbarian_attack.asset",
+                "name": "Barbarian_attack",
+                "frameCount": 3,
+                "frameSignature": "e5950061ab53a44eb941258701ecf317:4c1bc6667634a481ba3d0ba65b63f01e:bab3f95e814b64aa3a697479b6f86d2a",
+                "playable": true
+              }
+            ],
+            "includesLower": true,
+            "newMotionCount": 1,
+            "cumulative": true,
+            "status": "ready"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": false,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": false,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
+      },
       "assetMotionCounts": {
+        "anyImage": 16,
         "baseIdle": 4,
         "idleVariant": 8,
+        "master": 1,
         "tier1": 3
       },
       "packageChecklist": {
-        "index": false,
+        "index": true,
         "brief": true,
         "perfectPixelInput": true,
-        "measurements": false,
+        "measurements": true,
         "motionBrief": true,
-        "status": "Unknown"
+        "status": "Master Approved",
+        "master": true
       },
       "runtimeChecklist": {
         "motionProfile": true,
+        "profilePlayable": null,
         "characterDefinition": true,
+        "attackPools": false,
         "table": null
       },
-      "packageComplete": false,
-      "runtimeConnected": true,
+      "packageComplete": true,
+      "runtimeConnected": false,
       "completeness": 67,
-      "nextAction": "제작 패키지 인덱스 작성",
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 100,
+          "done": 6,
+          "total": 6,
+          "complete": true,
+          "checklist": {
+            "index": true,
+            "brief": true,
+            "perfectPixelInput": true,
+            "measurements": true,
+            "motionBrief": true,
+            "status": "Master Approved",
+            "master": true
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": 67,
+          "done": 2,
+          "total": 3,
+          "applicable": true,
+          "missing": [
+            "tier2"
+          ]
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 67,
+          "done": 2,
+          "total": 3,
+          "applicable": true,
+          "complete": false,
+          "checklist": {
+            "motionProfile": true,
+            "profilePlayable": null,
+            "characterDefinition": true,
+            "attackPools": false,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": "Assets/Art/Character/Barbarian/master/Barbarian-master-v1.png",
+      "thumbnailKind": "master",
+      "stage": "Animation",
+      "nextAction": "필수 애니메이션 프레임 제작",
       "importProfile": "V1"
     },
     {
@@ -477,12 +963,59 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
         "observed": [],
         "missingRequired": [],
         "missingOptional": []
+      },
+      "attackPoolAudit": {
+        "requiredTiers": [],
+        "connected": true,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
       },
       "assetMotionCounts": {},
       "packageChecklist": {
@@ -491,16 +1024,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": false,
+        "attackPools": true,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": false,
+            "attackPools": true,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -534,12 +1114,59 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
         "observed": [],
         "missingRequired": [],
         "missingOptional": []
+      },
+      "attackPoolAudit": {
+        "requiredTiers": [],
+        "connected": true,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
       },
       "assetMotionCounts": {},
       "packageChecklist": {
@@ -548,16 +1175,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": false,
+        "attackPools": true,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": false,
+            "attackPools": true,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -579,6 +1253,261 @@ window.ACTOR_PRODUCTION_DATA = {
         "plannedPaths": []
       },
       "evidence": {
+        "anyImage": [
+          {
+            "path": "Assets/Art/Character/CatKnight/attack_tier1/Cat-knight-attack_tier1-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/attack_tier1/Cat-knight-attack_tier1-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/attack_tier1/Cat-knight-attack_tier1-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/attack_tier2/Cat-knight-attack_tier2-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/attack_tier2/Cat-knight-attack_tier2-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/attack_tier2/Cat-knight-attack_tier2-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/idle_a/Cat-knight-idle_a-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/idle_a/Cat-knight-idle_a-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/idle_a/Cat-knight-idle_a-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/idle_a/Cat-knight-idle_a-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/idle_b/Cat-knight-idle_b-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/idle_b/Cat-knight-idle_b-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/idle_b/Cat-knight-idle_b-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/idle_c/Cat-knight-idle_c-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/idle_c/Cat-knight-idle_c-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/idle_c/Cat-knight-idle_c-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/idle_c/Cat-knight-idle_c-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/idle_c/Cat-knight-idle_c-04.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/idle_c/Cat-knight-idle_c-05.png",
+            "size": {
+              "width": 182,
+              "height": 182
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/idle/Cat-knight-idle-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/idle/Cat-knight-idle-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/idle/Cat-knight-idle-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatKnight/idle/Cat-knight-idle-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          }
+        ],
         "tier1": [
           {
             "path": "Assets/Art/Character/CatKnight/attack_tier1/Cat-knight-attack_tier1-00.png",
@@ -849,6 +1778,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Active",
       "world": "ANIMAL-LAND-01",
       "profile": "Player Basic",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [
           "baseIdle",
@@ -862,6 +1792,7 @@ window.ACTOR_PRODUCTION_DATA = {
           "master"
         ],
         "observed": [
+          "anyImage",
           "baseIdle",
           "idleVariant",
           "tier1",
@@ -874,7 +1805,83 @@ window.ACTOR_PRODUCTION_DATA = {
           "master"
         ]
       },
+      "attackPoolAudit": {
+        "requiredTiers": [
+          "tier1",
+          "tier2"
+        ],
+        "connected": true,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": "58e789b616554da690b8e287516a0fe4",
+            "poolPath": "Assets/Data/CatKnight/CatKnight_Tier1AttackPool.asset",
+            "referenced": true,
+            "motionCount": 1,
+            "playableCount": 1,
+            "motions": [
+              {
+                "guid": "5f728f81380b4dfc83ae4072b24580c5",
+                "path": "Assets/Data/CatKnight/CatKnight_BasicAttack_A.asset",
+                "name": "CatKnight_BasicAttack_A",
+                "frameCount": 3,
+                "frameSignature": "c33f718582be41a5a3a6a744411a5aab:331ec9194c474153ba79a102a97dfa6d:34866bf00b8846768783d3263645aa4d",
+                "playable": true
+              }
+            ],
+            "includesLower": true,
+            "newMotionCount": 1,
+            "cumulative": true,
+            "status": "ready"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": "5b0086c1a12343fc8c99cc976eee1fac",
+            "poolPath": "Assets/Data/CatKnight/CatKnight_Tier2AttackPool.asset",
+            "referenced": true,
+            "motionCount": 2,
+            "playableCount": 2,
+            "motions": [
+              {
+                "guid": "5f728f81380b4dfc83ae4072b24580c5",
+                "path": "Assets/Data/CatKnight/CatKnight_BasicAttack_A.asset",
+                "name": "CatKnight_BasicAttack_A",
+                "frameCount": 3,
+                "frameSignature": "c33f718582be41a5a3a6a744411a5aab:331ec9194c474153ba79a102a97dfa6d:34866bf00b8846768783d3263645aa4d",
+                "playable": true
+              },
+              {
+                "guid": "26870bd48d13493fbdfa0cf441a0cc5d",
+                "path": "Assets/Data/CatKnight/CatKnight_BoostAttack_A.asset",
+                "name": "CatKnight_BoostAttack_A",
+                "frameCount": 3,
+                "frameSignature": "5ecf45081ed7048a392b151da133510e:8d06084f68d8d4063b7ae44359be880d:d2152bd0049d24618bf7050587979682",
+                "playable": true
+              }
+            ],
+            "includesLower": true,
+            "newMotionCount": 1,
+            "cumulative": true,
+            "status": "ready"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": false,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
+      },
       "assetMotionCounts": {
+        "anyImage": 23,
         "baseIdle": 4,
         "idleVariant": 13,
         "tier1": 3,
@@ -886,16 +1893,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": true,
+        "profilePlayable": null,
         "characterDefinition": true,
+        "attackPools": true,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": true,
       "completeness": 100,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "complete": true,
+          "checklist": {
+            "motionProfile": true,
+            "profilePlayable": null,
+            "characterDefinition": true,
+            "attackPools": true,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": "Assets/Art/Character/CatKnight/idle/Cat-knight-idle-00.png",
+      "thumbnailKind": "baseIdle",
+      "stage": "Brief",
       "nextAction": "제작 패키지 인덱스 작성",
       "importProfile": "V1"
     },
@@ -921,6 +1975,181 @@ window.ACTOR_PRODUCTION_DATA = {
         "plannedPaths": []
       },
       "evidence": {
+        "anyImage": [
+          {
+            "path": "Assets/Art/Character/CatMage/cast/BlackCatMage-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatMage/cast/BlackCatMage-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatMage/cast/BlackCatMage-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatMage/idle_a/BlackCatMage-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatMage/idle_a/BlackCatMage-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatMage/idle_a/BlackCatMage-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatMage/idle_a/BlackCatMage-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatMage/idle_b/BlackCatMage-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatMage/idle_b/BlackCatMage-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatMage/idle_b/BlackCatMage-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatMage/idle_b/BlackCatMage-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatMage/idle/BlackCatMage-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatMage/idle/BlackCatMage-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatMage/idle/BlackCatMage-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatMage/idle/BlackCatMage-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/CatMage/master/CatMage-master-v1.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": null
+          }
+        ],
         "tier1": [
           {
             "path": "Assets/Art/Character/CatMage/cast/BlackCatMage-frame-00.png",
@@ -1091,6 +2320,16 @@ window.ACTOR_PRODUCTION_DATA = {
               "pivot": "(0.5, 0.1)"
             }
           }
+        ],
+        "master": [
+          {
+            "path": "Assets/Art/Character/CatMage/master/CatMage-master-v1.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": null
+          }
         ]
       },
       "observations": [],
@@ -1099,20 +2338,25 @@ window.ACTOR_PRODUCTION_DATA = {
       ],
       "assetType": "Player",
       "package": {
-        "index": null,
+        "index": "ProjectDocs/ArtPipeline/Characters/BlackCatMage/00_package-index.md",
         "brief": "ProjectDocs/ArtPipeline/Characters/BlackCatMage/01_character-brief.md",
         "perfectPixel": "ProjectDocs/ArtPipeline/Characters/BlackCatMage/02_perfectpixel-input.md",
-        "measurements": null,
-        "motionDocs": [],
-        "prototypes": false,
+        "measurements": "ProjectDocs/ArtPipeline/Characters/BlackCatMage/03_master-measurements.md",
+        "motionDocs": [
+          "ProjectDocs/ArtPipeline/Characters/BlackCatMage/04_motion-idle.md",
+          "ProjectDocs/ArtPipeline/Characters/BlackCatMage/04_motion-tier1.md",
+          "ProjectDocs/ArtPipeline/Characters/BlackCatMage/04_motion-tier2.md"
+        ],
+        "prototypes": true,
         "masterFiles": [],
-        "status": "Unknown"
+        "status": "Master Approved"
       },
       "definitionId": "CatMage",
       "type": "Player",
       "lifecycle": "Active",
       "world": "ANIMAL-LAND-01",
       "profile": "Player Basic",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [
           "baseIdle",
@@ -1126,8 +2370,10 @@ window.ACTOR_PRODUCTION_DATA = {
           "master"
         ],
         "observed": [
+          "anyImage",
           "baseIdle",
           "idleVariant",
+          "master",
           "tier1"
         ],
         "missingRequired": [
@@ -1135,32 +2381,140 @@ window.ACTOR_PRODUCTION_DATA = {
         ],
         "missingOptional": [
           "tier3",
-          "portrait",
-          "master"
+          "portrait"
         ]
       },
+      "attackPoolAudit": {
+        "requiredTiers": [
+          "tier1",
+          "tier2"
+        ],
+        "connected": false,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": "9776e529858094c7497231c2faefa602",
+            "poolPath": "Assets/Data/MotionProfiles/Characters/CatMage/CatMage_Tier1AttackPool.asset",
+            "referenced": true,
+            "motionCount": 1,
+            "playableCount": 1,
+            "motions": [
+              {
+                "guid": "95fe9a7fea658410daec604cb12dd0a3",
+                "path": "Assets/Data/MotionProfiles/Characters/CatMage/CatMage_Attack.asset",
+                "name": "CatMage_Attack",
+                "frameCount": 3,
+                "frameSignature": "47878abb1145a4e2b9c93a3f3b2eb1e5:f65962854081348f08321d8dac5a2362:a471184ba0b7f443ea77032e21cc7e69",
+                "playable": true
+              }
+            ],
+            "includesLower": true,
+            "newMotionCount": 1,
+            "cumulative": true,
+            "status": "ready"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": false,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": false,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
+      },
       "assetMotionCounts": {
+        "anyImage": 16,
         "baseIdle": 4,
         "idleVariant": 8,
+        "master": 1,
         "tier1": 3
       },
       "packageChecklist": {
-        "index": false,
+        "index": true,
         "brief": true,
         "perfectPixelInput": true,
-        "measurements": false,
-        "motionBrief": false,
-        "status": "Unknown"
+        "measurements": true,
+        "motionBrief": true,
+        "status": "Master Approved",
+        "master": true
       },
       "runtimeChecklist": {
         "motionProfile": true,
+        "profilePlayable": null,
         "characterDefinition": true,
+        "attackPools": false,
         "table": null
       },
-      "packageComplete": false,
-      "runtimeConnected": true,
+      "packageComplete": true,
+      "runtimeConnected": false,
       "completeness": 67,
-      "nextAction": "제작 패키지 인덱스 작성",
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 100,
+          "done": 6,
+          "total": 6,
+          "complete": true,
+          "checklist": {
+            "index": true,
+            "brief": true,
+            "perfectPixelInput": true,
+            "measurements": true,
+            "motionBrief": true,
+            "status": "Master Approved",
+            "master": true
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": 67,
+          "done": 2,
+          "total": 3,
+          "applicable": true,
+          "missing": [
+            "tier2"
+          ]
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 67,
+          "done": 2,
+          "total": 3,
+          "applicable": true,
+          "complete": false,
+          "checklist": {
+            "motionProfile": true,
+            "profilePlayable": null,
+            "characterDefinition": true,
+            "attackPools": false,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": "Assets/Art/Character/CatMage/master/CatMage-master-v1.png",
+      "thumbnailKind": "master",
+      "stage": "Animation",
+      "nextAction": "필수 애니메이션 프레임 제작",
       "importProfile": "V1"
     },
     {
@@ -1193,6 +2547,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
@@ -1200,6 +2555,7 @@ window.ACTOR_PRODUCTION_DATA = {
         "missingRequired": [],
         "missingOptional": []
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {},
       "packageChecklist": {
         "index": false,
@@ -1207,16 +2563,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": null,
+        "attackPools": null,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -1250,6 +2653,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Hold",
       "world": "ANIMAL-LAND-01",
       "profile": "Hold Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [
           "baseIdle",
@@ -1275,6 +2679,55 @@ window.ACTOR_PRODUCTION_DATA = {
           "master"
         ]
       },
+      "attackPoolAudit": {
+        "requiredTiers": [
+          "tier1",
+          "tier2"
+        ],
+        "connected": false,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
+      },
       "assetMotionCounts": {},
       "packageChecklist": {
         "index": false,
@@ -1282,16 +2735,67 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": false,
+        "attackPools": false,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": 0,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": 0,
+          "done": 0,
+          "total": 3,
+          "applicable": true,
+          "missing": [
+            "baseIdle",
+            "tier1",
+            "tier2"
+          ]
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 0,
+          "done": 0,
+          "total": 3,
+          "applicable": true,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": false,
+            "attackPools": false,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Hold",
       "nextAction": "보류: 누락은 표시하지만 우선순위에서 제외",
       "importProfile": "unknown"
     },
@@ -1324,12 +2828,59 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
         "observed": [],
         "missingRequired": [],
         "missingOptional": []
+      },
+      "attackPoolAudit": {
+        "requiredTiers": [],
+        "connected": true,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
       },
       "assetMotionCounts": {},
       "packageChecklist": {
@@ -1338,16 +2889,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": false,
+        "attackPools": true,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": false,
+            "attackPools": true,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -1381,12 +2979,59 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
         "observed": [],
         "missingRequired": [],
         "missingOptional": []
+      },
+      "attackPoolAudit": {
+        "requiredTiers": [],
+        "connected": true,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
       },
       "assetMotionCounts": {},
       "packageChecklist": {
@@ -1395,16 +3040,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": false,
+        "attackPools": true,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": false,
+            "attackPools": true,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -1426,6 +3118,261 @@ window.ACTOR_PRODUCTION_DATA = {
         "plannedPaths": []
       },
       "evidence": {
+        "anyImage": [
+          {
+            "path": "Assets/Art/Character/ElfArcher/attack_t2/ElfArcher-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/attack_t2/ElfArcher-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/attack_t2/ElfArcher-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/attack_t2/ElfArcher-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/attack_t2/ElfArcher-frame-04.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/attack/ElfArcher-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/attack/ElfArcher-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/attack/ElfArcher-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/idle_a/ElfArcher-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/idle_a/ElfArcher-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/idle_a/ElfArcher-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/idle_a/ElfArcher-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/idle_a/ElfArcher-frame-04.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/idle_b/ElfArcher-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/idle_b/ElfArcher-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/idle_b/ElfArcher-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/idle_b/ElfArcher-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/idle_b/ElfArcher-frame-04.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/idle_b/ElfArcher-frame-05.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/idle/ElfArcher-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/idle/ElfArcher-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/idle/ElfArcher-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfArcher/idle/ElfArcher-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          }
+        ],
         "tier1": [
           {
             "path": "Assets/Art/Character/ElfArcher/attack/ElfArcher-frame-00.png",
@@ -1696,6 +3643,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Active",
       "world": "FANTASIA",
       "profile": "Player Basic",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [
           "baseIdle",
@@ -1709,6 +3657,7 @@ window.ACTOR_PRODUCTION_DATA = {
           "master"
         ],
         "observed": [
+          "anyImage",
           "baseIdle",
           "idleVariant",
           "tier1",
@@ -1721,7 +3670,83 @@ window.ACTOR_PRODUCTION_DATA = {
           "master"
         ]
       },
+      "attackPoolAudit": {
+        "requiredTiers": [
+          "tier1",
+          "tier2"
+        ],
+        "connected": true,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": "f8e1bf7a261ff4424a4f67a8c4cfb397",
+            "poolPath": "Assets/Data/MotionProfiles/Characters/ElfArcher/ElfArcher_Tier1AttackPool.asset",
+            "referenced": true,
+            "motionCount": 1,
+            "playableCount": 1,
+            "motions": [
+              {
+                "guid": "7cdefd9f104bb4097a2d70a7683b731c",
+                "path": "Assets/Data/MotionProfiles/Characters/ElfArcher/ElfArcher_attack.asset",
+                "name": "ElfArcher_attack",
+                "frameCount": 3,
+                "frameSignature": "ec22e1d359ed64bef82ffa38cabc2598:eaac5d366023b44729816d053ab8a175:492cbc58763bb4640936e318bc9efc46",
+                "playable": true
+              }
+            ],
+            "includesLower": true,
+            "newMotionCount": 1,
+            "cumulative": true,
+            "status": "ready"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": "eaf26c1e25bd24d0aafe0353c15afc01",
+            "poolPath": "Assets/Data/MotionProfiles/Characters/ElfArcher/ElfArcher_Tier2AttackPool.asset",
+            "referenced": true,
+            "motionCount": 2,
+            "playableCount": 2,
+            "motions": [
+              {
+                "guid": "37f08cdfa9af9431d8c76b1ffa2d2adf",
+                "path": "Assets/Data/MotionProfiles/Characters/ElfArcher/ElfArcher_Attack_t2_1.asset",
+                "name": "ElfArcher_Attack_t2_1",
+                "frameCount": 3,
+                "frameSignature": "ec22e1d359ed64bef82ffa38cabc2598:eaac5d366023b44729816d053ab8a175:492cbc58763bb4640936e318bc9efc46",
+                "playable": true
+              },
+              {
+                "guid": "10759f39e06e84e59a40510cb12a7bee",
+                "path": "Assets/Data/MotionProfiles/Characters/ElfArcher/ElfArcher_Attack_t2_2.asset",
+                "name": "ElfArcher_Attack_t2_2",
+                "frameCount": 5,
+                "frameSignature": "869d011cb1eba46cfb5a81f089cc6997:cac3c2df9369847beba31705b92a75fb:08a21273f98374d82af9e52e287958ea:05ff33ad429c54223ad2a972bb723d8a:b1032856fa145449989b85666cc37843",
+                "playable": true
+              }
+            ],
+            "includesLower": true,
+            "newMotionCount": 1,
+            "cumulative": true,
+            "status": "ready"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": false,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
+      },
       "assetMotionCounts": {
+        "anyImage": 23,
         "baseIdle": 4,
         "idleVariant": 11,
         "tier1": 3,
@@ -1733,16 +3758,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": true,
+        "profilePlayable": null,
         "characterDefinition": true,
+        "attackPools": true,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": true,
       "completeness": 100,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "complete": true,
+          "checklist": {
+            "motionProfile": true,
+            "profilePlayable": null,
+            "characterDefinition": true,
+            "attackPools": true,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": "Assets/Art/Character/ElfArcher/idle/ElfArcher-frame-00.png",
+      "thumbnailKind": "baseIdle",
+      "stage": "Brief",
       "nextAction": "제작 패키지 인덱스 작성",
       "importProfile": "V1"
     },
@@ -1768,6 +3840,371 @@ window.ACTOR_PRODUCTION_DATA = {
         "plannedPaths": []
       },
       "evidence": {
+        "anyImage": [
+          {
+            "path": "Assets/Art/Character/ElfGuardian/attack_T2/Elfguardian-frame-00.png",
+            "size": {
+              "width": 256,
+              "height": 256
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/attack_T2/Elfguardian-frame-01.png",
+            "size": {
+              "width": 256,
+              "height": 256
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/attack_T2/Elfguardian-frame-02.png",
+            "size": {
+              "width": 256,
+              "height": 256
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/attack/Elfguardian-frame-00.png",
+            "size": {
+              "width": 256,
+              "height": 256
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/attack/Elfguardian-frame-01.png",
+            "size": {
+              "width": 256,
+              "height": 256
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/attack/Elfguardian-frame-02.png",
+            "size": {
+              "width": 256,
+              "height": 256
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/concept/LeafGlaiveElf-concept-v5-reset.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/idle/Elfguardian-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/idle/Elfguardian-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/idle/Elfguardian-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/idle/Elfguardian-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v1-chromakey-source.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v1-chromakey.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v1-proportion-draft.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v1-transparent-source.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v1.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v2-chromakey-source.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v2-chromakey.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v2-transparent-source.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v2.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v3-chromakey-source.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v3-chromakey.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v3-transparent-source.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v3.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v4-chromakey-source.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v4-chromakey.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v4-transparent-source.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v4.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v5-chromakey-source.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v5-chromakey.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v5-transparent-source.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v5.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v6.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          }
+        ],
         "tier1": [
           {
             "path": "Assets/Art/Character/ElfGuardian/attack/Elfguardian-frame-00.png",
@@ -2131,7 +4568,8 @@ window.ACTOR_PRODUCTION_DATA = {
       },
       "observations": [],
       "warnings": [
-        "Alias mapping: LeafGlaiveElf → ElfGuardian"
+        "Alias mapping: LeafGlaiveElf → ElfGuardian",
+        "Unreferenced attack pool assets: Assets/Data/MotionProfiles/Characters/ElfGuardian/ElfGuardian_Tier2AttackPool.asset"
       ],
       "assetType": "Player",
       "package": {
@@ -2149,6 +4587,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Active",
       "world": "FANTASIA",
       "profile": "Player Basic",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [
           "baseIdle",
@@ -2162,6 +4601,7 @@ window.ACTOR_PRODUCTION_DATA = {
           "master"
         ],
         "observed": [
+          "anyImage",
           "baseIdle",
           "master",
           "tier1",
@@ -2174,7 +4614,89 @@ window.ACTOR_PRODUCTION_DATA = {
           "portrait"
         ]
       },
+      "attackPoolAudit": {
+        "requiredTiers": [
+          "tier1",
+          "tier2"
+        ],
+        "connected": true,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": "88883ad4e6d8b4765b5c145a19c37efd",
+            "poolPath": "Assets/Data/MotionProfiles/Characters/ElfGuardian/ElfGuardian_Tier1AttackPool.asset",
+            "referenced": true,
+            "motionCount": 1,
+            "playableCount": 1,
+            "motions": [
+              {
+                "guid": "ef776ddf711874e7989f834af3fe7bd7",
+                "path": "Assets/Data/MotionProfiles/Characters/ElfGuardian/ElfGuardian_Attack.asset",
+                "name": "ElfGuardian_Attack",
+                "frameCount": 3,
+                "frameSignature": "8be684b22648d49de970aa67b67b94ea:03fa25d6ebeb84131a03c464a8bee414:7cb42d8020567491894e961871d3ef1b",
+                "playable": true
+              }
+            ],
+            "includesLower": true,
+            "newMotionCount": 1,
+            "cumulative": true,
+            "status": "ready"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": "60d0b04bb36da4d168fd71059509bd66",
+            "poolPath": "Assets/Data/MotionProfiles/Characters/ElfGuardian/ElfGuardian_Tier2AttackPool 1.asset",
+            "referenced": true,
+            "motionCount": 2,
+            "playableCount": 2,
+            "motions": [
+              {
+                "guid": "95f91174f0da1416b871bc2c42c57671",
+                "path": "Assets/Data/MotionProfiles/Characters/ElfGuardian/ElfGuardian_Attack_T2_1.asset",
+                "name": "ElfGuardian_Attack_T2_1",
+                "frameCount": 3,
+                "frameSignature": "8be684b22648d49de970aa67b67b94ea:03fa25d6ebeb84131a03c464a8bee414:7cb42d8020567491894e961871d3ef1b",
+                "playable": true
+              },
+              {
+                "guid": "4c7246a3756364997ae21b03d6ab3ac5",
+                "path": "Assets/Data/MotionProfiles/Characters/ElfGuardian/ElfGuardian_Attack_T2_2.asset",
+                "name": "ElfGuardian_Attack_T2_2",
+                "frameCount": 3,
+                "frameSignature": "036c31a4c35c94bbf89ab3f8a4a984ee:92e8716e73de64743aa7c4a0d93541a6:9d5d08e393fd9430887cd0851b61f1df",
+                "playable": true
+              }
+            ],
+            "includesLower": true,
+            "newMotionCount": 1,
+            "cumulative": true,
+            "status": "ready"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": false,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": [
+          {
+            "path": "Assets/Data/MotionProfiles/Characters/ElfGuardian/ElfGuardian_Tier2AttackPool.asset",
+            "motionCount": 0,
+            "motions": []
+          }
+        ]
+      },
       "assetMotionCounts": {
+        "anyImage": 33,
         "baseIdle": 4,
         "master": 22,
         "tier1": 3,
@@ -2186,16 +4708,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": true,
         "motionBrief": false,
-        "status": "Unknown"
+        "status": "Unknown",
+        "master": true
       },
       "runtimeChecklist": {
         "motionProfile": true,
+        "profilePlayable": null,
         "characterDefinition": true,
+        "attackPools": true,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": true,
       "completeness": 100,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 50,
+          "done": 3,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": true,
+            "perfectPixelInput": false,
+            "measurements": true,
+            "motionBrief": false,
+            "status": "Unknown",
+            "master": true
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "complete": true,
+          "checklist": {
+            "motionProfile": true,
+            "profilePlayable": null,
+            "characterDefinition": true,
+            "attackPools": true,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": "Assets/Art/Character/ElfGuardian/master/LeafGlaiveElf-master-v1-proportion-draft.png",
+      "thumbnailKind": "master",
+      "stage": "Ready",
       "nextAction": "제작 패키지 인덱스 작성",
       "importProfile": "V1"
     },
@@ -2228,12 +4797,59 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
         "observed": [],
         "missingRequired": [],
         "missingOptional": []
+      },
+      "attackPoolAudit": {
+        "requiredTiers": [],
+        "connected": true,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
       },
       "assetMotionCounts": {},
       "packageChecklist": {
@@ -2242,16 +4858,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": false,
+        "attackPools": true,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": false,
+            "attackPools": true,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -2285,12 +4948,59 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
         "observed": [],
         "missingRequired": [],
         "missingOptional": []
+      },
+      "attackPoolAudit": {
+        "requiredTiers": [],
+        "connected": true,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
       },
       "assetMotionCounts": {},
       "packageChecklist": {
@@ -2299,16 +5009,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": false,
+        "attackPools": true,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": false,
+            "attackPools": true,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -2342,6 +5099,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
@@ -2349,6 +5107,7 @@ window.ACTOR_PRODUCTION_DATA = {
         "missingRequired": [],
         "missingOptional": []
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {},
       "packageChecklist": {
         "index": false,
@@ -2356,16 +5115,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": null,
+        "attackPools": null,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -2387,6 +5193,228 @@ window.ACTOR_PRODUCTION_DATA = {
         "plannedPaths": []
       },
       "evidence": {
+        "anyImage": [
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/hit/HyenaRaider-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/hit/HyenaRaider-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/idle_a/HyenaRaider-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/idle_a/HyenaRaider-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/idle_a/HyenaRaider-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/idle_a/HyenaRaider-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/idle_b/HyenaRaider-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/idle_b/HyenaRaider-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/idle_b/HyenaRaider-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/idle_b/HyenaRaider-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/idle/HyenaRaider-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/idle/HyenaRaider-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/idle/HyenaRaider-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/idle/HyenaRaider-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/master/HyenaRaider-master-v1-84px-chromakey.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/master/HyenaRaider-master-v1-84px-logical.png",
+            "size": {
+              "width": 170,
+              "height": 170
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/master/HyenaRaider-master-v1-84px.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/master/HyenaRaider-master-v1-source-chromakey.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/master/HyenaRaider-master-v1-source.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/HyenaRaider/Portrait/Portrait_HyenaRaider.png",
+            "size": {
+              "width": 64,
+              "height": 64
+            },
+            "meta": {
+              "ppu": "200",
+              "pivot": "(0.5, 0.078)"
+            }
+          }
+        ],
         "portrait": [
           {
             "path": "Assets/Art/Enemy/HyenaRaider/Portrait/Portrait_HyenaRaider.png",
@@ -2401,17 +5429,6 @@ window.ACTOR_PRODUCTION_DATA = {
           }
         ],
         "hitHold": [
-          {
-            "path": "Assets/Art/Enemy/HyenaRaider/hit/HyenaRaider-frame-00.png",
-            "size": {
-              "width": 128,
-              "height": 128
-            },
-            "meta": {
-              "ppu": "50",
-              "pivot": "(0.5, 0.1)"
-            }
-          },
           {
             "path": "Assets/Art/Enemy/HyenaRaider/hit/HyenaRaider-frame-01.png",
             "size": {
@@ -2619,7 +5636,7 @@ window.ACTOR_PRODUCTION_DATA = {
         ],
         "hitRecovery": [
           {
-            "path": "Assets/Art/Enemy/HyenaRaider/hit/HyenaRaider-frame-01.png",
+            "path": "Assets/Art/Enemy/HyenaRaider/hit/HyenaRaider-frame-00.png",
             "size": {
               "width": 128,
               "height": 128
@@ -2637,13 +5654,136 @@ window.ACTOR_PRODUCTION_DATA = {
       "table": {
         "path": "Assets/TableData/Game/Monster.csv",
         "key": "HyenaRaider_MotionProfile",
+        "motionProfileKey": "HyenaRaider_MotionProfile",
+        "monsterId": "5",
+        "displayName": "하이에나라이더",
         "world": "1",
-        "worldName": "애니멀랜드"
+        "worldName": "애니멀랜드",
+        "previewSpriteKey": "Portrait_HyenaRaider",
+        "enabled": true,
+        "displayOrder": 50
       },
       "type": "Enemy",
       "lifecycle": "Active",
       "world": "1 애니멀랜드",
       "profile": "Passive Enemy",
+      "enemyRuntimeAudit": {
+        "profilePath": "Assets/Data/MotionProfiles/Monsters/HyenaRaider/HyenaRaider_MotionProfile.asset",
+        "displayName": "HyenaRaider",
+        "resourceFolderPath": "Assets/Art/Enemy/HyenaRaider",
+        "resourceFolderMatches": true,
+        "baseIdle": {
+          "field": "baseIdle",
+          "frameCount": 4,
+          "uniqueFrameCount": 4,
+          "frameGuids": [
+            "aaa8311a833cf419583a81abb0c43a49",
+            "32b59663a77f54bd6a0b6b158dd8af8b",
+            "50a698f23d872465bbf4ba153fef0947",
+            "466ac670bb7754dbd8c24b7ca30f0a3f"
+          ],
+          "framePaths": [
+            "Assets/Art/Enemy/HyenaRaider/idle/HyenaRaider-frame-00.png",
+            "Assets/Art/Enemy/HyenaRaider/idle/HyenaRaider-frame-01.png",
+            "Assets/Art/Enemy/HyenaRaider/idle/HyenaRaider-frame-02.png",
+            "Assets/Art/Enemy/HyenaRaider/idle/HyenaRaider-frame-03.png"
+          ],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": true
+        },
+        "idleEvents": [
+          {
+            "name": "idle a",
+            "frameCount": 4,
+            "uniqueFrameCount": 4,
+            "frameGuids": [
+              "6ebfff81d02cd470f82b6729ee3d7fbe",
+              "aab10471d27b946a9bc3e857ed670bfe",
+              "1716c8f7621dd40c880721c77fce4d58",
+              "9aa0df2acc03d4cdfb9b087383de5b5e"
+            ],
+            "framePaths": [
+              "Assets/Art/Enemy/HyenaRaider/idle_a/HyenaRaider-frame-00.png",
+              "Assets/Art/Enemy/HyenaRaider/idle_a/HyenaRaider-frame-01.png",
+              "Assets/Art/Enemy/HyenaRaider/idle_a/HyenaRaider-frame-02.png",
+              "Assets/Art/Enemy/HyenaRaider/idle_a/HyenaRaider-frame-03.png"
+            ],
+            "unresolvedGuids": [],
+            "fps": 6,
+            "playable": true
+          },
+          {
+            "name": "idle b",
+            "frameCount": 4,
+            "uniqueFrameCount": 4,
+            "frameGuids": [
+              "cb182e61340114880a084b6d9759be98",
+              "4d4258792ac3c445ab83cc1cb3ea43a9",
+              "3607b27c404b34d259cd17063d91420e",
+              "96ab092737e5a495981feddc72e74772"
+            ],
+            "framePaths": [
+              "Assets/Art/Enemy/HyenaRaider/idle_b/HyenaRaider-frame-00.png",
+              "Assets/Art/Enemy/HyenaRaider/idle_b/HyenaRaider-frame-01.png",
+              "Assets/Art/Enemy/HyenaRaider/idle_b/HyenaRaider-frame-02.png",
+              "Assets/Art/Enemy/HyenaRaider/idle_b/HyenaRaider-frame-03.png"
+            ],
+            "unresolvedGuids": [],
+            "fps": 6,
+            "playable": true
+          }
+        ],
+        "hit": {
+          "field": "hit",
+          "frameCount": 2,
+          "uniqueFrameCount": 2,
+          "frameGuids": [
+            "6aeb59302c9b14df9b56a0291a38d78b",
+            "d70ee8dc6d4434ed79a8da2f4f2f37df"
+          ],
+          "framePaths": [
+            "Assets/Art/Enemy/HyenaRaider/hit/HyenaRaider-frame-01.png",
+            "Assets/Art/Enemy/HyenaRaider/hit/HyenaRaider-frame-00.png"
+          ],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": true
+        },
+        "defeat": {
+          "field": "defeat",
+          "frameCount": 0,
+          "uniqueFrameCount": 0,
+          "frameGuids": [],
+          "framePaths": [],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": false
+        },
+        "hitReaction": {
+          "holdFrame": 0,
+          "recoveryFrame": 1,
+          "holdGuid": "6aeb59302c9b14df9b56a0291a38d78b",
+          "recoveryGuid": "d70ee8dc6d4434ed79a8da2f4f2f37df",
+          "indexesValid": true,
+          "recoveryVisuallyDistinct": true,
+          "repeatedRecoveryAllowed": false,
+          "recoveryAccepted": true,
+          "exceptionReason": null
+        },
+        "defeatMode": "fade-only",
+        "profilePlayable": true,
+        "tableConnected": true,
+        "tableProfileMatches": true,
+        "previewSpriteReady": true,
+        "unreferencedMotionFrames": [],
+        "foreignFrameRefs": [],
+        "motionQualityReady": true,
+        "productionClass": "package-only"
+      },
       "requirements": {
         "required": [
           "baseIdle",
@@ -2656,6 +5796,7 @@ window.ACTOR_PRODUCTION_DATA = {
           "master"
         ],
         "observed": [
+          "anyImage",
           "baseIdle",
           "hitHold",
           "hitRecovery",
@@ -2668,9 +5809,11 @@ window.ACTOR_PRODUCTION_DATA = {
           "death"
         ]
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {
+        "anyImage": 20,
         "baseIdle": 4,
-        "hitHold": 2,
+        "hitHold": 1,
         "hitRecovery": 1,
         "idleVariant": 8,
         "master": 5,
@@ -2682,16 +5825,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": true
       },
       "runtimeChecklist": {
         "motionProfile": true,
+        "profilePlayable": true,
         "characterDefinition": null,
+        "attackPools": null,
         "table": true
       },
       "packageComplete": false,
       "runtimeConnected": true,
       "completeness": 100,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 17,
+          "done": 1,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": true
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "complete": true,
+          "checklist": {
+            "motionProfile": true,
+            "profilePlayable": true,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": true
+          }
+        }
+      },
+      "thumbnailPath": "Assets/Art/Enemy/HyenaRaider/master/HyenaRaider-master-v1-84px-logical.png",
+      "thumbnailKind": "master",
+      "stage": "Brief",
       "nextAction": "제작 패키지 인덱스 작성",
       "importProfile": "V1"
     },
@@ -2725,6 +5915,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
@@ -2732,6 +5923,7 @@ window.ACTOR_PRODUCTION_DATA = {
         "missingRequired": [],
         "missingOptional": []
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {},
       "packageChecklist": {
         "index": false,
@@ -2739,16 +5931,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": null,
+        "attackPools": null,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -2782,6 +6021,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
@@ -2789,6 +6029,7 @@ window.ACTOR_PRODUCTION_DATA = {
         "missingRequired": [],
         "missingOptional": []
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {},
       "packageChecklist": {
         "index": false,
@@ -2796,16 +6037,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": null,
+        "attackPools": null,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -2839,12 +6127,59 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
         "observed": [],
         "missingRequired": [],
         "missingOptional": []
+      },
+      "attackPoolAudit": {
+        "requiredTiers": [],
+        "connected": true,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
       },
       "assetMotionCounts": {},
       "packageChecklist": {
@@ -2853,16 +6188,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": false,
+        "attackPools": true,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": false,
+            "attackPools": true,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -2884,6 +6266,195 @@ window.ACTOR_PRODUCTION_DATA = {
         "plannedPaths": []
       },
       "evidence": {
+        "anyImage": [
+          {
+            "path": "Assets/Art/Enemy/MoleMiner/concept/MoleMiner-concept-v1-chromakey.png",
+            "size": {
+              "width": 1103,
+              "height": 1426
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/MoleMiner/concept/MoleMiner-concept-v2-chromakey.png",
+            "size": {
+              "width": 1103,
+              "height": 1426
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/MoleMiner/hit/MoleMiner-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/MoleMiner/hit/MoleMiner-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/MoleMiner/idle_a/MoleMiner-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/MoleMiner/idle_a/MoleMiner-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/MoleMiner/idle_a/MoleMiner-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/MoleMiner/idle_a/MoleMiner-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/MoleMiner/idle_a/MoleMiner-frame-04.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/MoleMiner/idle_a/MoleMiner-frame-05.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/MoleMiner/idle/MoleMiner-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/MoleMiner/idle/MoleMiner-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/MoleMiner/idle/MoleMiner-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/MoleMiner/idle/MoleMiner-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/MoleMiner/master/MoleMiner-master-v1.png",
+            "size": {
+              "width": 1103,
+              "height": 1426
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/MoleMiner/master/MoleMiner-master-v2.png",
+            "size": {
+              "width": 1103,
+              "height": 1426
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/MoleMiner/Portrait/Portrait_MoleMiner.png",
+            "size": {
+              "width": 64,
+              "height": 64
+            },
+            "meta": {
+              "ppu": "200",
+              "pivot": "(0.5, 0.078)"
+            }
+          }
+        ],
         "portrait": [
           {
             "path": "Assets/Art/Enemy/MoleMiner/Portrait/Portrait_MoleMiner.png",
@@ -2900,17 +6471,6 @@ window.ACTOR_PRODUCTION_DATA = {
         "hitHold": [
           {
             "path": "Assets/Art/Enemy/MoleMiner/hit/MoleMiner-frame-00.png",
-            "size": {
-              "width": 128,
-              "height": 128
-            },
-            "meta": {
-              "ppu": "50",
-              "pivot": "(0.5, 0.1)"
-            }
-          },
-          {
-            "path": "Assets/Art/Enemy/MoleMiner/hit/MoleMiner-frame-01.png",
             "size": {
               "width": 128,
               "height": 128
@@ -3079,13 +6639,120 @@ window.ACTOR_PRODUCTION_DATA = {
       "table": {
         "path": "Assets/TableData/Game/Monster.csv",
         "key": "MoleMiner_MotionProfile",
+        "motionProfileKey": "MoleMiner_MotionProfile",
+        "monsterId": "6",
+        "displayName": "두더지광부",
         "world": "1",
-        "worldName": "애니멀랜드"
+        "worldName": "애니멀랜드",
+        "previewSpriteKey": "Portrait_MoleMiner",
+        "enabled": true,
+        "displayOrder": 60
       },
       "type": "Enemy",
       "lifecycle": "Active",
       "world": "1 애니멀랜드",
       "profile": "Passive Enemy",
+      "enemyRuntimeAudit": {
+        "profilePath": "Assets/Data/MotionProfiles/Monsters/MoleMiner/MoleMiner_MotionProfile.asset",
+        "displayName": "MoleMiner",
+        "resourceFolderPath": "Assets/Art/Enemy/MoleMiner",
+        "resourceFolderMatches": true,
+        "baseIdle": {
+          "field": "baseIdle",
+          "frameCount": 4,
+          "uniqueFrameCount": 4,
+          "frameGuids": [
+            "9bdeacd364be24b1db58a287bc8b2713",
+            "3aa323152bc0f4e0c9ec4e08d376a045",
+            "70a0a47f84a23416b942097ba1e85b1b",
+            "2aa564ece3f0c4bc0be63151f73d7e20"
+          ],
+          "framePaths": [
+            "Assets/Art/Enemy/MoleMiner/idle/MoleMiner-frame-00.png",
+            "Assets/Art/Enemy/MoleMiner/idle/MoleMiner-frame-01.png",
+            "Assets/Art/Enemy/MoleMiner/idle/MoleMiner-frame-02.png",
+            "Assets/Art/Enemy/MoleMiner/idle/MoleMiner-frame-03.png"
+          ],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": true
+        },
+        "idleEvents": [
+          {
+            "name": "idle a",
+            "frameCount": 6,
+            "uniqueFrameCount": 6,
+            "frameGuids": [
+              "e86f62d86a4b745ad88d0b3cc1d47e0c",
+              "97282c1220fb94ef492cbc0e4b96a99f",
+              "b0fb96b0884ea4cad85d92fcefda9816",
+              "1de9171f6ba54413e8ffce18b1931444",
+              "80d2fff42146f4571939e6bceddd5b02",
+              "5b548fc0f95c64fefbd0de1310f70cbe"
+            ],
+            "framePaths": [
+              "Assets/Art/Enemy/MoleMiner/idle_a/MoleMiner-frame-00.png",
+              "Assets/Art/Enemy/MoleMiner/idle_a/MoleMiner-frame-01.png",
+              "Assets/Art/Enemy/MoleMiner/idle_a/MoleMiner-frame-02.png",
+              "Assets/Art/Enemy/MoleMiner/idle_a/MoleMiner-frame-03.png",
+              "Assets/Art/Enemy/MoleMiner/idle_a/MoleMiner-frame-04.png",
+              "Assets/Art/Enemy/MoleMiner/idle_a/MoleMiner-frame-05.png"
+            ],
+            "unresolvedGuids": [],
+            "fps": 6,
+            "playable": true
+          }
+        ],
+        "hit": {
+          "field": "hit",
+          "frameCount": 2,
+          "uniqueFrameCount": 2,
+          "frameGuids": [
+            "36f3aa3282e2f4a56a3b36db4f3e63f5",
+            "ec39be6279ae849f58cd0e91c864e5a8"
+          ],
+          "framePaths": [
+            "Assets/Art/Enemy/MoleMiner/hit/MoleMiner-frame-00.png",
+            "Assets/Art/Enemy/MoleMiner/hit/MoleMiner-frame-01.png"
+          ],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": true
+        },
+        "defeat": {
+          "field": "defeat",
+          "frameCount": 0,
+          "uniqueFrameCount": 0,
+          "frameGuids": [],
+          "framePaths": [],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": false
+        },
+        "hitReaction": {
+          "holdFrame": 0,
+          "recoveryFrame": 1,
+          "holdGuid": "36f3aa3282e2f4a56a3b36db4f3e63f5",
+          "recoveryGuid": "ec39be6279ae849f58cd0e91c864e5a8",
+          "indexesValid": true,
+          "recoveryVisuallyDistinct": true,
+          "repeatedRecoveryAllowed": false,
+          "recoveryAccepted": true,
+          "exceptionReason": null
+        },
+        "defeatMode": "fade-only",
+        "profilePlayable": true,
+        "tableConnected": true,
+        "tableProfileMatches": true,
+        "previewSpriteReady": true,
+        "unreferencedMotionFrames": [],
+        "foreignFrameRefs": [],
+        "motionQualityReady": true,
+        "productionClass": "package-only"
+      },
       "requirements": {
         "required": [
           "baseIdle",
@@ -3098,6 +6765,7 @@ window.ACTOR_PRODUCTION_DATA = {
           "master"
         ],
         "observed": [
+          "anyImage",
           "baseIdle",
           "hitHold",
           "hitRecovery",
@@ -3110,9 +6778,11 @@ window.ACTOR_PRODUCTION_DATA = {
           "death"
         ]
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {
+        "anyImage": 17,
         "baseIdle": 4,
-        "hitHold": 2,
+        "hitHold": 1,
         "hitRecovery": 1,
         "idleVariant": 6,
         "master": 2,
@@ -3124,16 +6794,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": true
       },
       "runtimeChecklist": {
         "motionProfile": true,
+        "profilePlayable": true,
         "characterDefinition": null,
+        "attackPools": null,
         "table": true
       },
       "packageComplete": false,
       "runtimeConnected": true,
       "completeness": 100,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 17,
+          "done": 1,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": true
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "complete": true,
+          "checklist": {
+            "motionProfile": true,
+            "profilePlayable": true,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": true
+          }
+        }
+      },
+      "thumbnailPath": "Assets/Art/Enemy/MoleMiner/master/MoleMiner-master-v1.png",
+      "thumbnailKind": "master",
+      "stage": "Brief",
       "nextAction": "제작 패키지 인덱스 작성",
       "importProfile": "V1"
     },
@@ -3167,6 +6884,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
@@ -3174,6 +6892,7 @@ window.ACTOR_PRODUCTION_DATA = {
         "missingRequired": [],
         "missingOptional": []
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {},
       "packageChecklist": {
         "index": false,
@@ -3181,16 +6900,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": null,
+        "attackPools": null,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -3224,6 +6990,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
@@ -3231,6 +6998,7 @@ window.ACTOR_PRODUCTION_DATA = {
         "missingRequired": [],
         "missingOptional": []
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {},
       "packageChecklist": {
         "index": false,
@@ -3238,16 +7006,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": null,
+        "attackPools": null,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -3281,6 +7096,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
@@ -3288,6 +7104,7 @@ window.ACTOR_PRODUCTION_DATA = {
         "missingRequired": [],
         "missingOptional": []
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {},
       "packageChecklist": {
         "index": false,
@@ -3295,16 +7112,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": null,
+        "attackPools": null,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -3328,6 +7192,250 @@ window.ACTOR_PRODUCTION_DATA = {
         "plannedPaths": []
       },
       "evidence": {
+        "anyImage": [
+          {
+            "path": "Assets/Art/Character/RabbitHealer/attack/RabbitHealer-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/attack/RabbitHealer-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/attack/RabbitHealer-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/concept/RabbitHealer-concept-v1-chromakey.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/concept/RabbitHealer-concept-v2-chromakey.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/idle_a/RabbitHealer-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/idle_a/RabbitHealer-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/idle_a/RabbitHealer-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/idle_a/RabbitHealer-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/idle_a/RabbitHealer-frame-04.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/idle_b/RabbitHealer-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/idle_b/RabbitHealer-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/idle_b/RabbitHealer-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/idle_b/RabbitHealer-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/idle_b/RabbitHealer-frame-04.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/idle_b/RabbitHealer-frame-05.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/idle/RabbitHealer-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/idle/RabbitHealer-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/idle/RabbitHealer-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/idle/RabbitHealer-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/master/RabbitHealer-master-v1.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/RabbitHealer/master/RabbitHealer-master-v2.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          }
+        ],
         "tier1": [
           {
             "path": "Assets/Art/Character/RabbitHealer/attack/RabbitHealer-frame-00.png",
@@ -3561,20 +7669,25 @@ window.ACTOR_PRODUCTION_DATA = {
       "warnings": [],
       "assetType": "Player",
       "package": {
-        "index": null,
-        "brief": "ProjectDocs/ArtPipeline/Characters/RabbitHealer/01_character-sheet.md",
-        "perfectPixel": null,
-        "measurements": null,
-        "motionDocs": [],
-        "prototypes": false,
+        "index": "ProjectDocs/ArtPipeline/Characters/RabbitHealer/00_package-index.md",
+        "brief": "ProjectDocs/ArtPipeline/Characters/RabbitHealer/01_character-brief.md",
+        "perfectPixel": "ProjectDocs/ArtPipeline/Characters/RabbitHealer/02_perfectpixel-input.md",
+        "measurements": "ProjectDocs/ArtPipeline/Characters/RabbitHealer/03_master-measurements.md",
+        "motionDocs": [
+          "ProjectDocs/ArtPipeline/Characters/RabbitHealer/04_motion-idle.md",
+          "ProjectDocs/ArtPipeline/Characters/RabbitHealer/04_motion-tier1.md",
+          "ProjectDocs/ArtPipeline/Characters/RabbitHealer/04_motion-tier2.md"
+        ],
+        "prototypes": true,
         "masterFiles": [],
-        "status": "Unknown"
+        "status": "Master Approved"
       },
       "definitionId": "RabbitHealer",
       "type": "Player",
       "lifecycle": "Active",
       "world": "ANIMAL-LAND-01",
       "profile": "Player Basic",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [
           "baseIdle",
@@ -3588,6 +7701,7 @@ window.ACTOR_PRODUCTION_DATA = {
           "master"
         ],
         "observed": [
+          "anyImage",
           "baseIdle",
           "idleVariant",
           "master",
@@ -3601,29 +7715,137 @@ window.ACTOR_PRODUCTION_DATA = {
           "portrait"
         ]
       },
+      "attackPoolAudit": {
+        "requiredTiers": [
+          "tier1",
+          "tier2"
+        ],
+        "connected": false,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": "b91f4d60af9634afc9101a92559b851b",
+            "poolPath": "Assets/Data/MotionProfiles/Characters/RabbitHealer/RabbitHealer_Tier1AttackPool.asset",
+            "referenced": true,
+            "motionCount": 1,
+            "playableCount": 1,
+            "motions": [
+              {
+                "guid": "229fc50320a6a46aeb87c400d24b2108",
+                "path": "Assets/Data/MotionProfiles/Characters/RabbitHealer/RabbitHealer_Attack.asset",
+                "name": "RabbitHealer_Attack",
+                "frameCount": 3,
+                "frameSignature": "d6e3d812b0cad4312a9da0304c02dcbd:d68eb9c7f89a14aea81c2cec05cddb50:10318005e83a7415b8c95a5db50b8017",
+                "playable": true
+              }
+            ],
+            "includesLower": true,
+            "newMotionCount": 1,
+            "cumulative": true,
+            "status": "ready"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": false,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": false,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
+      },
       "assetMotionCounts": {
+        "anyImage": 22,
         "baseIdle": 4,
         "idleVariant": 11,
         "master": 2,
         "tier1": 3
       },
       "packageChecklist": {
-        "index": false,
+        "index": true,
         "brief": true,
-        "perfectPixelInput": false,
-        "measurements": false,
-        "motionBrief": false,
-        "status": "Unknown"
+        "perfectPixelInput": true,
+        "measurements": true,
+        "motionBrief": true,
+        "status": "Master Approved",
+        "master": true
       },
       "runtimeChecklist": {
         "motionProfile": true,
+        "profilePlayable": null,
         "characterDefinition": true,
+        "attackPools": false,
         "table": null
       },
-      "packageComplete": false,
-      "runtimeConnected": true,
+      "packageComplete": true,
+      "runtimeConnected": false,
       "completeness": 67,
-      "nextAction": "제작 패키지 인덱스 작성",
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 100,
+          "done": 6,
+          "total": 6,
+          "complete": true,
+          "checklist": {
+            "index": true,
+            "brief": true,
+            "perfectPixelInput": true,
+            "measurements": true,
+            "motionBrief": true,
+            "status": "Master Approved",
+            "master": true
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": 67,
+          "done": 2,
+          "total": 3,
+          "applicable": true,
+          "missing": [
+            "tier2"
+          ]
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 67,
+          "done": 2,
+          "total": 3,
+          "applicable": true,
+          "complete": false,
+          "checklist": {
+            "motionProfile": true,
+            "profilePlayable": null,
+            "characterDefinition": true,
+            "attackPools": false,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": "Assets/Art/Character/RabbitHealer/master/RabbitHealer-master-v1.png",
+      "thumbnailKind": "master",
+      "stage": "Animation",
+      "nextAction": "필수 애니메이션 프레임 제작",
       "importProfile": "V1"
     },
     {
@@ -3656,12 +7878,59 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
         "observed": [],
         "missingRequired": [],
         "missingOptional": []
+      },
+      "attackPoolAudit": {
+        "requiredTiers": [],
+        "connected": true,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
       },
       "assetMotionCounts": {},
       "packageChecklist": {
@@ -3670,16 +7939,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": false,
+        "attackPools": true,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": false,
+            "attackPools": true,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -3713,12 +8029,59 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
         "observed": [],
         "missingRequired": [],
         "missingOptional": []
+      },
+      "attackPoolAudit": {
+        "requiredTiers": [],
+        "connected": true,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
       },
       "assetMotionCounts": {},
       "packageChecklist": {
@@ -3727,16 +8090,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": false,
+        "attackPools": true,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": false,
+            "attackPools": true,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -3770,6 +8180,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
@@ -3777,6 +8188,7 @@ window.ACTOR_PRODUCTION_DATA = {
         "missingRequired": [],
         "missingOptional": []
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {},
       "packageChecklist": {
         "index": false,
@@ -3784,16 +8196,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": null,
+        "attackPools": null,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -3827,6 +8286,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
@@ -3834,6 +8294,7 @@ window.ACTOR_PRODUCTION_DATA = {
         "missingRequired": [],
         "missingOptional": []
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {},
       "packageChecklist": {
         "index": false,
@@ -3841,16 +8302,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": null,
+        "attackPools": null,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -3872,20 +8380,29 @@ window.ACTOR_PRODUCTION_DATA = {
         "plannedPaths": []
       },
       "evidence": {
-        "portrait": [
+        "anyImage": [
           {
-            "path": "Assets/Art/Enemy/RockGolem/Portrait/Portrait_RockGolem.png",
+            "path": "Assets/Art/Enemy/RockGolem/concept/RockGolem-concept-v1-chromakey.png",
             "size": {
-              "width": 64,
-              "height": 64
+              "width": 1148,
+              "height": 1370
             },
             "meta": {
-              "ppu": "200",
-              "pivot": "(0.5, 0.078)"
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
             }
-          }
-        ],
-        "hitHold": [
+          },
+          {
+            "path": "Assets/Art/Enemy/RockGolem/concept/RockGolem-concept-v2-sd-chromakey.png",
+            "size": {
+              "width": 1148,
+              "height": 1370
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
           {
             "path": "Assets/Art/Enemy/RockGolem/hit/RockGolem-frame-00.png",
             "size": {
@@ -3910,6 +8427,109 @@ window.ACTOR_PRODUCTION_DATA = {
           },
           {
             "path": "Assets/Art/Enemy/RockGolem/hit/RockGolem-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/RockGolem/idle/RockGolem-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/RockGolem/idle/RockGolem-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/RockGolem/idle/RockGolem-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/RockGolem/idle/RockGolem-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/RockGolem/master/RockGolem-master-v1.png",
+            "size": {
+              "width": 1148,
+              "height": 1370
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/RockGolem/master/RockGolem-master-v2-sd.png",
+            "size": {
+              "width": 1148,
+              "height": 1370
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/RockGolem/Portrait/Portrait_RockGolem.png",
+            "size": {
+              "width": 64,
+              "height": 64
+            },
+            "meta": {
+              "ppu": "200",
+              "pivot": "(0.5, 0.078)"
+            }
+          }
+        ],
+        "portrait": [
+          {
+            "path": "Assets/Art/Enemy/RockGolem/Portrait/Portrait_RockGolem.png",
+            "size": {
+              "width": 64,
+              "height": 64
+            },
+            "meta": {
+              "ppu": "200",
+              "pivot": "(0.5, 0.078)"
+            }
+          }
+        ],
+        "hitHold": [
+          {
+            "path": "Assets/Art/Enemy/RockGolem/hit/RockGolem-frame-01.png",
             "size": {
               "width": 128,
               "height": 128
@@ -3992,7 +8612,7 @@ window.ACTOR_PRODUCTION_DATA = {
         ],
         "hitRecovery": [
           {
-            "path": "Assets/Art/Enemy/RockGolem/hit/RockGolem-frame-01.png",
+            "path": "Assets/Art/Enemy/RockGolem/hit/RockGolem-frame-02.png",
             "size": {
               "width": 128,
               "height": 128
@@ -4005,18 +8625,104 @@ window.ACTOR_PRODUCTION_DATA = {
         ]
       },
       "observations": [],
-      "warnings": [],
+      "warnings": [
+        "Unreferenced motion frames: Assets/Art/Enemy/RockGolem/hit/RockGolem-frame-00.png"
+      ],
       "assetType": "Enemy",
       "table": {
         "path": "Assets/TableData/Game/Monster.csv",
         "key": "RockGolem_MotionProfile",
+        "motionProfileKey": "RockGolem_MotionProfile",
+        "monsterId": "7",
+        "displayName": "돌골렘",
         "world": "2",
-        "worldName": "판타지아"
+        "worldName": "판타지아",
+        "previewSpriteKey": "Portrait_RockGolem",
+        "enabled": true,
+        "displayOrder": 70
       },
       "type": "Enemy",
       "lifecycle": "Active",
       "world": "2 판타지아",
       "profile": "Passive Enemy",
+      "enemyRuntimeAudit": {
+        "profilePath": "Assets/Data/MotionProfiles/Monsters/RockGolem/RockGolem_MotionProfile.asset",
+        "displayName": "RockGolem",
+        "resourceFolderPath": "Assets/Art/Enemy/RockGolem",
+        "resourceFolderMatches": true,
+        "baseIdle": {
+          "field": "baseIdle",
+          "frameCount": 4,
+          "uniqueFrameCount": 4,
+          "frameGuids": [
+            "70f41e9f6f9ff4b8cb1aa083aaf623ff",
+            "71556b33a8ce14468b8d6e3cda8e885b",
+            "c76f447300f304ddaabe1eaf3de48a60",
+            "8099731572da34116895a0a9e9012254"
+          ],
+          "framePaths": [
+            "Assets/Art/Enemy/RockGolem/idle/RockGolem-frame-00.png",
+            "Assets/Art/Enemy/RockGolem/idle/RockGolem-frame-01.png",
+            "Assets/Art/Enemy/RockGolem/idle/RockGolem-frame-02.png",
+            "Assets/Art/Enemy/RockGolem/idle/RockGolem-frame-03.png"
+          ],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": true
+        },
+        "idleEvents": [],
+        "hit": {
+          "field": "hit",
+          "frameCount": 2,
+          "uniqueFrameCount": 2,
+          "frameGuids": [
+            "a855e68d9c8fd46659cdcb31dd056195",
+            "0603dc004f5054ef99e0d474d1c37cf3"
+          ],
+          "framePaths": [
+            "Assets/Art/Enemy/RockGolem/hit/RockGolem-frame-01.png",
+            "Assets/Art/Enemy/RockGolem/hit/RockGolem-frame-02.png"
+          ],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": true
+        },
+        "defeat": {
+          "field": "defeat",
+          "frameCount": 0,
+          "uniqueFrameCount": 0,
+          "frameGuids": [],
+          "framePaths": [],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": false
+        },
+        "hitReaction": {
+          "holdFrame": 0,
+          "recoveryFrame": 1,
+          "holdGuid": "a855e68d9c8fd46659cdcb31dd056195",
+          "recoveryGuid": "0603dc004f5054ef99e0d474d1c37cf3",
+          "indexesValid": true,
+          "recoveryVisuallyDistinct": true,
+          "repeatedRecoveryAllowed": false,
+          "recoveryAccepted": true,
+          "exceptionReason": null
+        },
+        "defeatMode": "fade-only",
+        "profilePlayable": true,
+        "tableConnected": true,
+        "tableProfileMatches": true,
+        "previewSpriteReady": true,
+        "unreferencedMotionFrames": [
+          "Assets/Art/Enemy/RockGolem/hit/RockGolem-frame-00.png"
+        ],
+        "foreignFrameRefs": [],
+        "motionQualityReady": true,
+        "productionClass": "package-only"
+      },
       "requirements": {
         "required": [
           "baseIdle",
@@ -4029,6 +8735,7 @@ window.ACTOR_PRODUCTION_DATA = {
           "master"
         ],
         "observed": [
+          "anyImage",
           "baseIdle",
           "hitHold",
           "hitRecovery",
@@ -4040,9 +8747,11 @@ window.ACTOR_PRODUCTION_DATA = {
           "death"
         ]
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {
+        "anyImage": 12,
         "baseIdle": 4,
-        "hitHold": 3,
+        "hitHold": 1,
         "hitRecovery": 1,
         "master": 2,
         "portrait": 1
@@ -4053,16 +8762,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": true
       },
       "runtimeChecklist": {
         "motionProfile": true,
+        "profilePlayable": true,
         "characterDefinition": null,
+        "attackPools": null,
         "table": true
       },
       "packageComplete": false,
       "runtimeConnected": true,
       "completeness": 100,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 17,
+          "done": 1,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": true
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "complete": true,
+          "checklist": {
+            "motionProfile": true,
+            "profilePlayable": true,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": true
+          }
+        }
+      },
+      "thumbnailPath": "Assets/Art/Enemy/RockGolem/master/RockGolem-master-v1.png",
+      "thumbnailKind": "master",
+      "stage": "Brief",
       "nextAction": "제작 패키지 인덱스 작성",
       "importProfile": "V1"
     },
@@ -4084,6 +8840,305 @@ window.ACTOR_PRODUCTION_DATA = {
         "plannedPaths": []
       },
       "evidence": {
+        "anyImage": [
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/hit/Scarecrow-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/hit/Scarecrow-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/idle/Scarecrow-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/idle/Scarecrow-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/idle/Scarecrow-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/idle/Scarecrow-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-nohat-v2-chromakey.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-nohat-v2.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-nohat-v3-chromakey.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-nohat-v3.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-nohat-v4-chromakey.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-nohat-v4.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-nohat-v5-chromakey.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-nohat-v5.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-nohat-v6-chromakey.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-nohat-v6.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-nohat-v7-chromakey.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-nohat-v7.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-nohat-v8-chromakey.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-nohat-v8.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-nohat-v9-chromakey.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-nohat-v9.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-strawhat-v2-chromakey.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-strawhat-v2.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-strawhat-v3-chromakey.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-strawhat-v3.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Scarecrow/Portrait/Portrait_Scarecrow.png",
+            "size": {
+              "width": 64,
+              "height": 64
+            },
+            "meta": {
+              "ppu": "200",
+              "pivot": "(0.5, 0.078)"
+            }
+          }
+        ],
         "portrait": [
           {
             "path": "Assets/Art/Enemy/Scarecrow/Portrait/Portrait_Scarecrow.png",
@@ -4098,17 +9153,6 @@ window.ACTOR_PRODUCTION_DATA = {
           }
         ],
         "hitHold": [
-          {
-            "path": "Assets/Art/Enemy/Scarecrow/hit/Scarecrow-frame-00.png",
-            "size": {
-              "width": 128,
-              "height": 128
-            },
-            "meta": {
-              "ppu": "50",
-              "pivot": "(0.5, 0.1)"
-            }
-          },
           {
             "path": "Assets/Art/Enemy/Scarecrow/hit/Scarecrow-frame-01.png",
             "size": {
@@ -4391,7 +9435,7 @@ window.ACTOR_PRODUCTION_DATA = {
         ],
         "hitRecovery": [
           {
-            "path": "Assets/Art/Enemy/Scarecrow/hit/Scarecrow-frame-01.png",
+            "path": "Assets/Art/Enemy/Scarecrow/hit/Scarecrow-frame-00.png",
             "size": {
               "width": 128,
               "height": 128
@@ -4409,13 +9453,95 @@ window.ACTOR_PRODUCTION_DATA = {
       "table": {
         "path": "Assets/TableData/Game/Monster.csv",
         "key": "Scarecrow_MotionProfile",
+        "motionProfileKey": "Scarecrow_MotionProfile",
+        "monsterId": "1",
+        "displayName": "허수아비",
         "world": "2",
-        "worldName": "판타지아"
+        "worldName": "판타지아",
+        "previewSpriteKey": "Portrait_Scarecrow",
+        "enabled": true,
+        "displayOrder": 10
       },
       "type": "Enemy",
       "lifecycle": "Active",
       "world": "2 판타지아",
       "profile": "Passive Enemy",
+      "enemyRuntimeAudit": {
+        "profilePath": "Assets/Data/MotionProfiles/Monsters/Scarecrow/Scarecrow_MotionProfile.asset",
+        "displayName": "Scarecrow",
+        "resourceFolderPath": "Assets/Art/Enemy/Scarecrow",
+        "resourceFolderMatches": true,
+        "baseIdle": {
+          "field": "baseIdle",
+          "frameCount": 4,
+          "uniqueFrameCount": 4,
+          "frameGuids": [
+            "14e6e0c605b9949279f21bcdf6ba87c7",
+            "c0955fb87045046439996349e43f8472",
+            "55d8eb9e4464f41de89ad7f48d92324c",
+            "c7be73287bb1d47f3bf27b459cbe18a2"
+          ],
+          "framePaths": [
+            "Assets/Art/Enemy/Scarecrow/idle/Scarecrow-frame-00.png",
+            "Assets/Art/Enemy/Scarecrow/idle/Scarecrow-frame-01.png",
+            "Assets/Art/Enemy/Scarecrow/idle/Scarecrow-frame-02.png",
+            "Assets/Art/Enemy/Scarecrow/idle/Scarecrow-frame-03.png"
+          ],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": true
+        },
+        "idleEvents": [],
+        "hit": {
+          "field": "hit",
+          "frameCount": 2,
+          "uniqueFrameCount": 2,
+          "frameGuids": [
+            "a43ce97e8b1f942c780a21ce34bbe810",
+            "e8077dc8617d4459d884f17621685c1f"
+          ],
+          "framePaths": [
+            "Assets/Art/Enemy/Scarecrow/hit/Scarecrow-frame-01.png",
+            "Assets/Art/Enemy/Scarecrow/hit/Scarecrow-frame-00.png"
+          ],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": true
+        },
+        "defeat": {
+          "field": "defeat",
+          "frameCount": 0,
+          "uniqueFrameCount": 0,
+          "frameGuids": [],
+          "framePaths": [],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": false
+        },
+        "hitReaction": {
+          "holdFrame": 0,
+          "recoveryFrame": 1,
+          "holdGuid": "a43ce97e8b1f942c780a21ce34bbe810",
+          "recoveryGuid": "e8077dc8617d4459d884f17621685c1f",
+          "indexesValid": true,
+          "recoveryVisuallyDistinct": true,
+          "repeatedRecoveryAllowed": false,
+          "recoveryAccepted": true,
+          "exceptionReason": null
+        },
+        "defeatMode": "fade-only",
+        "profilePlayable": true,
+        "tableConnected": true,
+        "tableProfileMatches": true,
+        "previewSpriteReady": true,
+        "unreferencedMotionFrames": [],
+        "foreignFrameRefs": [],
+        "motionQualityReady": true,
+        "productionClass": "package-only"
+      },
       "requirements": {
         "required": [
           "baseIdle",
@@ -4428,6 +9554,7 @@ window.ACTOR_PRODUCTION_DATA = {
           "master"
         ],
         "observed": [
+          "anyImage",
           "baseIdle",
           "hitHold",
           "hitRecovery",
@@ -4439,9 +9566,11 @@ window.ACTOR_PRODUCTION_DATA = {
           "death"
         ]
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {
+        "anyImage": 27,
         "baseIdle": 4,
-        "hitHold": 2,
+        "hitHold": 1,
         "hitRecovery": 1,
         "master": 20,
         "portrait": 1
@@ -4452,16 +9581,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": true
       },
       "runtimeChecklist": {
         "motionProfile": true,
+        "profilePlayable": true,
         "characterDefinition": null,
+        "attackPools": null,
         "table": true
       },
       "packageComplete": false,
       "runtimeConnected": true,
       "completeness": 100,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 17,
+          "done": 1,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": true
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "complete": true,
+          "checklist": {
+            "motionProfile": true,
+            "profilePlayable": true,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": true
+          }
+        }
+      },
+      "thumbnailPath": "Assets/Art/Enemy/Scarecrow/master/Scarecrow-master-nohat-v2.png",
+      "thumbnailKind": "master",
+      "stage": "Brief",
       "nextAction": "제작 패키지 인덱스 작성",
       "importProfile": "V1"
     },
@@ -4495,6 +9671,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
@@ -4502,6 +9679,7 @@ window.ACTOR_PRODUCTION_DATA = {
         "missingRequired": [],
         "missingOptional": []
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {},
       "packageChecklist": {
         "index": false,
@@ -4509,16 +9687,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": null,
+        "attackPools": null,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -4542,6 +9767,217 @@ window.ACTOR_PRODUCTION_DATA = {
         "plannedPaths": []
       },
       "evidence": {
+        "anyImage": [
+          {
+            "path": "Assets/Art/Enemy/Specter/hit/Specter-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/hit/Specter-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/idle_a/Specter-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/idle_a/Specter-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/idle_a/Specter-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/idle_a/Specter-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/idle/Specter-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/idle/Specter-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/idle/Specter-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/idle/Specter-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/master/Specter-master-v1-chromakey-source.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/master/Specter-master-v1-chromakey.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/master/Specter-master-v1-transparent-source.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/master/Specter-master-v1.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/master/Specter-master-v2-chromakey-source.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/master/Specter-master-v2-chromakey.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/master/Specter-master-v2-transparent-source.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/master/Specter-master-v2.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Specter/Portrait/Portrait_Specter.png",
+            "size": {
+              "width": 64,
+              "height": 64
+            },
+            "meta": {
+              "ppu": "200",
+              "pivot": "(0.5, 0.078)"
+            }
+          }
+        ],
         "portrait": [
           {
             "path": "Assets/Art/Enemy/Specter/Portrait/Portrait_Specter.png",
@@ -4558,17 +9994,6 @@ window.ACTOR_PRODUCTION_DATA = {
         "hitHold": [
           {
             "path": "Assets/Art/Enemy/Specter/hit/Specter-frame-00.png",
-            "size": {
-              "width": 128,
-              "height": 128
-            },
-            "meta": {
-              "ppu": "50",
-              "pivot": "(0.5, 0.1)"
-            }
-          },
-          {
-            "path": "Assets/Art/Enemy/Specter/hit/Specter-frame-01.png",
             "size": {
               "width": 128,
               "height": 128
@@ -4779,25 +10204,132 @@ window.ACTOR_PRODUCTION_DATA = {
       "warnings": [],
       "assetType": "Enemy",
       "package": {
-        "index": null,
+        "index": "ProjectDocs/ArtPipeline/Enemies/Specter/00_package-index.md",
         "brief": "ProjectDocs/ArtPipeline/Enemies/Specter/01_monster-brief.md",
         "perfectPixel": "ProjectDocs/ArtPipeline/Enemies/Specter/02_perfectpixel-input.md",
         "measurements": "ProjectDocs/ArtPipeline/Enemies/Specter/03_master-measurements.md",
-        "motionDocs": [],
+        "motionDocs": [
+          "ProjectDocs/ArtPipeline/Enemies/Specter/04_motion-hit.md",
+          "ProjectDocs/ArtPipeline/Enemies/Specter/04_motion-idle.md",
+          "ProjectDocs/ArtPipeline/Enemies/Specter/04_motion-idle_a.md"
+        ],
         "prototypes": false,
         "masterFiles": [],
-        "status": "Unknown"
+        "status": "Runtime Documented"
       },
       "table": {
         "path": "Assets/TableData/Game/Monster.csv",
         "key": "Specter_MotionProfile",
+        "motionProfileKey": "Specter_MotionProfile",
+        "monsterId": "2",
+        "displayName": "스펙터",
         "world": "3",
-        "worldName": "망자의 도시"
+        "worldName": "망자의 도시",
+        "previewSpriteKey": "Portrait_Specter",
+        "enabled": true,
+        "displayOrder": 20
       },
       "type": "Enemy",
       "lifecycle": "Active",
       "world": "3 망자의 도시",
       "profile": "Passive Enemy",
+      "enemyRuntimeAudit": {
+        "profilePath": "Assets/Data/MotionProfiles/Monsters/Specter/Specter_MotionProfile.asset",
+        "displayName": "Specter",
+        "resourceFolderPath": "Assets/Art/Enemy/Specter",
+        "resourceFolderMatches": true,
+        "baseIdle": {
+          "field": "baseIdle",
+          "frameCount": 4,
+          "uniqueFrameCount": 4,
+          "frameGuids": [
+            "daff5af6b853045f786f506d2c71c488",
+            "d6027c613258b40278664afcfdd3d13f",
+            "4ccb4396b8e124d63af1f2c6b237fbc9",
+            "ca15d08bcf21f4ce5a4f615a95c16f52"
+          ],
+          "framePaths": [
+            "Assets/Art/Enemy/Specter/idle/Specter-frame-00.png",
+            "Assets/Art/Enemy/Specter/idle/Specter-frame-01.png",
+            "Assets/Art/Enemy/Specter/idle/Specter-frame-02.png",
+            "Assets/Art/Enemy/Specter/idle/Specter-frame-03.png"
+          ],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": true
+        },
+        "idleEvents": [
+          {
+            "name": "idle a",
+            "frameCount": 4,
+            "uniqueFrameCount": 4,
+            "frameGuids": [
+              "4a5d8690f87934affb9aaefce738c736",
+              "3621e577ebfa7451bac7096fb00b22bf",
+              "6933ab393cbde404f9520645fe8fc4bc",
+              "f524c4ae605784352a5e8801e1a28a41"
+            ],
+            "framePaths": [
+              "Assets/Art/Enemy/Specter/idle_a/Specter-frame-00.png",
+              "Assets/Art/Enemy/Specter/idle_a/Specter-frame-01.png",
+              "Assets/Art/Enemy/Specter/idle_a/Specter-frame-02.png",
+              "Assets/Art/Enemy/Specter/idle_a/Specter-frame-03.png"
+            ],
+            "unresolvedGuids": [],
+            "fps": 6,
+            "playable": true
+          }
+        ],
+        "hit": {
+          "field": "hit",
+          "frameCount": 2,
+          "uniqueFrameCount": 2,
+          "frameGuids": [
+            "7ef29ccd1d8324273ae0abaedf3767b0",
+            "2a535a67f32744610870a1bf02dfcfbc"
+          ],
+          "framePaths": [
+            "Assets/Art/Enemy/Specter/hit/Specter-frame-00.png",
+            "Assets/Art/Enemy/Specter/hit/Specter-frame-01.png"
+          ],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": true
+        },
+        "defeat": {
+          "field": "defeat",
+          "frameCount": 0,
+          "uniqueFrameCount": 0,
+          "frameGuids": [],
+          "framePaths": [],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": false
+        },
+        "hitReaction": {
+          "holdFrame": 0,
+          "recoveryFrame": 1,
+          "holdGuid": "7ef29ccd1d8324273ae0abaedf3767b0",
+          "recoveryGuid": "2a535a67f32744610870a1bf02dfcfbc",
+          "indexesValid": true,
+          "recoveryVisuallyDistinct": true,
+          "repeatedRecoveryAllowed": false,
+          "recoveryAccepted": true,
+          "exceptionReason": null
+        },
+        "defeatMode": "fade-only",
+        "profilePlayable": true,
+        "tableConnected": true,
+        "tableProfileMatches": true,
+        "previewSpriteReady": true,
+        "unreferencedMotionFrames": [],
+        "foreignFrameRefs": [],
+        "motionQualityReady": true,
+        "productionClass": "usable"
+      },
       "requirements": {
         "required": [
           "baseIdle",
@@ -4810,6 +10342,7 @@ window.ACTOR_PRODUCTION_DATA = {
           "master"
         ],
         "observed": [
+          "anyImage",
           "baseIdle",
           "hitHold",
           "hitRecovery",
@@ -4822,31 +10355,80 @@ window.ACTOR_PRODUCTION_DATA = {
           "death"
         ]
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {
+        "anyImage": 19,
         "baseIdle": 4,
-        "hitHold": 2,
+        "hitHold": 1,
         "hitRecovery": 1,
         "idleVariant": 4,
         "master": 8,
         "portrait": 1
       },
       "packageChecklist": {
-        "index": false,
+        "index": true,
         "brief": true,
         "perfectPixelInput": true,
         "measurements": true,
-        "motionBrief": false,
-        "status": "Unknown"
+        "motionBrief": true,
+        "status": "Runtime Documented",
+        "master": true
       },
       "runtimeChecklist": {
         "motionProfile": true,
+        "profilePlayable": true,
         "characterDefinition": null,
+        "attackPools": null,
         "table": true
       },
-      "packageComplete": false,
+      "packageComplete": true,
       "runtimeConnected": true,
       "completeness": 100,
-      "nextAction": "제작 패키지 인덱스 작성",
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 100,
+          "done": 6,
+          "total": 6,
+          "complete": true,
+          "checklist": {
+            "index": true,
+            "brief": true,
+            "perfectPixelInput": true,
+            "measurements": true,
+            "motionBrief": true,
+            "status": "Runtime Documented",
+            "master": true
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "complete": true,
+          "checklist": {
+            "motionProfile": true,
+            "profilePlayable": true,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": true
+          }
+        }
+      },
+      "thumbnailPath": "Assets/Art/Enemy/Specter/master/Specter-master-v1-transparent-source.png",
+      "thumbnailKind": "master",
+      "stage": "Ready",
+      "nextAction": "애니메이션 요구사항 및 런타임 연결 확인",
       "importProfile": "V1"
     },
     {
@@ -4879,12 +10461,59 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
         "observed": [],
         "missingRequired": [],
         "missingOptional": []
+      },
+      "attackPoolAudit": {
+        "requiredTiers": [],
+        "connected": true,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
       },
       "assetMotionCounts": {},
       "packageChecklist": {
@@ -4893,16 +10522,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": false,
+        "attackPools": true,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": false,
+            "attackPools": true,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -4922,6 +10598,19 @@ window.ACTOR_PRODUCTION_DATA = {
         "plannedPaths": []
       },
       "evidence": {
+        "anyImage": [
+          {
+            "path": "Assets/Art/Character/StagGroveWarden/master/StagGroveWarden-master-v1.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          }
+        ],
         "master": [
           {
             "path": "Assets/Art/Character/StagGroveWarden/master/StagGroveWarden-master-v1.png",
@@ -4929,7 +10618,10 @@ window.ACTOR_PRODUCTION_DATA = {
               "width": 1254,
               "height": 1254
             },
-            "meta": null
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
           }
         ]
       },
@@ -4957,6 +10649,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Hold",
       "world": "ANIMAL-LAND-01",
       "profile": "Hold Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [
           "baseIdle",
@@ -4970,6 +10663,7 @@ window.ACTOR_PRODUCTION_DATA = {
           "master"
         ],
         "observed": [
+          "anyImage",
           "master"
         ],
         "missingRequired": [
@@ -4983,7 +10677,57 @@ window.ACTOR_PRODUCTION_DATA = {
           "portrait"
         ]
       },
+      "attackPoolAudit": {
+        "requiredTiers": [
+          "tier1",
+          "tier2"
+        ],
+        "connected": false,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
+      },
       "assetMotionCounts": {
+        "anyImage": 1,
         "master": 1
       },
       "packageChecklist": {
@@ -4992,16 +10736,67 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": true,
         "measurements": true,
         "motionBrief": true,
-        "status": "Motion Ready"
+        "status": "Motion Ready",
+        "master": true
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": false,
+        "attackPools": false,
         "table": null
       },
       "packageComplete": true,
       "runtimeConnected": false,
       "completeness": 0,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 100,
+          "done": 6,
+          "total": 6,
+          "complete": true,
+          "checklist": {
+            "index": true,
+            "brief": true,
+            "perfectPixelInput": true,
+            "measurements": true,
+            "motionBrief": true,
+            "status": "Motion Ready",
+            "master": true
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": 0,
+          "done": 0,
+          "total": 3,
+          "applicable": true,
+          "missing": [
+            "baseIdle",
+            "tier1",
+            "tier2"
+          ]
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 0,
+          "done": 0,
+          "total": 3,
+          "applicable": true,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": false,
+            "attackPools": false,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": "Assets/Art/Character/StagGroveWarden/master/StagGroveWarden-master-v1.png",
+      "thumbnailKind": "master",
+      "stage": "Hold",
       "nextAction": "보류: 누락은 표시하지만 우선순위에서 제외",
       "importProfile": "V2 candidate/pending import"
     },
@@ -5022,46 +10817,206 @@ window.ACTOR_PRODUCTION_DATA = {
         ],
         "plannedPaths": []
       },
-      "evidence": {},
+      "evidence": {
+        "anyImage": [
+          {
+            "path": "Assets/Art/Enemy/Test_Gblin/base.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.234)"
+            }
+          }
+        ],
+        "hitHold": [
+          {
+            "path": "Assets/Art/Enemy/Test_Gblin/base.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.234)"
+            }
+          }
+        ],
+        "hitRecovery": []
+      },
       "observations": [],
-      "warnings": [],
+      "warnings": [
+        "Monster hit hold/recovery frame index is out of range."
+      ],
       "assetType": "Enemy",
       "table": {
         "path": "Assets/TableData/Game/Monster.csv",
         "key": "Test_Gblin_MotionProfile",
+        "motionProfileKey": "Test_Gblin_MotionProfile",
+        "monsterId": "8",
+        "displayName": "고블린(T)",
         "world": "2",
-        "worldName": "판타지아"
+        "worldName": "판타지아",
+        "previewSpriteKey": null,
+        "enabled": true,
+        "displayOrder": 80
       },
       "type": "Enemy",
       "lifecycle": "Test",
       "world": "2 판타지아",
       "profile": "Test Actor",
+      "enemyRuntimeAudit": {
+        "profilePath": "Assets/Data/MotionProfiles/Monsters/Test_Gblin/Test_Gblin_MotionProfile.asset",
+        "displayName": "Test_Gblin",
+        "resourceFolderPath": "Assets/Art/Enemy/Test_Gblin",
+        "resourceFolderMatches": true,
+        "baseIdle": {
+          "field": "baseIdle",
+          "frameCount": 1,
+          "uniqueFrameCount": 1,
+          "frameGuids": [
+            "1fdff5dd01e054c6b94a8e141cd1b452"
+          ],
+          "framePaths": [
+            "Assets/Art/Enemy/Test_Gblin/base.png"
+          ],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": true
+        },
+        "idleEvents": [],
+        "hit": {
+          "field": "hit",
+          "frameCount": 1,
+          "uniqueFrameCount": 1,
+          "frameGuids": [
+            "1fdff5dd01e054c6b94a8e141cd1b452"
+          ],
+          "framePaths": [
+            "Assets/Art/Enemy/Test_Gblin/base.png"
+          ],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": true
+        },
+        "defeat": {
+          "field": "defeat",
+          "frameCount": 0,
+          "uniqueFrameCount": 0,
+          "frameGuids": [],
+          "framePaths": [],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": false
+        },
+        "hitReaction": {
+          "holdFrame": 0,
+          "recoveryFrame": 1,
+          "holdGuid": "1fdff5dd01e054c6b94a8e141cd1b452",
+          "recoveryGuid": null,
+          "indexesValid": false,
+          "recoveryVisuallyDistinct": false,
+          "repeatedRecoveryAllowed": false,
+          "recoveryAccepted": false,
+          "exceptionReason": null
+        },
+        "defeatMode": "fade-only",
+        "profilePlayable": true,
+        "tableConnected": true,
+        "tableProfileMatches": true,
+        "previewSpriteReady": true,
+        "unreferencedMotionFrames": [],
+        "foreignFrameRefs": [],
+        "motionQualityReady": false,
+        "productionClass": "motion-revision"
+      },
       "requirements": {
         "required": [],
         "optional": [],
-        "observed": [],
+        "observed": [
+          "anyImage",
+          "hitHold",
+          "hitRecovery"
+        ],
         "missingRequired": [],
         "missingOptional": []
       },
-      "assetMotionCounts": {},
+      "attackPoolAudit": null,
+      "assetMotionCounts": {
+        "anyImage": 1,
+        "hitHold": 1,
+        "hitRecovery": 0
+      },
       "packageChecklist": {
         "index": false,
         "brief": false,
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": true,
+        "profilePlayable": true,
         "characterDefinition": null,
+        "attackPools": null,
         "table": true
       },
       "packageComplete": false,
       "runtimeConnected": true,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "complete": true,
+          "checklist": {
+            "motionProfile": true,
+            "profilePlayable": true,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": true
+          }
+        }
+      },
+      "thumbnailPath": "Assets/Art/Enemy/Test_Gblin/base.png",
+      "thumbnailKind": "anyImage",
+      "stage": "Test",
       "nextAction": "테스트 배우: 관찰 전용",
-      "importProfile": "unknown"
+      "importProfile": "V2"
     },
     {
       "id": "Test_IceMage",
@@ -5083,6 +11038,96 @@ window.ACTOR_PRODUCTION_DATA = {
         "plannedPaths": []
       },
       "evidence": {
+        "anyImage": [
+          {
+            "path": "Assets/Art/Character/Test_IceMage/attack/IceMage-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.234)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Test_IceMage/attack/IceMage-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.234)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Test_IceMage/attack/IceMage-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.234)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Test_IceMage/base.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.234)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Test_IceMage/idle/IceMage-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.234)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Test_IceMage/idle/IceMage-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.234)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Test_IceMage/idle/IceMage-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.234)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Test_IceMage/idle/IceMage-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.234)"
+            }
+          }
+        ],
         "tier1": [
           {
             "path": "Assets/Art/Character/Test_IceMage/attack/IceMage-frame-00.png",
@@ -5176,17 +11221,75 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Test",
       "world": "Unmapped",
       "profile": "Test Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
         "observed": [
+          "anyImage",
           "baseIdle",
           "tier1"
         ],
         "missingRequired": [],
         "missingOptional": []
       },
+      "attackPoolAudit": {
+        "requiredTiers": [],
+        "connected": true,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": "6791d151810114594a9d038bad2df5e9",
+            "poolPath": "Assets/Data/MotionProfiles/Characters/Test_IceMage/Test_IceMage_Tier1AttackPool.asset",
+            "referenced": true,
+            "motionCount": 1,
+            "playableCount": 1,
+            "motions": [
+              {
+                "guid": "581de67fec6d44e1d9635994eb33d111",
+                "path": "Assets/Data/MotionProfiles/Characters/Test_IceMage/Test_IceMage_Attack.asset",
+                "name": "Test_IceMage_Attack",
+                "frameCount": 3,
+                "frameSignature": "72ac68a3961984915903cdbd59a97c3a:005ea777ef1ac4c56949b0be45a526c7:5fa81a7d98451433eada12f110964365",
+                "playable": true
+              }
+            ],
+            "includesLower": true,
+            "newMotionCount": 1,
+            "cumulative": true,
+            "status": "ready"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": false,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": false,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
+      },
       "assetMotionCounts": {
+        "anyImage": 8,
         "baseIdle": 4,
         "tier1": 3
       },
@@ -5196,16 +11299,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": true,
+        "profilePlayable": null,
         "characterDefinition": true,
+        "attackPools": true,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": true,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "complete": true,
+          "checklist": {
+            "motionProfile": true,
+            "profilePlayable": null,
+            "characterDefinition": true,
+            "attackPools": true,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": "Assets/Art/Character/Test_IceMage/idle/IceMage-frame-00.png",
+      "thumbnailKind": "baseIdle",
+      "stage": "Test",
       "nextAction": "테스트 배우: 관찰 전용",
       "importProfile": "V2"
     },
@@ -5228,7 +11378,65 @@ window.ACTOR_PRODUCTION_DATA = {
         "tablePaths": [],
         "plannedPaths": []
       },
-      "evidence": {},
+      "evidence": {
+        "anyImage": [
+          {
+            "path": "Assets/Art/Character/Test_Leopard/base.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.234)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Test_Leopard/idle_0.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.234)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Test_Leopard/idle_1.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.234)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Test_Leopard/idle_2.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.234)"
+            }
+          },
+          {
+            "path": "Assets/Art/Character/Test_Leopard/idle_3.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.234)"
+            }
+          }
+        ]
+      },
       "observations": [],
       "warnings": [
         "Alias mapping: Leopard → Test_Leopard",
@@ -5240,30 +11448,128 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Test",
       "world": "Unmapped",
       "profile": "Test Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
-        "observed": [],
+        "observed": [
+          "anyImage"
+        ],
         "missingRequired": [],
         "missingOptional": []
       },
-      "assetMotionCounts": {},
+      "attackPoolAudit": {
+        "requiredTiers": [],
+        "connected": true,
+        "tiers": {
+          "tier1": {
+            "field": "tier1Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier2": {
+            "field": "tier2Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          },
+          "tier3": {
+            "field": "tier3Pool",
+            "poolGuid": null,
+            "poolPath": null,
+            "referenced": false,
+            "motionCount": 0,
+            "playableCount": 0,
+            "motions": [],
+            "includesLower": true,
+            "newMotionCount": 0,
+            "cumulative": false,
+            "status": "pool missing"
+          }
+        },
+        "orphanPools": []
+      },
+      "assetMotionCounts": {
+        "anyImage": 5
+      },
       "packageChecklist": {
         "index": false,
         "brief": false,
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": true,
+        "profilePlayable": null,
         "characterDefinition": true,
+        "attackPools": true,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": true,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "complete": true,
+          "checklist": {
+            "motionProfile": true,
+            "profilePlayable": null,
+            "characterDefinition": true,
+            "attackPools": true,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": "Assets/Art/Character/Test_Leopard/base.png",
+      "thumbnailKind": "anyImage",
+      "stage": "Test",
       "nextAction": "테스트 배우: 관찰 전용",
       "importProfile": "unknown"
     },
@@ -5287,6 +11593,261 @@ window.ACTOR_PRODUCTION_DATA = {
         "plannedPaths": []
       },
       "evidence": {
+        "anyImage": [
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/hit/VenomCultist-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/hit/VenomCultist-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/idle_a/VenomCultist-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/idle_a/VenomCultist-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/idle_a/VenomCultist-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/idle_a/VenomCultist-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/idle_a/VenomCultist-frame-04.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/idle_a/VenomCultist-frame-05.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/idle_b/VenomCultist-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/idle_b/VenomCultist-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/idle_b/VenomCultist-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/idle_b/VenomCultist-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/idle_b/VenomCultist-frame-04.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/idle_b/VenomCultist-frame-05.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/idle/VenomCultist-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/idle/VenomCultist-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/idle/VenomCultist-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/idle/VenomCultist-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/master/VenomCultist-master-v1-chromakey-source.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/master/VenomCultist-master-v1-chromakey.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/master/VenomCultist-master-v1-transparent-source.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/master/VenomCultist-master-v1.png",
+            "size": {
+              "width": 512,
+              "height": 512
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/VenomCultist/Portrait/Portrait_VenomCultist.png",
+            "size": {
+              "width": 64,
+              "height": 64
+            },
+            "meta": {
+              "ppu": "200",
+              "pivot": "(0.5, 0.078)"
+            }
+          }
+        ],
         "portrait": [
           {
             "path": "Assets/Art/Enemy/VenomCultist/Portrait/Portrait_VenomCultist.png",
@@ -5303,17 +11864,6 @@ window.ACTOR_PRODUCTION_DATA = {
         "hitHold": [
           {
             "path": "Assets/Art/Enemy/VenomCultist/hit/VenomCultist-frame-00.png",
-            "size": {
-              "width": 128,
-              "height": 128
-            },
-            "meta": {
-              "ppu": "50",
-              "pivot": "(0.5, 0.1)"
-            }
-          },
-          {
-            "path": "Assets/Art/Enemy/VenomCultist/hit/VenomCultist-frame-01.png",
             "size": {
               "width": 128,
               "height": 128
@@ -5568,25 +12118,161 @@ window.ACTOR_PRODUCTION_DATA = {
       "warnings": [],
       "assetType": "Enemy",
       "package": {
-        "index": null,
+        "index": "ProjectDocs/ArtPipeline/Enemies/VenomCultist/00_package-index.md",
         "brief": "ProjectDocs/ArtPipeline/Enemies/VenomCultist/01_monster-brief.md",
         "perfectPixel": "ProjectDocs/ArtPipeline/Enemies/VenomCultist/02_perfectpixel-input.md",
         "measurements": "ProjectDocs/ArtPipeline/Enemies/VenomCultist/03_master-measurements.md",
-        "motionDocs": [],
+        "motionDocs": [
+          "ProjectDocs/ArtPipeline/Enemies/VenomCultist/04_motion-hit.md",
+          "ProjectDocs/ArtPipeline/Enemies/VenomCultist/04_motion-idle.md",
+          "ProjectDocs/ArtPipeline/Enemies/VenomCultist/04_motion-idle_a.md",
+          "ProjectDocs/ArtPipeline/Enemies/VenomCultist/04_motion-idle_b.md"
+        ],
         "prototypes": false,
         "masterFiles": [],
-        "status": "Unknown"
+        "status": "Runtime Documented"
       },
       "table": {
         "path": "Assets/TableData/Game/Monster.csv",
         "key": "VenomCultist_MotionProfile",
+        "motionProfileKey": "VenomCultist_MotionProfile",
+        "monsterId": "3",
+        "displayName": "이교도",
         "world": "2",
-        "worldName": "판타지아"
+        "worldName": "판타지아",
+        "previewSpriteKey": "Portrait_VenomCultist",
+        "enabled": true,
+        "displayOrder": 30
       },
       "type": "Enemy",
       "lifecycle": "Active",
       "world": "2 판타지아",
       "profile": "Passive Enemy",
+      "enemyRuntimeAudit": {
+        "profilePath": "Assets/Data/MotionProfiles/Monsters/VenomCultist/VenomCultist_MotionProfile.asset",
+        "displayName": "VenomCultist",
+        "resourceFolderPath": "Assets/Art/Enemy/VenomCultist",
+        "resourceFolderMatches": true,
+        "baseIdle": {
+          "field": "baseIdle",
+          "frameCount": 4,
+          "uniqueFrameCount": 4,
+          "frameGuids": [
+            "8044ce61dc1bf45ab8147ce9d5e410cf",
+            "4a2e563be6cb84f7ea484579ba6ff587",
+            "f586ae073ad1846869f0611c13c3ca25",
+            "cc350f80915844388a75a09b9d5fb568"
+          ],
+          "framePaths": [
+            "Assets/Art/Enemy/VenomCultist/idle/VenomCultist-frame-00.png",
+            "Assets/Art/Enemy/VenomCultist/idle/VenomCultist-frame-01.png",
+            "Assets/Art/Enemy/VenomCultist/idle/VenomCultist-frame-02.png",
+            "Assets/Art/Enemy/VenomCultist/idle/VenomCultist-frame-03.png"
+          ],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": true
+        },
+        "idleEvents": [
+          {
+            "name": "idle a",
+            "frameCount": 6,
+            "uniqueFrameCount": 6,
+            "frameGuids": [
+              "6a0eb298f3db64122bb192b08802151c",
+              "01a1dff73d3b14680b2df37382a8a2ea",
+              "ee1e58823ddc844ebb54f166d90c69ca",
+              "2a7e1bab4c257400ba1dc7e0c2a78b62",
+              "f5e38f92a17a74b7c97e31d0be547e4a",
+              "2b532136977f94286a610ac8589f8a71"
+            ],
+            "framePaths": [
+              "Assets/Art/Enemy/VenomCultist/idle_a/VenomCultist-frame-00.png",
+              "Assets/Art/Enemy/VenomCultist/idle_a/VenomCultist-frame-01.png",
+              "Assets/Art/Enemy/VenomCultist/idle_a/VenomCultist-frame-02.png",
+              "Assets/Art/Enemy/VenomCultist/idle_a/VenomCultist-frame-03.png",
+              "Assets/Art/Enemy/VenomCultist/idle_a/VenomCultist-frame-04.png",
+              "Assets/Art/Enemy/VenomCultist/idle_a/VenomCultist-frame-05.png"
+            ],
+            "unresolvedGuids": [],
+            "fps": 6,
+            "playable": true
+          },
+          {
+            "name": "idle b",
+            "frameCount": 6,
+            "uniqueFrameCount": 6,
+            "frameGuids": [
+              "8e495fb8a9fc44da189dd015ae648a4e",
+              "9560eb5cbae2d441babd35d72184f79c",
+              "83d63bba73a31475eb04f97742a27ebf",
+              "165183b0469454d3ab65353c81db4cb2",
+              "2b4c1b210557b496b980099a878ecbcf",
+              "d07ca811769d64017b2d1c5a0c616f27"
+            ],
+            "framePaths": [
+              "Assets/Art/Enemy/VenomCultist/idle_b/VenomCultist-frame-00.png",
+              "Assets/Art/Enemy/VenomCultist/idle_b/VenomCultist-frame-01.png",
+              "Assets/Art/Enemy/VenomCultist/idle_b/VenomCultist-frame-02.png",
+              "Assets/Art/Enemy/VenomCultist/idle_b/VenomCultist-frame-03.png",
+              "Assets/Art/Enemy/VenomCultist/idle_b/VenomCultist-frame-04.png",
+              "Assets/Art/Enemy/VenomCultist/idle_b/VenomCultist-frame-05.png"
+            ],
+            "unresolvedGuids": [],
+            "fps": 6,
+            "playable": true
+          }
+        ],
+        "hit": {
+          "field": "hit",
+          "frameCount": 2,
+          "uniqueFrameCount": 2,
+          "frameGuids": [
+            "c0b068181470a4b7cbcf8f5f5ea32276",
+            "32b041589dc314a11ba82219afc3128f"
+          ],
+          "framePaths": [
+            "Assets/Art/Enemy/VenomCultist/hit/VenomCultist-frame-00.png",
+            "Assets/Art/Enemy/VenomCultist/hit/VenomCultist-frame-01.png"
+          ],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": true
+        },
+        "defeat": {
+          "field": "defeat",
+          "frameCount": 0,
+          "uniqueFrameCount": 0,
+          "frameGuids": [],
+          "framePaths": [],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": false
+        },
+        "hitReaction": {
+          "holdFrame": 0,
+          "recoveryFrame": 1,
+          "holdGuid": "c0b068181470a4b7cbcf8f5f5ea32276",
+          "recoveryGuid": "32b041589dc314a11ba82219afc3128f",
+          "indexesValid": true,
+          "recoveryVisuallyDistinct": true,
+          "repeatedRecoveryAllowed": false,
+          "recoveryAccepted": true,
+          "exceptionReason": null
+        },
+        "defeatMode": "fade-only",
+        "profilePlayable": true,
+        "tableConnected": true,
+        "tableProfileMatches": true,
+        "previewSpriteReady": true,
+        "unreferencedMotionFrames": [],
+        "foreignFrameRefs": [],
+        "motionQualityReady": true,
+        "productionClass": "usable"
+      },
       "requirements": {
         "required": [
           "baseIdle",
@@ -5599,6 +12285,7 @@ window.ACTOR_PRODUCTION_DATA = {
           "master"
         ],
         "observed": [
+          "anyImage",
           "baseIdle",
           "hitHold",
           "hitRecovery",
@@ -5611,31 +12298,80 @@ window.ACTOR_PRODUCTION_DATA = {
           "death"
         ]
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {
+        "anyImage": 23,
         "baseIdle": 4,
-        "hitHold": 2,
+        "hitHold": 1,
         "hitRecovery": 1,
         "idleVariant": 12,
         "master": 4,
         "portrait": 1
       },
       "packageChecklist": {
-        "index": false,
+        "index": true,
         "brief": true,
         "perfectPixelInput": true,
         "measurements": true,
-        "motionBrief": false,
-        "status": "Unknown"
+        "motionBrief": true,
+        "status": "Runtime Documented",
+        "master": true
       },
       "runtimeChecklist": {
         "motionProfile": true,
+        "profilePlayable": true,
         "characterDefinition": null,
+        "attackPools": null,
         "table": true
       },
-      "packageComplete": false,
+      "packageComplete": true,
       "runtimeConnected": true,
       "completeness": 100,
-      "nextAction": "제작 패키지 인덱스 작성",
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 100,
+          "done": 6,
+          "total": 6,
+          "complete": true,
+          "checklist": {
+            "index": true,
+            "brief": true,
+            "perfectPixelInput": true,
+            "measurements": true,
+            "motionBrief": true,
+            "status": "Runtime Documented",
+            "master": true
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "complete": true,
+          "checklist": {
+            "motionProfile": true,
+            "profilePlayable": true,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": true
+          }
+        }
+      },
+      "thumbnailPath": "Assets/Art/Enemy/VenomCultist/master/VenomCultist-master-v1-transparent-source.png",
+      "thumbnailKind": "master",
+      "stage": "Ready",
+      "nextAction": "애니메이션 요구사항 및 런타임 연결 확인",
       "importProfile": "V1"
     },
     {
@@ -5668,6 +12404,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
@@ -5675,6 +12412,7 @@ window.ACTOR_PRODUCTION_DATA = {
         "missingRequired": [],
         "missingOptional": []
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {},
       "packageChecklist": {
         "index": false,
@@ -5682,16 +12420,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": null,
+        "attackPools": null,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -5713,6 +12498,239 @@ window.ACTOR_PRODUCTION_DATA = {
         "plannedPaths": []
       },
       "evidence": {
+        "anyImage": [
+          {
+            "path": "Assets/Art/Enemy/Werewolf/hit/Werewolf-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/hit/Werewolf-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/idle_a/Werewolf-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/idle_a/Werewolf-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/idle_a/Werewolf-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/idle_a/Werewolf-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/idle_a/Werewolf-frame-04.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/idle_a/Werewolf-frame-05.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/idle_b/Werewolf-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/idle_b/Werewolf-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/idle_b/Werewolf-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/idle_b/Werewolf-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/idle/Werewolf-frame-00.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/idle/Werewolf-frame-01.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/idle/Werewolf-frame-02.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/idle/Werewolf-frame-03.png",
+            "size": {
+              "width": 128,
+              "height": 128
+            },
+            "meta": {
+              "ppu": "50",
+              "pivot": "(0.5, 0.1)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/master/Werewolf-master-v1-chromakey.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/master/Werewolf-master-v1.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/master/Werewolf-master-v2-chromakey.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/master/Werewolf-master-v2.png",
+            "size": {
+              "width": 1254,
+              "height": 1254
+            },
+            "meta": {
+              "ppu": "100",
+              "pivot": "(0.5, 0.5)"
+            }
+          },
+          {
+            "path": "Assets/Art/Enemy/Werewolf/Portrait/Portrait_Werewolf.png",
+            "size": {
+              "width": 64,
+              "height": 64
+            },
+            "meta": {
+              "ppu": "200",
+              "pivot": "(0.5, 0.078)"
+            }
+          }
+        ],
         "portrait": [
           {
             "path": "Assets/Art/Enemy/Werewolf/Portrait/Portrait_Werewolf.png",
@@ -5727,17 +12745,6 @@ window.ACTOR_PRODUCTION_DATA = {
           }
         ],
         "hitHold": [
-          {
-            "path": "Assets/Art/Enemy/Werewolf/hit/Werewolf-frame-00.png",
-            "size": {
-              "width": 128,
-              "height": 128
-            },
-            "meta": {
-              "ppu": "50",
-              "pivot": "(0.5, 0.1)"
-            }
-          },
           {
             "path": "Assets/Art/Enemy/Werewolf/hit/Werewolf-frame-01.png",
             "size": {
@@ -5968,19 +12975,152 @@ window.ACTOR_PRODUCTION_DATA = {
           }
         ]
       },
-      "observations": [],
-      "warnings": [],
+      "observations": [
+        "Repeated Hit Recovery accepted by explicit production exception: 리소스 퀄리티 문제로 Hold와 Recovery에 같은 프레임을 의도적으로 사용"
+      ],
+      "warnings": [
+        "Unreferenced motion frames: Assets/Art/Enemy/Werewolf/hit/Werewolf-frame-00.png"
+      ],
       "assetType": "Enemy",
       "table": {
         "path": "Assets/TableData/Game/Monster.csv",
         "key": "Werewolf_MotionProfile",
+        "motionProfileKey": "Werewolf_MotionProfile",
+        "monsterId": "4",
+        "displayName": "늑대인간",
         "world": "1",
-        "worldName": "애니멀랜드"
+        "worldName": "애니멀랜드",
+        "previewSpriteKey": "Portrait_Werewolf",
+        "enabled": true,
+        "displayOrder": 40
       },
       "type": "Enemy",
       "lifecycle": "Active",
       "world": "1 애니멀랜드",
       "profile": "Passive Enemy",
+      "enemyRuntimeAudit": {
+        "profilePath": "Assets/Data/MotionProfiles/Monsters/Werewolf/Werewolf_MotionProfile.asset",
+        "displayName": "Werewolf",
+        "resourceFolderPath": "Assets/Art/Enemy/Werewolf",
+        "resourceFolderMatches": true,
+        "baseIdle": {
+          "field": "baseIdle",
+          "frameCount": 4,
+          "uniqueFrameCount": 4,
+          "frameGuids": [
+            "9717fc5f94a9e418cae91d9564b3c7f0",
+            "eae99a5a97fbb4b75bafcde96725a554",
+            "720cbb29957d2482b926452ed4023ce8",
+            "b6b4cbb2134c7472cb93044581d3943a"
+          ],
+          "framePaths": [
+            "Assets/Art/Enemy/Werewolf/idle/Werewolf-frame-00.png",
+            "Assets/Art/Enemy/Werewolf/idle/Werewolf-frame-01.png",
+            "Assets/Art/Enemy/Werewolf/idle/Werewolf-frame-02.png",
+            "Assets/Art/Enemy/Werewolf/idle/Werewolf-frame-03.png"
+          ],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": true
+        },
+        "idleEvents": [
+          {
+            "name": "idle a",
+            "frameCount": 6,
+            "uniqueFrameCount": 6,
+            "frameGuids": [
+              "2d6aa5265337246d698f7c3e343a515e",
+              "a8a7b005ea8a94a2799453b07ffb0ae8",
+              "e9f4152473e32471bb4a64e3f8f0c574",
+              "10faaa2170d7a482aa5624763bd7fcf5",
+              "1eb32db658cdc4adfbfcaa0014c041ad",
+              "1ebecf98a9f4d4a42a508820f2ef225a"
+            ],
+            "framePaths": [
+              "Assets/Art/Enemy/Werewolf/idle_a/Werewolf-frame-00.png",
+              "Assets/Art/Enemy/Werewolf/idle_a/Werewolf-frame-01.png",
+              "Assets/Art/Enemy/Werewolf/idle_a/Werewolf-frame-02.png",
+              "Assets/Art/Enemy/Werewolf/idle_a/Werewolf-frame-03.png",
+              "Assets/Art/Enemy/Werewolf/idle_a/Werewolf-frame-04.png",
+              "Assets/Art/Enemy/Werewolf/idle_a/Werewolf-frame-05.png"
+            ],
+            "unresolvedGuids": [],
+            "fps": 6,
+            "playable": true
+          },
+          {
+            "name": "idle b",
+            "frameCount": 4,
+            "uniqueFrameCount": 4,
+            "frameGuids": [
+              "33f982f3fe41548c38f2c5fd7aa9d261",
+              "0c2af642d18d44dc8b2490edc2ea8a66",
+              "fe4d9fc2ae5e3486bb5fe4d17c16941f",
+              "df63c90c2563a4115aba3d125143e22f"
+            ],
+            "framePaths": [
+              "Assets/Art/Enemy/Werewolf/idle_b/Werewolf-frame-00.png",
+              "Assets/Art/Enemy/Werewolf/idle_b/Werewolf-frame-01.png",
+              "Assets/Art/Enemy/Werewolf/idle_b/Werewolf-frame-02.png",
+              "Assets/Art/Enemy/Werewolf/idle_b/Werewolf-frame-03.png"
+            ],
+            "unresolvedGuids": [],
+            "fps": 6,
+            "playable": true
+          }
+        ],
+        "hit": {
+          "field": "hit",
+          "frameCount": 2,
+          "uniqueFrameCount": 1,
+          "frameGuids": [
+            "71efa022aef1a47bf9547aec7d1f52c2",
+            "71efa022aef1a47bf9547aec7d1f52c2"
+          ],
+          "framePaths": [
+            "Assets/Art/Enemy/Werewolf/hit/Werewolf-frame-01.png",
+            "Assets/Art/Enemy/Werewolf/hit/Werewolf-frame-01.png"
+          ],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 1,
+          "fps": 6,
+          "playable": true
+        },
+        "defeat": {
+          "field": "defeat",
+          "frameCount": 0,
+          "uniqueFrameCount": 0,
+          "frameGuids": [],
+          "framePaths": [],
+          "unresolvedGuids": [],
+          "duplicateFrameRefs": 0,
+          "fps": 6,
+          "playable": false
+        },
+        "hitReaction": {
+          "holdFrame": 0,
+          "recoveryFrame": 1,
+          "holdGuid": "71efa022aef1a47bf9547aec7d1f52c2",
+          "recoveryGuid": "71efa022aef1a47bf9547aec7d1f52c2",
+          "indexesValid": true,
+          "recoveryVisuallyDistinct": false,
+          "repeatedRecoveryAllowed": true,
+          "recoveryAccepted": true,
+          "exceptionReason": "리소스 퀄리티 문제로 Hold와 Recovery에 같은 프레임을 의도적으로 사용"
+        },
+        "defeatMode": "fade-only",
+        "profilePlayable": true,
+        "tableConnected": true,
+        "tableProfileMatches": true,
+        "previewSpriteReady": true,
+        "unreferencedMotionFrames": [
+          "Assets/Art/Enemy/Werewolf/hit/Werewolf-frame-00.png"
+        ],
+        "foreignFrameRefs": [],
+        "motionQualityReady": true,
+        "productionClass": "package-only"
+      },
       "requirements": {
         "required": [
           "baseIdle",
@@ -5993,6 +13133,7 @@ window.ACTOR_PRODUCTION_DATA = {
           "master"
         ],
         "observed": [
+          "anyImage",
           "baseIdle",
           "hitHold",
           "hitRecovery",
@@ -6005,9 +13146,11 @@ window.ACTOR_PRODUCTION_DATA = {
           "death"
         ]
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {
+        "anyImage": 21,
         "baseIdle": 4,
-        "hitHold": 2,
+        "hitHold": 1,
         "hitRecovery": 1,
         "idleVariant": 10,
         "master": 4,
@@ -6019,16 +13162,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": true
       },
       "runtimeChecklist": {
         "motionProfile": true,
+        "profilePlayable": true,
         "characterDefinition": null,
+        "attackPools": null,
         "table": true
       },
       "packageComplete": false,
       "runtimeConnected": true,
       "completeness": 100,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 17,
+          "done": 1,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": true
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": 100,
+          "done": 3,
+          "total": 3,
+          "applicable": true,
+          "complete": true,
+          "checklist": {
+            "motionProfile": true,
+            "profilePlayable": true,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": true
+          }
+        }
+      },
+      "thumbnailPath": "Assets/Art/Enemy/Werewolf/master/Werewolf-master-v1.png",
+      "thumbnailKind": "master",
+      "stage": "Brief",
       "nextAction": "제작 패키지 인덱스 작성",
       "importProfile": "V1"
     },
@@ -6062,6 +13252,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
@@ -6069,6 +13260,7 @@ window.ACTOR_PRODUCTION_DATA = {
         "missingRequired": [],
         "missingOptional": []
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {},
       "packageChecklist": {
         "index": false,
@@ -6076,16 +13268,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": null,
+        "attackPools": null,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -6119,6 +13358,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
@@ -6126,6 +13366,7 @@ window.ACTOR_PRODUCTION_DATA = {
         "missingRequired": [],
         "missingOptional": []
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {},
       "packageChecklist": {
         "index": false,
@@ -6133,16 +13374,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": null,
+        "attackPools": null,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     },
@@ -6176,6 +13464,7 @@ window.ACTOR_PRODUCTION_DATA = {
       "lifecycle": "Candidate",
       "world": "ANIMAL-LAND-01",
       "profile": "Concept Actor",
+      "enemyRuntimeAudit": null,
       "requirements": {
         "required": [],
         "optional": [],
@@ -6183,6 +13472,7 @@ window.ACTOR_PRODUCTION_DATA = {
         "missingRequired": [],
         "missingOptional": []
       },
+      "attackPoolAudit": null,
       "assetMotionCounts": {},
       "packageChecklist": {
         "index": false,
@@ -6190,16 +13480,63 @@ window.ACTOR_PRODUCTION_DATA = {
         "perfectPixelInput": false,
         "measurements": false,
         "motionBrief": false,
-        "status": "No package"
+        "status": "No package",
+        "master": false
       },
       "runtimeChecklist": {
         "motionProfile": false,
+        "profilePlayable": null,
         "characterDefinition": null,
+        "attackPools": null,
         "table": null
       },
       "packageComplete": false,
       "runtimeConnected": false,
       "completeness": null,
+      "progress": {
+        "package": {
+          "label": "설정/패키지",
+          "percent": 0,
+          "done": 0,
+          "total": 6,
+          "complete": false,
+          "checklist": {
+            "index": false,
+            "brief": false,
+            "perfectPixelInput": false,
+            "measurements": false,
+            "motionBrief": false,
+            "status": "No package",
+            "master": false
+          }
+        },
+        "resources": {
+          "label": "리소스",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "missing": []
+        },
+        "game": {
+          "label": "게임 연결",
+          "percent": null,
+          "done": null,
+          "total": null,
+          "applicable": false,
+          "complete": false,
+          "checklist": {
+            "motionProfile": false,
+            "profilePlayable": null,
+            "characterDefinition": null,
+            "attackPools": null,
+            "table": null
+          }
+        }
+      },
+      "thumbnailPath": null,
+      "thumbnailKind": null,
+      "stage": "Candidate",
       "nextAction": "후보 선택 및 Brief 승인",
       "importProfile": "unknown"
     }
