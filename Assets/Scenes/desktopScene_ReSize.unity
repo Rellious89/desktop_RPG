@@ -9168,17 +9168,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 989eb016cc6740468e3cee7cfd618381, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  entries:
-  - definition: {fileID: 11400000, guid: 6a26af04782f43e7aecb5da3ad0e773c, type: 2}
-  - definition: {fileID: 11400000, guid: 545af0af88684a7e8cdec723d453d29e, type: 2}
-  - definition: {fileID: 11400000, guid: 731bd16ac75347a1a42b9b65a0454789, type: 2}
-  - definition: {fileID: 11400000, guid: 2bb964cc0650423f809a2eae6b992ce2, type: 2}
-  - definition: {fileID: 11400000, guid: b94859fe830b4ef4a6c04cf4e5fb62eb, type: 2}
-  - definition: {fileID: 11400000, guid: 7e3199f48eeb4a7cb8570429b5e254f9, type: 2}
-  - definition: {fileID: 11400000, guid: 829166e6860874821b8a0289ac0df6db, type: 2}
-  - definition: {fileID: 11400000, guid: 737d4c5e053534506a14e4bddb6928c3, type: 2}
+  catalog: {fileID: 11400000, guid: 5f24823f983054d358a82014246a9fa7, type: 2}
+  entries: []
   runtimeActor: {fileID: 1959120555}
-  defaultCharacter: {fileID: 11400000, guid: 6a26af04782f43e7aecb5da3ad0e773c, type: 2}
+  defaultCharacter: {fileID: 11400000, guid: 342e077c6a6894f169a84d989ea37a84, type: 2}
   staminaCostPerDefeat: 1
   overrideStaminaOnStart: 0
   debugStartStamina: 30
