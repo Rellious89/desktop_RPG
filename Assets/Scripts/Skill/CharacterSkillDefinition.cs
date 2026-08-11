@@ -8,9 +8,15 @@ namespace Skill
     /// 들고 있지 않고, 관계만 따로 모아 두는 이유는 하나다 - 한쪽 표에 목록 칸을 두면 같은 관계가
     /// 캐릭터 쪽과 스킬 쪽 두 곳에 적히고, 둘이 어긋났을 때 어느 쪽이 맞는지 정할 수 없게 된다.
     ///
-    /// <b>여기에 해금 규칙은 없다.</b> <see cref="RequiredCharacterLevel"/>은 표에 적힌 숫자일 뿐이고,
-    /// 그 값을 보고 스킬을 열어 주거나 막는 코드는 어디에도 없다 - 이번 단계의 범위는 관계 표가
-    /// 존재하고 검증되며 에셋으로 만들어진다까지다.
+    /// <b>여기에 해금 규칙은 없다 - 규칙이 없다는 뜻이 아니라, 규칙의 주인이 여기가 아니라는
+    /// 뜻이다.</b> 이 에셋은 표에 적힌 값을 그대로 담아 두는 <b>정적 데이터</b>이고,
+    /// <see cref="RequiredCharacterLevel"/>을 읽어 "지금 이 캐릭터가 이 스킬을 쓸 수 있는가"를 정하는
+    /// 것은 <see cref="CharacterSkillUnlockService"/> 하나뿐이다. 그래서 이 클래스는 무엇도 열어 주지
+    /// 않고, 무엇이 열렸는지 기억하지도 않는다.
+    ///
+    /// <b>해금 상태는 어디에도 저장되지 않는다.</b> 서비스가 물을 때마다 이 값과 저장된 캐릭터 레벨로
+    /// 다시 계산하므로, 표의 필요 레벨을 고치면 답도 함께 바뀐다 - 플래그를 저장해 두면 표와 저장
+    /// 파일이 어긋났을 때 어느 쪽이 맞는지 정할 방법이 없어진다.
     ///
     /// <b>식별자는 문자열 두 개이고, 참조는 그것을 푼 결과다.</b> <see cref="CharacterId"/> /
     /// <see cref="SkillId"/>가 이 관계의 정체이며(생성 에셋을 다시 찾을 때 쓰는 키가 이것이다),
@@ -44,8 +50,9 @@ namespace Skill
         [SerializeField] private SkillDefinition skill;
 
         [Header("Condition")]
-        [Tooltip("표에 적힌 필요 캐릭터 레벨. <b>지금은 이 값을 보고 무엇을 여닫는 코드가 없다</b> - " +
-                 "해금 규칙은 이번 단계의 범위가 아니다.")]
+        [Tooltip("표에 적힌 필요 캐릭터 레벨. 이 에셋은 값을 담기만 하고 스스로 무엇을 여닫지 않는다 - " +
+                 "이 값을 읽어 해금을 판정하는 것은 CharacterSkillUnlockService이며, 그 결과는 " +
+                 "저장되지 않고 물을 때마다 다시 계산된다.")]
         [Min(1)]
         [SerializeField] private int requiredCharacterLevel = 1;
 
@@ -74,7 +81,8 @@ namespace Skill
         /// <summary>skill_id가 가리키는 정의. 연결되지 않았으면 null이다.</summary>
         public SkillDefinition Skill => skill;
 
-        /// <summary>표에 적힌 필요 캐릭터 레벨(1 이상). <b>해금 판정에 쓰이지 않는다</b>.</summary>
+        /// <summary>표에 적힌 필요 캐릭터 레벨(1 이상). <b>해금 판정의 근거이지만 판정은 여기서 하지
+        /// 않는다</b> - 이 값을 읽어 열림/잠김을 정하는 것은 <see cref="CharacterSkillUnlockService"/>다.</summary>
         public int RequiredCharacterLevel => Mathf.Max(1, requiredCharacterLevel);
 
         /// <summary>정렬용 순서 값. 작을수록 앞이며, 지정하지 않으면 0이다.</summary>

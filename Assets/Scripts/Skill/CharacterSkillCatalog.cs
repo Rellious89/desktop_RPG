@@ -14,8 +14,13 @@ namespace Skill
     /// <b>담기는 것은 활성 관계뿐이다.</b> enabled=1인 행만, display_order 오름차순 → 같으면
     /// character_id → 같으면 skill_id Ordinal 오름차순으로 임포터가 넣는다.
     ///
-    /// <b>여기서 스킬을 열어 주지 않는다.</b> 이 목록은 "누가 어떤 스킬을 가진다고 표에 적혀 있는가"
-    /// 뿐이고, 필요 레벨을 보고 사용 가능 여부를 정하는 코드는 어디에도 없다.
+    /// <b>여기서 스킬을 열어 주지 않는다.</b> 이 목록이 답하는 것은 "누가 어떤 스킬을 가진다고 표에
+    /// 적혀 있는가"까지이고, 그 관계의 필요 레벨을 읽어 <b>지금 쓸 수 있는지</b>를 정하는 것은
+    /// <see cref="CharacterSkillUnlockService"/>다 - 목록의 순서와 구성을 소유하는 자리와, 그 목록을
+    /// 저장된 레벨과 겹쳐 판정하는 자리를 나눠 두면 표가 바뀌어도 판정 규칙을 고칠 일이 없다.
+    ///
+    /// 그래서 <b>이 에셋에는 해금 상태가 없다.</b> 무엇이 열렸는지 여기에 적어 두지 않으며, 서비스가
+    /// 물을 때마다 이 목록과 저장된 캐릭터 레벨로 다시 계산한다.
     /// </summary>
     [CreateAssetMenu(fileName = "CharacterSkillCatalog", menuName = "Skill/Character Skill Catalog")]
     public class CharacterSkillCatalog : ScriptableObject

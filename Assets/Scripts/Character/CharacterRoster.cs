@@ -140,6 +140,17 @@ namespace Character
         /// <summary>지금 전투 중인 캐릭터. 사용 가능한 항목이 하나도 없으면 null이다.</summary>
         public CharacterDefinition Current => current;
 
+        /// <summary>
+        /// 이 로스터가 목록의 근거로 삼는 <b>활성 캐릭터 카탈로그</b>. 연결되지 않은 과도기 구성에서는
+        /// null이다.
+        ///
+        /// <b>읽기 전용 이음매다.</b> 캐릭터 id를 근거로 무언가를 계산하는 다른 시스템(스킬 해금 등)이
+        /// "지금 어떤 카탈로그가 쓰이고 있는가"를 자기 Inspector 칸으로 한 벌 더 들고 있으면, 두 곳이
+        /// 서로 다른 카탈로그를 가리키는 씬을 만들 수 있다 - 그러면 로스터가 인정한 캐릭터와 스킬이
+        /// 인정한 캐릭터가 달라진다. 근거는 이 하나뿐이다.
+        /// </summary>
+        public CharacterCatalog Catalog => catalog;
+
         /// <summary>지금 전투 중인 캐릭터가 <b>새 공격을 시작</b>할 수 있는지(행동력 &gt; 0).
         /// PlayerCharacterAnimator가 입력을 받을지 판단할 때 Target.HasAttackableTarget과 함께 본다.
         ///

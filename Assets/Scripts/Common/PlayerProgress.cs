@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Character;
+using Skill;
 using UnityEngine;
 
 namespace Common
@@ -51,6 +53,15 @@ namespace Common
         [Tooltip("Target(허수아비 등) 하나를 처치할 때마다 지금 전투 중인 캐릭터에게 지급할 경험치")]
         [SerializeField] private int expPerTargetDefeat = 1;
 
+        [Header("Skill Unlock (연결하지 않으면 해금 신호가 나가지 않는다)")]
+        [Tooltip("정식 스킬 목록. 캐릭터 카탈로그는 CharacterRoster가 쓰는 것을 그대로 따르므로 " +
+                 "여기에 다시 두지 않는다.")]
+        [SerializeField] private SkillCatalog skillCatalog;
+
+        [Tooltip("캐릭터-스킬 관계 목록. 지금 표에는 관계 행이 하나도 없어 비어 있는 것이 정상이며, " +
+                 "그때는 해금 신호가 하나도 나가지 않는다.")]
+        [SerializeField] private CharacterSkillCatalog characterSkillCatalog;
+
         /// <summary>지금 전투 중인 캐릭터의 레벨. 표시용이라 언제나 하한(1) 이상이다.</summary>
         public static int CurrentLevel { get; private set; } = CharacterProgressionService.MinimumLevel;
 
@@ -98,6 +109,19 @@ namespace Common
 
         /// <summary>레벨이 오를 때마다 발생(한 번에 여러 레벨이 오르면 그 횟수만큼 발생). 새 레벨 값을 전달한다.</summary>
         public static event Action<int> OnLevelUp;
+
+        /// <summary>
+        /// 레벨이 올라 스킬이 <b>새로 열렸을 때</b> 그 관계 하나마다 한 번씩 발생. 어떤 캐릭터의 어떤
+        /// 스킬인지 함께 보낸다 - 받는 쪽(토스트·스킬 목록)이 무엇을 그릴지 정할 수 있어야 한다.
+        ///
+        /// <b>해금은 어디에도 저장되지 않는다.</b> 이 신호는 "방금 조건을 넘었다"는 알림일 뿐이고,
+        /// 지금 열려 있는지는 언제나 <see cref="CharacterSkillUnlockService"/>가 표와 레벨로 다시
+        /// 계산해서 답한다 - 이 신호를 놓쳤다고 스킬이 잠기지 않는다.
+        ///
+        /// 나가지 않는 경우: 레벨이 오르지 않은 성장(어긋난 값의 정리), 이미 조건을 넘긴 뒤의 반복
+        /// 획득, 캐릭터 교체, 줄 대상이 없는 처치, 그리고 표에 관계가 하나도 없는 지금 상태.
+        /// </summary>
+        public static event Action<CharacterDefinition, SkillDefinition> OnSkillUnlocked;
 
         /// <summary>같은 처치 이벤트가 두 번 들어와도 킬카운트와 경험치가 두 번 오르지 않게 막는 최소
         /// 방어(판정 규칙은 <see cref="DefeatEventFilter"/> 참고). <b>이 컴포넌트만의 필터</b>다 -
@@ -186,7 +210,13 @@ namespace Common
         ///   2. 누적 킬카운트는 <b>캐릭터와 무관하게</b> 오른다. 아무도 투입되지 않았어도 처치는
         ///      일어난 일이다.
         ///   3. 경험치는 지금 투입된 보유 캐릭터에게만 간다.
-        ///   4. 저장은 <b>마지막에 한 번</b>. 레벨이 몇 단계를 오르든 파일 쓰기는 한 번이다.
+        ///   4. <b>저장은 알리기 전에 한 번</b>. 레벨이 몇 단계를 오르든 파일 쓰기는 한 번이다.
+        ///
+        /// <b>알리기 전에 저장한다.</b> 구독자(토스트·스킬 목록·교체 패널)는 알림을 받은 순간 값을
+        /// 다시 읽고, 그 자리에서 다른 저장을 부르는 것도 있다 - 아직 저장하지 않은 상태에서 알리면
+        /// "화면에는 올라간 레벨이 보이는데 파일에는 없는" 창이 열리고, 그 사이에 앱이 꺼지면 사용자가
+        /// 본 것과 다음에 불러오는 것이 달라진다. 저장을 마친 뒤에 알리면 알림이 언제나 <b>이미 남은
+        /// 사실</b>을 가리킨다.
         ///
         /// <b>행동력이 0이 되는 마지막 처치도 경험치를 받는다.</b> 여기서는 행동력을 아예 보지 않기
         /// 때문에, 행동력을 깎는 CharacterRoster가 먼저 처리되든 나중에 처리되든 결과가 같다 -
@@ -204,8 +234,12 @@ namespace Common
             if (!defeatFilter.Accept(targetId, this)) return;
 
             TotalKillCount++;
-            GrantToCurrentCharacter(expPerTargetDefeat);
+
+            // 값을 먼저 전부 고치고, 한 번 저장하고, 그 다음에 알린다. 킬카운트와 경험치가 같은 파일
+            // 쓰기 하나에 함께 들어가는 것도 이 순서 덕분이다.
+            bool grew = ApplyExperienceToCurrentCharacter(expPerTargetDefeat, out Growth growth);
             SaveProgress();
+            if (grew) RaiseGrowthEvents(growth);
         }
 
         /// <summary>
@@ -213,19 +247,26 @@ namespace Common
         ///
         /// <b>실제로 값이 달라졌을 때만</b> 저장하고 알린다 - 줄 캐릭터가 없거나, 0 이하를 넣었거나,
         /// 저장 칸의 한계에 닿아 한 톨도 들어가지 않았으면 파일도 이벤트도 건드리지 않는다.
+        ///
+        /// <b>저장이 먼저다.</b> 구독자가 알림을 받는 순간에는 그 값이 이미 파일에 남아 있어야 한다.
         /// </summary>
         public void AddExp(int amount)
         {
-            if (!GrantToCurrentCharacter(amount)) return;
+            if (!ApplyExperienceToCurrentCharacter(amount, out Growth growth)) return;
 
             SaveProgress();
+            RaiseGrowthEvents(growth);
         }
 
-        /// <summary>경험치를 실제로 적용하고 그 결과를 알린다. <b>저장하지 않는다</b> - 저장 시점은
-        /// 부르는 쪽이 정한다(처치 경로는 킬카운트까지 함께 한 번에 저장한다).</summary>
-        /// <returns>저장 항목이 실제로 달라졌으면 true.</returns>
-        private bool GrantToCurrentCharacter(int amount)
+        /// <summary>
+        /// 경험치를 실제로 적용하고 표시값을 맞춘다. <b>저장하지도 알리지도 않는다</b> - 저장과 알림의
+        /// 순서를 부르는 쪽이 정할 수 있도록 "값 고치기"와 "알리기"를 갈라 둔다.
+        /// </summary>
+        /// <returns>저장 항목이 실제로 달라졌으면 true. 그때만 <paramref name="growth"/>가 뜻을 갖는다.</returns>
+        private bool ApplyExperienceToCurrentCharacter(int amount, out Growth growth)
         {
+            growth = default;
+
             if (amount <= 0) return false;
 
             // 투입된 보유 캐릭터가 없으면 여기서 끝난다 - 항목을 만들지 않으므로 "주려고 했다"는
@@ -241,6 +282,15 @@ namespace Common
 
             PublishSnapshot(result.NewLevel, result.NewExp);
 
+            growth = new Growth(roster, canonical, result);
+            return true;
+        }
+
+        /// <summary>이번 성장을 구독자에게 알린다. <b>저장이 이미 끝난 뒤에만</b> 불린다.</summary>
+        private void RaiseGrowthEvents(Growth growth)
+        {
+            CharacterProgressionResult result = growth.Result;
+
             // 실제로 들어간 양이 0이면 알리지 않는다. 0을 얻었다는 토스트는 사용자에게 거짓말이고,
             // 여기까지 온 것은 어긋난 값이 정리된 경우뿐이다(저장 칸의 한계에 닿은 자리).
             if (result.ExperienceAdded > 0) OnExpGained?.Invoke(result.ExperienceAdded);
@@ -251,11 +301,64 @@ namespace Common
 
             OnExperienceChanged?.Invoke();
 
+            // 값이 먼저 맞춰진 뒤에 그 결과(새로 열린 스킬)를 알린다 - 받는 쪽이 새 레벨을 이미 볼 수
+            // 있는 상태여야 한다.
+            RaiseSkillUnlocks(
+                growth.Roster, growth.Character, levelBeforeGrowth, result.NewLevel, result.LevelsGained);
+
             // 캐릭터 교체 패널·회복소의 레벨 표시가 이 이벤트를 이미 구독하고 있다. 직접 부르지 않고
             // 로스터의 경로를 지나는 이유는, 그쪽이 <b>정식 정의</b>를 넘기고 보유가 사라진 캐릭터를
             // 걸러 주기 때문이다 - 알림 규칙을 여기 한 벌 더 두지 않는다.
-            roster.RaiseCharacterStateChanged(canonical);
-            return true;
+            growth.Roster.RaiseCharacterStateChanged(growth.Character);
+        }
+
+        /// <summary>값을 고친 결과 중 <b>알릴 때 필요한 것</b>만 담아 두는 자리. 알리는 시점에 저장
+        /// 항목을 다시 읽지 않기 위해서다 - 그 사이에 값이 또 바뀌었는지 알 수 없다.</summary>
+        private readonly struct Growth
+        {
+            public CharacterRoster Roster { get; }
+
+            public CharacterDefinition Character { get; }
+
+            public CharacterProgressionResult Result { get; }
+
+            public Growth(CharacterRoster roster, CharacterDefinition character, CharacterProgressionResult result)
+            {
+                Roster = roster;
+                Character = character;
+                Result = result;
+            }
+        }
+
+        /// <summary>
+        /// 이번 성장으로 <b>새로 열린</b> 스킬을 관계 하나마다 한 번씩 알린다.
+        ///
+        /// <b>레벨이 실제로 올랐을 때만 계산한다.</b> 어긋난 값이 정리되기만 한 성장은 조건을 넘긴 것이
+        /// 아니므로 볼 것이 없고, 여기서 계산하면 저장 파일을 고칠 때마다 같은 스킬이 "새로 열렸다"고
+        /// 나온다.
+        ///
+        /// <b>구간 계산은 한 번뿐이다.</b> 레벨이 한 번에 여러 단계 올라도 이전 레벨과 새 레벨을 한
+        /// 구간으로 놓고 한 번 묻는다 - 단계마다 나눠 물으면 같은 스킬이 여러 번 나올 자리가 생긴다.
+        ///
+        /// <b>저장하지 않는다.</b> 해금은 어디에도 적히지 않으므로 이 계산은 파일을 건드릴 이유가
+        /// 없다 - 처치 하나당 저장 한 번이라는 규칙이 이것 때문에 깨지면 안 된다.
+        /// </summary>
+        private void RaiseSkillUnlocks(
+            CharacterRoster roster, CharacterDefinition canonical,
+            int previousLevel, int newLevel, int levelsGained)
+        {
+            if (levelsGained <= 0) return;
+            if (OnSkillUnlocked == null) return;
+
+            // 카탈로그는 로스터가 쓰는 것을 그대로 따른다 - 여기에 한 벌 더 두면 두 곳이 서로 다른
+            // 캐릭터 목록을 가리키는 씬을 만들 수 있다.
+            var unlocks = new CharacterSkillUnlockService(
+                roster.Catalog, skillCatalog, characterSkillCatalog, SaveSystem.Data);
+
+            IReadOnlyList<SkillDefinition> opened =
+                unlocks.GetNewlyUnlockedSkills(canonical.CharacterId, previousLevel, newLevel);
+
+            for (int i = 0; i < opened.Count; i++) OnSkillUnlocked?.Invoke(canonical, opened[i]);
         }
 
         /// <summary>지금 전투 중인 캐릭터의 값을 정적 프로퍼티에 비춘다. 로스터·캐릭터가 없으면
