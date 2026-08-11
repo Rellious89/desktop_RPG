@@ -41,7 +41,7 @@ namespace Character
     /// 전용 경로인 <see cref="ApplyRecoveryStamina"/>를 쓴다.
     /// </summary>
     [DisallowMultipleComponent]
-    public class CharacterRoster : MonoBehaviour
+    public class CharacterRoster : MonoBehaviour, IOwnedCharacterLevelSource
     {
         /// <summary>교체가 막히는 이유. UI가 사용자에게 무엇을 보여줄지 결정하는 근거다 -
         /// "선택했는데 아무 반응 없이 실패"하는 경로를 만들지 않기 위해 항상 이유를 함께 돌려준다.</summary>
@@ -525,6 +525,39 @@ namespace Character
             Debug.LogWarning("[CharacterRoster] 보유한 모든 캐릭터가 회복소에 있어 전투에 투입할 캐릭터가 " +
                              "없습니다 - 회복이 끝난 캐릭터를 합류시키면 다시 선택할 수 있습니다.", this);
             return null;
+        }
+
+        // ---- IOwnedCharacterLevelSource ----
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// <b>usableEntries를 순회한다.</b> <see cref="BuildUsableEntries"/>가 걸러낸, 재생 가능한
+        /// 모션 프로필이 있는 보유 캐릭터만 대상이다. <see cref="OwnedCharacterCollection.OwnedCharacters"/>를
+        /// 직접 쓰면 프로필 검증에 실패한 정의가 포함되어, 화면에 투입할 수 없는 캐릭터의 레벨이
+        /// 던전 입장 판정에 쓰인다.
+        ///
+        /// 항목마다 <see cref="TryGetOwnedState"/>로 <b>지금도 보유 중인지</b> 재확인한다 -
+        /// usableEntries는 Awake 때 한 번 만든 목록이라, 그 뒤에 저장 문서에서 보유가 사라진
+        /// 캐릭터도 남아 있기 때문이다.
+        /// </remarks>
+        public int HighestOwnedCharacterLevel
+        {
+            get
+            {
+                if (owned == null) return 0;
+
+                int highest = 0;
+                for (int i = 0; i < usableEntries.Count; i++)
+                {
+                    Entry entry = usableEntries[i];
+                    if (entry == null || entry.definition == null) continue;
+
+                    if (!TryGetOwnedState(entry.definition, out _, out CharacterSaveState state)) continue;
+                    int level = state.level < 1 ? 1 : state.level;
+                    if (level > highest) highest = level;
+                }
+                return highest;
+            }
         }
 
         // ---- 조회 ----

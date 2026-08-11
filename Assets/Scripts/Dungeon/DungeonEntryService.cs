@@ -1,4 +1,5 @@
 using System;
+using Character;
 using UnityEngine;
 
 namespace Dungeon
@@ -13,8 +14,9 @@ namespace Dungeon
     /// 로그만 남기고 끝난다 - 그래도 패널은 요청이 받아들여진 것으로 보고 닫힌다. 이 동작이 나중에
     /// 구독자가 생겼을 때와 같은 경로를 지나게 하기 위함이다(구독자 유무로 UI 흐름이 갈라지지 않는다).
     ///
-    /// <b>검증은 여기서 끝낸다.</b> 던전이 없거나 식별자가 없는 요청은 이벤트를 발행하지 않고 false를
-    /// 돌려주므로, 구독자는 "언제나 유효한 던전"만 받는다.
+    /// <b>검증은 여기서 끝낸다.</b> 던전이 없거나 식별자가 없는 요청, 그리고 필요 레벨에 못 미치는
+    /// 요청은 이벤트를 발행하지 않고 false를 돌려주므로, 구독자는 "언제나 유효하고 입장 가능한 던전"만
+    /// 받는다.
     /// </summary>
     public static class DungeonEntryService
     {
@@ -33,6 +35,8 @@ namespace Dungeon
         /// 데 쓴다 - 거부된 요청은 세지 않는다.</summary>
         public static int AcceptedRequestCount { get; private set; }
 
+        private static DungeonAccessService accessOverride;
+
         /// <summary>
         /// 던전 입장을 요청한다. 받아들여지면 <see cref="DungeonEnterRequested"/>를 한 번 발행하고
         /// true를, 요청이 유효하지 않으면 아무것도 발행하지 않고 false를 돌려준다.
@@ -40,6 +44,9 @@ namespace Dungeon
         /// <b>중복 클릭 억제는 호출하는 쪽이 한다.</b> 이 통로는 "요청이 왔다"는 사실만 처리하고,
         /// 같은 클릭이 두 번 도달하지 않게 막는 것은 버튼을 소유한 UI의 몫이다(패널은 요청이
         /// 받아들여지면 즉시 버튼을 끄고 닫는다).
+        ///
+        /// <b>레벨 판정은 요청 직전에 현재 상태로 한다.</b> UI가 미리 계산한 값은 이 통로가 보지
+        /// 않으며, 우회할 수 없다.
         /// </summary>
         public static bool RequestEnterDungeon(DungeonDefinition dungeon)
         {
@@ -56,12 +63,18 @@ namespace Dungeon
                 return false;
             }
 
+            DungeonAccessResult access = EvaluateAccess(dungeon);
+            if (!access.Allowed)
+            {
+                Debug.Log($"[DungeonEntryService] 던전 '{dungeon.DungeonId}' 입장 거부: {access.FailureReason} " +
+                          $"(필요 {access.DungeonRequiredLevel}, 최고 보유 {access.HighestOwnedLevel}).");
+                return false;
+            }
+
             LastRequestedDungeon = dungeon;
             LastRequestedDungeonId = dungeon.DungeonId;
             AcceptedRequestCount++;
 
-            // 요청 한 번에 로그 한 줄. 어떤 던전이 요청됐는지가 식별자로 남아야 나중에 필드 모드 쪽과
-            // 맞춰볼 수 있다.
             Debug.Log($"[DungeonEntryService] 던전 입장 요청: '{dungeon.DungeonId}'.", dungeon);
 
             DungeonEnterRequested?.Invoke(dungeon);
@@ -75,6 +88,28 @@ namespace Dungeon
             LastRequestedDungeon = null;
             LastRequestedDungeonId = string.Empty;
             AcceptedRequestCount = 0;
+            accessOverride = null;
+        }
+
+        internal static void SetAccessServiceForTests(DungeonAccessService service)
+        {
+            accessOverride = service;
+        }
+
+        private static DungeonAccessResult EvaluateAccess(DungeonDefinition dungeon)
+        {
+            DungeonAccessService service = accessOverride ?? DefaultAccessService();
+            if (service == null)
+                return DungeonAccessResult.Deny(DungeonAccessFailureReason.MissingRosterOrProgression);
+
+            return service.Evaluate(dungeon);
+        }
+
+        private static DungeonAccessService DefaultAccessService()
+        {
+            CharacterRoster roster = CharacterRoster.Instance;
+            if (roster == null) return null;
+            return new DungeonAccessService(roster);
         }
     }
 }
