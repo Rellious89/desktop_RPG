@@ -27,8 +27,12 @@ namespace CommonEditor.Tests
         private const string LegacyV0Json =
             @"{""currentLevel"":7,""currentExp"":240,""totalKillCount"":133,""currency"":1250}";
 
-        /// <summary>v1 파일. 캐릭터 항목이 하나만 있는데, 그것이 v1의 실제 모습이다 - 목록은 실제로 써 본
-        /// 캐릭터만 담았고 "가지고 있는가"를 적는 자리는 없었다.</summary>
+        /// <summary>
+        /// v1 파일. 캐릭터 항목이 하나만 있는 문서다 - v1에서 쓸 수 있는 캐릭터를 정한 것은 씬의
+        /// 직렬화된 로스터 목록이었고 저장 목록은 그 목록을 따라 만들어진 상태 기록이었으므로,
+        /// 로스터 구성이 달랐던 시점에 저장된 문서는 이렇게 일부만 담고 있을 수 있다. 그 문서를 v2로
+        /// 올릴 때 나머지가 미보유로 사라지지 않는지를 이 상수로 확인한다.
+        /// </summary>
         private const string LegacyV1Json =
             @"{""saveVersion"":1,""saveRevision"":5,""lastSavedAtUtc"":""2026-01-02T03:04:05.0000000Z"","
             + @"""currentLevel"":7,""currency"":1250,"

@@ -73,7 +73,13 @@ namespace Character
         }
 
         [Header("Roster")]
-        [Tooltip("보유 캐릭터 목록. 순서가 곧 교체 패널 리스트 순서다.")]
+        [Tooltip("이 게임의 활성 캐릭터 전체(생성 카탈로그). 이것이 연결되면 로스터는 " +
+                 "'카탈로그 순서 ∩ 저장 데이터의 보유'로 목록을 만들고 아래 Entries는 보지 않는다.")]
+        [SerializeField] private CharacterCatalog catalog;
+
+        [Tooltip("<b>과도기 폴백</b>. Character Catalog가 연결되지 않은 씬에서만 쓰인다 - " +
+                 "카탈로그가 있으면 이 목록은 한 항목도 읽지 않는다. 여기 적힌 캐릭터는 " +
+                 "보유로 취급되지 않으며 저장 데이터에 항목을 만들지도 않는다.")]
         [SerializeField] private List<Entry> entries = new List<Entry>();
 
         [Header("Runtime Actor")]
@@ -116,6 +122,14 @@ namespace Character
 
         private CharacterDefinition current;
 
+        /// <summary>카탈로그와 저장 문서를 겹쳐 보는 자리. 카탈로그가 없으면 null이며, 그때 로스터는
+        /// 과도기 폴백(직렬화된 Entries)으로 동작한다.</summary>
+        private OwnedCharacterCollection owned;
+
+        /// <summary>이번 실행이 카탈로그 기반인지. 두 모드의 차이가 코드 여러 곳에 흩어지지 않도록
+        /// 판정을 한 곳에 둔다.</summary>
+        private bool UsesCatalog => catalog != null;
+
         // 같은 처치 이벤트가 두 번 들어와도 행동력이 두 번 깎이지 않게 막는 최소 방어(판정 규칙은
         // DefeatEventFilter 참고). 보상 지급 쪽은 자기 필터를 따로 들고 있다 - 하나를 공유하면
         // 먼저 처리한 쪽이 다른 쪽의 이벤트를 삼켜서 둘이 서로에게 영향을 준다.
@@ -129,19 +143,34 @@ namespace Character
         /// <summary>지금 전투 중인 캐릭터가 <b>새 공격을 시작</b>할 수 있는지(행동력 &gt; 0).
         /// PlayerCharacterAnimator가 입력을 받을지 판단할 때 Target.HasAttackableTarget과 함께 본다.
         ///
-        /// 로스터가 없는 씬이나 사용 가능한 캐릭터가 <b>하나도 없는</b> 구성에서는 항상 true를 돌려준다 -
-        /// 행동력 시스템을 쓰지 않는 씬의 기존 전투를 막지 않기 위함이다.
+        /// <b>로스터가 아예 없는 씬</b>에서만 항상 true다 - 행동력 시스템을 쓰지 않는 씬의 기존 전투를
+        /// 막지 않기 위함이다.
         ///
-        /// 반면 <b>캐릭터는 있는데 아무도 투입되지 않은 상태</b>(전원이 회복소 슬롯에 있어 시작
-        /// 캐릭터를 고르지 못한 경우)는 false다. 예전에는 이 경우도 "current가 null" 하나로 묶여
-        /// true가 됐는데, 그러면 화면에 아무도 없는 채로 공격 입력이 통한다.</summary>
+        /// <b>로스터가 있는데 보유한 캐릭터가 하나도 없으면 false다.</b> 예전에는 "목록이 비었으면
+        /// true"였는데, 보유가 저장 데이터로 정해진 뒤로 그것은 위험한 판정이 됐다 - 아직 아무도 가지지
+        /// 못한 사람이 화면에 아무도 없는 채로 공격할 수 있게 된다. <b>보유 0은 '로스터가 없다'가
+        /// 아니다.</b>
+        ///
+        /// 카탈로그가 아직 연결되지 않은 과도기 씬(폴백)에서는 예전 판정을 그대로 둔다 - 그 구성에는
+        /// 보유라는 개념 자체가 없으므로 새 규칙을 적용할 근거가 없다.
+        ///
+        /// <b>캐릭터는 있는데 아무도 투입되지 않은 상태</b>(전원이 회복소 슬롯에 있어 시작 캐릭터를
+        /// 고르지 못한 경우)도 false다 - 화면에 아무도 없는 채로 공격 입력이 통하면 안 된다.</summary>
         public static bool CurrentCharacterCanAct
         {
             get
             {
                 CharacterRoster roster = Instance;
-                // 로스터를 쓰지 않는 씬 / 로스터는 있지만 캐릭터 목록이 비어 있는 구성 - 기존 동작 유지.
-                if (roster == null || roster.usableEntries.Count == 0) return true;
+
+                // 로스터를 쓰지 않는 씬 - 기존 동작 유지.
+                if (roster == null) return true;
+
+                if (roster.usableEntries.Count == 0)
+                {
+                    // 카탈로그 기반인데 쓸 수 있는 캐릭터가 없다 = 보유가 없다. 싸울 주체가 없다.
+                    // 폴백 구성에서만 예전의 "비었으면 통과"를 유지한다.
+                    return !roster.UsesCatalog;
+                }
 
                 // 캐릭터는 있는데 투입된 캐릭터가 없다 - 전투할 주체가 없으므로 공격을 허용하지 않는다.
                 if (roster.current == null) return false;
@@ -160,11 +189,17 @@ namespace Character
             }
             Instance = this;
 
+            owned = UsesCatalog ? new OwnedCharacterCollection(catalog, SaveSystem.Data) : null;
+            GrantInitialCharactersOnNewGameOnly();
+
             BuildUsableEntries();
             if (usableEntries.Count == 0)
             {
-                Debug.LogError("[CharacterRoster] 사용할 수 있는 캐릭터가 하나도 없습니다 - Entries에 " +
-                               "Character Definition을 연결하세요.", this);
+                Debug.LogError(UsesCatalog
+                    ? "[CharacterRoster] 보유한 캐릭터가 하나도 없습니다 - 저장 데이터의 보유 목록이 " +
+                      "비어 있거나 카탈로그와 겹치는 id가 없습니다."
+                    : "[CharacterRoster] 사용할 수 있는 캐릭터가 하나도 없습니다 - Character Catalog를 " +
+                      "연결하거나 Entries에 Character Definition을 연결하세요.", this);
                 // 로스터가 인정하지 않는 캐릭터가 화면에 남아 계속 입력을 받는 것을 막는다.
                 // CurrentCharacterCanAct는 "목록이 비어 있으면 true"(로스터를 쓰지 않는 씬 호환)라서,
                 // 액터를 켜둔 채로 두면 아무도 투입되지 않았는데 공격이 통한다.
@@ -172,7 +207,7 @@ namespace Character
                 return;
             }
 
-            SyncSaveStates();
+            NormalizeOwnedStamina();
             ApplyDebugStartStamina();
 
             if (runtimeActor == null)
@@ -185,6 +220,29 @@ namespace Character
             }
 
             ApplyActiveCharacter(ResolveStartCharacter());
+        }
+
+        /// <summary>
+        /// <b>새 게임일 때만</b> 표의 initially_owned 캐릭터를 지급한다.
+        ///
+        /// 판단의 근거는 <see cref="SaveSystem.LoadStatus"/> 하나뿐이며 "목록이 비어 있다"가 아니다 -
+        /// v2에서 <b>빈 보유 목록은 정상적인 상태</b>라서, 비었다고 채우면 플레이어가 스스로 비운 목록이
+        /// 다시 채워지고 불러오기가 실패한 문서 위에도 지급이 얹힌다. Loaded / Migrated /
+        /// CorruptFallback / FutureVersionBlocked / MigrationFailed에서는 <b>한 항목도 만들지 않는다</b>.
+        ///
+        /// 여기서 저장하지 않는다 - 새 게임의 첫 저장은 기존 저장 경로가 알아서 하며, 저장되기 전에
+        /// 종료해도 다음 실행이 다시 새 게임이라 같은 결과가 된다(지급은 여러 번 해도 같다).
+        /// </summary>
+        private void GrantInitialCharactersOnNewGameOnly()
+        {
+            if (owned == null) return;
+            if (SaveSystem.LoadStatus != SaveLoadStatus.NewGame) return;
+
+            int granted = owned.InitializeNewGame();
+            if (granted > 0)
+            {
+                Debug.Log($"[CharacterRoster] 새 게임이라 시작 캐릭터 {granted}명을 지급했습니다.", this);
+            }
         }
 
         private void OnEnable()
@@ -226,6 +284,64 @@ namespace Character
         private void BuildUsableEntries()
         {
             usableEntries.Clear();
+
+            if (UsesCatalog)
+            {
+                BuildUsableEntriesFromCatalog();
+                return;
+            }
+
+            BuildUsableEntriesFromSerializedList();
+        }
+
+        /// <summary>
+        /// 카탈로그 기반 목록. 순서는 <b>카탈로그(표의 display_order)</b>이고, 그 중 저장 데이터가
+        /// 보유한 것만 남긴 뒤 기존 재생 가능 검사를 그대로 통과시킨다.
+        ///
+        /// <b>여기서 저장 데이터에 손대지 않는다.</b> 보유하지 않은 캐릭터는 그냥 목록에 없을 뿐이고,
+        /// 목록을 만드는 동안 항목이 생기거나 사라지지 않는다 - 목록을 여는 것만으로 캐릭터가 지급되면
+        /// "보유"라는 말이 아무 뜻도 갖지 못한다.
+        ///
+        /// 중복 id 검사가 없는 것은 카탈로그가 이미 그것을 보장하기 때문이다(같은 id는 한 번만 담긴다).
+        /// </summary>
+        private void BuildUsableEntriesFromCatalog()
+        {
+            IReadOnlyList<CharacterDefinition> ownedCharacters = owned.OwnedCharacters;
+
+            for (int i = 0; i < ownedCharacters.Count; i++)
+            {
+                CharacterDefinition definition = ownedCharacters[i];
+
+                if (definition.MotionProfile == null)
+                {
+                    Debug.LogError($"[CharacterRoster] '{definition.CharacterId}'의 Definition에 Character " +
+                                   "Motion Profile이 연결되지 않았습니다 - 연기할 모션 데이터가 없으므로 이 항목은 " +
+                                   "무시합니다.", definition);
+                    continue;
+                }
+
+                if (!CharacterMotionProfile.IsPlayable(definition.MotionProfile))
+                {
+                    Debug.LogError($"[CharacterRoster] '{definition.CharacterId}'의 프로필 " +
+                                   $"'{definition.MotionProfile.name}'에 재생 가능한 Base Idle 프레임이 " +
+                                   "없습니다 - 이 항목은 무시합니다.", definition.MotionProfile);
+                    continue;
+                }
+
+                usableEntries.Add(new Entry { definition = definition });
+            }
+        }
+
+        /// <summary>
+        /// <b>과도기 폴백</b> - Character Catalog가 연결되지 않은 씬에서만 쓴다. 예전 규칙 그대로
+        /// 직렬화된 목록을 검사해 쓴다.
+        ///
+        /// <b>여기 적힌 캐릭터는 보유가 아니다.</b> 이 경로는 저장 데이터에 항목을 만들지 않으며,
+        /// 그래서 이 구성에서는 행동력을 읽고 쓰는 동작이 대부분 아무 일도 하지 않는다(보유한 상태가
+        /// 없으므로). 카탈로그를 연결하는 순간 이 목록은 <b>한 항목도 읽히지 않는다</b>.
+        /// </summary>
+        private void BuildUsableEntriesFromSerializedList()
+        {
             if (entries == null) return;
 
             var seenIds = new HashSet<string>();
@@ -262,15 +378,22 @@ namespace Character
             }
         }
 
-        /// <summary>저장 문서에 이번 로스터의 캐릭터 항목이 모두 존재하도록 맞춘다. 새로 추가된
-        /// 캐릭터는 정의의 기본값으로 채우고, 저장된 현재 행동력은 최대치를 넘지 않게 자른다
-        /// (Max Stamina를 나중에 낮춘 경우).</summary>
-        private void SyncSaveStates()
+        /// <summary>
+        /// <b>이미 보유한</b> 캐릭터의 행동력만 쓸 수 있는 값으로 맞춘다. -1("아직 초기화되지 않음")은
+        /// 정의의 Max Stamina로 확정하고, 그 밖의 값은 0 ~ Max로 자른다(Max를 나중에 낮춘 경우).
+        ///
+        /// <b>없는 항목을 만들지 않는다.</b> 예전에는 이 자리가 "로스터에 있으면 저장 항목을 만든다"였고,
+        /// 그것이 곧 캐릭터 지급이었다 - v2에서 보유는 저장 데이터가 정하므로, 여기서 항목을 만들면
+        /// 목록을 켜는 것만으로 캐릭터가 생긴다. 지급 경로는
+        /// <see cref="OwnedCharacterCollection.InitializeNewGame"/> 하나뿐이다.
+        /// </summary>
+        private void NormalizeOwnedStamina()
         {
             for (int i = 0; i < usableEntries.Count; i++)
             {
                 CharacterDefinition definition = usableEntries[i].definition;
-                CharacterSaveState state = GetOrCreateState(definition);
+                if (!TryGetOwnedState(definition, out _, out CharacterSaveState state)) continue;
+
                 state.currentStamina = Mathf.Clamp(
                     state.currentStamina < 0 ? definition.MaxStamina : state.currentStamina,
                     0,
@@ -278,22 +401,73 @@ namespace Character
             }
         }
 
-        private CharacterSaveState GetOrCreateState(CharacterDefinition definition)
+        /// <summary>
+        /// 이 로스터가 쓰는 <b>정식 정의</b>와 그 저장 상태를 함께 찾는다. <b>만들지 않는다.</b>
+        ///
+        /// <b>반드시 목록을 먼저 지난다.</b> 저장 문서만 보고 상태를 찾으면, 카탈로그에 없는
+        /// 저장 전용 id(예전 빌드에서 남은 캐릭터)를 가리키는 정의를 만들어 넘기는 것만으로 그 값을
+        /// 읽고 고칠 수 있게 된다 - 그 id는 <b>보존하되 감춰야 하는</b> 값이므로, 지금 쓸 수 있는
+        /// 캐릭터(usableEntries)로 해석되지 않으면 여기서 끝난다.
+        ///
+        /// 해석은 <b>CharacterId의 Ordinal 완전 일치</b>이므로 같은 id의 수동 에셋으로 물어도 같은
+        /// 정식 정의와 같은 상태를 얻는다.
+        /// </summary>
+        private bool TryGetOwnedState(
+            CharacterDefinition definition, out CharacterDefinition canonical, out CharacterSaveState state)
         {
-            List<CharacterSaveState> states = SaveSystem.Data.characters;
-            for (int i = 0; i < states.Count; i++)
+            canonical = null;
+            state = null;
+
+            // 카탈로그가 없는 폴백 구성에는 보유라는 개념이 없다 - 상태를 만들지 않으므로 언제나 실패다.
+            if (owned == null) return false;
+
+            canonical = ResolveUsable(definition);
+            if (canonical == null) return false;
+
+            return owned.TryGetState(canonical.CharacterId, out state);
+        }
+
+        /// <summary>
+        /// 목록에도 있고 <b>지금도 보유 중인</b> 캐릭터의 정식 정의. 둘 중 하나라도 아니면 null이다.
+        ///
+        /// <see cref="ResolveUsable"/>만으로는 부족한 이유는 usableEntries가 Awake 때 한 번 만든
+        /// 목록이기 때문이다 - 그 뒤에 저장 문서에서 보유가 사라져도 목록에는 그대로 남아 있어서,
+        /// 목록만 보는 판정은 <b>이미 잃은 캐릭터를 아직 가진 것처럼</b> 다룬다.
+        /// </summary>
+        private CharacterDefinition ResolveOwnedUsable(CharacterDefinition definition)
+        {
+            // 카탈로그가 없는 폴백 구성에는 <b>보유라는 개념 자체가 없다</b> - 저장 문서를 다시 확인할
+            // 대상이 없으므로 예전처럼 목록만 보고 답한다. 여기서 null을 돌려주면 그 구성의 교체 판정과
+            // 상태 변경 알림이 통째로 죽는다(모든 캐릭터가 "쓸 수 없음"이 된다).
+            if (owned == null) return ResolveUsable(definition);
+
+            return TryGetOwnedState(definition, out CharacterDefinition canonical, out _) ? canonical : null;
+        }
+
+        /// <summary>
+        /// 넘어온 정의를 <b>이 로스터가 실제로 쓰는 정의</b>로 바꾼다. 같은 id를 가진 수동 에셋을
+        /// 넘겨받아도 생성 에셋으로 이어지도록, 비교는 참조가 아니라 CharacterId로 한다 - 씬과 표가
+        /// 서로 다른 에셋을 들고 있어도 같은 캐릭터를 가리킬 수 있어야 한다.
+        ///
+        /// 목록에 없으면 null이다(= 지금 쓸 수 없는 캐릭터).
+        /// </summary>
+        private CharacterDefinition ResolveUsable(CharacterDefinition definition)
+        {
+            if (definition == null) return null;
+
+            string id = definition.CharacterId;
+            if (string.IsNullOrEmpty(id)) return null;
+
+            for (int i = 0; i < usableEntries.Count; i++)
             {
-                if (states[i] != null && states[i].characterId == definition.CharacterId) return states[i];
+                CharacterDefinition candidate = usableEntries[i].definition;
+                if (candidate != null && string.Equals(candidate.CharacterId, id, StringComparison.Ordinal))
+                {
+                    return candidate;
+                }
             }
 
-            var created = new CharacterSaveState
-            {
-                characterId = definition.CharacterId,
-                level = 1,
-                currentStamina = definition.MaxStamina,
-            };
-            states.Add(created);
-            return created;
+            return null;
         }
 
         /// <summary>
@@ -311,17 +485,22 @@ namespace Character
         /// </summary>
         private CharacterDefinition ResolveStartCharacter()
         {
-            if (defaultCharacter != null && IndexOf(defaultCharacter) >= 0)
-            {
-                if (!Recovery.RecoveryService.IsCharacterInRecovery(defaultCharacter)) return defaultCharacter;
+            // Default Character는 씬이 들고 있는 <b>수동 에셋</b>일 수 있다. id로 이 로스터가 실제로
+            // 쓰는 정의(카탈로그의 생성 에셋)로 바꿔 놓아야, 같은 캐릭터인데 참조가 달라서 "목록에
+            // 없다"고 판정하는 일이 없다.
+            CharacterDefinition resolvedDefault = ResolveUsable(defaultCharacter);
 
-                Debug.Log($"[CharacterRoster] Default Character('{defaultCharacter.CharacterId}')가 회복소에 " +
+            if (resolvedDefault != null)
+            {
+                if (!Recovery.RecoveryService.IsCharacterInRecovery(resolvedDefault)) return resolvedDefault;
+
+                Debug.Log($"[CharacterRoster] Default Character('{resolvedDefault.CharacterId}')가 회복소에 " +
                           "있어 다른 캐릭터로 시작합니다.", this);
             }
             else if (defaultCharacter != null)
             {
-                Debug.LogWarning($"[CharacterRoster] Default Character('{defaultCharacter.CharacterId}')가 Entries에 " +
-                                 "없어 목록의 첫 번째 캐릭터로 시작합니다.", this);
+                Debug.LogWarning($"[CharacterRoster] Default Character('{defaultCharacter.CharacterId}')를 쓸 수 " +
+                                 "없어(보유하지 않았거나 목록에 없음) 목록의 첫 번째 캐릭터로 시작합니다.", this);
             }
 
             for (int i = 0; i < usableEntries.Count; i++)
@@ -339,33 +518,57 @@ namespace Character
 
         // ---- 조회 ----
 
+        /// <summary>보유하고 <b>지금 쓸 수 있는</b> 캐릭터의 레벨. 그 밖에는(null, 미보유, 카탈로그에
+        /// 없는 저장 전용 id) 0이며 저장 데이터에 항목이 생기지 않는다 - 값을 물어보는 것만으로
+        /// 캐릭터가 지급되거나 감춰 둔 값이 드러나면 안 된다.</summary>
         public int GetLevel(CharacterDefinition definition)
         {
-            return definition == null ? 0 : GetOrCreateState(definition).level;
+            return TryGetOwnedState(definition, out _, out CharacterSaveState state) ? state.level : 0;
         }
 
+        /// <summary>보유한 캐릭터의 현재 행동력. 규칙은 <see cref="GetLevel"/>과 같다.</summary>
         public int GetStamina(CharacterDefinition definition)
         {
-            return definition == null ? 0 : GetOrCreateState(definition).currentStamina;
+            return TryGetOwnedState(definition, out _, out CharacterSaveState state) ? state.currentStamina : 0;
         }
 
+        /// <summary>
+        /// 행동력의 상한. <b>넘어온 에셋이 아니라 이 로스터가 쓰는 정식 정의</b>의 값이다 - 같은 id의
+        /// 수동 에셋이 다른 Max Stamina를 들고 있어도 실제 상한은 표(카탈로그)가 정한 값 하나여야
+        /// 한다.
+        ///
+        /// <b>지금 이 순간의 저장 문서까지 확인한다.</b> usableEntries는 Awake 때 한 번 만든 목록이라,
+        /// 그 뒤에 보유가 사라진 캐릭터도 계속 들어 있다 - 목록만 믿으면 이미 잃은 캐릭터의 상한이
+        /// 그대로 나온다. 쓸 수 없거나 더 이상 보유하지 않는 캐릭터는 0이다.
+        /// </summary>
         public int GetMaxStamina(CharacterDefinition definition)
         {
-            return definition == null ? 0 : definition.MaxStamina;
+            // 카탈로그가 없는 폴백 구성에서는 보유라는 개념이 없으므로 예전처럼 넘어온 정의를 그대로 본다.
+            if (owned == null) return definition != null ? definition.MaxStamina : 0;
+
+            return TryGetOwnedState(definition, out CharacterDefinition canonical, out _) ? canonical.MaxStamina : 0;
         }
 
         /// <summary>이 캐릭터로 교체할 수 없는 이유. <see cref="SwapBlockReason.None"/>이면 교체 가능하다.</summary>
         public SwapBlockReason GetSwapBlockReason(CharacterDefinition definition)
         {
-            if (definition == null || IndexOf(definition) < 0) return SwapBlockReason.NotAvailable;
+            // 보유하지 않았거나 목록에 없는 캐릭터는 여기서 끝난다 - 상태를 만들지 않으므로 물어보는
+            // 것만으로 지급되지 않는다.
+            //
+            // <b>지금 저장 문서에 상태가 남아 있는지까지 본다.</b> Awake 이후에 보유가 사라졌다면
+            // 그 캐릭터는 이미 투입 중이었더라도, 행동력이 남아 있었더라도 교체 대상이 아니다 -
+            // 목록(usableEntries)만 믿으면 잃은 캐릭터로 계속 갈아탈 수 있다.
+            CharacterDefinition usable = ResolveOwnedUsable(definition);
+            if (usable == null) return SwapBlockReason.NotAvailable;
+
             // 연기할 액터가 없으면 어떤 캐릭터도 투입할 수 없다 - 행동력/회복 상태보다 먼저 본다.
             // 이 상태에서는 current가 항상 null이라 AlreadyCurrent와 겹치지 않는다.
             if (runtimeActor == null) return SwapBlockReason.NotAvailable;
-            if (definition == current) return SwapBlockReason.AlreadyCurrent;
+            if (usable == current) return SwapBlockReason.AlreadyCurrent;
             // 회복 중에는 행동력이 이미 차 있어도 교체할 수 없다 - 행동력 값이 아니라 "슬롯에 있는가"가
             // 근거이므로 행동력 판정보다 먼저 본다.
-            if (Recovery.RecoveryService.IsCharacterInRecovery(definition)) return SwapBlockReason.InRecovery;
-            if (GetStamina(definition) <= 0) return SwapBlockReason.NoStamina;
+            if (Recovery.RecoveryService.IsCharacterInRecovery(usable)) return SwapBlockReason.InRecovery;
+            if (GetStamina(usable) <= 0) return SwapBlockReason.NoStamina;
             return SwapBlockReason.None;
         }
 
@@ -381,7 +584,9 @@ namespace Character
             reason = GetSwapBlockReason(definition);
             if (reason != SwapBlockReason.None) return false;
 
-            if (ApplyActiveCharacter(definition)) return true;
+            // 판정을 통과했다면 이 로스터가 쓰는 정의가 반드시 있다. 넘어온 것이 같은 id의 수동
+            // 에셋이어도 <b>실제로 투입되는 것은 카탈로그의 생성 정의</b>다.
+            if (ApplyActiveCharacter(ResolveUsable(definition))) return true;
 
             // 자격은 통과했는데 적용이 실패했다(설정 문제) - 지금 이 캐릭터는 투입할 수 없는 상태다.
             reason = SwapBlockReason.NotAvailable;
@@ -414,20 +619,27 @@ namespace Character
         public void SetStamina(CharacterDefinition definition, int value)
         {
             if (definition == null) return;
-            if (Recovery.RecoveryService.IsCharacterInRecovery(definition))
+
+            // <b>쓸 수 없는 캐릭터에는 아무 일도 하지 않는다.</b> 미보유든, 카탈로그에 없는 저장 전용
+            // id든 마찬가지다 - 항목을 만들지 않고 저장하지도 알리지도 않는다. 회복 판정보다 먼저 보는
+            // 이유는, 우리가 다루지 않는 캐릭터에 대해 경고까지 남길 이유가 없기 때문이다.
+            if (!TryGetOwnedState(definition, out CharacterDefinition canonical, out CharacterSaveState state)) return;
+
+            if (Recovery.RecoveryService.IsCharacterInRecovery(canonical))
             {
-                Debug.LogWarning($"[CharacterRoster] '{definition.CharacterId}'는 회복소 슬롯에 있어 행동력을 " +
+                Debug.LogWarning($"[CharacterRoster] '{canonical.CharacterId}'는 회복소 슬롯에 있어 행동력을 " +
                                  "바깥에서 바꿀 수 없습니다 - 합류시킨 뒤에 변경하세요.", this);
                 return;
             }
 
-            CharacterSaveState state = GetOrCreateState(definition);
-            int clamped = Mathf.Clamp(value, 0, definition.MaxStamina);
+            // 상한도 이벤트 인자도 <b>정식 정의</b>를 쓴다 - 수동 에셋이 더 큰 Max를 들고 있어도
+            // 그 값으로 잘리지 않고, 구독자는 언제나 같은 객체를 받는다.
+            int clamped = Mathf.Clamp(value, 0, canonical.MaxStamina);
             if (clamped == state.currentStamina) return;
 
             state.currentStamina = clamped;
             SaveSystem.Save();
-            CharacterStateChanged?.Invoke(definition);
+            CharacterStateChanged?.Invoke(canonical);
         }
 
         // ---- 회복소 전용 경로 ----
@@ -441,10 +653,14 @@ namespace Character
         /// <returns>값이 실제로 달라졌으면 true.</returns>
         public bool ApplyRecoveryStamina(CharacterDefinition definition, int value)
         {
-            if (definition == null) return false;
+            // 쓸 수 없는 캐릭터(미보유/저장 전용 id)는 회복 대상이 될 수 없다 - 상태를 만들지 않고
+            // 그대로 false다. 상한은 정식 정의의 것을 쓴다.
+            if (!TryGetOwnedState(definition, out CharacterDefinition canonical, out CharacterSaveState state))
+            {
+                return false;
+            }
 
-            CharacterSaveState state = GetOrCreateState(definition);
-            int clamped = Mathf.Clamp(value, 0, definition.MaxStamina);
+            int clamped = Mathf.Clamp(value, 0, canonical.MaxStamina);
             if (clamped == state.currentStamina) return false;
 
             state.currentStamina = clamped;
@@ -456,8 +672,16 @@ namespace Character
         /// 연결을 만들 필요가 없다.</summary>
         public void RaiseCharacterStateChanged(CharacterDefinition definition)
         {
-            if (definition == null) return;
-            CharacterStateChanged?.Invoke(definition);
+            // 쓸 수 없는 캐릭터의 상태 변경은 알릴 것이 없다 - 구독자(리스트/행동력 표시)가 목록에
+            // 없는 캐릭터를 받아 그리려 하면 그때서야 없는 값을 묻게 된다. 알릴 때는 언제나
+            // <b>정식 정의</b>를 넘겨, 구독자가 받는 객체가 목록에 있는 그 객체와 같게 한다.
+            //
+            // 보유가 사라진 캐릭터도 마찬가지로 알리지 않는다 - 구독자가 받아서 그리려는 순간
+            // 그 값들은 이미 없다.
+            CharacterDefinition canonical = ResolveOwnedUsable(definition);
+            if (canonical == null) return;
+
+            CharacterStateChanged?.Invoke(canonical);
         }
 
         // ---- 개발용 진입점 (정식 사용자 UI에 노출하지 않는다) ----
@@ -500,7 +724,10 @@ namespace Character
                     continue;
                 }
 
-                GetOrCreateState(definition).currentStamina = Mathf.Clamp(debugStartStamina, 0, definition.MaxStamina);
+                // 보유한 캐릭터만 건드린다 - 개발용 플래그가 캐릭터를 지급해서는 안 된다.
+                if (!TryGetOwnedState(definition, out _, out CharacterSaveState state)) continue;
+
+                state.currentStamina = Mathf.Clamp(debugStartStamina, 0, definition.MaxStamina);
                 applied++;
             }
 
@@ -562,14 +789,5 @@ namespace Character
             CurrentCharacterChanged?.Invoke(current);
         }
 
-        private int IndexOf(CharacterDefinition definition)
-        {
-            if (definition == null) return -1;
-            for (int i = 0; i < usableEntries.Count; i++)
-            {
-                if (usableEntries[i].definition == definition) return i;
-            }
-            return -1;
-        }
     }
 }
