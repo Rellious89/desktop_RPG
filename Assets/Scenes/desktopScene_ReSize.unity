@@ -2902,11 +2902,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 465a7d6e61614791bef63b3852357aea, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  currentLevel: 1
-  currentExp: 0
   totalKillCount: 0
   expToNextLevel: 10
   expPerTargetDefeat: 1
+  skillCatalog: {fileID: 11400000, guid: 6f83e310e008c4b8dbc41d382a075cac, type: 2}
+  characterSkillCatalog: {fileID: 11400000, guid: 3f9eaae2823dc4c8a87a194e8165f086, type: 2}
 --- !u!1 &649947815
 GameObject:
   m_ObjectHideFlags: 0
