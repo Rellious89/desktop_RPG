@@ -526,6 +526,43 @@ namespace Character
             return TryGetOwnedState(definition, out _, out CharacterSaveState state) ? state.level : 0;
         }
 
+        /// <summary>보유하고 지금 쓸 수 있는 캐릭터의 <b>이번 레벨 진행도</b>. 규칙은
+        /// <see cref="GetLevel"/>과 같다 - 그 밖에는 0이고 저장 데이터에 항목이 생기지 않는다.
+        ///
+        /// 이름을 <c>GetCurrentExp</c>가 아니라 <c>GetExp</c>로 둔 이유는 이 로스터의 조회 가족
+        /// (<see cref="GetLevel"/>/<see cref="GetStamina"/>)이 모두 "정의를 받아 그 캐릭터의 값을
+        /// 돌려준다"는 같은 모양이기 때문이다 - <c>Current~</c>는 "지금 전투 중인 캐릭터"를 뜻하는
+        /// 말로 이미 쓰이고 있어서, 인자를 받는 조회에 붙이면 두 뜻이 겹친다.
+        ///
+        /// <b>다음 레벨까지 얼마가 필요한지는 여기서 답하지 않는다.</b> 그것은 저장된 값이 아니라
+        /// 성장 규칙이고, 규칙의 주인은 <see cref="CharacterProgressionService"/> 하나뿐이다 -
+        /// 로스터가 같은 계산을 한 벌 더 들고 있으면 두 곳이 서로 다른 답을 하는 날이 온다.</summary>
+        public int GetExp(CharacterDefinition definition)
+        {
+            return TryGetOwnedState(definition, out _, out CharacterSaveState state) ? state.currentExp : 0;
+        }
+
+        /// <summary>
+        /// <b>지금 전투 중인</b> 캐릭터의 정식 정의와 저장 상태를 함께 찾는다. <b>만들지 않는다.</b>
+        ///
+        /// 성장(경험치)처럼 "현재 캐릭터의 저장 항목을 직접 고쳐야 하는" 시스템이 쓰라고 낸
+        /// <b>단 하나의 이음매</b>다. 값을 하나씩 읽어 가는 조회로는 부족한 이유는, 읽은 값을 고쳐
+        /// 다시 넣는 사이에 다른 캐릭터로 바뀌면 <b>엉뚱한 캐릭터의 항목</b>에 결과가 적히기 때문이다.
+        ///
+        /// 판정은 기존 보유 경로(<see cref="TryGetOwnedState"/>)를 그대로 지난다 - 투입된 캐릭터가
+        /// 없거나, 목록에 없거나, 지금 이 순간 보유가 사라졌거나, 카탈로그가 없는 과도기 구성이면
+        /// false이고 그때는 <b>저장 문서에 아무 항목도 만들지 않는다</b>.
+        /// </summary>
+        public bool TryGetCurrentState(out CharacterDefinition canonical, out CharacterSaveState state)
+        {
+            canonical = null;
+            state = null;
+
+            if (current == null) return false;
+
+            return TryGetOwnedState(current, out canonical, out state);
+        }
+
         /// <summary>보유한 캐릭터의 현재 행동력. 규칙은 <see cref="GetLevel"/>과 같다.</summary>
         public int GetStamina(CharacterDefinition definition)
         {
