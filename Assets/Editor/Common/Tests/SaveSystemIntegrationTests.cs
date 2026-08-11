@@ -380,6 +380,17 @@ namespace CommonEditor.Tests
             SaveSystem.Data.currentLevel = 12;
             SaveSystem.Data.currency = 4321;
             SaveSystem.Data.items.Add(new InventoryItemState { itemId = "potion", count = 3 });
+
+            // 캐릭터 진행도 세 칸을 <b>모두 0이 아닌 값</b>으로 넣는다 - 경험치가 저장/직렬화 경로 어딘가에서
+            // 빠지면 기본값 0으로 되돌아오므로, 0이 아닌 값이어야 그 사고가 보인다.
+            SaveSystem.Data.characters.Add(new CharacterSaveState
+            {
+                characterId = "CatKnight",
+                level = 5,
+                currentExp = 7,
+                currentStamina = 21,
+            });
+
             Assert.IsTrue(SaveSystem.Save());
 
             // "다시 켠" 상태: 메모리 문서를 비우고 같은 폴더에서 읽는다.
@@ -394,6 +405,35 @@ namespace CommonEditor.Tests
             Assert.AreEqual("potion", SaveSystem.Data.items[0].itemId);
             Assert.AreEqual(1, SaveSystem.Data.saveRevision);
             Assert.AreEqual(FixedNowText, SaveSystem.Data.lastSavedAtUtc);
+
+            Assert.AreEqual(1, SaveSystem.Data.characters.Count);
+            CharacterSaveState character = SaveSystem.Data.characters[0];
+            Assert.AreEqual("CatKnight", character.characterId);
+            Assert.AreEqual(5, character.level);
+            Assert.AreEqual(7, character.currentExp,
+                "경험치가 실제 파일을 한 번 왕복해도 그대로여야 합니다.");
+            Assert.AreEqual(21, character.currentStamina);
+        }
+
+        [Test]
+        public void 경험치_칸을_더해도_저장_형식_번호는_2_그대로다()
+        {
+            // 필드를 <b>추가</b>하기만 하는 변경은 형식 번호를 올리지 않는다 - 없는 필드는 기본값으로
+            // 읽히므로 예전 파일이 그대로 유효하다. 번호가 올라가면 예전 클라이언트가 이 파일을
+            // "미래 버전"으로 보고 진행을 막으므로, 그 판단을 시험으로 못 박아 둔다.
+            Assert.AreEqual(2, SaveData.CurrentSaveVersion,
+                "체크포인트 A는 저장 형식 번호를 올리지 않습니다 - 올려야 한다면 마이그레이션 단계도 함께 필요합니다.");
+
+            LocalFileSaveStorage real = UseTemporaryDirectoryStorage();
+            SaveSystem.Data.characters.Add(new CharacterSaveState
+            {
+                characterId = "CatKnight", level = 3, currentExp = 4, currentStamina = 9,
+            });
+
+            Assert.IsTrue(SaveSystem.Save());
+
+            Assert.AreEqual(2, SaveVersionProbe.Probe(File.ReadAllText(real.PrimaryPath)).Version,
+                "실제로 쓴 파일에도 2가 적혀 있어야 합니다.");
         }
 
         // ---- 기존 호출부와의 계약 ----

@@ -254,6 +254,7 @@ namespace Common
                     {
                         characterId = item.characterId,
                         level = item.level,
+                        currentExp = item.currentExp,
                         currentStamina = item.currentStamina,
                     });
             }

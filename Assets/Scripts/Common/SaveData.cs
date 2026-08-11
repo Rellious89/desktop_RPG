@@ -64,6 +64,7 @@ namespace Common
         /// <list type="number">
         ///   <item>플레이어가 <b>그 characterId를 가지고 있다</b>(보유).</item>
         ///   <item>그 캐릭터의 진행 상태(<see cref="CharacterSaveState.level"/>,
+        ///         <see cref="CharacterSaveState.currentExp"/>,
         ///         <see cref="CharacterSaveState.currentStamina"/>)가 이 값이다.</item>
         /// </list>
         ///
@@ -288,6 +289,16 @@ namespace Common
         public string characterId;
 
         public int level = 1;
+
+        /// <summary>
+        /// 지금 레벨에서 <b>다음 레벨까지 모아 둔 경험치</b>. 누적 총량이 아니라 <b>이번 레벨 안에서의
+        /// 진행</b>이며, 레벨이 오를 때마다 필요량만큼 빠지고 나머지가 이월된다.
+        ///
+        /// <b>이 칸이 없던 저장 파일은 0으로 읽힌다.</b> JsonUtility가 없는 필드를 기본값으로 채우고,
+        /// 0은 "이번 레벨에서 아직 아무것도 모으지 않았다"는 뜻이라 그대로 옳은 값이다 - 그래서 이
+        /// 칸을 더하면서 저장 형식 번호를 올리지 않았다(<see cref="SaveData.CurrentSaveVersion"/> 참고).
+        /// </summary>
+        public int currentExp = 0;
 
         /// <summary>현재 행동력. -1은 "아직 한 번도 초기화되지 않음"을 뜻하며, CharacterRoster가
         /// 정의의 Max Stamina로 채운다 - 0(행동력 소진)과 구분하기 위해 0이 아닌 값을 쓴다.</summary>

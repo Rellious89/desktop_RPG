@@ -804,7 +804,10 @@ namespace CommonEditor.Tests
                 currency = 1250,
                 characters = new List<CharacterSaveState>
                 {
-                    new CharacterSaveState { characterId = "barbarian", level = 4, currentStamina = 9 },
+                    new CharacterSaveState
+                    {
+                        characterId = "barbarian", level = 4, currentExp = 5, currentStamina = 9,
+                    },
                 },
                 items = new List<InventoryItemState>
                 {
@@ -922,6 +925,7 @@ namespace CommonEditor.Tests
             Assert.AreEqual(3, data.items[0].count);
             Assert.AreEqual("barbarian", data.characters[0].characterId);
             Assert.AreEqual(9, data.characters[0].currentStamina);
+            Assert.AreEqual(5, data.characters[0].currentExp, "사본이 경험치를 빠뜨리면 안 된다.");
             Assert.AreEqual("barbarian", data.recoverySlots[0].characterId);
             Assert.AreEqual(2, data.recoverySlots[0].startStamina);
             Assert.AreEqual("2026-01-02T05:04:05.0000000Z", data.recoverySlots[0].completeAtUtc);
@@ -949,6 +953,131 @@ namespace CommonEditor.Tests
 
             CollectionAssert.AreEquivalent(expected, actual,
                 "SaveData의 필드가 바뀌었습니다 - SaveMigrationRunner의 CopyInto와 이 목록을 함께 고치세요.");
+        }
+
+        [Test]
+        public void 캐릭터_항목에_필드를_추가하면_깊은_사본도_함께_고쳐야_한다()
+        {
+            // CopyCharacters도 손으로 쓴 코드다. 캐릭터 항목에 칸을 늘리고 사본을 빠뜨리면 그 값이
+            // 변환을 지날 때마다 조용히 기본값으로 되돌아간다.
+            string[] expected = { "characterId", "level", "currentExp", "currentStamina" };
+
+            List<string> actual = new List<string>();
+            foreach (System.Reflection.FieldInfo field in typeof(CharacterSaveState).GetFields(
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            {
+                actual.Add(field.Name);
+            }
+
+            CollectionAssert.AreEquivalent(expected, actual,
+                "CharacterSaveState의 필드가 바뀌었습니다 - SaveMigrationRunner의 CopyCharacters와 이 목록을 함께 고치세요.");
+        }
+
+        [Test]
+        public void 깊은_사본은_캐릭터의_경험치를_옮기고_원본과_끊어_둔다()
+        {
+            SaveData data = new SaveData
+            {
+                saveVersion = SaveData.CurrentSaveVersion,
+                characters = new List<CharacterSaveState>
+                {
+                    new CharacterSaveState { characterId = "CatKnight", level = 4, currentExp = 7, currentStamina = 9 },
+                },
+            };
+
+            CharacterSaveState original = data.characters[0];
+
+            SaveMigrationResult result = SaveMigrationRunner.Default.Migrate(data, SaveData.CurrentSaveVersion);
+
+            Assert.AreEqual(SaveMigrationOutcome.AlreadyCurrent, result.Outcome);
+            Assert.AreEqual(4, data.characters[0].level);
+            Assert.AreEqual(7, data.characters[0].currentExp, "사본이 경험치를 빠뜨리면 안 된다.");
+            Assert.AreEqual(9, data.characters[0].currentStamina);
+
+            // 사본을 거쳤으므로 호출부의 문서에는 <b>새 항목</b>이 들어와 있어야 한다.
+            Assert.AreNotSame(original, data.characters[0], "목록 안의 항목까지 새로 만들어야 얕은 사본이 아니다.");
+        }
+
+        [Test]
+        public void v1_변환은_캐릭터의_경험치를_건드리지_않는다()
+        {
+            SaveData data = V1Document(
+                Character("Barbarian", 4, 9),
+                Character("scarecrow", 2, 0));
+
+            data.characters[0].currentExp = 6;
+            data.characters[1].currentExp = 3;
+
+            ApplyV1ToV2(data);
+
+            Assert.AreEqual(6, data.characters[0].currentExp, "변환은 진행 값을 바꾸지 않는다.");
+            Assert.AreEqual(3, data.characters[1].currentExp);
+
+            // 새로 덧붙는 항목의 경험치는 기본값 0이다.
+            for (int i = 2; i < data.characters.Count; i++)
+            {
+                Assert.AreEqual(0, data.characters[i].currentExp,
+                    $"덧붙인 {data.characters[i].characterId}의 경험치는 0에서 시작한다.");
+            }
+        }
+
+        [Test]
+        public void 경험치_항목이_없는_예전_파일은_0으로_읽힌다()
+        {
+            // 이 칸을 더하면서 저장 형식 번호를 올리지 않은 근거다 - 없는 필드는 0으로 채워지고,
+            // 0은 "이번 레벨에서 아직 아무것도 모으지 않았다"라서 그대로 옳은 값이다.
+            string json = $@"{{""saveVersion"":{SaveData.CurrentSaveVersion},"
+                          + @"""characters"":[{""characterId"":""CatKnight"",""level"":4,""currentStamina"":9}]}";
+
+            SaveLoadResult result = SaveMigrationRunner.Default.Load(json, JsonDeserializer);
+
+            Assert.AreEqual(SaveLoadStatus.Loaded, result.Status);
+            Assert.AreEqual(1, result.Data.characters.Count);
+            Assert.AreEqual(4, result.Data.characters[0].level, "기존 값은 그대로 읽혀야 한다.");
+            Assert.AreEqual(9, result.Data.characters[0].currentStamina);
+            Assert.AreEqual(0, result.Data.characters[0].currentExp,
+                "없는 경험치 칸은 0이어야 한다(형식 번호를 올리지 않는 근거).");
+        }
+
+        [Test]
+        public void 경험치_항목이_없는_v0_파일도_v2까지_올라가고_0을_얻는다()
+        {
+            SaveLoadResult result = SaveMigrationRunner.Default.Load(LegacyJson, JsonDeserializer);
+
+            Assert.AreEqual(SaveLoadStatus.Migrated, result.Status);
+            Assert.AreEqual(0, result.FromVersion);
+            Assert.AreEqual(SaveData.CurrentSaveVersion, result.ToVersion);
+
+            foreach (CharacterSaveState state in result.Data.characters)
+            {
+                Assert.AreEqual(0, state.currentExp, $"{state.characterId}의 경험치는 0으로 읽혀야 한다.");
+            }
+
+            // 예전 파일에 적혀 있던 값은 그대로다 - 경험치 칸이 생겼다고 다른 값이 달라지지 않는다.
+            Assert.AreEqual(4, result.Data.characters[0].level);
+            Assert.AreEqual(9, result.Data.characters[0].currentStamina);
+        }
+
+        [Test]
+        public void 경험치를_담은_문서는_저장하고_다시_읽어도_그대로다()
+        {
+            SaveData source = new SaveData
+            {
+                characters = new List<CharacterSaveState>
+                {
+                    new CharacterSaveState { characterId = "CatKnight", level = 12, currentExp = 7, currentStamina = 3 },
+                },
+            };
+
+            SaveData.MarkSaved(source, DateTime.UtcNow);
+            string json = JsonUtility.ToJson(source);
+
+            SaveLoadResult result = SaveMigrationRunner.Default.Load(json, JsonDeserializer);
+
+            Assert.AreEqual(SaveLoadStatus.Loaded, result.Status);
+            Assert.AreEqual(12, result.Data.characters[0].level);
+            Assert.AreEqual(7, result.Data.characters[0].currentExp, "왕복해도 경험치가 살아 있어야 한다.");
+            Assert.AreEqual(3, result.Data.characters[0].currentStamina);
         }
 
         // ---- 훑기는 JSON 문법을 엄격하게 지킨다 ----
