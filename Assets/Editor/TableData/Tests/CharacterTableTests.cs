@@ -60,10 +60,22 @@ namespace TableDataEditor.Tests
                 new[]
                 {
                     "character_id", "name_category", "name_key", "motion_profile_key", "portrait_key",
-                    "base_max_health", "max_stamina", "display_order", "enabled", "memo",
+                    "base_max_health", "max_stamina", "initially_owned", "display_order", "enabled", "memo",
                 },
                 TableDataColumns.Character,
                 "Character.csv의 필수 컬럼과 순서가 약속과 달라졌습니다.");
+        }
+
+        [Test]
+        public void Schema_PlacesInitiallyOwnedBetweenMaxStaminaAndDisplayOrder()
+        {
+            // 자리까지 못 박는 이유는 사람이 스프레드시트에서 칸을 옮기기 쉽기 때문이다 - 이름만 맞고
+            // 자리가 바뀌면 헤더 검사는 통과하는데 작업자가 보는 표의 모양이 달라진다.
+            int index = Array.IndexOf(TableDataColumns.Character, "initially_owned");
+
+            Assert.Greater(index, 0, "initially_owned가 필수 컬럼에 없습니다.");
+            Assert.AreEqual("max_stamina", TableDataColumns.Character[index - 1]);
+            Assert.AreEqual("display_order", TableDataColumns.Character[index + 1]);
         }
 
         [Test]
@@ -233,6 +245,7 @@ namespace TableDataEditor.Tests
             Assert.AreSame(profile, row.MotionProfile);
             Assert.IsFalse(row.HasBaseMaxHealth, "빈 base_max_health는 '지정하지 않음'이어야 한다.");
             Assert.AreEqual(0, row.BaseMaxHealth);
+            Assert.IsTrue(row.InitiallyOwned, "표에 적힌 initially_owned가 행에 그대로 실려야 한다.");
             Assert.AreSame(row, snapshot.CharactersById["CatKnight"]);
         }
 
@@ -361,6 +374,125 @@ namespace TableDataEditor.Tests
             Assert.AreEqual(0, log.ErrorCount, Describe(log));
             Assert.AreEqual(1, CountWarnings(log, TableDataColumns.DisplayOrder), Describe(log));
             Assert.AreEqual(2, snapshot.Characters.Count);
+        }
+
+        // ---- 새 게임 시작 구성(initially_owned) ----
+
+        [Test]
+        public void InitiallyOwned_ZeroAndOne_AreBothAccepted()
+        {
+            TableDataSnapshot owned = Validate(IndexWith(NewPlayableProfile(), "P"), out TableDataDiagnosticLog a,
+                Row("CatKnight", motionKey: "P", initiallyOwned: "1"));
+            Assert.AreEqual(0, a.ErrorCount, Describe(a));
+            Assert.IsTrue(owned.Characters[0].InitiallyOwned);
+
+            TableDataSnapshot locked = Validate(IndexWith(NewPlayableProfile(), "P"), out TableDataDiagnosticLog b,
+                Row("CatKnight", motionKey: "P", initiallyOwned: "0"));
+            Assert.AreEqual(0, b.ErrorCount, Describe(b));
+            Assert.IsFalse(locked.Characters[0].InitiallyOwned,
+                "0은 '새 게임에서 주지 않는다'는 뜻이며 그 자체로 올바른 값이다.");
+        }
+
+        [Test]
+        public void InitiallyOwned_IsRequiredAndRejectsEverythingElse()
+        {
+            // 빈 칸을 받아 주면 "정하지 않았다"가 조용히 "주지 않는다"로 굳는다.
+            foreach (string bad in new[] { "", " ", "true", "false", "TRUE", "False", "1 ", " 0", "2", "-1", "yes" })
+            {
+                TableDataSnapshot snapshot = Validate(
+                    IndexWith(NewPlayableProfile(), "P"), out TableDataDiagnosticLog log,
+                    Row("CatKnight", motionKey: "P", initiallyOwned: bad));
+
+                Assert.AreEqual(1, CountErrors(log, TableDataColumns.InitiallyOwned),
+                    $"'{bad}'은(는) 오류여야 한다: " + Describe(log));
+                Assert.IsFalse(snapshot.Characters[0].InitiallyOwned,
+                    $"'{bad}'을(를) 참으로 읽어 통과시키면 안 된다.");
+            }
+        }
+
+        [Test]
+        public void InitiallyOwned_UsesTheSameStrictRuleAsEnabled()
+        {
+            // 두 칸이 같은 규칙을 쓴다는 것 자체를 못 박는다 - 한쪽만 느슨해지면 표의 규칙이 갈라진다.
+            var log = new TableDataDiagnosticLog();
+
+            Assert.IsTrue(TableDataFieldRules.TryReadFlag("f", 2, "c", "1", log, out bool one));
+            Assert.IsTrue(one);
+            Assert.IsTrue(TableDataFieldRules.TryReadFlag("f", 2, "c", "0", log, out bool zero));
+            Assert.IsFalse(zero);
+            Assert.AreEqual(0, log.Entries.Count);
+
+            Assert.IsFalse(TableDataFieldRules.TryReadFlag("f", 2, "c", "true", log, out _));
+            Assert.AreEqual(1, log.ErrorCount);
+        }
+
+        [Test]
+        public void InitiallyOwned_DoesNotChangeWhetherTheRowIsEnabled()
+        {
+            // 두 값은 서로 독립이다 - 새 게임에 주지 않는 캐릭터도 카탈로그에는 들어간다.
+            TableDataSnapshot snapshot = Validate(IndexWith(NewPlayableProfile(), "P"), out TableDataDiagnosticLog log,
+                Row("CatKnight", motionKey: "P", initiallyOwned: "0", enabled: "1"));
+
+            Assert.AreEqual(0, log.ErrorCount, Describe(log));
+            Assert.IsTrue(snapshot.Characters[0].Enabled);
+            Assert.IsFalse(snapshot.Characters[0].InitiallyOwned);
+        }
+
+        // ---- CharacterDefinition의 공개 계약 ----
+
+        [Test]
+        public void CharacterDefinition_ExposesInitiallyOwnedAsAReadOnlyProperty()
+        {
+            PropertyInfo property = typeof(CharacterDefinition).GetProperty(
+                "InitiallyOwned", BindingFlags.Public | BindingFlags.Instance);
+
+            Assert.IsNotNull(property, "InitiallyOwned 공개 프로퍼티가 있어야 한다.");
+            Assert.AreEqual(typeof(bool), property.PropertyType);
+            Assert.IsNull(property.GetSetMethod(), "표가 정하는 값이므로 바깥에서 쓸 수 없어야 한다.");
+        }
+
+        [Test]
+        public void CharacterDefinition_KeepsItsExistingPublicApi()
+        {
+            // 새 칸을 더하면서 기존 호출부(로스터/교체 패널/회복소)가 쓰는 API가 사라지면 안 된다.
+            foreach (string name in new[]
+                     {
+                         "CharacterId", "DisplayName", "MotionProfile", "Portrait", "MaxStamina",
+                         "LocalizedName", "HasLocalizedName", "HasBaseMaxHealth", "BaseMaxHealth", "DisplayOrder",
+                     })
+            {
+                Assert.IsNotNull(
+                    typeof(CharacterDefinition).GetProperty(name, BindingFlags.Public | BindingFlags.Instance),
+                    $"기존 공개 API '{name}'이 사라졌다.");
+            }
+        }
+
+        [Test]
+        public void CharacterDefinition_SerializesInitiallyOwnedAndDefaultsToFalse()
+        {
+            // 이 칸이 생기기 전에 만들어진 수동 에셋에는 값이 없다 - Unity가 false로 채우는 것이
+            // 안전한 기본값이어야 한다("모르면 주지 않는다").
+            var probe = ScriptableObject.CreateInstance<CharacterDefinition>();
+            created.Add(probe);
+
+            SerializedProperty field = new SerializedObject(probe).FindProperty("initiallyOwned");
+
+            Assert.IsNotNull(field, "initiallyOwned가 직렬화 칸이어야 한다.");
+            Assert.AreEqual(SerializedPropertyType.Boolean, field.propertyType);
+            Assert.IsFalse(field.boolValue);
+            Assert.IsFalse(probe.InitiallyOwned, "기본값은 false여야 한다.");
+        }
+
+        [Test]
+        public void ManualCharacterDefinitions_DefaultToNotInitiallyOwned()
+        {
+            // 수동 에셋은 이번 작업에서 건드리지 않았으므로 값이 없고, 없는 값은 false로 읽힌다.
+            var manual = AssetDatabase.LoadAssetAtPath<CharacterDefinition>(
+                "Assets/Data/Characters/CatKnight_CharacterDefinition.asset");
+
+            Assert.IsNotNull(manual);
+            Assert.IsFalse(manual.InitiallyOwned,
+                "수동 에셋에는 이 칸이 없으므로 false로 읽혀야 한다(임포터가 고치지 않는다).");
         }
 
         // ---- 모션 프로필 ----
@@ -517,6 +649,8 @@ namespace TableDataEditor.Tests
                 Assert.AreEqual(30, row.MaxStamina, $"{row.Id}의 max_stamina");
                 Assert.IsFalse(row.HasBaseMaxHealth, $"{row.Id}의 base_max_health는 아직 비어 있어야 한다.");
                 Assert.IsTrue(row.Enabled, $"{row.Id}는 활성이어야 한다.");
+                Assert.IsTrue(row.InitiallyOwned,
+                    $"{row.Id}는 지금까지 모두가 쓸 수 있던 캐릭터이므로 새 게임에서도 처음부터 가진다.");
                 Assert.IsTrue(row.Name.Resolved, $"{row.Id}의 이름 참조가 해석되어야 한다.");
                 Assert.IsNotNull(row.MotionProfile, $"{row.Id}의 모션 프로필이 연결되어야 한다.");
             }
@@ -602,13 +736,14 @@ namespace TableDataEditor.Tests
             string portraitKey = "",
             string baseMaxHealth = "",
             string maxStamina = "30",
+            string initiallyOwned = "1",
             string displayOrder = "10",
             string enabled = "1")
         {
             return new[]
             {
-                id, category, key, motionKey, portraitKey, baseMaxHealth, maxStamina, displayOrder, enabled,
-                string.Empty,
+                id, category, key, motionKey, portraitKey, baseMaxHealth, maxStamina, initiallyOwned,
+                displayOrder, enabled, string.Empty,
             };
         }
 

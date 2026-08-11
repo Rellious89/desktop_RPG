@@ -51,6 +51,12 @@ namespace Character
         [Min(1)]
         [SerializeField] private int maxStamina = 5;
 
+        [Header("New Game")]
+        [Tooltip("새 게임을 시작할 때 이 캐릭터를 처음부터 가지고 시작하는가. " +
+                 "이미 진행 중인 저장 데이터에는 소급 적용되지 않는다 - 보유 여부는 저장 데이터가 " +
+                 "소유하며, 이 값은 저장 문서를 처음 만들 때만 참고하는 표의 정책이다.")]
+        [SerializeField] private bool initiallyOwned;
+
         [Header("Localization")]
         [Tooltip("표에서 지정한 캐릭터 이름. 카테고리 번호 + 숫자 키로 가리킨다. " +
                  "지금은 어떤 UI도 읽지 않는 정적 데이터이며, Display Name의 동작을 바꾸지 않는다.")]
@@ -118,6 +124,22 @@ namespace Character
         /// <summary>기본 최대 체력. <b>지정하지 않았으면 0</b>이므로 값을 쓰기 전에 반드시
         /// <see cref="HasBaseMaxHealth"/>를 먼저 본다 - 0을 "체력 0"으로 읽으면 안 된다.</summary>
         public int BaseMaxHealth => hasBaseMaxHealth ? Mathf.Max(1, baseMaxHealth) : 0;
+
+        /// <summary>
+        /// <b>새 게임을 시작할 때</b> 이 캐릭터를 처음부터 가지고 시작하는지. 표(Character.csv)의
+        /// <c>initially_owned</c>가 그대로 들어온다.
+        ///
+        /// <b>이 값은 "지금 이 플레이어가 그 캐릭터를 보유했는가"가 아니다.</b> 보유는 저장 문서
+        /// (SaveData.characters)가 소유한다 - 그 목록에 항목이 있다는 것이 곧 보유이며, 이 정의 에셋은
+        /// 어떤 플레이어의 상태도 알지 못한다.
+        ///
+        /// <b>이미 있는 저장 파일에 소급 적용되지 않는다.</b> 이 값을 나중에 켜거나 꺼도 진행 중인
+        /// 저장 문서의 보유 목록은 달라지지 않는다 - 표를 고쳤다고 남의 캐릭터를 뺏거나 주지 않는다는
+        /// 뜻이며, 새 게임을 시작하는 순간에만 읽히는 <b>시드 정책</b>이다.
+        ///
+        /// 값이 없는(= 이 칸이 생기기 전에 만들어진) 수동 에셋은 Unity가 <c>false</c>로 채운다.
+        /// </summary>
+        public bool InitiallyOwned => initiallyOwned;
 
         /// <summary>정렬용 순서 값. 작을수록 앞이며, 지정하지 않으면 0이다.</summary>
         public int DisplayOrder => displayOrder;

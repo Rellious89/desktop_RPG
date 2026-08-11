@@ -136,18 +136,32 @@ namespace TableDataEditor
         public static bool TryReadEnabled(
             string file, int line, string column, string raw, TableDataDiagnosticLog log, out bool enabled)
         {
-            enabled = false;
+            return TryReadFlag(file, line, column, raw, log, out enabled);
+        }
+
+        /// <summary>
+        /// 참/거짓 칸을 읽는 <b>유일한 규칙</b>. <c>enabled</c>와 <c>initially_owned</c>처럼 "둘 중
+        /// 하나"인 칸은 전부 이 함수를 지난다 - 표마다 다른 표기를 받아 주기 시작하면 어느 칸이 무엇을
+        /// 허용하는지 아무도 기억하지 못한다.
+        ///
+        /// <b>정확히 "1" 또는 "0"</b>만 허용한다. 빈 칸, <c>true</c>/<c>TRUE</c>/<c>false</c>,
+        /// 앞뒤 공백이 붙은 값, 그 밖의 정수는 모두 오류이며 <b>값을 고쳐서 통과시키지 않는다</b>.
+        /// </summary>
+        public static bool TryReadFlag(
+            string file, int line, string column, string raw, TableDataDiagnosticLog log, out bool value)
+        {
+            value = false;
 
             if (string.Equals(raw, "1", StringComparison.Ordinal))
             {
-                enabled = true;
+                value = true;
                 return true;
             }
 
             if (string.Equals(raw, "0", StringComparison.Ordinal)) return true;
 
             log.Error(file, line, column, raw ?? string.Empty,
-                "enabled는 정확히 1 또는 0이어야 합니다.");
+                $"{column}는 정확히 1 또는 0이어야 합니다 - 빈 칸이나 true/false 같은 다른 표기는 쓸 수 없습니다.");
             return false;
         }
 

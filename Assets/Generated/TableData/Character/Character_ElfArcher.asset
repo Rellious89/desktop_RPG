@@ -17,6 +17,7 @@ MonoBehaviour:
   motionProfile: {fileID: 11400000, guid: 06714079119664c029fa36e4bc234e67, type: 2}
   portrait: {fileID: 0}
   maxStamina: 30
+  initiallyOwned: 1
   localizedName:
     m_TableReference:
       m_TableCollectionName: GUID:0cb4ffaa38b6b4d8a9ad892beab1142d

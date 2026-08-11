@@ -122,6 +122,10 @@ namespace TableDataEditor
         private const string HasBaseMaxHealthField = "hasBaseMaxHealth";
         private const string BaseMaxHealthField = "baseMaxHealth";
 
+        // 새 게임 시작 구성. 참/거짓 칸이라 타입까지 확인한다 - 정수 칸으로 되돌아가 있으면
+        // boolValue에 넣은 값이 조용히 버려져 아무도 처음부터 가지지 못한 채로 만들어진다.
+        private const string InitiallyOwnedField = "initiallyOwned";
+
         // 관계가 가리키는 두 참조 칸. 문자열로 되돌아가 있으면 objectReferenceValue에 넣은 값이
         // 조용히 버려지므로, 이름뿐 아니라 타입까지 미리 확인한다(재화 칸과 같은 이유다).
         private const string RelationCharacterField = "character";
@@ -626,6 +630,7 @@ namespace TableDataEditor
             serialized.FindProperty("motionProfile").objectReferenceValue = row.MotionProfile;
             serialized.FindProperty("portrait").objectReferenceValue = row.Portrait;
             serialized.FindProperty("maxStamina").intValue = row.MaxStamina;
+            serialized.FindProperty(InitiallyOwnedField).boolValue = row.InitiallyOwned;
             serialized.FindProperty(HasBaseMaxHealthField).boolValue = row.HasBaseMaxHealth;
             serialized.FindProperty(BaseMaxHealthField).intValue = row.HasBaseMaxHealth ? row.BaseMaxHealth : 1;
             serialized.FindProperty("displayOrder").intValue = row.DisplayOrder;
@@ -816,7 +821,11 @@ namespace TableDataEditor
             // 목록에 넣어 두었다: 그 칸이 사라지면 표시 이름의 근거가 통째로 달라지므로, 임포터를 함께
             // 고쳐야 하는 변경이라는 것을 여기서 드러낸다.
             ok &= VerifyFields<CharacterDefinition>(log, "characterId", "displayName", "motionProfile", "portrait",
-                "maxStamina", "localizedName", HasBaseMaxHealthField, BaseMaxHealthField, "displayOrder");
+                "maxStamina", InitiallyOwnedField, "localizedName", HasBaseMaxHealthField, BaseMaxHealthField,
+                "displayOrder");
+            ok &= VerifyPropertyType<CharacterDefinition>(
+                log, InitiallyOwnedField, SerializedPropertyType.Boolean,
+                "새 게임 시작 구성은 참/거짓 칸이어야 합니다 - 다른 타입이면 표의 값이 조용히 버려집니다.");
             ok &= VerifyPropertyType<CharacterDefinition>(
                 log, HasBaseMaxHealthField, SerializedPropertyType.Boolean,
                 "기본 체력을 '지정했는지'는 참/거짓 칸이어야 합니다 - 숫자 칸 하나로 합치면 빈 CSV 칸과 " +

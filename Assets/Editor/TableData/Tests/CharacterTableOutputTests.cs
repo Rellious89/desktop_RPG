@@ -601,6 +601,22 @@ namespace TableDataEditor.Tests
         }
 
         [Test]
+        public void GeneratedCharacters_AreAllInitiallyOwned()
+        {
+            // 표의 여섯 행이 전부 initially_owned=1이므로 생성 에셋도 전부 true여야 한다.
+            // 이 값이 false로 새면 새 게임을 시작한 사람이 캐릭터를 하나도 갖지 못한다.
+            foreach (string id in new[]
+                     { "CatKnight", "ElfArcher", "Barbarian", "ElfGuardian", "RabbitHealer", "CatMage" })
+            {
+                var definition = AssetDatabase.LoadAssetAtPath<CharacterDefinition>(
+                    TableDataPaths.CharacterAssetPath(id));
+
+                Assert.IsNotNull(definition, $"생성 에셋이 없습니다 - Rebuild를 먼저 실행하세요: {id}");
+                Assert.IsTrue(definition.InitiallyOwned, $"{id}는 새 게임에서 처음부터 가지고 시작해야 한다.");
+            }
+        }
+
+        [Test]
         public void GeneratedCharacters_CarryTheValuesFromTheTable()
         {
             var catalog = AssetDatabase.LoadAssetAtPath<CharacterCatalog>(TableDataPaths.CharacterCatalogAssetPath);
@@ -610,6 +626,7 @@ namespace TableDataEditor.Tests
 
             foreach (CharacterDefinition character in catalog.Characters)
             {
+                Assert.IsTrue(character.InitiallyOwned, $"{character.CharacterId}의 새 게임 시작 구성");
                 Assert.AreEqual(30, character.MaxStamina, $"{character.CharacterId}의 Max Stamina");
                 Assert.IsFalse(character.HasBaseMaxHealth, $"{character.CharacterId}의 기본 체력은 아직 미지정이다.");
                 Assert.AreEqual(0, character.BaseMaxHealth);

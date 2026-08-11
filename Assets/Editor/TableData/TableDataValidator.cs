@@ -857,6 +857,15 @@ namespace TableDataEditor
                     row.MaxStamina = stamina;
                 }
 
+                // 새 게임 시작 구성은 <b>모든 행이 반드시 밝혀야 하는 값</b>이다 - 비워 두면 "정하지
+                // 않았다"가 곧 "주지 않는다"로 조용히 굳으므로, enabled와 같은 엄격한 0/1로 받는다.
+                if (TableDataFieldRules.TryReadFlag(
+                        file, line, TableDataColumns.InitiallyOwned,
+                        table.Get(record, TableDataColumns.InitiallyOwned), log, out bool initiallyOwned))
+                {
+                    row.InitiallyOwned = initiallyOwned;
+                }
+
                 // memo는 사람이 읽는 칸이라 검증하지 않는다.
 
                 if (!idOk) continue;

@@ -131,10 +131,20 @@ namespace TableDataEditor
 
         public const string MaxStamina = "max_stamina";
 
+        /// <summary>
+        /// <b>새 게임을 시작할 때</b> 이 캐릭터를 처음부터 가지고 시작하는가. <c>enabled</c>와 같은
+        /// 엄격한 0/1 칸이며 빈 칸도 <c>true</c>도 받지 않는다.
+        ///
+        /// <b>지금 플레이어가 그 캐릭터를 보유했는지와는 다른 값이다.</b> 보유는 저장 문서
+        /// (SaveData.characters)가 소유하며, 이 칸은 저장 문서를 <b>처음 만들 때</b> 무엇을 넣을지를
+        /// 정하는 표의 정책일 뿐이다 - 이미 있는 저장 파일에 소급 적용되지 않는다.
+        /// </summary>
+        public const string InitiallyOwned = "initially_owned";
+
         public static readonly string[] Character =
         {
             CharacterId, NameCategory, NameKey, MotionProfileKey, PortraitKey, BaseMaxHealth,
-            MaxStamina, DisplayOrder, Enabled, Memo,
+            MaxStamina, InitiallyOwned, DisplayOrder, Enabled, Memo,
         };
 
         // Skill.csv

@@ -185,6 +185,11 @@ namespace TableDataEditor
         public int BaseMaxHealth;
 
         public int MaxStamina = 1;
+
+        /// <summary>새 게임을 시작할 때 이 캐릭터를 처음부터 가지고 시작하는가.
+        /// <b>지금 보유했는지가 아니다</b> - 그것은 저장 문서의 몫이다.</summary>
+        public bool InitiallyOwned;
+
         public int DisplayOrder;
         public bool Enabled;
     }
