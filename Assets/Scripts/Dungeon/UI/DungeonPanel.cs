@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Character;
 using Common;
 using Inventory;
 using TMPro;
@@ -26,6 +27,10 @@ namespace Dungeon
     /// <b>입장 이후는 이 패널이 알지 못한다.</b> 입장 버튼은 <see cref="DungeonEntryService"/>에 요청을
     /// 한 번 보낼 뿐이고, 필드 모드 전환이나 전투 시작은 나중에 그 이벤트를 구독하는 쪽이 담당한다 -
     /// 지금은 구독자가 없어도 정상 동작한다(요청 로그만 남고 패널이 닫힌다).
+    ///
+    /// <b>레벨 판정은 <see cref="DungeonAccessService"/>를 재사용한다.</b> 로스터가 없으면 전원 잠금(fail
+    /// closed). 패널이 열린 동안 <see cref="CharacterRoster.CharacterStateChanged"/>를 구독해서 레벨이
+    /// 오르면 즉시 모든 항목의 잠김 표시와 입장 버튼을 다시 판정한다.
     /// </summary>
     [DisallowMultipleComponent]
     public class DungeonPanel : ModalPanel
@@ -93,11 +98,21 @@ namespace Dungeon
         private bool missingWorldNameWarned;
         private bool worldFormatFailureLogged;
 
+        private bool subscribedToStateChanged;
+
         /// <summary>지금 선택된 던전. 검증/디버깅과 테스트용 읽기 전용 값이다.</summary>
         public DungeonDefinition SelectedDungeon => selectedDungeon;
 
         /// <summary>지금 만들어져 있는 목록 항목 복제본 수.</summary>
         public int SpawnedItemCount => spawnedItems.Count;
+
+        /// <summary>만들어져 있는 목록 항목 복제본 하나를 <b>읽기 전용으로</b> 돌려준다 - 범위를 벗어난
+        /// 색인이면 null이다. 목록 자체를 밖으로 내보내지 않는 이유는, 복제본의 수명(생성/Unbind/파괴)을
+        /// 이 패널만 소유하기 때문이다. 검증/테스트에서 항목의 표시 상태를 확인하는 용도로만 쓴다.</summary>
+        public DungeonListItemView GetSpawnedItem(int index)
+        {
+            return index >= 0 && index < spawnedItems.Count ? spawnedItems[index] : null;
+        }
 
         /// <summary>지금 만들어져 있는 몬스터 미리보기 복제본 수.</summary>
         public int SpawnedMonsterPreviewCount => spawnedMonsterPreviews.Count;
@@ -128,11 +143,15 @@ namespace Dungeon
                 enterButton.onClick.RemoveListener(HandleEnterClicked);
                 enterButton.onClick.AddListener(HandleEnterClicked);
             }
+
+            SubscribeToStateChanged();
         }
 
         protected override void OnModalClosed()
         {
             if (enterButton != null) enterButton.onClick.RemoveListener(HandleEnterClicked);
+
+            UnsubscribeFromStateChanged();
 
             // 복제본과 문구 구독을 모두 정리한다 - 다시 열 때 새로 만들기 때문에, 남겨두면 그대로 중복이 된다.
             UnbindWorldText();
@@ -148,6 +167,52 @@ namespace Dungeon
         protected override void RefreshContents()
         {
             RebuildDungeonList();
+        }
+
+        // ---- CharacterStateChanged 구독 ----
+
+        private void SubscribeToStateChanged()
+        {
+            if (subscribedToStateChanged) return;
+            subscribedToStateChanged = true;
+            CharacterRoster.CharacterStateChanged += HandleCharacterStateChanged;
+        }
+
+        private void UnsubscribeFromStateChanged()
+        {
+            if (!subscribedToStateChanged) return;
+            subscribedToStateChanged = false;
+            CharacterRoster.CharacterStateChanged -= HandleCharacterStateChanged;
+        }
+
+        private void HandleCharacterStateChanged(CharacterDefinition _)
+        {
+            RefreshAllAccessVisuals();
+        }
+
+        // ---- 접근 판정 ----
+
+        private DungeonAccessResult EvaluateAccess(DungeonDefinition dungeon)
+        {
+            CharacterRoster roster = CharacterRoster.Instance;
+            if (roster == null)
+                return DungeonAccessResult.Deny(DungeonAccessFailureReason.MissingRosterOrProgression);
+
+            var service = new DungeonAccessService(roster);
+            return service.Evaluate(dungeon);
+        }
+
+        private void RefreshAllAccessVisuals()
+        {
+            for (int i = 0; i < spawnedItems.Count; i++)
+            {
+                DungeonListItemView item = spawnedItems[i];
+                if (item == null || item.BoundDungeon == null) continue;
+
+                item.SetAccessResult(EvaluateAccess(item.BoundDungeon));
+            }
+
+            UpdateEnterButton();
         }
 
         // ---- 던전 목록 ----
@@ -173,6 +238,8 @@ namespace Dungeon
                     // 복제본에 남아 있던 LocalizedTMPText의 OnEnable이 먼저 돌아 프리팹의 정적 문구가
                     // 한 프레임 보이게 된다.
                     item.Bind(dungeon, HandleDungeonSelected);
+                    // 잠김 표시도 켜기 전에 확정한다 - 켠 뒤에 낮추면 밝은 상태가 한 프레임 보인다.
+                    item.SetAccessResult(EvaluateAccess(dungeon));
                     // 원본은 비활성 그대로 두고 복제본만 켠다.
                     item.gameObject.SetActive(true);
                     spawnedItems.Add(item);
@@ -447,6 +514,10 @@ namespace Dungeon
         /// 요청이 거부되면 세워 둔 상태를 <b>되돌리고</b> 버튼을 다시 판정한다 - 거부는 패널을 닫지
         /// 않는 경로이므로, 되돌리지 않으면 열려 있는 패널의 입장 버튼이 영영 잠긴 채로 남는다.
         /// 왜 거부됐는지는 요청 통로가 로그로 남긴다.
+        ///
+        /// <b>레벨 판정을 여기서 다시 하지 않는다.</b> 최종 거부자는 <see cref="DungeonEntryService"/>이며
+        /// 요청 직전에 현재 상태로 판정한다 - 그래서 버튼의 interactable이 어떤 이유로 낡아 있어도
+        /// (외부에서 강제로 켜더라도) 입장 요청이 통과하지 못하고, 이 경로가 그대로 되돌린다.
         /// </summary>
         private void HandleEnterClicked()
         {
@@ -471,14 +542,21 @@ namespace Dungeon
             Close();
         }
 
-        /// <summary>입장 버튼은 "지금 이 선택으로 입장 요청이 실제로 나갈 수 있을 때"만 켠다.</summary>
+        /// <summary>입장 버튼은 "지금 이 선택으로 입장 요청이 실제로 나갈 수 있을 때"만 켠다 - 선택이
+        /// 유효한지에 더해 <see cref="DungeonAccessService"/>의 레벨 판정까지 통과해야 한다. 이것은
+        /// 표시일 뿐이고, 실제 거부는 <see cref="DungeonEntryService"/>가 요청 시점에 다시 한다.</summary>
         private void UpdateEnterButton()
         {
             if (enterButton == null) return;
 
-            enterButton.interactable = !enterRequestSent
-                                       && selectedDungeon != null
-                                       && selectedDungeon.IsValid;
+            bool allowed = false;
+            if (!enterRequestSent && selectedDungeon != null && selectedDungeon.IsValid)
+            {
+                DungeonAccessResult result = EvaluateAccess(selectedDungeon);
+                allowed = result.Allowed;
+            }
+
+            enterButton.interactable = allowed;
         }
 
         // ---- 참조 ----
