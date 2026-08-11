@@ -703,6 +703,13 @@ namespace TableDataEditor
                 ReadMonsterList(table, record, file, line, snapshot, row, log);
                 ReadRewardList(table, record, file, line, snapshot, row, log);
 
+                if (TableDataFieldRules.TryReadIntAtLeast(
+                        file, line, TableDataColumns.RequiredCharacterLevel,
+                        table.Get(record, TableDataColumns.RequiredCharacterLevel), 1, log, out int reqLevel))
+                {
+                    row.RequiredCharacterLevel = reqLevel;
+                }
+
                 if (!idOk) continue;
 
                 snapshot.Dungeons.Add(row);

@@ -112,7 +112,7 @@ namespace TableDataEditor
         public static readonly string[] Dungeon =
         {
             DungeonId, NameCategory, NameKey, WorldId, RepresentativeSpriteKey, MonsterIds,
-            RewardItemIds, DisplayOrder, Enabled, Memo,
+            RewardItemIds, RequiredCharacterLevel, DisplayOrder, Enabled, Memo,
         };
 
         // Character.csv

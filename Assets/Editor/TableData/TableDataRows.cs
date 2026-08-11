@@ -154,6 +154,9 @@ namespace TableDataEditor
         /// 아이템 에셋은 임포터의 출력 대상이 아니다.</summary>
         public readonly List<string> RewardItemIds = new List<string>();
 
+        /// <summary>표에 적힌 필요 캐릭터 레벨. 1 이상만 여기까지 오며 <b>상한은 없다</b>.</summary>
+        public int RequiredCharacterLevel = 1;
+
         public int DisplayOrder;
         public bool Enabled;
     }

@@ -63,6 +63,11 @@ namespace Dungeon
                  "수량/확률/보유량은 표시하지 않는다.")]
         [SerializeField] private List<ItemDefinition> rewardItems = new List<ItemDefinition>();
 
+        [Header("Condition")]
+        [Tooltip("표에 적힌 필요 캐릭터 레벨. 이 에셋은 값을 담기만 하고 스스로 무엇을 여닫지 않는다.")]
+        [Min(1)]
+        [SerializeField] private int requiredCharacterLevel = 1;
+
         [Header("Ordering")]
         [Tooltip("던전을 정렬할 때 쓰는 순서 값. 작을수록 앞이다 - 이 값 자체가 목록을 만들지는 않으며, " +
                  "목록의 순서는 DungeonCatalog의 작성 순서가 결정한다.")]
@@ -98,6 +103,9 @@ namespace Dungeon
         /// 비어 있는(null) 항목은 그리는 쪽이 건너뛴다.</summary>
         public IReadOnlyList<ItemDefinition> RewardItems =>
             rewardItems != null ? (IReadOnlyList<ItemDefinition>)rewardItems : EmptyRewards;
+
+        /// <summary>표에 적힌 필요 캐릭터 레벨(1 이상).</summary>
+        public int RequiredCharacterLevel => Mathf.Max(1, requiredCharacterLevel);
 
         /// <summary>정렬용 순서 값. 작을수록 앞이며, 지정하지 않으면 0이다.</summary>
         public int DisplayOrder => displayOrder;

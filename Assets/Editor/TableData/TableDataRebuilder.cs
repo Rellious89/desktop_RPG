@@ -607,6 +607,8 @@ namespace TableDataEditor
                 rewardList.GetArrayElementAtIndex(i).objectReferenceValue = Lookup(items, row.RewardItemIds[i]);
             }
 
+            serialized.FindProperty("requiredCharacterLevel").intValue = row.RequiredCharacterLevel;
+
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(asset);
         }
@@ -809,7 +811,7 @@ namespace TableDataEditor
             ok &= VerifyMonsterCurrencyIsAReference(log);
             ok &= VerifyDropEntryFields(log);
             ok &= VerifyFields<DungeonDefinition>(log, "dungeonId", "dungeonName", "world", "representativeSprite",
-                "monsters", "rewardItems", "displayOrder");
+                "monsters", "rewardItems", "requiredCharacterLevel", "displayOrder");
             ok &= VerifyFields<WorldCatalog>(log, "worlds");
             ok &= VerifyFields<CurrencyCatalog>(log, "currencies");
             ok &= VerifyFields<ItemCatalog>(log, "items");

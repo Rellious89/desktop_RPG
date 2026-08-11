@@ -29,6 +29,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 4db51d9371d3144f9bf18a5fbe24eec5, type: 2}
   - {fileID: 11400000, guid: 8daf2b2fd616f49e9ac1505f2a26a95e, type: 2}
   rewardItems: []
+  requiredCharacterLevel: 1
   displayOrder: 60
   references:
     version: 2
