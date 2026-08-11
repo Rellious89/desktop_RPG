@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using Common;
@@ -25,6 +26,13 @@ namespace CommonEditor.Tests
     {
         private const string LegacyV0Json =
             @"{""currentLevel"":7,""currentExp"":240,""totalKillCount"":133,""currency"":1250}";
+
+        /// <summary>v1 파일. 캐릭터 항목이 하나만 있는데, 그것이 v1의 실제 모습이다 - 목록은 실제로 써 본
+        /// 캐릭터만 담았고 "가지고 있는가"를 적는 자리는 없었다.</summary>
+        private const string LegacyV1Json =
+            @"{""saveVersion"":1,""saveRevision"":5,""lastSavedAtUtc"":""2026-01-02T03:04:05.0000000Z"","
+            + @"""currentLevel"":7,""currency"":1250,"
+            + @"""characters"":[{""characterId"":""CatMage"",""level"":8,""currentStamina"":3}]}";
 
         private static readonly DateTime FixedNow = new DateTime(2026, 5, 6, 7, 8, 9, DateTimeKind.Utc);
         private const string FixedNowText = "2026-05-06T07:08:09.0000000Z";
@@ -134,7 +142,7 @@ namespace CommonEditor.Tests
         }
 
         [Test]
-        public void 올린_뒤_명시적_Save가_v1을_쓰고_v0_원본을_백업에_남긴다()
+        public void 올린_뒤_명시적_Save가_현재_버전을_쓰고_v0_원본을_백업에_남긴다()
         {
             LocalFileSaveStorage real = UseTemporaryDirectoryStorage();
             File.WriteAllText(real.PrimaryPath, LegacyV0Json);
@@ -149,6 +157,47 @@ namespace CommonEditor.Tests
                 "주 파일은 이제 현재 버전입니다.");
             Assert.AreEqual(LegacyV0Json, File.ReadAllText(real.BackupPath),
                 "원자적 교체가 v0 원본을 백업 자리에 그대로 남겨야 합니다 - 되돌아갈 곳입니다.");
+        }
+
+        [Test]
+        public void v1_파일은_올려서_읽되_그_자리에서_쓰지_않는다()
+        {
+            fake.ReadResult = SaveReadResult.Loaded("fake://primary", LegacyV1Json);
+
+            Assert.IsTrue(SaveSystem.LoadedFromFile);
+            Assert.AreEqual(SaveLoadStatus.Migrated, SaveSystem.LoadStatus);
+            Assert.AreEqual(SaveData.CurrentSaveVersion, SaveSystem.Data.saveVersion);
+
+            // v1->v2가 그 시절 여섯을 채운다. 파일에 이미 있던 'CatMage'는 앞자리를 지킨다.
+            Assert.AreEqual("CatMage", SaveSystem.Data.characters[0].characterId);
+            Assert.AreEqual(8, SaveSystem.Data.characters[0].level, "변환은 있던 값을 바꾸지 않습니다.");
+            // 기대값은 이 시험이 독립적으로 들고 있다 - 변환의 상수를 그대로 가져다 비교하면 그 상수를
+            // 잘못 고쳐도 시험이 함께 따라가 통과한다.
+            CollectionAssert.AreEqual(
+                new[] { "CatMage", "Barbarian", "CatKnight", "ElfArcher", "ElfGuardian", "RabbitHealer" },
+                IdsOf(SaveSystem.Data.characters),
+                "CatMage는 여섯 중 하나이므로 나머지 다섯만 정해진 차례로 덧붙습니다.");
+
+            Assert.AreEqual(0, fake.WriteCalls,
+                "켜기만 한 사용자의 파일을 바꿔 놓지 않도록, 올린 결과는 다음 명시적 Save까지 기다립니다.");
+        }
+
+        [Test]
+        public void 올린_뒤_명시적_Save가_v2를_쓰고_v1_원본을_백업에_남긴다()
+        {
+            LocalFileSaveStorage real = UseTemporaryDirectoryStorage();
+            File.WriteAllText(real.PrimaryPath, LegacyV1Json);
+
+            Assert.AreEqual(SaveLoadStatus.Migrated, SaveSystem.LoadStatus, "v1 파일은 한 칸 올라갑니다.");
+            Assert.IsFalse(File.Exists(real.BackupPath), "아직 아무것도 쓰지 않았으므로 백업도 없습니다.");
+
+            Assert.IsTrue(SaveSystem.Save());
+
+            Assert.AreEqual(SaveData.CurrentSaveVersion,
+                SaveVersionProbe.Probe(File.ReadAllText(real.PrimaryPath)).Version,
+                "주 파일은 이제 v2입니다.");
+            Assert.AreEqual(LegacyV1Json, File.ReadAllText(real.BackupPath),
+                "원자적 교체가 v1 원본을 백업 자리에 그대로 남겨야 합니다 - 되돌아갈 곳입니다.");
         }
 
         // ---- 손상된 파일 ----
@@ -441,6 +490,13 @@ namespace CommonEditor.Tests
             public int ToVersion => 1;
 
             public void Apply(SaveData data) => throw new InvalidOperationException("일부러 실패");
+        }
+
+        private static List<string> IdsOf(List<CharacterSaveState> characters)
+        {
+            List<string> ids = new List<string>();
+            foreach (CharacterSaveState state in characters) ids.Add(state == null ? null : state.characterId);
+            return ids;
         }
 
         private static string CurrentVersionJson(int level, int currency)

@@ -74,7 +74,9 @@ namespace Common
     ///
     /// 러너는 파일도 JSON도 모른다 - 넘겨받은 <see cref="SaveData"/>와 "이 문서는 몇 번 버전인가"만
     /// 다룬다. 그래서 시험이 디스크 없이 전부 돌아가고, 저장소 구현(경로, 백업, 원자적 쓰기)이 바뀌어도
-    /// 변환 규칙은 손댈 이유가 없다.
+    /// 변환 규칙은 손댈 이유가 없다. <b>단계도 같은 규칙을 지킨다</b> - 에셋이나 카탈로그를 읽는 단계는
+    /// 두지 않는다(<see cref="V1ToV2Step"/> 참고). 지금의 프로젝트 데이터를 읽어 예전 문서를 고치면
+    /// 같은 파일이 빌드마다 다르게 변환된다.
     ///
     /// <b>변환은 전부 되거나 전혀 안 된다.</b> 단계는 문서를 제자리에서 고치므로 세 칸 중 두 번째에서
     /// 실패하면 반쯤 바뀐 문서가 남는데, 그것을 호출부에 보이지 않게 하려고 단계는 <b>작업 사본</b>
@@ -135,6 +137,7 @@ namespace Common
             return new ISaveMigrationStep[]
             {
                 new UnversionedToV1Step(),
+                new V1ToV2Step(),
             };
         }
 
@@ -400,6 +403,103 @@ namespace Common
 
             data.saveRevision = 0;
             data.lastSavedAtUtc = null;
+        }
+    }
+
+    /// <summary>
+    /// v1 문서를 v2로 올린다. 하는 일은 하나다 - <b>그 시절 쓸 수 있던 캐릭터 여섯을
+    /// <see cref="SaveData.characters"/>에 빠짐없이 남긴다.</b>
+    ///
+    /// <b>왜 필요한가.</b> v2에서 <see cref="SaveData.characters"/>의 항목은 곧 <b>보유</b>다 - 항목이
+    /// 없는 캐릭터는 가지고 있지 않은 캐릭터다. v1에는 그 뜻이 없었다: 항목이 있든 없든 여섯 캐릭터를
+    /// 모두 쓸 수 있었고 항목은 <b>실제로 한 번 써 본 뒤에야</b> 생겼다. 그래서 v1 문서를 그대로 v2의
+    /// 규칙으로 읽으면 <b>한 번도 써 보지 않은 캐릭터가 미보유가 되어</b> 가진 것이 줄어든다. 이 단계가
+    /// 그 여섯을 보유로 확정해 그 일을 막는다.
+    ///
+    /// <b>여섯 id를 이 클래스 안에 글자 그대로 박아 둔다.</b> 이 단계는 Unity 에셋도 CharacterCatalog도
+    /// 읽지 않는다 - 변환은 "그때 무엇이 있었는가"라는 <b>역사적 사실</b>을 옮기는 일인데, 지금의 표를
+    /// 읽으면 나중에 캐릭터를 추가하거나 지우는 순간 <b>예전 파일의 변환 결과가 함께 바뀐다</b>.
+    /// 그러면 같은 저장 파일을 다른 빌드에서 열 때마다 다른 결과가 나온다. 표가 아니라 상수여야 하는
+    /// 이유가 이것이다(러너를 엔진에 묶지 않는다는 기존 규칙과도 같은 방향이다).
+    ///
+    /// 그 목록과 기본값은 <b>바깥에 내보내지 않는다</b>. 이것은 이 한 칸의 <b>구현 세부</b>이지 다른
+    /// 코드가 읽고 쓸 계약이 아니다 - 내보내면 "지금 지급해야 할 캐릭터 목록"으로 오해돼 여기저기서
+    /// 참조되기 시작하고, 그러면 <b>역사적 사실이어야 할 값이 현재 밸런스처럼 고쳐진다</b>. 확인이
+    /// 필요한 쪽(시험)은 이 필드를 들여다보는 대신 <b>변환 결과</b>를 본다.
+    ///
+    /// <b>기존 항목은 한 글자도 건드리지 않는다.</b> 순서, id, 레벨, 행동력, 중복 항목, null 항목까지
+    /// 그대로 두고 <b>없는 것만 뒤에 덧붙인다</b>. 특히 대소문자를 맞추거나 중복을 합치지 않는다 -
+    /// 'barbarian'과 'Barbarian'은 다른 키이고, 둘을 합치는 판단은 변환이 할 일이 아니다(합쳐 놓으면
+    /// 어느 쪽 진행이 사라졌는지 아무도 모른다). 목록 모양 보정은 지금까지대로
+    /// <see cref="SaveDataNormalizer"/> 한 곳의 몫이다.
+    /// </summary>
+    public sealed class V1ToV2Step : ISaveMigrationStep
+    {
+        /// <summary>
+        /// v1 시절 모두가 쓸 수 있던 여섯 캐릭터의 id. <b>철자와 대소문자가 저장 키 그 자체</b>라
+        /// 한 글자도 바꿀 수 없다(CharacterDefinition.CharacterId와 같은 값).
+        ///
+        /// 덧붙이는 차례도 이 배열의 순서다 - 변환 결과가 실행할 때마다 달라지지 않으려면 순서가
+        /// 코드에 적혀 있어야 한다. <b>바깥에 내보내지 않는다</b>(클래스 설명 참고).
+        /// </summary>
+        private static readonly string[] LegacyCharacterIds =
+        {
+            "Barbarian",
+            "CatKnight",
+            "CatMage",
+            "ElfArcher",
+            "ElfGuardian",
+            "RabbitHealer",
+        };
+
+        /// <summary>덧붙이는 항목의 레벨. 새 캐릭터의 기본값과 같다.</summary>
+        private const int AppendedLevel = 1;
+
+        /// <summary>덧붙이는 항목의 현재 행동력. <b>-1은 "아직 초기화되지 않음"</b>이라 실행 시점에
+        /// 정의의 Max Stamina로 채워진다 - 0(소진)으로 적으면 예전 사용자가 행동력이 빈 채로 시작한다.</summary>
+        private const int AppendedCurrentStamina = -1;
+
+        public int FromVersion => 1;
+
+        public int ToVersion => 2;
+
+        public void Apply(SaveData data)
+        {
+            if (data == null) throw new ArgumentNullException(nameof(data));
+
+            List<CharacterSaveState> characters = data.characters;
+
+            // 이미 적혀 있는 id를 모은다. 비교는 <b>Ordinal 완전 일치</b>다 - 대소문자를 맞추면
+            // 'barbarian'이 'Barbarian'을 있는 것으로 만들어, 실제로는 없던 항목이 조용히 빠진다.
+            HashSet<string> present = new HashSet<string>(StringComparer.Ordinal);
+
+            if (characters != null)
+            {
+                foreach (CharacterSaveState state in characters)
+                {
+                    // null 항목과 id 없는 항목은 아무것도 가리키지 않으므로 "있다"의 근거가 될 수 없다.
+                    // 그렇다고 지우지도 않는다 - 목록을 손보는 것은 이 단계의 일이 아니다.
+                    if (state == null) continue;
+                    if (string.IsNullOrEmpty(state.characterId)) continue;
+
+                    present.Add(state.characterId);
+                }
+            }
+
+            foreach (string id in LegacyCharacterIds)
+            {
+                if (!present.Add(id)) continue;
+
+                // 목록이 없던 문서에서만, 그리고 실제로 덧붙일 것이 생겼을 때만 만든다.
+                if (characters == null) characters = data.characters = new List<CharacterSaveState>();
+
+                characters.Add(new CharacterSaveState
+                {
+                    characterId = id,
+                    level = AppendedLevel,
+                    currentStamina = AppendedCurrentStamina,
+                });
+            }
         }
     }
 }

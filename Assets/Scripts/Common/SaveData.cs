@@ -22,7 +22,7 @@ namespace Common
         /// <see cref="SaveMigrationRunner"/>에 그 한 단계를 등록한다. 필드를 새로 <i>추가</i>하기만
         /// 할 때는 올리지 않는다 - JsonUtility가 없는 필드를 기본값으로 채우므로 예전 파일이 그대로
         /// 유효하다.</summary>
-        public const int CurrentSaveVersion = 1;
+        public const int CurrentSaveVersion = 2;
 
         /// <summary>버전 필드가 아예 없던 시절의 저장 파일 번호. 파일 안에 <c>saveVersion</c> 항목이
         /// 없으면(빈 객체 <c>{}</c> 포함) 그 파일은 이 버전이다 - 없는 것 자체가 곧 표식이라
@@ -57,9 +57,34 @@ namespace Common
         public int currentExp = 0;
         public int totalKillCount = 0;
 
-        /// <summary>캐릭터별 진행 상태. 캐릭터 정의(CharacterDefinition)가 존재하는데 여기에 항목이
-        /// 없으면 CharacterRoster가 정의의 기본값으로 새 항목을 만든다 - 캐릭터를 나중에 추가해도
-        /// 기존 저장 파일이 그대로 유효하다.</summary>
+        /// <summary>
+        /// 보유 캐릭터 목록. <b>v2에서 이 목록의 뜻은 하나로 고정됐다</b> - 항목 하나는 <b>동시에 두
+        /// 가지</b>를 말한다.
+        ///
+        /// <list type="number">
+        ///   <item>플레이어가 <b>그 characterId를 가지고 있다</b>(보유).</item>
+        ///   <item>그 캐릭터의 진행 상태(<see cref="CharacterSaveState.level"/>,
+        ///         <see cref="CharacterSaveState.currentStamina"/>)가 이 값이다.</item>
+        /// </list>
+        ///
+        /// 둘은 나뉘지 않는다. 보유를 적는 별도의 목록이나 플래그는 없으며, <b>항목의 존재 자체가
+        /// 보유</b>다. id 비교는 <see cref="StringComparer.Ordinal"/> 완전 일치이므로
+        /// 'Barbarian'과 'barbarian'은 서로 다른 캐릭터다.
+        ///
+        /// 그래서 카탈로그(게임에 존재하는 캐릭터 전체)와 이 목록의 관계는 이렇게 갈린다.
+        ///
+        /// <list type="bullet">
+        ///   <item><b>카탈로그에 있고 여기에 없다 → 미보유.</b> 아직 얻지 않은 캐릭터이며, 그 사실을
+        ///         적기 위해 항목을 만들지 않는다(없다는 것이 곧 표식이다).</item>
+        ///   <item><b>여기에 있고 카탈로그에 없다 → 값은 보존하되 지금 빌드에서는 쓸 수 없다.</b>
+        ///         카탈로그에서 빠졌거나 아직 들어오지 않은 id이며, 항목을 지우면 그 캐릭터가 다시
+        ///         들어왔을 때 레벨과 행동력이 사라진다. 저장 계층은 <b>모르는 id도 그대로 남긴다</b>.</item>
+        /// </list>
+        ///
+        /// <b>목록에 항목을 더하는 것은 곧 캐릭터를 지급하는 것</b>이므로, 저장 계층에서 항목이 늘어나는
+        /// 경로는 <see cref="V1ToV2Step"/>이 예전 문서를 올릴 때 한 번뿐이다 - 그 단계가 v1 시절 모두가
+        /// 쓸 수 있던 여섯 캐릭터를 보유로 확정해, 버전이 올라가면서 가진 것이 줄어드는 일이 없게 한다.
+        /// </summary>
         public List<CharacterSaveState> characters = new List<CharacterSaveState>();
 
         /// <summary>보유 재화(전역 값 하나). 아이템 목록과 완전히 별개이며 아이템 슬롯에 표시하지

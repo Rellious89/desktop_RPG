@@ -308,7 +308,7 @@ namespace CommonEditor.Tests
             // 이것이 훑기를 따로 두는 이유 그 자체다. v0 파일을 역직렬화하면 saveVersion에는 필드
             // 기본값(현재 버전)이 들어 있어 "이미 최신"으로 보이지만, 실제로는 올려야 한다.
             List<string> log = new List<string>();
-            SaveMigrationRunner runner = RunnerWith(new RecordingStep(0, log));
+            SaveMigrationRunner runner = RunnerTo(1, new RecordingStep(0, log));
             SaveData data = new SaveData { saveVersion = SaveData.CurrentSaveVersion };
 
             SaveMigrationResult result = runner.Migrate(data, SaveData.UnversionedSaveVersion);
@@ -379,7 +379,9 @@ namespace CommonEditor.Tests
             Assert.AreEqual(133, data.totalKillCount);
             Assert.AreEqual(1250, data.currency);
 
-            Assert.AreEqual(2, data.characters.Count);
+            // 예전 파일에 적혀 있던 두 항목은 <b>앞자리에 그대로</b> 남는다. 그 뒤로 v1->v2가 그 시절
+            // 여섯 캐릭터를 덧붙이므로 개수는 2 + 6이다('barbarian'은 'Barbarian'과 다른 키다).
+            Assert.AreEqual(2 + ExpectedLegacyIds.Length, data.characters.Count);
             Assert.AreEqual("barbarian", data.characters[0].characterId);
             Assert.AreEqual(4, data.characters[0].level);
             Assert.AreEqual(9, data.characters[0].currentStamina);
@@ -1120,6 +1122,433 @@ namespace CommonEditor.Tests
             Assert.AreEqual(SaveLoadStatus.FutureVersionBlocked, result.Status);
             Assert.IsNull(result.Data, "막힌 결과에 데이터를 쥐어 주면 호출부가 저장해 버립니다.");
             Assert.IsTrue(result.ShouldBlockSaving);
+        }
+
+        // ---- v1 -> v2: 그 시절 여섯 캐릭터를 파일에 남긴다 ----
+        //
+        // v1까지는 "이 캐릭터를 가지고 있는가"를 적는 자리가 없었고, 항목은 그 캐릭터를 실제로 써 본
+        // 뒤에야 생겼다. 그래서 v1 문서만으로는 그때 쓸 수 있던 캐릭터를 알 수 없다 - 아직 알 수 있는
+        // 지금 파일에 적어 두는 것이 이 단계의 전부다. 아래 시험들이 확인하는 것은 두 가지뿐이다.
+        // (1) 없는 것만 정확히 덧붙인다. (2) 이미 있던 것은 한 글자도 건드리지 않는다.
+
+        /// <summary>
+        /// v1 시절 모두가 쓸 수 있던 여섯 캐릭터의 id를, 변환이 덧붙여야 하는 <b>차례 그대로</b>.
+        ///
+        /// <b>일부러 프로덕션 코드를 참조하지 않고 여기에 다시 적는다.</b> 변환의 상수를 그대로 가져다
+        /// 비교하면 그 상수를 잘못 고쳐도 시험이 함께 따라가 통과한다 - 그러면 예전 사용자의 캐릭터가
+        /// 사라지는 변경을 아무도 막지 못한다. 이 목록은 시험이 독립적으로 들고 있는 <b>기대값</b>이며,
+        /// 변환이 무엇을 하든 결과가 이것과 같아야 한다.
+        /// </summary>
+        private static readonly string[] ExpectedLegacyIds =
+        {
+            "Barbarian", "CatKnight", "CatMage", "ElfArcher", "ElfGuardian", "RabbitHealer",
+        };
+
+        /// <summary>변환이 새로 덧붙이는 항목의 기대 레벨.</summary>
+        private const int ExpectedAppendedLevel = 1;
+
+        /// <summary>변환이 새로 덧붙이는 항목의 기대 행동력. -1은 "아직 초기화되지 않음"이다.</summary>
+        private const int ExpectedAppendedStamina = -1;
+
+        /// <summary>덧붙여진 항목이 기대한 기본값을 가졌는지.</summary>
+        private static void AssertAppendedDefaults(CharacterSaveState state)
+        {
+            Assert.IsNotNull(state);
+            Assert.AreEqual(ExpectedAppendedLevel, state.level, $"{state.characterId}의 레벨");
+            Assert.AreEqual(ExpectedAppendedStamina, state.currentStamina,
+                $"{state.characterId}의 행동력 - -1(초기화 안 됨)이어야 하며 0(소진)이면 안 됩니다.");
+        }
+
+        /// <summary>v1 문서 하나를 만든다. 캐릭터 목록만 시험마다 다르게 넣는다.</summary>
+        private static SaveData V1Document(params CharacterSaveState[] characters)
+        {
+            return new SaveData
+            {
+                saveVersion = 1,
+                saveRevision = 5,
+                lastSavedAtUtc = "2026-01-02T03:04:05.0000000Z",
+                currentLevel = 7,
+                currentExp = 240,
+                totalKillCount = 133,
+                currency = 1250,
+                characters = new List<CharacterSaveState>(characters),
+                items = new List<InventoryItemState>
+                {
+                    new InventoryItemState { itemId = "potion", count = 3 },
+                },
+                recoverySlots = new List<RecoverySlotSaveState>
+                {
+                    new RecoverySlotSaveState { characterId = "CatKnight", startStamina = 2 },
+                },
+            };
+        }
+
+        private static CharacterSaveState Character(string id, int level, int stamina)
+        {
+            return new CharacterSaveState { characterId = id, level = level, currentStamina = stamina };
+        }
+
+        private static List<string> IdsOf(List<CharacterSaveState> characters)
+        {
+            List<string> ids = new List<string>();
+            foreach (CharacterSaveState state in characters) ids.Add(state == null ? null : state.characterId);
+            return ids;
+        }
+
+        /// <summary>러너를 거치지 않고 단계만 돌린다 - 정규화가 목록을 손대기 전의 결과를 봐야 하는
+        /// 시험(특히 null 항목 보존)이 있기 때문이다.</summary>
+        private static SaveData ApplyV1ToV2(SaveData data)
+        {
+            new V1ToV2Step().Apply(data);
+            return data;
+        }
+
+        [Test]
+        public void v1_v2_단계는_한_칸짜리_단계다()
+        {
+            V1ToV2Step step = new V1ToV2Step();
+
+            Assert.AreEqual(1, step.FromVersion);
+            Assert.AreEqual(2, step.ToVersion);
+            Assert.AreEqual(step.FromVersion + 1, step.ToVersion);
+        }
+
+        [Test]
+        public void 변환_결과의_여섯_id는_철자와_순서까지_고정이다()
+        {
+            // 이 문자열이 곧 저장 키다. 한 글자라도 달라지면 예전 사용자의 진행과 연결이 끊긴다.
+            // 변환의 내부 상수가 아니라 <b>변환이 실제로 만들어 낸 목록</b>을 본다.
+            SaveData data = ApplyV1ToV2(V1Document());
+
+            CollectionAssert.AreEqual(ExpectedLegacyIds, IdsOf(data.characters),
+                "여섯 id의 철자와 덧붙이는 차례가 달라지면 예전 사용자의 진행과 연결이 끊깁니다.");
+
+            foreach (CharacterSaveState state in data.characters) AssertAppendedDefaults(state);
+        }
+
+        [Test]
+        public void 기본_표는_v0와_v1_두_칸을_빈틈없이_등록한다()
+        {
+            List<ISaveMigrationStep> steps = new List<ISaveMigrationStep>(SaveMigrationRunner.CreateDefaultSteps());
+
+            Assert.AreEqual(SaveData.CurrentSaveVersion, steps.Count,
+                "v0부터 현재 버전까지 한 칸씩 올리려면 칸 수만큼의 단계가 있어야 합니다.");
+
+            List<int> fromVersions = new List<int>();
+            foreach (ISaveMigrationStep step in steps) fromVersions.Add(step.FromVersion);
+
+            CollectionAssert.AreEquivalent(new[] { 0, 1 }, fromVersions, "0->1과 1->2가 모두 있어야 합니다.");
+            Assert.AreEqual(SaveData.CurrentSaveVersion, SaveMigrationRunner.Default.TargetVersion);
+        }
+
+        [Test]
+        public void v1_문서의_캐릭터_목록이_비어_있으면_여섯이_모두_생긴다()
+        {
+            SaveData data = ApplyV1ToV2(V1Document());
+
+            CollectionAssert.AreEqual(ExpectedLegacyIds, IdsOf(data.characters),
+                "덧붙이는 차례는 정해진 순서 그대로여야 합니다.");
+
+            foreach (CharacterSaveState state in data.characters) AssertAppendedDefaults(state);
+        }
+
+        [Test]
+        public void v1_문서의_캐릭터_목록이_null이어도_여섯이_모두_생긴다()
+        {
+            SaveData data = V1Document();
+            data.characters = null;
+
+            ApplyV1ToV2(data);
+
+            Assert.IsNotNull(data.characters);
+            CollectionAssert.AreEqual(ExpectedLegacyIds, IdsOf(data.characters));
+        }
+
+        [Test]
+        public void v1_문서에_여섯이_이미_다_있으면_아무것도_덧붙이지_않는다()
+        {
+            SaveData data = V1Document(
+                Character("Barbarian", 4, 9),
+                Character("CatKnight", 3, 0),
+                Character("CatMage", 2, 30),
+                Character("ElfArcher", 5, 1),
+                Character("ElfGuardian", 1, -1),
+                Character("RabbitHealer", 9, 12));
+
+            ApplyV1ToV2(data);
+
+            Assert.AreEqual(6, data.characters.Count, "이미 다 있으면 늘어날 이유가 없습니다.");
+
+            // 값도 순서도 그대로여야 한다 - 변환은 '없는 것을 채우는' 일만 한다.
+            Assert.AreEqual("Barbarian", data.characters[0].characterId);
+            Assert.AreEqual(4, data.characters[0].level);
+            Assert.AreEqual(9, data.characters[0].currentStamina);
+            Assert.AreEqual("CatKnight", data.characters[1].characterId);
+            Assert.AreEqual(0, data.characters[1].currentStamina, "행동력 0을 -1로 되돌리면 안 됩니다.");
+            Assert.AreEqual("RabbitHealer", data.characters[5].characterId);
+            Assert.AreEqual(9, data.characters[5].level);
+            Assert.AreEqual(12, data.characters[5].currentStamina);
+        }
+
+        [Test]
+        public void v1_문서에_일부만_있으면_없는_것만_뒤에_덧붙인다()
+        {
+            SaveData data = V1Document(
+                Character("CatMage", 8, 3),
+                Character("Barbarian", 2, 0));
+
+            ApplyV1ToV2(data);
+
+            CollectionAssert.AreEqual(
+                new[] { "CatMage", "Barbarian", "CatKnight", "ElfArcher", "ElfGuardian", "RabbitHealer" },
+                IdsOf(data.characters),
+                "있던 항목은 자리를 지키고, 없던 것만 코드에 적힌 차례로 뒤에 붙습니다.");
+
+            Assert.AreEqual(8, data.characters[0].level, "있던 항목의 값은 그대로여야 합니다.");
+            Assert.AreEqual(3, data.characters[0].currentStamina);
+            Assert.AreEqual(2, data.characters[1].level);
+            Assert.AreEqual(0, data.characters[1].currentStamina);
+
+            for (int i = 2; i < data.characters.Count; i++) AssertAppendedDefaults(data.characters[i]);
+        }
+
+        [Test]
+        public void v1_변환은_모르는_id를_지우지도_바꾸지도_않는다()
+        {
+            SaveData data = V1Document(
+                Character("scarecrow", 3, 7),
+                Character("IceMage", 6, 2));
+
+            ApplyV1ToV2(data);
+
+            Assert.AreEqual(2 + 6, data.characters.Count);
+            Assert.AreEqual("scarecrow", data.characters[0].characterId, "모르는 id도 자리를 지킵니다.");
+            Assert.AreEqual(3, data.characters[0].level);
+            Assert.AreEqual(7, data.characters[0].currentStamina);
+            Assert.AreEqual("IceMage", data.characters[1].characterId);
+            Assert.AreEqual(6, data.characters[1].level);
+        }
+
+        [Test]
+        public void v1_변환은_대소문자를_구분한다()
+        {
+            // 'barbarian'은 'Barbarian'이 아니다 - 저장 키는 Ordinal 완전 일치로만 같다.
+            SaveData data = V1Document(Character("barbarian", 4, 9), Character("CATMAGE", 2, 1));
+
+            ApplyV1ToV2(data);
+
+            Assert.AreEqual(2 + 6, data.characters.Count,
+                "대소문자만 다른 항목은 그 캐릭터가 '있다'는 근거가 될 수 없습니다.");
+
+            List<string> ids = IdsOf(data.characters);
+            Assert.AreEqual("barbarian", ids[0], "원래 있던 철자를 고쳐 쓰면 안 됩니다.");
+            Assert.AreEqual("CATMAGE", ids[1]);
+            CollectionAssert.Contains(ids, "Barbarian");
+            CollectionAssert.Contains(ids, "CatMage");
+            Assert.AreEqual(4, data.characters[0].level, "원래 항목의 값도 그대로입니다.");
+        }
+
+        [Test]
+        public void v1_변환은_중복_항목을_합치지도_지우지도_않는다()
+        {
+            SaveData data = V1Document(
+                Character("CatMage", 8, 3),
+                Character("CatMage", 1, 0));
+
+            ApplyV1ToV2(data);
+
+            List<string> ids = IdsOf(data.characters);
+            Assert.AreEqual("CatMage", ids[0]);
+            Assert.AreEqual("CatMage", ids[1], "중복을 합치면 어느 쪽 진행이 사라졌는지 아무도 모릅니다.");
+            Assert.AreEqual(8, data.characters[0].level);
+            Assert.AreEqual(1, data.characters[1].level);
+
+            Assert.AreEqual(2 + 5, data.characters.Count, "CatMage는 이미 있으므로 덧붙지 않습니다.");
+            CollectionAssert.DoesNotContain(ids.GetRange(2, ids.Count - 2), "CatMage");
+        }
+
+        [Test]
+        public void v1_변환은_null_항목과_빈_id를_그대로_둔다()
+        {
+            SaveData data = V1Document(null, Character(string.Empty, 2, 2), Character("Barbarian", 4, 9));
+
+            ApplyV1ToV2(data);
+
+            Assert.IsNull(data.characters[0], "목록을 손보는 것은 변환의 일이 아닙니다(정규화의 몫).");
+            Assert.AreEqual(string.Empty, data.characters[1].characterId);
+            Assert.AreEqual(2, data.characters[1].level);
+            Assert.AreEqual("Barbarian", data.characters[2].characterId);
+
+            // null과 빈 id는 아무것도 가리키지 않으므로 '있다'의 근거가 아니다 - Barbarian만 이미 있다.
+            Assert.AreEqual(3 + 5, data.characters.Count);
+        }
+
+        [Test]
+        public void v1_변환은_다른_필드를_하나도_건드리지_않는다()
+        {
+            SaveData data = V1Document(Character("Barbarian", 4, 9));
+
+            ApplyV1ToV2(data);
+
+            Assert.AreEqual(5, data.saveRevision, "일련번호는 v1->v2가 손댈 값이 아닙니다.");
+            Assert.AreEqual("2026-01-02T03:04:05.0000000Z", data.lastSavedAtUtc,
+                "저장 시각도 그대로여야 합니다(v0->v1과 달리 v1에는 이미 값이 있습니다).");
+            Assert.AreEqual(7, data.currentLevel);
+            Assert.AreEqual(240, data.currentExp);
+            Assert.AreEqual(133, data.totalKillCount);
+            Assert.AreEqual(1250, data.currency);
+            Assert.AreEqual(1, data.items.Count);
+            Assert.AreEqual("potion", data.items[0].itemId);
+            Assert.AreEqual(3, data.items[0].count);
+            Assert.AreEqual(1, data.recoverySlots.Count);
+            Assert.AreEqual("CatKnight", data.recoverySlots[0].characterId);
+            Assert.AreEqual(2, data.recoverySlots[0].startStamina);
+        }
+
+        [Test]
+        public void v1_변환은_두_번_돌려도_결과가_같다()
+        {
+            SaveData data = V1Document(Character("CatMage", 8, 3));
+
+            ApplyV1ToV2(data);
+            List<string> afterFirst = IdsOf(data.characters);
+
+            ApplyV1ToV2(data);
+
+            CollectionAssert.AreEqual(afterFirst, IdsOf(data.characters),
+                "두 번 돌아도 같은 항목이 두 벌 생기면 안 됩니다.");
+        }
+
+        [Test]
+        public void v1_변환은_잘못된_입력에_조용히_넘어가지_않는다()
+        {
+            Assert.Throws<ArgumentNullException>(() => new V1ToV2Step().Apply(null));
+        }
+
+        // ---- v0 -> v1 -> v2: 두 칸을 이어서 ----
+
+        [Test]
+        public void v0_문서는_v1을_거쳐_v2까지_한_칸씩_올라간다()
+        {
+            SaveLoadResult result = SaveMigrationRunner.Default.Load(LegacyJson, JsonDeserializer);
+
+            Assert.AreEqual(SaveLoadStatus.Migrated, result.Status);
+            Assert.AreEqual(0, result.FromVersion);
+            Assert.AreEqual(2, result.ToVersion);
+            Assert.AreEqual(SaveData.CurrentSaveVersion, result.Data.saveVersion);
+
+            // v0->v1의 결과(메타데이터를 '모름'으로)와 v1->v2의 결과(여섯 캐릭터)가 <b>둘 다</b> 보여야
+            // 두 칸을 실제로 거쳤다고 할 수 있다.
+            Assert.AreEqual(0, result.Data.saveRevision, "v0->v1이 일련번호를 모름(0)으로 두었어야 합니다.");
+            Assert.IsTrue(string.IsNullOrEmpty(result.Data.lastSavedAtUtc));
+
+            List<string> ids = IdsOf(result.Data.characters);
+            foreach (string legacyId in ExpectedLegacyIds)
+            {
+                CollectionAssert.Contains(ids, legacyId, "v1->v2가 여섯을 채웠어야 합니다.");
+            }
+
+            Assert.AreEqual("barbarian", ids[0], "예전 파일에 있던 항목이 앞자리를 지켜야 합니다.");
+            Assert.AreEqual("scarecrow", ids[1]);
+        }
+
+        [Test]
+        public void v1_문서를_읽으면_한_칸만_올라간다()
+        {
+            string json = $@"{{""saveVersion"":1,""saveRevision"":5,"
+                          + $@"""lastSavedAtUtc"":""2026-01-02T03:04:05.0000000Z"","
+                          + $@"""currentLevel"":7,""currency"":1250,"
+                          + $@"""characters"":[{{""characterId"":""CatMage"",""level"":8,""currentStamina"":3}}]}}";
+
+            SaveLoadResult result = SaveMigrationRunner.Default.Load(json, JsonDeserializer);
+
+            Assert.AreEqual(SaveLoadStatus.Migrated, result.Status);
+            Assert.AreEqual(1, result.FromVersion);
+            Assert.AreEqual(2, result.ToVersion);
+            Assert.IsTrue(result.ShouldResaveSoon, "올린 문서는 다음 명시적 저장으로 굳혀야 합니다.");
+
+            // v1->v2는 메타데이터를 건드리지 않는다 - v0->v1이 함께 돌지 않았다는 증거이기도 하다.
+            Assert.AreEqual(5, result.Data.saveRevision);
+            Assert.AreEqual("2026-01-02T03:04:05.0000000Z", result.Data.lastSavedAtUtc);
+
+            CollectionAssert.AreEqual(
+                new[] { "CatMage", "Barbarian", "CatKnight", "ElfArcher", "ElfGuardian", "RabbitHealer" },
+                IdsOf(result.Data.characters));
+            Assert.AreEqual(8, result.Data.characters[0].level, "있던 항목의 값은 그대로입니다.");
+        }
+
+        [Test]
+        public void v2_문서는_변환_없이_그대로_읽고_여섯을_다시_덧붙이지_않는다()
+        {
+            SaveData source = V1Document(Character("CatMage", 8, 3));
+            source.saveVersion = 2;
+            string json = JsonUtility.ToJson(source);
+
+            SaveLoadResult result = SaveMigrationRunner.Default.Load(json, JsonDeserializer);
+
+            Assert.AreEqual(SaveLoadStatus.Loaded, result.Status, "이미 현재 버전이면 변환하지 않습니다.");
+            Assert.AreEqual(1, result.Data.characters.Count,
+                "v2 문서에 여섯을 다시 채워 넣으면 지운 캐릭터가 되살아납니다.");
+            Assert.AreEqual("CatMage", result.Data.characters[0].characterId);
+        }
+
+        [Test]
+        public void v1에서_올리다_뒤_칸이_없으면_캐릭터를_덧붙인_흔적도_남지_않는다()
+        {
+            // 실제 두 단계를 그대로 쓰되 목표만 한 칸 더 높여 '뒤 칸 없음'을 만든다. 여기서 롤백이
+            // 깨지면 여섯이 덧붙은 채로 실패 문서가 호출부에 남는다.
+            SaveMigrationRunner runner = RunnerTo(3, new UnversionedToV1Step(), new V1ToV2Step());
+            SaveData data = FullyPopulated();
+
+            SaveMigrationResult result = runner.Migrate(data, 0);
+
+            Assert.AreEqual(SaveMigrationOutcome.StepMissing, result.Outcome);
+            Assert.AreEqual(2, result.ReachedVersion, "v2까지는 갔고 v2->v3이 없어 멈춥니다.");
+            AssertUntouched(data, "뒤 칸이 없어 멈췄으면 문서는 시도 전과 같아야 합니다");
+            Assert.AreEqual(1, data.characters.Count, "덧붙인 여섯이 호출부의 문서에 새면 안 됩니다.");
+        }
+
+        [Test]
+        public void v1_변환_뒤에도_작업_사본이_모든_필드를_왕복시킨다()
+        {
+            // 성공 경로는 반드시 사본을 거친다. v1->v2를 실제로 거치면서도 필드가 하나도 빠지지
+            // 않는지를 본다 - CopyInto에 빠진 필드가 있으면 여기서 기본값으로 되돌아간다.
+            SaveData data = FullyPopulated();
+            data.saveVersion = 1;
+
+            SaveMigrationResult result = SaveMigrationRunner.Default.Migrate(data, 1);
+
+            Assert.AreEqual(SaveMigrationOutcome.Migrated, result.Outcome);
+            Assert.AreEqual(2, data.saveVersion);
+            Assert.AreEqual(41, data.saveRevision);
+            Assert.AreEqual("2026-01-02T03:04:05.0000000Z", data.lastSavedAtUtc);
+            Assert.AreEqual(7, data.currentLevel);
+            Assert.AreEqual(240, data.currentExp);
+            Assert.AreEqual(133, data.totalKillCount);
+            Assert.AreEqual(1250, data.currency);
+            Assert.AreEqual(1, data.items.Count);
+            Assert.AreEqual("potion", data.items[0].itemId);
+            Assert.AreEqual(3, data.items[0].count);
+            Assert.AreEqual(1, data.recoverySlots.Count);
+            Assert.AreEqual("barbarian", data.recoverySlots[0].characterId);
+            Assert.IsTrue(data.recoverySlots[0].completionNotified);
+
+            // FullyPopulated의 'barbarian'은 여섯과 다른 키이므로 1 + 6이다.
+            Assert.AreEqual(1 + 6, data.characters.Count);
+            Assert.AreEqual("barbarian", data.characters[0].characterId);
+            Assert.AreEqual(4, data.characters[0].level);
+        }
+
+        [Test]
+        public void v2보다_새로운_문서는_여전히_읽지도_고치지도_않는다()
+        {
+            SaveData data = FullyPopulated();
+
+            SaveMigrationResult result = SaveMigrationRunner.Default.Migrate(data, 3);
+
+            Assert.AreEqual(SaveMigrationOutcome.FutureVersion, result.Outcome);
+            AssertUntouched(data, "미래 버전은 읽지도 고치지도 않습니다");
+            Assert.AreEqual(1, data.characters.Count, "미래 버전 문서에 여섯을 덧붙이면 안 됩니다.");
         }
     }
 }
