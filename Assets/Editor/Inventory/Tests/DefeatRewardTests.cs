@@ -123,10 +123,10 @@ namespace InventoryEditor.Tests
             MonsterDefinition monster = CreateMonster(Drop(item, 5000, 1));
             var random = new FakeRandom(1234);
 
-            TestDefeatRewardDistributor.BuildReward(monster, random.Next);
+            DefeatRewardDistributor.BuildReward(monster, random.Next);
 
             Assert.AreEqual(1, random.CallCount, "재화 지정이 없으면 난수는 아이템 판정 한 번뿐이다.");
-            Assert.AreEqual((long)TestDefeatRewardDistributor.ItemRollRange, random.Bounds[0],
+            Assert.AreEqual((long)DefeatRewardDistributor.ItemRollRange, random.Bounds[0],
                 "아이템 난수의 범위는 0~9999여야 한다.");
         }
 
@@ -136,8 +136,8 @@ namespace InventoryEditor.Tests
             MonsterDefinition monster = CreateMonster();
             var random = new FakeRandom(0);
 
-            TestDefeatRewardDistributor.DefeatReward reward =
-                TestDefeatRewardDistributor.BuildReward(monster, random.Next);
+            DefeatRewardDistributor.DefeatReward reward =
+                DefeatRewardDistributor.BuildReward(monster, random.Next);
 
             Assert.AreEqual(1, random.CallCount, "슬롯이 없어도 뽑는 횟수는 달라지지 않는다.");
             Assert.IsFalse(reward.HasItem);
@@ -154,8 +154,8 @@ namespace InventoryEditor.Tests
 
             foreach (int roll in new[] { 0, 2999, 3000, 5999, 6000, 9999 })
             {
-                TestDefeatRewardDistributor.DefeatReward reward =
-                    TestDefeatRewardDistributor.BuildReward(monster, new FakeRandom(roll).Next);
+                DefeatRewardDistributor.DefeatReward reward =
+                    DefeatRewardDistributor.BuildReward(monster, new FakeRandom(roll).Next);
 
                 Assert.IsTrue(reward.HasItem, $"합이 10000이면 roll {roll}에서도 아이템이 나온다.");
                 Assert.AreEqual(2, reward.ItemCount, "지급 개수는 뽑힌 슬롯의 개수 하나뿐이다.");
@@ -185,8 +185,8 @@ namespace InventoryEditor.Tests
             MonsterDefinition monster = CreateMonster(Drop(item, 10000, 1));
             var random = new FakeRandom(0);
 
-            TestDefeatRewardDistributor.DefeatReward reward =
-                TestDefeatRewardDistributor.BuildReward(monster, random.Next);
+            DefeatRewardDistributor.DefeatReward reward =
+                DefeatRewardDistributor.BuildReward(monster, random.Next);
 
             Assert.AreEqual(0, reward.Currency);
             Assert.IsFalse(reward.HasCurrency);
@@ -202,8 +202,8 @@ namespace InventoryEditor.Tests
             MonsterDefinition monster = CreateMonster((CurrencyDefinition)null, 5, 9);
             var random = new FakeRandom(0, 3);
 
-            TestDefeatRewardDistributor.DefeatReward reward =
-                TestDefeatRewardDistributor.BuildReward(monster, random.Next);
+            DefeatRewardDistributor.DefeatReward reward =
+                DefeatRewardDistributor.BuildReward(monster, random.Next);
 
             Assert.IsFalse(monster.HasCurrencyReward);
             Assert.IsNull(monster.Currency);
@@ -220,8 +220,8 @@ namespace InventoryEditor.Tests
             MonsterDefinition monster = CreateMonster(CreateCurrency(string.Empty), 5, 9);
             var random = new FakeRandom(0, 3);
 
-            TestDefeatRewardDistributor.DefeatReward reward =
-                TestDefeatRewardDistributor.BuildReward(monster, random.Next);
+            DefeatRewardDistributor.DefeatReward reward =
+                DefeatRewardDistributor.BuildReward(monster, random.Next);
 
             Assert.IsFalse(monster.HasCurrencyReward, "id가 없는 정의는 지급 근거가 되지 못한다.");
             Assert.IsNull(monster.Currency, "쓸 수 없는 정의는 null로 돌려준다 - 반쯤 유효한 참조를 넘기지 않는다.");
@@ -269,12 +269,12 @@ namespace InventoryEditor.Tests
             // 참조로 바뀌어도 금액 규칙은 그대로다 - 고정은 난수 없이, 범위는 양 끝을 포함해서.
             MonsterDefinition fixedAmount = CreateMonster(CreateCurrency("jewel"), 7, 7);
             var noRoll = new FakeRandom(0);
-            Assert.AreEqual(7, TestDefeatRewardDistributor.BuildReward(fixedAmount, noRoll.Next).Currency);
+            Assert.AreEqual(7, DefeatRewardDistributor.BuildReward(fixedAmount, noRoll.Next).Currency);
             Assert.AreEqual(1, noRoll.CallCount, "min==max면 재화 난수를 뽑지 않는다.");
 
             MonsterDefinition range = CreateMonster(CreateCurrency("jewel"), 5, 9);
-            Assert.AreEqual(5, TestDefeatRewardDistributor.BuildReward(range, new FakeRandom(0, 0).Next).Currency);
-            Assert.AreEqual(9, TestDefeatRewardDistributor.BuildReward(range, new FakeRandom(0, 4).Next).Currency);
+            Assert.AreEqual(5, DefeatRewardDistributor.BuildReward(range, new FakeRandom(0, 0).Next).Currency);
+            Assert.AreEqual(9, DefeatRewardDistributor.BuildReward(range, new FakeRandom(0, 4).Next).Currency);
         }
 
         [Test]
@@ -283,8 +283,8 @@ namespace InventoryEditor.Tests
             MonsterDefinition monster = CreateMonster("gold", 7, 7);
             var random = new FakeRandom(0);
 
-            TestDefeatRewardDistributor.DefeatReward reward =
-                TestDefeatRewardDistributor.BuildReward(monster, random.Next);
+            DefeatRewardDistributor.DefeatReward reward =
+                DefeatRewardDistributor.BuildReward(monster, random.Next);
 
             Assert.AreEqual(7, reward.Currency);
             Assert.AreEqual(1, random.CallCount, "min==max면 난수 없이 고정 금액이다.");
@@ -296,12 +296,12 @@ namespace InventoryEditor.Tests
             MonsterDefinition monster = CreateMonster("gold", 5, 9);
 
             var atMin = new FakeRandom(0, 0);
-            Assert.AreEqual(5, TestDefeatRewardDistributor.BuildReward(monster, atMin.Next).Currency);
+            Assert.AreEqual(5, DefeatRewardDistributor.BuildReward(monster, atMin.Next).Currency);
             Assert.AreEqual(2, atMin.CallCount, "아이템 1회 + 재화 1회.");
             Assert.AreEqual(5L, atMin.Bounds[1], "양 끝을 포함하려면 범위는 max-min+1이어야 한다.");
 
             var atMax = new FakeRandom(0, 4);
-            Assert.AreEqual(9, TestDefeatRewardDistributor.BuildReward(monster, atMax.Next).Currency);
+            Assert.AreEqual(9, DefeatRewardDistributor.BuildReward(monster, atMax.Next).Currency);
         }
 
         [Test]
@@ -313,14 +313,14 @@ namespace InventoryEditor.Tests
             const long span = (long)int.MaxValue + 1L;
 
             var atMin = new FakeRandom(0L, 0L);
-            Assert.AreEqual(0, TestDefeatRewardDistributor.BuildReward(monster, atMin.Next).Currency);
+            Assert.AreEqual(0, DefeatRewardDistributor.BuildReward(monster, atMin.Next).Currency);
             Assert.AreEqual(span, atMin.Bounds[1], "재화 난수 요청 범위는 max-min+1 = 2^31이어야 한다.");
-            Assert.AreEqual(TestDefeatRewardDistributor.MaxExclusiveBound, span);
+            Assert.AreEqual(DefeatRewardDistributor.MaxExclusiveBound, span);
 
             var atMax = new FakeRandom(0L, span - 1L);
             Assert.AreEqual(
                 int.MaxValue,
-                TestDefeatRewardDistributor.BuildReward(monster, atMax.Next).Currency,
+                DefeatRewardDistributor.BuildReward(monster, atMax.Next).Currency,
                 "구간의 마지막 칸은 int.MaxValue여야 한다.");
         }
 
@@ -333,10 +333,10 @@ namespace InventoryEditor.Tests
             // 약속을 어긴 값(구간보다 큼 / 음수)이 와도 int를 넘치지 않고 Min~Max 안에 머문다.
             Assert.AreEqual(
                 int.MaxValue,
-                TestDefeatRewardDistributor.BuildReward(monster, new FakeRandom(0L, span + 1000L).Next).Currency);
+                DefeatRewardDistributor.BuildReward(monster, new FakeRandom(0L, span + 1000L).Next).Currency);
             Assert.AreEqual(
                 0,
-                TestDefeatRewardDistributor.BuildReward(monster, new FakeRandom(0L, -5L).Next).Currency);
+                DefeatRewardDistributor.BuildReward(monster, new FakeRandom(0L, -5L).Next).Currency);
         }
 
         [Test]
@@ -351,7 +351,7 @@ namespace InventoryEditor.Tests
 
             for (int i = 0; i < 512; i++)
             {
-                long value = TestDefeatRewardDistributor.RollUnityRandomBelow(span);
+                long value = DefeatRewardDistributor.RollUnityRandomBelow(span);
 
                 Assert.GreaterOrEqual(value, 0L, "2^31 구간의 난수가 음수가 되면 안 된다.");
                 Assert.Less(value, span, "2^31 구간의 난수가 구간을 벗어나면 안 된다.");
@@ -372,11 +372,11 @@ namespace InventoryEditor.Tests
 
             for (int i = 0; i < 128; i++)
             {
-                long value = TestDefeatRewardDistributor.RollUnityRandomBelow(
-                    TestDefeatRewardDistributor.ItemRollRange);
+                long value = DefeatRewardDistributor.RollUnityRandomBelow(
+                    DefeatRewardDistributor.ItemRollRange);
 
                 Assert.GreaterOrEqual(value, 0L);
-                Assert.Less(value, TestDefeatRewardDistributor.ItemRollRange,
+                Assert.Less(value, DefeatRewardDistributor.ItemRollRange,
                     "아이템 판정 난수는 0~9999를 벗어나지 않는다.");
             }
         }
@@ -386,8 +386,8 @@ namespace InventoryEditor.Tests
         {
             MonsterDefinition monster = CreateMonster("gold", 5, 9);
 
-            Assert.AreEqual(9, TestDefeatRewardDistributor.BuildReward(monster, new FakeRandom(0, 999).Next).Currency);
-            Assert.AreEqual(5, TestDefeatRewardDistributor.BuildReward(monster, new FakeRandom(0, -3).Next).Currency);
+            Assert.AreEqual(9, DefeatRewardDistributor.BuildReward(monster, new FakeRandom(0, 999).Next).Currency);
+            Assert.AreEqual(5, DefeatRewardDistributor.BuildReward(monster, new FakeRandom(0, -3).Next).Currency);
         }
 
         [Test]
@@ -397,10 +397,10 @@ namespace InventoryEditor.Tests
             MonsterDefinition monster = CreateMonster("gold", 5, 9, Drop(item, 3000, 1));
 
             // 아이템이 나온 처치와 나오지 않은 처치가 같은 재화를 준다(재화 난수값이 같으므로).
-            TestDefeatRewardDistributor.DefeatReward hit =
-                TestDefeatRewardDistributor.BuildReward(monster, new FakeRandom(0, 2).Next);
-            TestDefeatRewardDistributor.DefeatReward miss =
-                TestDefeatRewardDistributor.BuildReward(monster, new FakeRandom(9999, 2).Next);
+            DefeatRewardDistributor.DefeatReward hit =
+                DefeatRewardDistributor.BuildReward(monster, new FakeRandom(0, 2).Next);
+            DefeatRewardDistributor.DefeatReward miss =
+                DefeatRewardDistributor.BuildReward(monster, new FakeRandom(9999, 2).Next);
 
             Assert.IsTrue(hit.HasItem);
             Assert.IsFalse(miss.HasItem);
@@ -415,8 +415,8 @@ namespace InventoryEditor.Tests
             ItemDefinition item = CreateItem("50000");
             MonsterDefinition monster = CreateMonster(Drop(item, 3000, 1));
 
-            TestDefeatRewardDistributor.DefeatReward reward =
-                TestDefeatRewardDistributor.BuildReward(monster, new FakeRandom(9999).Next);
+            DefeatRewardDistributor.DefeatReward reward =
+                DefeatRewardDistributor.BuildReward(monster, new FakeRandom(9999).Next);
 
             Assert.IsTrue(reward.IsEmpty, "아이템도 재화도 없으면 빈 보상이다.");
         }
@@ -426,8 +426,8 @@ namespace InventoryEditor.Tests
         {
             var random = new FakeRandom(0);
 
-            TestDefeatRewardDistributor.DefeatReward reward =
-                TestDefeatRewardDistributor.BuildReward(null, random.Next);
+            DefeatRewardDistributor.DefeatReward reward =
+                DefeatRewardDistributor.BuildReward(null, random.Next);
 
             Assert.IsTrue(reward.IsEmpty);
             Assert.AreEqual(0, random.CallCount);
@@ -438,8 +438,8 @@ namespace InventoryEditor.Tests
         private static void AssertSelectedItem(
             MonsterDefinition monster, int roll, ItemDefinition expected, int expectedCount)
         {
-            TestDefeatRewardDistributor.DefeatReward reward =
-                TestDefeatRewardDistributor.BuildReward(monster, new FakeRandom(roll).Next);
+            DefeatRewardDistributor.DefeatReward reward =
+                DefeatRewardDistributor.BuildReward(monster, new FakeRandom(roll).Next);
 
             Assert.AreSame(expected, reward.Item, $"roll {roll}에서 기대한 아이템이 아니다.");
             Assert.AreEqual(expectedCount, reward.ItemCount, $"roll {roll}의 지급 개수가 다르다.");
@@ -448,8 +448,8 @@ namespace InventoryEditor.Tests
 
         private static void AssertNoItem(MonsterDefinition monster, int roll)
         {
-            TestDefeatRewardDistributor.DefeatReward reward =
-                TestDefeatRewardDistributor.BuildReward(monster, new FakeRandom(roll).Next);
+            DefeatRewardDistributor.DefeatReward reward =
+                DefeatRewardDistributor.BuildReward(monster, new FakeRandom(roll).Next);
 
             Assert.IsNull(reward.Item, $"roll {roll}에서는 아이템이 나오면 안 된다.");
             Assert.AreEqual(0, reward.ItemCount);

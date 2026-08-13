@@ -35,7 +35,7 @@ namespace Inventory
     /// 행동력이 0이 되는 마지막 처치에서도 보상은 그대로 지급된다(둘은 서로의 결과를 보지 않는다).
     /// </summary>
     [DisallowMultipleComponent]
-    public class TestDefeatRewardDistributor : MonoBehaviour
+    public class DefeatRewardDistributor : MonoBehaviour
     {
         [Header("References")]
         [Tooltip("보상을 적용할 InventoryManager. 비워두면 실행 시 InventoryManager.Instance를 쓴다.")]
@@ -146,7 +146,7 @@ namespace Inventory
             {
                 if (logIfMissing)
                 {
-                    Debug.LogError("[TestDefeatRewardDistributor] MonsterEncounterQueue를 찾지 못해 처치 보상을 " +
+                    Debug.LogError("[DefeatRewardDistributor] MonsterEncounterQueue를 찾지 못해 처치 보상을 " +
                                    "지급할 수 없습니다 - Inspector의 Encounter Queue에 대기열을 연결하세요.", this);
                 }
                 return;
@@ -184,22 +184,17 @@ namespace Inventory
             InventoryManager inventory = ResolveInventory();
             if (inventory == null)
             {
-                Debug.LogError("[TestDefeatRewardDistributor] InventoryManager를 찾지 못해 보상을 지급하지 " +
+                Debug.LogError("[DefeatRewardDistributor] InventoryManager를 찾지 못해 보상을 지급하지 " +
                                "못했습니다.", this);
                 return;
             }
 
-            // 이번 처치의 결과는 이 호출만의 지역 값이다. 멤버 버퍼를 재사용하면, 지급 도중
-            // InventoryChanged 구독자가 동기적으로 또 다른 처치 흐름을 일으켰을 때 안쪽 호출이 버퍼를
-            // 비워 바깥 호출의 토스트가 엉뚱한 내용이 된다.
             DefeatReward reward = BuildReward(defeatedMonster, UnityRollBelow);
 
-            // 재화와 아이템(있어도 한 칸)을 한 덩어리로 적용한다 - 처치당 ApplyRewards는 여기 한 번뿐이고,
-            // 실제로 바뀐 것이 없으면 그쪽이 저장도 알림도 하지 않는다(빈 보상에 저장이 일어나지 않는다).
-            inventory.ApplyRewards(reward.Currency, ToRewardStacks(reward));
+            InventoryRewardApplyResult actual =
+                inventory.ApplyRewards(reward.Currency, ToRewardStacks(reward));
 
-            // 아무것도 얻지 못한 처치에 "+0 재화"를 띄우지 않는다 - 실제로 받은 것이 있을 때만 알린다.
-            if (!reward.IsEmpty) ShowRewardToast(reward);
+            if (!actual.IsEmpty) ShowRewardToast(actual);
         }
 
         /// <summary>보상 결과를 <see cref="InventoryManager.ApplyRewards"/>가 받는 목록으로 바꾼다.
@@ -357,9 +352,9 @@ namespace Inventory
         /// 자리표시자 수가 맞지 않는 문구에 값을 넣으면 형식 오류가 나기 때문이다.
         /// ToastManager가 없는 구성에서도 값을 확인할 수 있도록 그때는 로그로 남긴다.
         /// </summary>
-        private void ShowRewardToast(DefeatReward reward)
+        private void ShowRewardToast(InventoryRewardApplyResult result)
         {
-            string message = BuildToastMessage(reward);
+            string message = BuildToastMessage(result);
             if (string.IsNullOrEmpty(message)) return;
 
             if (ToastManager.Instance != null)
@@ -368,22 +363,25 @@ namespace Inventory
                 return;
             }
 
-            Debug.Log($"[TestDefeatRewardDistributor] {message} (ToastManager가 없어 로그로만 표시합니다)");
+            Debug.Log($"[DefeatRewardDistributor] {message} (ToastManager가 없어 로그로만 표시합니다)");
         }
 
-        /// <summary>토스트 문구 한 줄. 받은 것이 없으면 빈 문자열이며, 그때는 아무것도 띄우지 않는다.</summary>
-        private string BuildToastMessage(DefeatReward reward)
+        private string BuildToastMessage(InventoryRewardApplyResult result)
         {
-            string itemName = reward.HasItem ? DescribeName(reward.Item) : string.Empty;
+            bool hasCurrency = result.ActualCurrencyDelta > 0;
+            bool hasItem = result.ItemDeltas.Count > 0;
 
-            if (reward.HasItem && reward.HasCurrency)
-            {
-                return string.Format(rewardToastFormat, reward.Currency, itemName, reward.ItemCount);
-            }
+            if (!hasItem && !hasCurrency) return string.Empty;
 
-            if (reward.HasItem) return string.Format(itemOnlyToastFormat, itemName, reward.ItemCount);
+            string itemName = hasItem ? DescribeName(result.ItemDeltas[0].Definition) : string.Empty;
+            int itemCount = hasItem ? result.ItemDeltas[0].ActualCount : 0;
 
-            return reward.HasCurrency ? string.Format(currencyOnlyToastFormat, reward.Currency) : string.Empty;
+            if (hasItem && hasCurrency)
+                return string.Format(rewardToastFormat, result.ActualCurrencyDelta, itemName, itemCount);
+
+            if (hasItem) return string.Format(itemOnlyToastFormat, itemName, itemCount);
+
+            return string.Format(currencyOnlyToastFormat, result.ActualCurrencyDelta);
         }
 
         private static string DescribeName(ItemDefinition item)

@@ -1,10 +1,57 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using Common;
 using UnityEngine;
 
 namespace Inventory
 {
+    /// <summary>
+    /// 보상 적용의 실제 결과 - 아이템 한 칸이 실제로 얼마나 늘었는가. 요청한 수량이 아니라
+    /// <b>적용 후 인벤토리에 실제로 더해진 수량</b>이며, 포화(int.MaxValue)로 잘린 분은 제외된다.
+    /// 같은 ItemId가 요청에 여러 번 나타나면 하나의 결과로 합산된다(첫 성공 순서 유지).
+    /// </summary>
+    public readonly struct InventoryRewardItemDelta
+    {
+        public InventoryRewardItemDelta(ItemDefinition definition, string itemId, int actualCount)
+        {
+            Definition = definition;
+            ItemId = itemId;
+            ActualCount = actualCount;
+        }
+
+        public ItemDefinition Definition { get; }
+        public string ItemId { get; }
+        public int ActualCount { get; }
+    }
+
+    /// <summary>
+    /// <see cref="InventoryManager.ApplyReward"/> / <see cref="InventoryManager.ApplyRewards"/>가
+    /// 돌려주는 불변 결과. 실제로 인벤토리에 적용된 양만 담으며, 요청한 양과 다를 수 있다(포화 등).
+    /// 외부 코드가 내부 컬렉션이나 스냅샷을 변경할 수 없다.
+    /// </summary>
+    public sealed class InventoryRewardApplyResult
+    {
+        public static readonly InventoryRewardApplyResult Empty =
+            new InventoryRewardApplyResult(0, Array.Empty<InventoryRewardItemDelta>());
+
+        private readonly ReadOnlyCollection<InventoryRewardItemDelta> items;
+
+        internal InventoryRewardApplyResult(int actualCurrencyDelta, InventoryRewardItemDelta[] itemDeltas)
+        {
+            ActualCurrencyDelta = actualCurrencyDelta;
+            items = Array.AsReadOnly(itemDeltas);
+        }
+
+        public int ActualCurrencyDelta { get; }
+
+        public ReadOnlyCollection<InventoryRewardItemDelta> ItemDeltas => items;
+
+        public bool Changed => ActualCurrencyDelta > 0 || items.Count > 0;
+
+        public bool IsEmpty => !Changed;
+    }
+
     /// <summary>
     /// 보유 재화와 보유 아이템을 소유하는 <b>단일 관리자</b>. 값이 바뀌는 경로는 이 컴포넌트의
     /// 메서드뿐이고, UI(InventoryPanel)는 여기서 읽기만 한다 - 씬에 배치된 오브젝트나 프리팹 상태를
@@ -28,8 +75,8 @@ namespace Inventory
     /// 표시 순서는 저장 목록의 순서, 즉 <b>처음 획득한 순서</b>다 - 새 아이템은 뒤에 추가되고 그 뒤로
     /// 자리가 바뀌지 않으므로 저장/불러오기를 거쳐도 순서가 유지된다.
     ///
-    /// <b>몬스터 처치 보상과는 아직 연결하지 않았다.</b> 값을 넣는 경로는 아래 개발용 진입점뿐이며,
-    /// 정식 획득 규칙이 정해지면 그때 <see cref="AddCurrency"/>/<see cref="AddItem"/>을 호출하면 된다.
+    /// <b>몬스터 처치 보상은 <see cref="DefeatRewardDistributor"/>가 <see cref="ApplyRewards"/>로
+    /// 지급한다.</b> 개발용 진입점은 아래에 별도로 있다.
     /// </summary>
     [DisallowMultipleComponent]
     public class InventoryManager : MonoBehaviour
@@ -92,6 +139,14 @@ namespace Inventory
         /// <summary>재화나 아이템이 실제로 바뀐 직후 발생. 열려 있는 인벤토리 패널이 이 신호로
         /// 즉시 갱신된다 - 값이 바뀌지 않은 호출에서는 발생하지 않는다.</summary>
         public static event Action InventoryChanged;
+
+        /// <summary>
+        /// <see cref="ApplyReward"/> / <see cref="ApplyRewards"/>로 실제로 인벤토리가 바뀐 뒤 발생.
+        /// <b>빈 결과에는 발생하지 않으며</b>, 기존 저장 처리와 <see cref="InventoryChanged"/>가 끝난
+        /// 뒤에만 발생한다. <see cref="AddCurrency"/>/<see cref="AddItem"/>/개발용 진입점/소비/환불은
+        /// 이 이벤트를 발생시키지 않는다.
+        /// </summary>
+        public event Action<InventoryRewardApplyResult> RewardApplied;
 
         // itemId -> 정의. 저장 데이터를 화면에 그릴 때마다 목록을 순회하지 않도록 Awake에서 한 번만 만든다.
         private readonly Dictionary<string, ItemDefinition> definitionsById = new Dictionary<string, ItemDefinition>();
@@ -258,15 +313,35 @@ namespace Inventory
         /// 기록된 파일이 남지 않는다(기존 저장 파일이 그대로 유지된다).
         ///
         /// 아이템 없이 재화만 주려면 <paramref name="item"/>에 null을 넘기면 된다. 아이템이 여러 칸이면
-        /// <see cref="ApplyRewards"/>를 쓴다 - 이쪽은 한 칸 전용이라 목록도 버퍼도 만들지 않는다.
+        /// <see cref="ApplyRewards"/>를 쓴다 - 이쪽은 한 칸 전용이라 결과 순서 추적용 1칸 목록만 만든다.
+        ///
+        /// 반환된 <see cref="InventoryRewardApplyResult"/>는 실제로 적용된 양만 담는다. 호출부가
+        /// 반환값을 무시해도 기존 동작은 달라지지 않는다.
         /// </summary>
-        public void ApplyReward(int currencyAmount, ItemDefinition item, int itemCount = 1)
+        public InventoryRewardApplyResult ApplyReward(int currencyAmount, ItemDefinition item, int itemCount = 1)
         {
+            int currencyBefore = SaveSystem.Data.currency;
+            var itemSnapshots = SnapshotItemCounts();
+
             bool changed = ApplyCurrencyDelta(currencyAmount);
-            // 비트 OR로 두 호출을 모두 실행한다 - ||를 쓰면 재화가 바뀐 순간 아이템 지급이 통째로 생략된다.
             changed |= ApplyItemDelta(item, itemCount);
 
-            if (changed) SaveAndNotify();
+            InventoryRewardApplyResult result;
+            if (changed)
+            {
+                var singleStack = item != null
+                    ? new List<RewardItemStack>(1) { new RewardItemStack(item, itemCount) }
+                    : null;
+                result = BuildResult(currencyBefore, itemSnapshots, singleStack);
+                SaveAndNotify();
+                if (!result.IsEmpty) RewardApplied?.Invoke(result);
+            }
+            else
+            {
+                result = InventoryRewardApplyResult.Empty;
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -285,21 +360,38 @@ namespace Inventory
         /// null 정의나 0 이하 수량은 조용히 건너뛴다(보상 판정에서 이미 걸러진 값이라 정상 입력이다).
         /// 다만 <b>카탈로그에 없는 정의는 기존과 똑같이 오류로 막는다</b> - 저장은 되는데 화면에 없는
         /// 아이템이 생기는 편이 훨씬 찾기 어렵기 때문이다.
+        ///
+        /// 반환된 <see cref="InventoryRewardApplyResult"/>는 실제로 적용된 양만 담는다. 호출부가
+        /// 반환값을 무시해도 기존 동작은 달라지지 않는다.
         /// </summary>
-        public void ApplyRewards(int currencyAmount, IReadOnlyList<RewardItemStack> itemStacks)
+        public InventoryRewardApplyResult ApplyRewards(int currencyAmount, IReadOnlyList<RewardItemStack> itemStacks)
         {
+            int currencyBefore = SaveSystem.Data.currency;
+            var itemSnapshots = SnapshotItemCounts();
+
             bool changed = ApplyCurrencyDelta(currencyAmount);
 
             if (itemStacks != null)
             {
                 for (int i = 0; i < itemStacks.Count; i++)
                 {
-                    // 비트 OR로 모든 칸을 반드시 실행한다 - ||를 쓰면 앞의 칸이 성공한 순간 뒤가 생략된다.
                     changed |= ApplyItemDelta(itemStacks[i].Definition, itemStacks[i].Count);
                 }
             }
 
-            if (changed) SaveAndNotify();
+            InventoryRewardApplyResult result;
+            if (changed)
+            {
+                result = BuildResult(currencyBefore, itemSnapshots, itemStacks);
+                SaveAndNotify();
+                if (!result.IsEmpty) RewardApplied?.Invoke(result);
+            }
+            else
+            {
+                result = InventoryRewardApplyResult.Empty;
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -387,15 +479,14 @@ namespace Inventory
             return true;
         }
 
-        /// <summary>메모리의 아이템 수량만 바꾼다(저장/알림 없음). 실제로 값이 달라졌으면 true.</summary>
+        /// <summary>메모리의 아이템 수량만 바꾼다(저장/알림 없음). 실제로 값이 달라졌으면 true.
+        /// 수량은 int.MaxValue에서 포화한다 - 넘치지 않는다.</summary>
         private bool ApplyItemDelta(ItemDefinition definition, int count)
         {
             if (definition == null || count <= 0) return false;
 
             if (!definitionsById.ContainsKey(definition.ItemId))
             {
-                // 카탈로그에 없는 아이템을 넣으면 저장은 되지만 인벤토리에 그려지지 않아 "사라진 것처럼"
-                // 보인다 - 조용히 넘어가지 않고 여기서 막는다.
                 Debug.LogError($"[InventoryManager] '{definition.ItemId}'가 Item Catalog에 없어 추가하지 않았습니다 - " +
                                "Inspector의 Generated Item Catalog(Item.csv로 만든 아이템) 또는 Item Catalog 목록에 " +
                                "이 정의를 등록하세요.", this);
@@ -407,11 +498,13 @@ namespace Inventory
             {
                 if (states[i] == null || states[i].itemId != definition.ItemId) continue;
 
-                states[i].count += count;
+                long sum = (long)states[i].count + count;
+                int clamped = sum >= int.MaxValue ? int.MaxValue : (int)sum;
+                if (clamped == states[i].count) return false;
+                states[i].count = clamped;
                 return true;
             }
 
-            // 처음 획득하는 아이템 - 목록 맨 뒤에 추가되고, 이 순서가 그대로 표시 순서가 된다.
             states.Add(new InventoryItemState { itemId = definition.ItemId, count = count });
             return true;
         }
@@ -443,6 +536,60 @@ namespace Inventory
         private static bool PersistToDisk()
         {
             return saveOverride != null ? saveOverride() : SaveSystem.Save();
+        }
+
+        private Dictionary<string, int> SnapshotItemCounts()
+        {
+            List<InventoryItemState> states = SaveSystem.Data.items;
+            var snapshot = new Dictionary<string, int>(states.Count);
+            for (int i = 0; i < states.Count; i++)
+            {
+                if (states[i] != null && !string.IsNullOrEmpty(states[i].itemId))
+                    snapshot[states[i].itemId] = states[i].count;
+            }
+            return snapshot;
+        }
+
+        private InventoryRewardApplyResult BuildResult(
+            int currencyBefore,
+            Dictionary<string, int> itemsBefore,
+            IReadOnlyList<RewardItemStack> requestedStacks)
+        {
+            long rawCurrencyDelta = (long)SaveSystem.Data.currency - currencyBefore;
+            int actualCurrencyDelta = rawCurrencyDelta <= 0L ? 0
+                : rawCurrencyDelta >= int.MaxValue ? int.MaxValue
+                : (int)rawCurrencyDelta;
+
+            var deltas = new List<InventoryRewardItemDelta>();
+
+            if (requestedStacks != null)
+            {
+                var seen = new HashSet<string>();
+                for (int i = 0; i < requestedStacks.Count; i++)
+                {
+                    RewardItemStack stack = requestedStacks[i];
+                    if (stack.Definition == null || stack.Count <= 0) continue;
+
+                    string id = stack.Definition.ItemId;
+                    if (string.IsNullOrEmpty(id)) continue;
+                    if (!seen.Add(id)) continue;
+
+                    if (!definitionsById.TryGetValue(id, out ItemDefinition def)) continue;
+
+                    itemsBefore.TryGetValue(id, out int before);
+                    int after = GetItemCount(id);
+                    long rawDiff = (long)after - before;
+                    if (rawDiff <= 0L) continue;
+                    int diff = rawDiff >= int.MaxValue ? int.MaxValue : (int)rawDiff;
+
+                    deltas.Add(new InventoryRewardItemDelta(def, id, diff));
+                }
+            }
+
+            if (actualCurrencyDelta == 0 && deltas.Count == 0)
+                return InventoryRewardApplyResult.Empty;
+
+            return new InventoryRewardApplyResult(actualCurrencyDelta, deltas.ToArray());
         }
 
         /// <summary>인벤토리가 실제로 바뀐 뒤에만 호출한다 - 저장은 이 경로 하나뿐이라 매 프레임이나
