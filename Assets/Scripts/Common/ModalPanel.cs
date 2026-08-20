@@ -71,7 +71,16 @@ namespace Common
 
         public void Close()
         {
+            OnCloseRequested();
             gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// 닫기 버튼, ESC 또는 호출자가 <see cref="Close"/>를 사용한 정상 닫기 요청에서만 호출된다.
+        /// 외부 SetActive(false), 씬 종료, 파괴 경로에서는 호출되지 않는다.
+        /// </summary>
+        protected virtual void OnCloseRequested()
+        {
         }
 
         /// <summary>패널에 보이는 값을 지금 데이터 기준으로 다시 그린다. 패널이 열릴 때마다 호출되므로,

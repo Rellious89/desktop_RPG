@@ -38,6 +38,7 @@ namespace Dungeon
             long sessionSequence,
             long earnedCurrency,
             long defeatedMonsterCount,
+            double elapsedSeconds,
             DungeonSessionItemReward[] items)
         {
             DungeonDefinition = dungeon;
@@ -45,6 +46,7 @@ namespace Dungeon
             SessionSequence = sessionSequence;
             EarnedCurrency = earnedCurrency;
             DefeatedMonsterCount = defeatedMonsterCount;
+            ElapsedSeconds = NormalizeElapsedSeconds(elapsedSeconds);
             earnedItems = Array.AsReadOnly(items ?? Array.Empty<DungeonSessionItemReward>());
         }
 
@@ -53,8 +55,15 @@ namespace Dungeon
         public long SessionSequence { get; }
         public long EarnedCurrency { get; }
         public long DefeatedMonsterCount { get; }
+        public double ElapsedSeconds { get; }
         public ReadOnlyCollection<DungeonSessionItemReward> EarnedItems => earnedItems;
         public bool IsEmpty => EarnedCurrency == 0L && DefeatedMonsterCount == 0L && earnedItems.Count == 0;
+
+        private static double NormalizeElapsedSeconds(double value)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value) || value <= 0d) return 0d;
+            return value;
+        }
     }
 
     /// <summary>
@@ -149,6 +158,13 @@ namespace Dungeon
         /// 활성 세션이 없으면 false.
         /// </summary>
         public bool TryCompleteSession(out DungeonSessionSnapshot snapshot)
+            => TryCompleteSession(0d, out snapshot);
+
+        /// <summary>
+        /// 활성 세션을 완료하고 런타임 Tracker가 측정한 경과 시간을 함께 담는다.
+        /// 원장은 Unity 시간 API를 읽지 않으며 전달받은 값만 불변 스냅샷으로 복사한다.
+        /// </summary>
+        public bool TryCompleteSession(double elapsedSeconds, out DungeonSessionSnapshot snapshot)
         {
             if (activeDungeon == null)
             {
@@ -165,7 +181,7 @@ namespace Dungeon
 
             snapshot = new DungeonSessionSnapshot(
                 activeDungeon, activeDungeonId, activeSequence,
-                activeCurrency, activeKills, items);
+                activeCurrency, activeKills, elapsedSeconds, items);
 
             completed.Enqueue(snapshot);
             ClearActive();

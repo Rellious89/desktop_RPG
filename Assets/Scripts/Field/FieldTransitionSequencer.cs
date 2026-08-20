@@ -38,6 +38,9 @@ namespace Field
         /// 판단하는 데 쓴다 - 없을 때 조용히 기존 동작으로 돌아가야 하므로 필수 참조로 두지 않는다.</summary>
         public static FieldTransitionSequencer Instance { get; private set; }
 
+        /// <summary>전환 연출이 정리되고 입력 복구까지 끝난 뒤 한 번 발생한다.</summary>
+        public event Action TransitionCompleted;
+
         [Header("연결")]
         [Tooltip("모드 전환의 단일 소유자. 연출이 끝난 뒤 이 매니저의 Try...를 그대로 호출한다.")]
         [SerializeField] private FieldModeManager fieldModeManager;
@@ -241,8 +244,10 @@ namespace Field
         {
             IsPlaying = false;
 
-            if (playerAnimator == null || fieldModeManager == null) return;
-            if (fieldModeManager.CanCombat) playerAnimator.SetCombatEnabled(true);
+            if (playerAnimator != null && fieldModeManager != null && fieldModeManager.CanCombat)
+                playerAnimator.SetCombatEnabled(true);
+
+            TransitionCompleted?.Invoke();
         }
     }
 }

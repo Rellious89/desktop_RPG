@@ -250,6 +250,28 @@ namespace DungeonEditor.Tests
             Assert.IsNull(snap);
         }
 
+        [Test]
+        public void Complete_UsesElapsedSecondsProvidedByRuntimeTracker()
+        {
+            DungeonDefinition d = MakeDungeon("forest_01");
+            ledger.TryStartSession(d);
+
+            Assert.IsTrue(ledger.TryCompleteSession(65.75d, out DungeonSessionSnapshot snap));
+            Assert.AreEqual(65.75d, snap.ElapsedSeconds, 0.0001d);
+        }
+
+        [TestCase(-1d)]
+        [TestCase(double.NaN)]
+        [TestCase(double.PositiveInfinity)]
+        public void Complete_InvalidElapsedSeconds_NormalizesToZero(double elapsedSeconds)
+        {
+            DungeonDefinition d = MakeDungeon("forest_01");
+            ledger.TryStartSession(d);
+
+            Assert.IsTrue(ledger.TryCompleteSession(elapsedSeconds, out DungeonSessionSnapshot snap));
+            Assert.AreEqual(0d, snap.ElapsedSeconds);
+        }
+
         // ======== Currency aggregation ========
 
         [Test]

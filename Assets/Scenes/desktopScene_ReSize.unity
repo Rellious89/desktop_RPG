@@ -2208,6 +2208,7 @@ GameObject:
   - component: {fileID: 468841863}
   - component: {fileID: 468841864}
   - component: {fileID: 468841865}
+  - component: {fileID: 468841866}
   m_Layer: 0
   m_Name: FieldSystem
   m_TagString: Untagged
@@ -2312,6 +2313,21 @@ MonoBehaviour:
   fieldModeManager: {fileID: 468841861}
   encounterQueue: {fileID: 324107453}
   inventoryManager: {fileID: 1047247884}
+--- !u!114 &468841866
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 468841860}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5831881ad8ca490085aad7439f97476a, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  sessionTracker: {fileID: 468841865}
+  resultPanel: {fileID: 5894670379954758321}
+  transitionSequencer: {fileID: 119946296}
 --- !u!1 &471919068
 GameObject:
   m_ObjectHideFlags: 0
@@ -10693,6 +10709,11 @@ PrefabInstance:
 --- !u!224 &3913077413343711968 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 1934778966377694745, guid: 2613aee3f050a40fd847bd6d869eb216, type: 3}
+  m_PrefabInstance: {fileID: 1816820195239382877}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &5894670379954758321 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7741803445950812271, guid: 2613aee3f050a40fd847bd6d869eb216, type: 3}
   m_PrefabInstance: {fileID: 1816820195239382877}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &4487653530675269656

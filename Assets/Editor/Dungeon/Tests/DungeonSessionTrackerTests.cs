@@ -51,6 +51,11 @@ namespace DungeonEditor.Tests
                 "inventoryManager",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
+        private static readonly FieldInfo RealtimeProviderField =
+            typeof(DungeonSessionTracker).GetField(
+                "realtimeSecondsProvider",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+
         private static readonly FieldInfo LastTransitionFrame =
             typeof(FieldModeManager).GetField(
                 "lastTransitionFrame",
@@ -116,6 +121,7 @@ namespace DungeonEditor.Tests
             Assert.IsNotNull(HandleReward, "HandleRewardApplied 리플렉션");
             Assert.IsNotNull(CurrentModeField, "CurrentMode 백킹필드 리플렉션");
             Assert.IsNotNull(CurrentDungeonField, "CurrentDungeon 백킹필드 리플렉션");
+            Assert.IsNotNull(RealtimeProviderField, "실시간 공급자 리플렉션");
 
             var fmmGo = new GameObject("TestFMM");
             fmmGo.SetActive(false);
@@ -244,6 +250,63 @@ namespace DungeonEditor.Tests
             Assert.IsTrue(tracker.TryPeekNextCompletedSession(out DungeonSessionSnapshot snap));
             Assert.IsTrue(snap.IsEmpty);
             Assert.AreEqual("forest_01", snap.DungeonId);
+        }
+
+        [Test]
+        public void ActualDungeonToTown_RecordsInjectedRealtimeElapsedSeconds()
+        {
+            double now = 100d;
+            RealtimeProviderField.SetValue(tracker, new Func<double>(() => now));
+
+            DungeonDefinition d = MakeDungeon("forest_01");
+            InvokeFieldMode(FieldMode.Dungeon, d);
+            now = 165d;
+            InvokeFieldMode(FieldMode.Town, null);
+
+            Assert.IsTrue(tracker.TryPeekNextCompletedSession(out DungeonSessionSnapshot snap));
+            Assert.AreEqual(65d, snap.ElapsedSeconds, 0.0001d);
+        }
+
+        [Test]
+        public void DuplicateDungeonSignal_DoesNotResetElapsedTimer()
+        {
+            double now = 10d;
+            RealtimeProviderField.SetValue(tracker, new Func<double>(() => now));
+
+            DungeonDefinition d = MakeDungeon("forest_01");
+            InvokeFieldMode(FieldMode.Dungeon, d);
+            now = 40d;
+            InvokeFieldMode(FieldMode.Dungeon, d);
+            now = 75d;
+            InvokeFieldMode(FieldMode.Town, null);
+
+            tracker.TryPeekNextCompletedSession(out DungeonSessionSnapshot snap);
+            Assert.AreEqual(65d, snap.ElapsedSeconds, 0.0001d,
+                "같은 던전 중복 시작 신호는 시작 시간을 갱신하지 않는다");
+        }
+
+        [Test]
+        public void ElapsedTime_DoesNotDependOnTimeScale()
+        {
+            float originalTimeScale = Time.timeScale;
+            try
+            {
+                double now = 200d;
+                RealtimeProviderField.SetValue(tracker, new Func<double>(() => now));
+                Time.timeScale = 0f;
+
+                DungeonDefinition d = MakeDungeon("forest_01");
+                InvokeFieldMode(FieldMode.Dungeon, d);
+                now = 205d;
+                InvokeFieldMode(FieldMode.Town, null);
+
+                tracker.TryPeekNextCompletedSession(out DungeonSessionSnapshot snap);
+                Assert.AreEqual(5d, snap.ElapsedSeconds, 0.0001d);
+            }
+            finally
+            {
+                Time.timeScale = originalTimeScale;
+            }
         }
 
         // ======== Defeat alignment ========

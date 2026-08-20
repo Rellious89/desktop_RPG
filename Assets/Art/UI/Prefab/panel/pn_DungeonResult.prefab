@@ -944,6 +944,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1934778966377694745}
   - component: {fileID: 584014750238456495}
+  - component: {fileID: 7741803445950812271}
   m_Layer: 5
   m_Name: pn_DungeonResult
   m_TagString: Untagged
@@ -985,6 +986,41 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   receiveMouseInput: 1
+--- !u!114 &7741803445950812271
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2605260328679881151}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 83504ff82b474facbf11e428a2b9b210, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  closeButton: {fileID: 3651809710075944375}
+  blockBackgroundInput: 1
+  inputBlocker: {fileID: 0}
+  inputBlockerColor: {r: 0, g: 0, b: 0, a: 0}
+  dungeonNameText: {fileID: 6437197655905881791}
+  elapsedTimeText: {fileID: 3679824086024845314}
+  defeatedMonsterCountText: {fileID: 7057129897536045261}
+  earnedCurrencyText: {fileID: 637844577243466197}
+  rewardItemContent: {fileID: 5315033669598968830}
+  rewardItemPrefab: {fileID: 9010276441122249481, guid: b4b934dafe76f420ab6bb64816bd240d, type: 3}
+  confirmButton: {fileID: 9051914525349458845}
+  dayOrMoreText:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 8207294704640004
+      m_Key:
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  references:
+    version: 2
+    RefIds: []
 --- !u!1 &3282853772972276602
 GameObject:
   m_ObjectHideFlags: 0

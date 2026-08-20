@@ -250,12 +250,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 2900175714725442721}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d368587137da4cf2a6de0524ee8bd94e, type: 3}
+  m_Script: {fileID: 11500000, guid: 4dd61472593c40128f5e3121100987ad, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  iconImage: {fileID: 2053817282085602351}
-  countText: {fileID: 8337175393950418401}
-  countFormat: '{0}'
+  itemIcon: {fileID: 2053817282085602351}
+  stackCountText: {fileID: 8337175393950418401}
 --- !u!1 &4725927601639197524
 GameObject:
   m_ObjectHideFlags: 0
