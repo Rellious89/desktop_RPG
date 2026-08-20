@@ -146,6 +146,30 @@ MonoBehaviour:
     m_Localized: Dangerous Area
     m_Metadata:
       m_Items: []
+  - m_Id: 8207294696251392
+    m_Localized: Result
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8207294704640000
+    m_Localized: Time - {0}
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8207294704640001
+    m_Localized: "\uCC98\uCE58\uD55C \uBAAC\uC2A4\uD130 \uC218"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8207294704640002
+    m_Localized: "\uD68D\uB4DD\uD55C \uC7AC\uD654"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8207294704640003
+    m_Localized: "\uD68D\uB4DD\uD55C \uC544\uC774\uD15C"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8207294704640004
+    m_Localized: "1\uC77C \uC774\uC0C1"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

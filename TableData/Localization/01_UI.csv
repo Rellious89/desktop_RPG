@@ -28,6 +28,12 @@ Key,Id,English(en),Korean (South Korea)(ko-KR)
 27,,주요 보상,주요 보상
 28,,애니멀랜드,애니멀랜드
 29,,판타지아,판타지아
-30,,ReturnTwon,마을로
+30,,ReturnTown,마을로
 31,,Safe Area,안전지역
 32,,Dangerous Area,위험지역
+33,,Result,결과
+34,,Time - {0},진행시간 - {0}
+35,,처치한 몬스터 수,처치한 몬스터 수
+36,,획득한 재화,획득한 재화
+37,,획득한 아이템,획득한 아이템
+38,,1일 이상,1일 이상
