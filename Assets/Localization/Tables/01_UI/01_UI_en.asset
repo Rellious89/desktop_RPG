@@ -151,7 +151,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 8207294704640000
-    m_Localized: Time - {0}
+    m_Localized: Time - HH:mm:ss
     m_Metadata:
       m_Items: []
   - m_Id: 8207294704640001

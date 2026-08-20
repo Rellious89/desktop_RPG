@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using Character;
+using Common;
 using Dungeon;
 using Field;
 using NUnit.Framework;
@@ -14,6 +16,10 @@ namespace DungeonEditor.Tests
 {
     public sealed class DungeonResultUiTests
     {
+        private static readonly MethodInfo SetAccessServiceMethod =
+            typeof(DungeonEntryService).GetMethod("SetAccessServiceForTests",
+                BindingFlags.NonPublic | BindingFlags.Static);
+
         private const string PanelPath =
             "Assets/Art/UI/Prefab/panel/pn_DungeonResult.prefab";
         private const string ItemPath =
@@ -22,12 +28,20 @@ namespace DungeonEditor.Tests
 
         private readonly List<Object> created = new List<Object>();
 
+        [SetUp]
+        public void SetUp()
+        {
+            Assert.IsNotNull(SetAccessServiceMethod);
+            DungeonEntryService.ResetRequestState();
+        }
+
         [TearDown]
         public void TearDown()
         {
             for (int i = created.Count - 1; i >= 0; i--)
                 if (created[i] != null) Object.DestroyImmediate(created[i]);
             created.Clear();
+            DungeonEntryService.ResetRequestState();
         }
 
         [Test]
@@ -64,6 +78,16 @@ namespace DungeonEditor.Tests
             Assert.AreEqual(8207294704640004L,
                 day.FindPropertyRelative("m_TableEntryReference.m_KeyId").longValue,
                 "01_UI / 38의 실제 Entry ID가 연결되어야 한다");
+
+            var elapsed = so.FindProperty("elapsedTimeText").objectReferenceValue
+                as TextMeshProUGUI;
+            Assert.IsNotNull(elapsed);
+            LocalizedTMPText elapsedLocalizer = elapsed.GetComponent<LocalizedTMPText>();
+            Assert.IsNotNull(elapsedLocalizer, "lb_Timer가 01_UI / 34 참조를 제공해야 한다");
+            var elapsedLocalizerSo = new SerializedObject(elapsedLocalizer);
+            Assert.AreEqual(8207294704640000L,
+                elapsedLocalizerSo.FindProperty("text.m_TableEntryReference.m_KeyId").longValue,
+                "진행 시간 형식은 01_UI / 34를 사용해야 한다");
         }
 
         [Test]
@@ -217,13 +241,62 @@ namespace DungeonEditor.Tests
             Assert.AreEqual(0, tracker.PendingCompletedSessionCount);
         }
 
+        [Test]
+        public void Coordinator_AcceptedDungeonEntry_ClosesAndConsumesOnlyDisplayedHead()
+        {
+            DungeonSessionTracker tracker = CreateInactiveTracker(out DungeonSessionLedger ledger);
+            DungeonSessionSnapshot first = EnqueueSnapshot(ledger, "first", 1d);
+            DungeonSessionSnapshot second = EnqueueSnapshot(ledger, "second", 2d);
+            DungeonResultPanel panel = CreatePanelInstance();
+            DungeonResultCoordinator coordinator = CreateCoordinator(tracker, panel, null);
+            InvokePrivate(coordinator, "Subscribe");
+            InvokePrivate(coordinator, "TryShowNextCompletedSession");
+
+            Assert.AreEqual(first.SessionSequence, panel.DisplayedSessionSequence);
+            SetAccessOverride(new DungeonAccessService(new StubLevelSource(99)));
+
+            Assert.IsTrue(DungeonEntryService.RequestEnterDungeon(first.DungeonDefinition));
+            Assert.IsFalse(panel.gameObject.activeSelf,
+                "승인된 입장은 열린 결과를 정상 Close 경로로 닫아야 한다");
+            Assert.AreEqual(1, tracker.PendingCompletedSessionCount,
+                "현재 표시한 FIFO 선두 한 건만 소비해야 한다");
+            if (panel.HasSnapshot)
+                InvokePrivate(panel, "OnModalClosed");
+
+            InvokePrivate(coordinator, "TryShowNextCompletedSession");
+            Assert.IsFalse(panel.gameObject.activeSelf,
+                "입장 요청 이후에는 남은 결과가 던전 진입 중 다시 열리면 안 된다");
+
+            InvokePrivateWithArgument(coordinator, "HandleSessionCompleted", second);
+            Assert.IsTrue(panel.gameObject.activeSelf,
+                "마을 복귀로 세션이 완료되면 남은 FIFO 선두를 다시 표시해야 한다");
+            Assert.AreEqual(second.SessionSequence, panel.DisplayedSessionSequence);
+            Assert.AreEqual(1, tracker.PendingCompletedSessionCount,
+                "복귀 후 표시는 Peek이므로 남은 결과를 미리 소비하지 않는다");
+        }
+
+        [Test]
+        public void Coordinator_DeniedDungeonEntry_KeepsPanelAndFifo()
+        {
+            DungeonSessionTracker tracker = CreateInactiveTracker(out DungeonSessionLedger ledger);
+            DungeonSessionSnapshot snapshot = EnqueueSnapshot(ledger, "visible", 1d);
+            DungeonResultPanel panel = CreatePanelInstance();
+            DungeonResultCoordinator coordinator = CreateCoordinator(tracker, panel, null);
+            InvokePrivate(coordinator, "Subscribe");
+            InvokePrivate(coordinator, "TryShowNextCompletedSession");
+            SetAccessOverride(new DungeonAccessService(new StubLevelSource(1)));
+            DungeonDefinition locked = CreateDungeon("locked", requiredLevel: 10);
+
+            Assert.IsFalse(DungeonEntryService.RequestEnterDungeon(locked));
+            Assert.IsTrue(panel.gameObject.activeSelf,
+                "거부된 입장은 DungeonEnterRequested가 없으므로 팝업을 닫으면 안 된다");
+            Assert.AreEqual(snapshot.SessionSequence, panel.DisplayedSessionSequence);
+            Assert.AreEqual(1, tracker.PendingCompletedSessionCount);
+        }
+
         private DungeonSessionSnapshot MakeSnapshot(double elapsedSeconds)
         {
-            var dungeon = ScriptableObject.CreateInstance<DungeonDefinition>();
-            created.Add(dungeon);
-            var so = new SerializedObject(dungeon);
-            so.FindProperty("dungeonId").stringValue = "test_dungeon";
-            so.ApplyModifiedPropertiesWithoutUndo();
+            DungeonDefinition dungeon = CreateDungeon("test_dungeon");
 
             var ledger = new DungeonSessionLedger();
             Assert.AreEqual(SessionStartResult.Started, ledger.TryStartSession(dungeon));
@@ -286,15 +359,22 @@ namespace DungeonEditor.Tests
         private DungeonSessionSnapshot EnqueueSnapshot(
             DungeonSessionLedger ledger, string id, double elapsedSeconds)
         {
-            var dungeon = ScriptableObject.CreateInstance<DungeonDefinition>();
-            created.Add(dungeon);
-            var so = new SerializedObject(dungeon);
-            so.FindProperty("dungeonId").stringValue = id;
-            so.ApplyModifiedPropertiesWithoutUndo();
+            DungeonDefinition dungeon = CreateDungeon(id);
 
             Assert.AreEqual(SessionStartResult.Started, ledger.TryStartSession(dungeon));
             Assert.IsTrue(ledger.TryCompleteSession(elapsedSeconds, out DungeonSessionSnapshot snapshot));
             return snapshot;
+        }
+
+        private DungeonDefinition CreateDungeon(string id, int requiredLevel = 1)
+        {
+            var dungeon = ScriptableObject.CreateInstance<DungeonDefinition>();
+            created.Add(dungeon);
+            var so = new SerializedObject(dungeon);
+            so.FindProperty("dungeonId").stringValue = id;
+            so.FindProperty("requiredCharacterLevel").intValue = requiredLevel;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return dungeon;
         }
 
         private static void SetSequencerPlaying(FieldTransitionSequencer sequencer, bool value)
@@ -313,6 +393,19 @@ namespace DungeonEditor.Tests
             method.Invoke(target, null);
         }
 
+        private static void InvokePrivateWithArgument(object target, string methodName, object argument)
+        {
+            MethodInfo method = target.GetType().GetMethod(
+                methodName, BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(method, methodName);
+            method.Invoke(target, new[] { argument });
+        }
+
+        private static void SetAccessOverride(DungeonAccessService service)
+        {
+            SetAccessServiceMethod.Invoke(null, new object[] { service });
+        }
+
         private static IEnumerator InvokePrivateEnumerator(object target, string methodName)
         {
             MethodInfo method = target.GetType().GetMethod(
@@ -329,6 +422,18 @@ namespace DungeonEditor.Tests
             T value = property.objectReferenceValue as T;
             Assert.IsNotNull(value, propertyName);
             Assert.AreEqual(objectName, value.name, propertyName);
+        }
+
+        private sealed class StubLevelSource : IOwnedCharacterLevelSource
+        {
+            private readonly int level;
+
+            public StubLevelSource(int level)
+            {
+                this.level = level;
+            }
+
+            public int HighestOwnedCharacterLevel => level;
         }
     }
 }

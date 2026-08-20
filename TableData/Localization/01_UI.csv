@@ -32,7 +32,7 @@ Key,Id,English(en),Korean (South Korea)(ko-KR)
 31,,Safe Area,안전지역
 32,,Dangerous Area,위험지역
 33,,Result,결과
-34,,Time - {0},진행시간 - {0}
+34,,Time - HH:mm:ss,진행시간 - HH:mm:ss
 35,,처치한 몬스터 수,처치한 몬스터 수
 36,,획득한 재화,획득한 재화
 37,,획득한 아이템,획득한 아이템

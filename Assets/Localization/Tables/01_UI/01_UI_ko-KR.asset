@@ -152,7 +152,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 8207294704640000
-    m_Localized: "\uC9C4\uD589\uC2DC\uAC04 - {0}"
+    m_Localized: "\uC9C4\uD589\uC2DC\uAC04 - HH:mm:ss"
     m_Metadata:
       m_Items: []
   - m_Id: 8207294704640001

@@ -996,16 +996,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 83504ff82b474facbf11e428a2b9b210, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   closeButton: {fileID: 3651809710075944375}
   blockBackgroundInput: 1
   inputBlocker: {fileID: 0}
   inputBlockerColor: {r: 0, g: 0, b: 0, a: 0}
   dungeonNameText: {fileID: 6437197655905881791}
   elapsedTimeText: {fileID: 3679824086024845314}
-  defeatedMonsterCountText: {fileID: 7057129897536045261}
-  earnedCurrencyText: {fileID: 637844577243466197}
+  defeatedMonsterCountText: {fileID: 637844577243466197}
+  earnedCurrencyText: {fileID: 7057129897536045261}
   rewardItemContent: {fileID: 5315033669598968830}
   rewardItemPrefab: {fileID: 9010276441122249481, guid: b4b934dafe76f420ab6bb64816bd240d, type: 3}
   confirmButton: {fileID: 9051914525349458845}
@@ -1014,7 +1014,7 @@ MonoBehaviour:
       m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
     m_TableEntryReference:
       m_KeyId: 8207294704640004
-      m_Key:
+      m_Key: 
     m_FallbackState: 0
     m_WaitForCompletion: 0
     m_LocalVariables: []

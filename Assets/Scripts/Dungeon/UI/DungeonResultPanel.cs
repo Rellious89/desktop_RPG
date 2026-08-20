@@ -38,7 +38,12 @@ namespace Dungeon
 
         private DungeonSessionSnapshot snapshot;
         private LocalizedTextReference boundDungeonName;
-        private LocalizedTextReference boundElapsedText;
+        private LocalizedTextReference boundElapsedFormat;
+        private LocalizedTextReference boundDayOrMoreText;
+        private string localizedElapsedFormat;
+        private string localizedDayOrMoreText;
+        private string elapsedTimeFallback;
+        private bool usesDayOrMoreText;
         private bool referencesValidated;
 
         public event Action<long> ConfirmationRequested;
@@ -123,25 +128,57 @@ namespace Dungeon
             return true;
         }
 
+        /// <summary>
+        /// 01_UI / 34의 HH:mm:ss 토큰만 현재 시간 값으로 바꾼다. 참조가 비었거나 토큰이 사라진
+        /// 비정상 형식에서는 시간 값 자체를 반환해 결과가 공백이 되지 않게 한다.
+        /// </summary>
+        public static string ApplyElapsedFormat(string localizedFormat, string elapsedValue)
+        {
+            if (string.IsNullOrEmpty(elapsedValue)) return string.Empty;
+            if (string.IsNullOrEmpty(localizedFormat)) return elapsedValue;
+            if (localizedFormat.IndexOf("HH:mm:ss", StringComparison.Ordinal) < 0)
+                return elapsedValue;
+
+            return localizedFormat.Replace("HH:mm:ss", elapsedValue);
+        }
+
         private void ApplyElapsedTime(double elapsedSeconds)
         {
-            DungeonStaticLocalizerGuard.DisableIfPresent(elapsedTimeText, nameof(DungeonResultPanel));
-
-            if (TryFormatElapsedTime(elapsedSeconds, out string formatted))
+            // 사용자가 lb_Timer에 연결한 LocalizedTMPText의 01_UI / 34 참조를 그대로 인계받는다.
+            // 정적 컴포넌트는 끄고 이 패널이 같은 참조를 구독해야 시간 토큰과 Locale 변경을 함께
+            // 처리할 수 있으며, 프리팹에 중복 Localization 필드를 추가할 필요도 없다.
+            LocalizedTextReference elapsedFormat = null;
+            if (elapsedTimeText.TryGetComponent(out LocalizedTMPText staticLocalizer))
             {
-                elapsedTimeText.text = formatted;
+                elapsedFormat = staticLocalizer.TextReference;
+                staticLocalizer.enabled = false;
+            }
+
+            usesDayOrMoreText = !TryFormatElapsedTime(elapsedSeconds, out string formatted);
+            elapsedTimeFallback = usesDayOrMoreText
+                ? FormatElapsedTimeWithoutDayLimit(elapsedSeconds)
+                : formatted;
+            localizedElapsedFormat = null;
+            localizedDayOrMoreText = null;
+            RefreshElapsedTimeText();
+
+            if (elapsedFormat != null && elapsedFormat.HasReference)
+            {
+                boundElapsedFormat = elapsedFormat;
+                boundElapsedFormat.StringChanged += ApplyLocalizedElapsedFormat;
+            }
+
+            if (!usesDayOrMoreText) return;
+
+            if (dayOrMoreText != null && dayOrMoreText.HasReference)
+            {
+                boundDayOrMoreText = dayOrMoreText;
+                boundDayOrMoreText.StringChanged += ApplyLocalizedDayOrMoreText;
                 return;
             }
 
-            elapsedTimeText.text = string.Empty;
-            if (dayOrMoreText == null || !dayOrMoreText.HasReference)
-            {
-                Debug.LogWarning("[DungeonResultPanel] 24시간 이상 문구(01_UI / 38)가 연결되지 않았습니다.", this);
-                return;
-            }
-
-            boundElapsedText = dayOrMoreText;
-            boundElapsedText.StringChanged += ApplyLocalizedElapsedText;
+            Debug.LogWarning("[DungeonResultPanel] 24시간 이상 문구(01_UI / 38)가 연결되지 않아 " +
+                             "시간 값 자체를 표시합니다.", this);
         }
 
         private void BindDungeonName(DungeonDefinition dungeon)
@@ -160,9 +197,26 @@ namespace Dungeon
             if (dungeonNameText != null) dungeonNameText.text = value;
         }
 
-        private void ApplyLocalizedElapsedText(string value)
+        private void ApplyLocalizedElapsedFormat(string value)
         {
-            if (elapsedTimeText != null) elapsedTimeText.text = value;
+            localizedElapsedFormat = value;
+            RefreshElapsedTimeText();
+        }
+
+        private void ApplyLocalizedDayOrMoreText(string value)
+        {
+            localizedDayOrMoreText = value;
+            RefreshElapsedTimeText();
+        }
+
+        private void RefreshElapsedTimeText()
+        {
+            if (elapsedTimeText == null) return;
+
+            string value = usesDayOrMoreText && !string.IsNullOrEmpty(localizedDayOrMoreText)
+                ? localizedDayOrMoreText
+                : elapsedTimeFallback;
+            elapsedTimeText.text = ApplyElapsedFormat(localizedElapsedFormat, value);
         }
 
         private void UnbindLocalizedText()
@@ -173,11 +227,22 @@ namespace Dungeon
                 boundDungeonName = null;
             }
 
-            if (boundElapsedText != null)
+            if (boundElapsedFormat != null)
             {
-                boundElapsedText.StringChanged -= ApplyLocalizedElapsedText;
-                boundElapsedText = null;
+                boundElapsedFormat.StringChanged -= ApplyLocalizedElapsedFormat;
+                boundElapsedFormat = null;
             }
+
+            if (boundDayOrMoreText != null)
+            {
+                boundDayOrMoreText.StringChanged -= ApplyLocalizedDayOrMoreText;
+                boundDayOrMoreText = null;
+            }
+
+            localizedElapsedFormat = null;
+            localizedDayOrMoreText = null;
+            elapsedTimeFallback = null;
+            usesDayOrMoreText = false;
         }
 
         private void ClearRewardItems()
@@ -221,6 +286,19 @@ namespace Dungeon
         {
             if (double.IsNaN(value) || double.IsInfinity(value) || value <= 0d) return 0d;
             return value;
+        }
+
+        private static string FormatElapsedTimeWithoutDayLimit(double elapsedSeconds)
+        {
+            double normalized = NormalizeElapsedSeconds(elapsedSeconds);
+            long totalSeconds = normalized >= long.MaxValue
+                ? long.MaxValue
+                : (long)Math.Floor(normalized);
+            long hours = totalSeconds / 3600L;
+            long minutes = totalSeconds % 3600L / 60L;
+            long seconds = totalSeconds % 60L;
+            return string.Format(
+                CultureInfo.InvariantCulture, "{0:00}:{1:00}:{2:00}", hours, minutes, seconds);
         }
     }
 }
