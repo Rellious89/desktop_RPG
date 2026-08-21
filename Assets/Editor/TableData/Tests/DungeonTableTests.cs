@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using Common;
 using Dungeon;
+using Inventory;
 using NUnit.Framework;
 using UnityEditor;
 
@@ -211,6 +212,64 @@ namespace TableDataEditor.Tests
             {
                 Assert.IsTrue(snapshot.DungeonsById.ContainsKey(i.ToString()),
                     $"던전 ID '{i}'이 스냅샷에 없습니다.");
+            }
+        }
+
+        /// <summary>
+        /// 아홉 던전의 대표 보상은 <b>정해진 값</b>이다. 앞의 여섯(애니멀랜드/판타지아)은 세 종류,
+        /// 망자의 도시 셋은 그 앞에 50000이 하나 더 붙는다 - 표를 손볼 때 어느 던전의 보상이 조용히
+        /// 달라지는 것을 막기 위해 값 자체를 여기에 적어 둔다.
+        /// </summary>
+        private static readonly string[] EarlyWorldRewardItemIds = { "50002", "50003", "50004" };
+
+        private static readonly string[] DeadCityRewardItemIds = { "50000", "50002", "50003", "50004" };
+
+        private static string[] ExpectedRewardItemIds(string dungeonId)
+        {
+            return int.Parse(dungeonId) <= 6 ? EarlyWorldRewardItemIds : DeadCityRewardItemIds;
+        }
+
+        [Test]
+        public void LiveCsv_AllNineRowsHaveTheAgreedRewardItemIds()
+        {
+            TableDataSnapshot snapshot = Live().Snapshot;
+            Assert.IsNotNull(snapshot, Live().Summary);
+            Assert.AreEqual(9, snapshot.Dungeons.Count);
+
+            foreach (DungeonRow row in snapshot.Dungeons)
+            {
+                CollectionAssert.AreEqual(ExpectedRewardItemIds(row.Id), row.RewardItemIds,
+                    $"던전 '{row.Id}'(CSV {row.Line}행)의 reward_item_ids가 약속한 값과 다릅니다.");
+            }
+        }
+
+        [Test]
+        public void GeneratedDefinitions_HaveRewardItemsMatchingCsv()
+        {
+            TableDataSnapshot snapshot = Live().Snapshot;
+            Assert.IsNotNull(snapshot, "여덟 표가 모두 읽혀야 스냅샷이 만들어진다: " + Live().Summary);
+            Assert.AreEqual(9, snapshot.Dungeons.Count);
+
+            foreach (DungeonRow row in snapshot.Dungeons)
+            {
+                string path = TableDataPaths.DungeonAssetPath(row.Id);
+                var definition = AssetDatabase.LoadAssetAtPath<DungeonDefinition>(path);
+                Assert.IsNotNull(definition, $"생성 에셋 '{path}'가 없습니다.");
+
+                string[] expected = ExpectedRewardItemIds(row.Id);
+                Assert.AreEqual(expected.Length, definition.RewardItems.Count,
+                    $"던전 '{row.Id}'의 대표 보상 개수가 CSV와 다릅니다.");
+
+                for (int i = 0; i < expected.Length; i++)
+                {
+                    // 프로젝트를 뒤져 찾은 아이템이 아니라 <b>Item 표가 만든 그 에셋</b>이어야 한다 -
+                    // 표 밖의 에셋을 가리키면 "CSV에 없는 보상"이 생긴다.
+                    var item = AssetDatabase.LoadAssetAtPath<ItemDefinition>(
+                        TableDataPaths.ItemAssetPath(expected[i]));
+                    Assert.IsNotNull(item, $"아이템 생성 에셋이 없습니다: {expected[i]}");
+                    Assert.AreSame(item, definition.RewardItems[i],
+                        $"던전 '{row.Id}'의 {i}번째 대표 보상이 Item 생성 에셋 '{expected[i]}'가 아닙니다.");
+                }
             }
         }
 

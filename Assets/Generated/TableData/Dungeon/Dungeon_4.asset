@@ -28,7 +28,10 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 5fc7227cf15f34aeab2816ab6f5ead2e, type: 2}
   - {fileID: 11400000, guid: 4db51d9371d3144f9bf18a5fbe24eec5, type: 2}
   - {fileID: 11400000, guid: 8daf2b2fd616f49e9ac1505f2a26a95e, type: 2}
-  rewardItems: []
+  rewardItems:
+  - {fileID: 11400000, guid: 7f57e18d4d07d440590e07db76470d0d, type: 2}
+  - {fileID: 11400000, guid: 77309d45b7b2343be8d600751716d1ae, type: 2}
+  - {fileID: 11400000, guid: c8030cc5dbcc24f638d72ed351c46977, type: 2}
   requiredCharacterLevel: 1
   displayOrder: 40
   references:
