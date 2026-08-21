@@ -434,7 +434,7 @@ namespace DungeonEditor.Tests
         }
 
         [Test]
-        public void ProductionPrefab_RootSizeRemains164x40()
+        public void ProductionPrefab_RootSizeRemains78x20()
         {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
             Assert.IsNotNull(prefab);
