@@ -151,7 +151,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 8207294704640000
-    m_Localized: Time - HH:mm:ss
+    m_Localized: "\uC9C4\uD589\uC2DC\uAC04 - HH:mm:ss"
     m_Metadata:
       m_Items: []
   - m_Id: 8207294704640001
@@ -167,7 +167,11 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 8207294704640004
-    m_Localized: 1 day or more
+    m_Localized: "1\uC77C \uC774\uC0C1"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 8673623974862848
+    m_Localized: Information
     m_Metadata:
       m_Items: []
   references:

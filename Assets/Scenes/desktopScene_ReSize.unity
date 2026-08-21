@@ -9187,7 +9187,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   outlineMaterial: {fileID: 2100000, guid: 28fe963341404f3494b9547affafbe5c, type: 2}
   outlineEnabled: 1
-  outlineColor: {r: 0, g: 0, b: 0, a: 0.85}
+  outlineColor: {r: 1, g: 1, b: 1, a: 0.85}
   outlineWidth: 1
 --- !u!114 &1900000011
 MonoBehaviour:
