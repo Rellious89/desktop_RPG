@@ -35,6 +35,10 @@ namespace Inventory
         [Tooltip("화면에 표시할 아이템 이름. 카테고리 번호 + 숫자 키로 지정한다.")]
         [SerializeField] private LocalizedTextReference localizedName = new LocalizedTextReference();
 
+        [Tooltip("아이템 툴팁에 표시할 설명. 이름과 같은 카테고리이며 숫자 키는 이름 키 + 10000이다 " +
+                 "- Item.csv 임포터가 그 규칙을 검사한 뒤에만 여기에 값을 쓴다.")]
+        [SerializeField] private LocalizedTextReference localizedDescription = new LocalizedTextReference();
+
         [Header("Presentation")]
         [Tooltip("인벤토리 슬롯(sp_ItemIcon)에 표시할 아이콘. 비어 있으면 슬롯은 아이콘 없이 " +
                  "수량만 보여준다.")]
@@ -64,6 +68,16 @@ namespace Inventory
 
         /// <summary>아이템 이름의 Table/Key가 지정되어 있는지 여부(번역 값의 존재를 보장하지는 않는다).</summary>
         public bool HasLocalizedName => localizedName != null && localizedName.HasReference;
+
+        /// <summary>아이템 설명 참조. 이름과 같은 규칙으로 <b>절대 null을 돌려주지 않는다</b> -
+        /// 참조가 비어 있을 수는 있어도 객체 자체는 항상 있다. 툴팁이 구독해서 현재 Locale 문자열을 받는다.</summary>
+        public LocalizedTextReference LocalizedDescription =>
+            localizedDescription ?? (localizedDescription = new LocalizedTextReference());
+
+        /// <summary>아이템 설명의 Table/Key가 지정되어 있는지 여부(번역 값의 존재를 보장하지는 않는다).
+        /// 활성 아이템은 CSV 검증에서 설명을 요구하므로 여기서 false가 나오는 것은 비활성 아이템이거나
+        /// 손으로 만든 정의라는 뜻이다.</summary>
+        public bool HasLocalizedDescription => localizedDescription != null && localizedDescription.HasReference;
 
         public Sprite Icon => icon;
 

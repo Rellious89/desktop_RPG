@@ -521,6 +521,8 @@ namespace TableDataEditor
         /// item_id는 <b>저장 파일의 키</b>라 여기서 쓰는 값이 CSV에 적힌 것과 한 글자도 달라서는 안 된다
         /// (검증이 다듬지 않은 값을 그대로 통과시켰으므로 그대로 쓴다). 사람이 손으로 채우던
         /// <c>displayName</c>은 임포터의 관심사가 아니라 건드리지 않는다 - 이름의 원천은 localizedName이다.
+        /// 설명 참조도 이름과 같은 규칙으로 쓴다 - 지정이 없으면 <b>비운다</b>(예전 값이 남으면 지운
+        /// 설명이 툴팁에 계속 나온다).
         /// </summary>
         private static void WriteItem(ItemDefinition asset, ItemRow row)
         {
@@ -529,6 +531,7 @@ namespace TableDataEditor
             serialized.FindProperty("displayOrder").intValue = row.DisplayOrder;
             serialized.FindProperty("icon").objectReferenceValue = row.Icon;
             ApplyLocalizedName(serialized.FindProperty("localizedName"), row.Name);
+            ApplyLocalizedName(serialized.FindProperty("localizedDescription"), row.Description);
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(asset);
         }
@@ -804,7 +807,8 @@ namespace TableDataEditor
             bool ok = true;
             ok &= VerifyFields<WorldDefinition>(log, "worldId", "localizedName", "displayOrder");
             ok &= VerifyFields<CurrencyDefinition>(log, "currencyId", "localizedName", "icon", "displayOrder");
-            ok &= VerifyFields<ItemDefinition>(log, "itemId", "localizedName", "icon", "displayOrder");
+            ok &= VerifyFields<ItemDefinition>(log, "itemId", "localizedName", "localizedDescription", "icon",
+                "displayOrder");
             ok &= VerifyFields<MonsterDefinition>(log, "monsterId", "baseMonsterId", "localizedName", "world",
                 "motionProfile", "previewSprite", "maxDurability", DropsField,
                 CurrencyField, CurrencyAmountMinField, CurrencyAmountMaxField, "displayOrder");

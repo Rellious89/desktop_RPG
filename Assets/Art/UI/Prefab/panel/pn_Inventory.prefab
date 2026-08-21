@@ -840,6 +840,7 @@ GameObject:
   - component: {fileID: 7989393940918023634}
   - component: {fileID: 5327538711147503284}
   - component: {fileID: 6991062175229860006}
+  - component: {fileID: 1642738905530417362}
   m_Layer: 5
   m_Name: pn_Inventory
   m_TagString: Untagged
@@ -914,6 +915,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   receiveMouseInput: 1
+--- !u!114 &1642738905530417362
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4080729873112905017}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9771ba5eeb594eae833c8909e135d504, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  tooltipPrefab: {fileID: 1189608051827806352, guid: e6aac7b0ae9904b669ad676fa28357c0, type: 3}
+  tooltipRoot: {fileID: 0}
+  tooltipDelay: 0
+  horizontalOffset: 8
 --- !u!1 &4545504779047233088
 GameObject:
   m_ObjectHideFlags: 0

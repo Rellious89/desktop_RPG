@@ -38,8 +38,12 @@ namespace TableDataEditor
         /// 않는 이유는 UI 팩의 이미지들이 서로 다른 폴더에 같은 파일 이름으로 들어 있어서, 전역 탐색은
         /// "이름이 겹쳐 정할 수 없다"만 돌려주기 때문이다 - 아이템 아이콘은 이 폴더에 두는 것을 규칙으로
         /// 삼고, 여기 없는 이름은 없는 것으로 본다.
+        ///
+        /// <b>값이 실제 아이콘이 놓인 자리를 가리켜야 한다.</b> 아이템 아이콘은 UI 아트와 함께
+        /// <c>Assets/Art/UI/Item</c>에 들어 있고, 임포터는 폴더를 만들지도 아이콘을 옮기지도 않는다 -
+        /// 자산의 자리는 사람이 정하고 이 상수는 그 자리를 따라간다.
         /// </summary>
-        public const string ItemIconRoot = "Assets/Art/Item";
+        public const string ItemIconRoot = "Assets/Art/UI/Item";
 
         /// <summary>
         /// 재화 아이콘을 찾는 <b>유일한</b> 폴더. <see cref="ItemIconRoot"/>와 같은 이유로 전역 탐색을

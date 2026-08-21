@@ -26,12 +26,18 @@ namespace TableDataEditor
         };
 
         // Item.csv
+        //
+        // 사람이 읽는 이름과 설명은 <c>$item_name</c> / <c>$item_description</c>이라는 참조 컬럼으로
+        // 따로 두며 여기 넣지 않는다 - 넣으면 필수 컬럼이 되고 임포터가 값을 읽는 칸처럼 보인다.
+        // description_category / description_key는 Skill.csv와 <b>같은 상수</b>를 쓴다(아래 Skill.csv
+        // 절에 정의) - 두 표가 같은 뜻의 칸을 가리키므로 이름을 두 번 적어 두면 한쪽만 고쳐질 수 있다.
         public const string ItemId = "item_id";
         public const string IconKey = "icon_key";
 
         public static readonly string[] Item =
         {
-            ItemId, NameCategory, NameKey, IconKey, DisplayOrder, Enabled, Memo,
+            ItemId, NameCategory, NameKey, DescriptionCategory, DescriptionKey, IconKey,
+            DisplayOrder, Enabled, Memo,
         };
 
         // Currency.csv

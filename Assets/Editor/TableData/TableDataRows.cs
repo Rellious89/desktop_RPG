@@ -61,6 +61,13 @@ namespace TableDataEditor
         public string Id = string.Empty;
         public LocalizedEntryRef Name;
 
+        /// <summary>
+        /// 아이템 툴팁에 그릴 설명 참조. <b>활성 행에서는 이름과 함께 반드시 있어야 한다</b> -
+        /// 툴팁은 이름과 설명 두 줄이 모두 있어야 성립하므로, 한쪽만 있는 상태를 "설명이 아직 없는
+        /// 정상"으로 두지 않는다(Skill.csv의 설명이 끝까지 선택 항목인 것과 다른 점이다).
+        /// </summary>
+        public LocalizedEntryRef Description;
+
         /// <summary>인벤토리 슬롯에 그릴 아이콘. 비어 있어도 된다(수량만 표시된다).</summary>
         public Sprite Icon;
 

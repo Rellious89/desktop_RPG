@@ -101,7 +101,7 @@ namespace Common
                 if (i < items.Count)
                 {
                     InventoryManager.Entry entry = items[i];
-                    slot.SetItem(entry.Definition.Icon, entry.Count);
+                    slot.SetItem(entry.Definition, entry.Count);
                 }
                 else
                 {

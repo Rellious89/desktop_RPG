@@ -74,6 +74,14 @@ namespace TableDataEditor
         /// </summary>
         public const string EmptyIdLabel = "(빈 ID)";
 
+        /// <summary>
+        /// 아이템 설명의 숫자 키가 이름 키보다 얼마나 큰지. <b>데이터가 아니라 규칙</b>이라 코드에
+        /// 둔다 - 표마다 다른 간격을 쓰기 시작하면 "이 아이템의 설명은 어디에 있는가"를 행마다 다시
+        /// 확인해야 한다. 04_Item의 이름이 1..N, 설명이 10001..10000+N인 지금 저작 방식이 그대로
+        /// 이 숫자다.
+        /// </summary>
+        public const int ItemDescriptionKeyOffset = 10000;
+
         /// <summary>메뉴와 테스트가 함께 쓰는 진입점. 부작용이 전혀 없다.
         /// 생성 에셋 쪽 점검까지 <b>여덟 도메인 전부</b>를 본다(기존 동작 그대로).</summary>
         public static TableDataValidationResult Validate()
@@ -365,10 +373,7 @@ namespace TableDataEditor
                     TableDataFieldRules.CheckDuplicateDisplayOrder(file, line, order, displayOrders, log);
                 }
 
-                // 아이템 이름은 Monster와 같은 선택 항목이다 - 인벤토리 슬롯은 아이콘과 수량만 그리므로
-                // 이름이 비어 있어도 표시가 성립한다. 반쪽만 채워진 것은 실수일 가능성이 높아 경고한다.
-                row.Name = ReadLocalizedName(
-                    table, record, file, line, row.Enabled, nameRequiredWhenEnabled: false, log);
+                ReadItemLocalizedTexts(table, record, file, line, row, log);
 
                 ReadIcon(table, record, file, line, assets, row, log);
 
@@ -377,6 +382,135 @@ namespace TableDataEditor
                 snapshot.Items.Add(row);
                 snapshot.ItemsById[row.Id] = row;
             }
+        }
+
+        /// <summary>
+        /// 아이템의 이름/설명 두 참조를 <b>한 덩어리로</b> 읽는다. 툴팁이 이름과 설명 두 줄로
+        /// 이루어지므로, 활성 아이템에서 한쪽만 있는 상태는 "아직 안 적었다"가 아니라 반쪽만 그려지는
+        /// 화면이다 - 그래서 enabled=1인 행은 <b>둘 다</b> 요구한다.
+        ///
+        /// 두 참조는 서로 독립이 아니다. 같은 아이템의 이름과 설명은 <b>같은 카테고리</b>에 있고,
+        /// 설명의 숫자 키는 이름 키에 <see cref="ItemDescriptionKeyOffset"/>을 더한 값이다 - 이 규칙을
+        /// 검사하지 않으면 엉뚱한 아이템의 설명을 가리키는 행이 조용히 통과한다. 존재 여부는
+        /// <see cref="TableDataFieldRules.TryResolveLocalizedEntry"/>가 이미 보므로 여기서는
+        /// <b>두 칸의 관계만</b> 본다.
+        /// </summary>
+        private static void ReadItemLocalizedTexts(
+            CsvTable table, CsvRecord record, string file, int line, ItemRow row, TableDataDiagnosticLog log)
+        {
+            // 이름은 활성 행의 필수 항목이다 - 인벤토리 슬롯과 툴팁이 모두 이 값을 그린다.
+            row.Name = ReadLocalizedName(
+                table, record, file, line, row.Enabled, nameRequiredWhenEnabled: true, log);
+
+            row.Description = ReadItemDescription(table, record, file, line, row.Enabled, log);
+
+            CheckItemDescriptionKeyRule(table, record, file, line, log);
+        }
+
+        /// <summary>
+        /// description_category / description_key 두 칸. 판정은 이름 칸과 같은 모양이지만
+        /// <see cref="ReadOptionalLocalizedPair"/>와 달리 <b>활성 행에서는 필수</b>라 따로 둔다 -
+        /// 두 규칙을 한 함수에 매개변수로 섞으면 어느 표가 무엇을 요구하는지가 호출부에서만 보인다.
+        /// </summary>
+        private static LocalizedEntryRef ReadItemDescription(
+            CsvTable table, CsvRecord record, string file, int line, bool enabled, TableDataDiagnosticLog log)
+        {
+            string categoryRaw = table.Get(record, TableDataColumns.DescriptionCategory);
+            string keyRaw = table.Get(record, TableDataColumns.DescriptionKey);
+
+            bool hasCategory = !string.IsNullOrEmpty(categoryRaw);
+            bool hasKey = !string.IsNullOrEmpty(keyRaw);
+
+            if (hasCategory && hasKey)
+            {
+                TableDataFieldRules.TryResolveLocalizedEntry(
+                    file, line, TableDataColumns.DescriptionCategory, categoryRaw,
+                    TableDataColumns.DescriptionKey, keyRaw, log, out LocalizedEntryRef entry);
+                return entry;
+            }
+
+            if (!hasCategory && !hasKey)
+            {
+                if (enabled)
+                {
+                    log.Error(file, line, TableDataColumns.DescriptionCategory, categoryRaw,
+                        "enabled=1인 행은 description_category와 description_key가 모두 필요합니다 - " +
+                        "아이템 툴팁은 이름과 설명 두 줄로 이루어집니다.");
+                }
+                else
+                {
+                    log.Warning(file, line, TableDataColumns.DescriptionCategory, categoryRaw,
+                        "설명 참조가 비어 있습니다 - 툴팁이 설명 없이 표시됩니다(비활성 행이라 경고입니다).");
+                }
+
+                return LocalizedEntryRef.None;
+            }
+
+            string emptyColumn = hasCategory ? TableDataColumns.DescriptionKey : TableDataColumns.DescriptionCategory;
+            string emptyValue = hasCategory ? keyRaw : categoryRaw;
+
+            log.Error(file, line, emptyColumn, emptyValue,
+                "description_category와 description_key는 함께 있어야 합니다 - " +
+                "한쪽만으로는 참조를 만들 수 없습니다.");
+
+            return LocalizedEntryRef.None;
+        }
+
+        /// <summary>
+        /// 이름 키와 설명 키의 <b>관계</b>만 본다. 네 칸 중 하나라도 비어 있거나 숫자로 읽히지 않으면
+        /// 아무것도 알리지 않고 돌아간다 - 그 문제는 각 칸을 읽은 쪽이 이미 보고했고, 여기서 한 번 더
+        /// 말하면 원인 하나에 오류 두 줄이 나온다.
+        ///
+        /// 더하기는 <c>checked</c>로 한다. <c>int.MaxValue</c>에 가까운 name_key가 들어오면 그냥
+        /// 더한 값은 음수로 감싸 돌아가고, 그 음수가 우연히 description_key와 같을 수는 없더라도
+        /// <b>"왜 틀렸는지"가 아니라 엉뚱한 기대값이 오류 메시지에 찍힌다</b>.
+        /// </summary>
+        private static void CheckItemDescriptionKeyRule(
+            CsvTable table, CsvRecord record, string file, int line, TableDataDiagnosticLog log)
+        {
+            if (!TryReadKeyNumber(table.Get(record, TableDataColumns.NameCategory), out int nameCategory)) return;
+            if (!TryReadKeyNumber(table.Get(record, TableDataColumns.NameKey), out int nameKey)) return;
+            if (!TryReadKeyNumber(table.Get(record, TableDataColumns.DescriptionCategory), out int descCategory)) return;
+            if (!TryReadKeyNumber(table.Get(record, TableDataColumns.DescriptionKey), out int descKey)) return;
+
+            if (nameCategory != descCategory)
+            {
+                log.Error(file, line, TableDataColumns.DescriptionCategory,
+                    table.Get(record, TableDataColumns.DescriptionCategory),
+                    $"설명은 이름과 같은 카테고리여야 합니다(name_category {nameCategory}, " +
+                    $"description_category {descCategory}) - 한 아이템의 이름과 설명이 서로 다른 " +
+                    "String Table에 흩어지지 않게 합니다.");
+                return;
+            }
+
+            int expectedKey;
+            try
+            {
+                expectedKey = checked(nameKey + ItemDescriptionKeyOffset);
+            }
+            catch (OverflowException)
+            {
+                log.Error(file, line, TableDataColumns.NameKey, table.Get(record, TableDataColumns.NameKey),
+                    $"name_key에 {ItemDescriptionKeyOffset}을 더하면 정수 범위를 넘어 설명 키를 만들 수 " +
+                    "없습니다 - 이름 키를 더 작은 값으로 바꾸세요.");
+                return;
+            }
+
+            if (descKey == expectedKey) return;
+
+            log.Error(file, line, TableDataColumns.DescriptionKey, table.Get(record, TableDataColumns.DescriptionKey),
+                $"description_key는 name_key + {ItemDescriptionKeyOffset}이어야 합니다" +
+                $"(name_key {nameKey}이므로 {expectedKey}) - 지금 값은 {descKey}입니다.");
+        }
+
+        /// <summary>
+        /// 카테고리/숫자 키 칸을 <b>관계 검사를 할 수 있을 때만</b> 숫자로 돌려준다. 형식이 어긋나면
+        /// false다 - <see cref="TableDataFieldRules.TryResolveLocalizedEntry"/>가 같은 값을 같은 규칙
+        /// (부호 없는 정수, 1 이상)으로 이미 보고 오류를 남겼기 때문에 여기서는 조용히 물러난다.
+        /// </summary>
+        private static bool TryReadKeyNumber(string raw, out int value)
+        {
+            return int.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out value) && value > 0;
         }
 
         private static void CheckManualItemConflict(
