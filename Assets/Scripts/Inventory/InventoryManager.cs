@@ -446,6 +446,148 @@ namespace Inventory
             InventoryChanged?.Invoke();
         }
 
+        // ---- 비용 지불 ----
+        //
+        // 재화만 내는 경로(TrySpendCurrency)와 달리, 아래 두 메서드는 재화와 아이템 여러 종을 한
+        // 덩어리로 다룬다. 판정을 전부 끝낸 뒤에만 값을 건드리므로 "재화는 빠졌는데 아이템이 모자라
+        // 실패" 같은 중간 상태가 생기지 않는다.
+        //
+        // 소비를 AddItem(음수)로 만들지 않는 이유는 TrySpendCurrency가 AddCurrency(음수)를 쓰지 않는
+        // 이유와 같다 - 그쪽은 결과를 0/포화로 자르기 때문에 3개를 가진 아이템에서 5개를 내면
+        // "성공한 것처럼" 0개가 된다(부분 지불). 비용은 전부 내거나 하나도 내지 않거나 둘 중 하나다.
+
+        /// <summary>
+        /// 이 비용을 지금 낼 수 있는지 <b>판정만</b> 한다 - 저장 항목을 만들지도, 값을 바꾸지도,
+        /// 캐시를 더럽히지도, 저장하지도, <see cref="InventoryChanged"/>나 <see cref="RewardApplied"/>를
+        /// 보내지도 않는다. 몇 번을 불러도 결과가 같다.
+        ///
+        /// UI가 "낼 수 있음/부족함"을 그리는 자리에서 쓰는 경로이며, 실제 지불은
+        /// <see cref="TrySpendCost"/>가 처음부터 다시 판정한다 - 이 결과를 근거로 차감하는 경로는
+        /// 만들지 않는다(판정과 지불 사이에 값이 바뀔 수 있다).
+        /// </summary>
+        public InventoryCostResult EvaluateCost(InventoryCostRequest request)
+        {
+            return EvaluateCost(request, new List<InventoryItemRequirement>());
+        }
+
+        /// <summary>
+        /// 비용을 <b>원자적으로</b> 낸다. 먼저 전부 판정하고, 하나라도 통과하지 못하면 재화도 아이템도
+        /// <b>전혀 건드리지 않은 채</b> 실패 이유를 돌려준다(저장 0회, <see cref="InventoryChanged"/>
+        /// 0회). 통과했을 때만 재화와 모든 아이템을 함께 빼고 <b>저장 1회, 알림 1회</b>로 끝낸다.
+        ///
+        /// 수량이 정확히 0이 된 아이템은 저장 항목째 지워지고, 남은 항목들은 순서도 값도 그대로다 -
+        /// 표시 순서가 "처음 획득한 순서"라는 규칙이 소비 때문에 흔들리지 않는다.
+        ///
+        /// <see cref="RewardApplied"/>는 <b>절대</b> 발생하지 않는다. 그 이벤트는 지급 전용이며,
+        /// 비용 지불을 "음수 보상"으로 흘려보내면 보상 연출이 소비에서도 뜬다.
+        ///
+        /// 비용이 아예 없는 요청(재화 0, 유효한 아이템 0칸)은 성공이지만 저장도 알림도 하지 않는다.
+        /// </summary>
+        public InventoryCostResult TrySpendCost(InventoryCostRequest request)
+        {
+            var requirements = new List<InventoryItemRequirement>();
+            InventoryCostResult evaluation = EvaluateCost(request, requirements);
+            if (!evaluation.Success) return evaluation;
+
+            bool changed = false;
+
+            if (request.Currency > 0)
+            {
+                // 판정을 통과했으므로 여기서 실패할 수 없다. 그래도 반환값을 버리지 않는 것은, 만약
+                // 실패한다면 아이템은 아직 하나도 건드리지 않은 시점이라 그대로 빠져나가는 것이
+                // 유일하게 안전한 처리이기 때문이다(재화 차감 경로는 실패 시 값을 바꾸지 않는다).
+                if (!TrySpendCurrencyWithoutSave(request.Currency))
+                {
+                    return InventoryCostResult.InsufficientCurrency(request.Currency, SaveSystem.Data.currency);
+                }
+                changed = true;
+            }
+
+            for (int i = 0; i < requirements.Count; i++)
+            {
+                SpendItemWithoutSave(requirements[i].ItemId, requirements[i].Count);
+                changed = true;
+            }
+
+            if (changed) SaveAndNotify();
+            return evaluation;
+        }
+
+        /// <summary>
+        /// 판정 본체. 성공하면 <paramref name="requirements"/>에 같은 Id끼리 합산이 끝난 요구 목록이
+        /// 남고, 지불 경로는 <b>이 목록 그대로</b> 차감한다 - 판정이 본 것과 차감하는 것이 어긋날
+        /// 자리를 만들지 않기 위해 정규화를 두 번 하지 않는다. 실패하면 목록을 비워, 통과하지 못한
+        /// 요구가 실수로 차감에 쓰일 수 없게 한다.
+        /// </summary>
+        private InventoryCostResult EvaluateCost(
+            InventoryCostRequest request, List<InventoryItemRequirement> requirements)
+        {
+            InventoryCostResult result = EvaluateNormalizedCost(request, requirements);
+            if (!result.Success) requirements.Clear();
+            return result;
+        }
+
+        /// <summary>
+        /// 판정 순서는 구조 → 등록 여부 → 재화 → 아이템이다. 잔액 부족이 "요청 자체가 잘못됐다"나
+        /// "카탈로그에 없는 아이템"을 가리면 원인을 찾기 어렵기 때문에, 보유량과 무관한 오류부터
+        /// 확정한다. 같은 이유로 아이템 부족은 정규화된 순서상 <b>처음 모자란 것</b>을 돌려준다 -
+        /// 같은 요청이면 언제나 같은 답이 나온다.
+        /// </summary>
+        private InventoryCostResult EvaluateNormalizedCost(
+            InventoryCostRequest request, List<InventoryItemRequirement> requirements)
+        {
+            requirements.Clear();
+
+            if (request == null) return InventoryCostResult.Invalid(string.Empty);
+
+            if (!request.TryNormalize(requirements, out string offendingItemId))
+                return InventoryCostResult.Invalid(offendingItemId);
+
+            for (int i = 0; i < requirements.Count; i++)
+            {
+                // 정의 에셋이 아니라 Id로 대조한다 - 저장 항목의 키가 Id이므로, 같은 Id를 가진 다른
+                // 정의 인스턴스를 넘겨도 가리키는 저장 항목은 하나다.
+                if (definitionsById.ContainsKey(requirements[i].ItemId)) continue;
+
+                return InventoryCostResult.UnknownItem(requirements[i].ItemId, requirements[i].Count);
+            }
+
+            if (request.Currency > 0 && SaveSystem.Data.currency < request.Currency)
+                return InventoryCostResult.InsufficientCurrency(request.Currency, SaveSystem.Data.currency);
+
+            for (int i = 0; i < requirements.Count; i++)
+            {
+                int held = GetItemCount(requirements[i].ItemId);
+                if (held >= requirements[i].Count) continue;
+
+                return InventoryCostResult.InsufficientItem(requirements[i].ItemId, requirements[i].Count, held);
+            }
+
+            return InventoryCostResult.Payable;
+        }
+
+        /// <summary>
+        /// 아이템 하나를 저장 데이터에서 뺀다(저장/알림 없음). 판정을 통과한 뒤에만 불리므로 보유량이
+        /// 모자랄 수 없고, 정확히 0이 되면 <b>항목 자체를 지운다</b> - 수량 0짜리 유령 항목이 저장
+        /// 파일에 쌓이지 않게 한다. 나머지 항목은 앞으로 당겨질 뿐 서로의 순서가 바뀌지 않는다.
+        ///
+        /// 대조는 <see cref="GetItemCount"/>와 똑같이 <b>처음 일치하는 항목 하나</b>만 본다 - 손상된
+        /// 저장 파일에 같은 Id가 두 줄 있어도 판정이 본 그 줄에서 빠진다.
+        /// </summary>
+        private void SpendItemWithoutSave(string itemId, int count)
+        {
+            List<InventoryItemState> states = SaveSystem.Data.items;
+            for (int i = 0; i < states.Count; i++)
+            {
+                if (states[i] == null || states[i].itemId != itemId) continue;
+
+                int remaining = states[i].count - count;
+                if (remaining == 0) states.RemoveAt(i);
+                else states[i].count = remaining;
+                return;
+            }
+        }
+
         /// <summary>
         /// 메모리의 재화 값만 바꾼다(저장/알림 없음). 실제로 값이 달라졌으면 true.
         ///
