@@ -3,12 +3,15 @@ using System.Collections.Generic;
 using System.Reflection;
 using Common;
 using DesktopWindow;
+using Dungeon;
 using Inventory;
 using NUnit.Framework;
 using TMPro;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace CommonEditor.Tests
@@ -20,11 +23,15 @@ namespace CommonEditor.Tests
     /// 값(위치, 폰트, 색, Layout)은 이 시험의 관심사가 아니고, 확인하는 것은 "스크립트가 무엇을
     /// 가리키는가"와 "입력을 받지 않는가"처럼 <b>코드가 기대하는 구조</b>뿐이다.
     ///
-    /// <b>런타임 동작은 메모리 위의 Canvas에서 확인한다.</b> 씬을 열지도 Play Mode에 들어가지도 않고,
-    /// 프리팹을 Instantiate해 실제 컴포넌트를 그대로 돌린다 - 만든 오브젝트는 전부 TearDown에서
-    /// 지운다. 로컬라이징 문자열은 비동기라 EditMode에서 도착을 기다릴 수 없으므로, <b>참조가 없는
+    /// <b>런타임 동작은 메모리 위의 Canvas에서 확인한다.</b> Play Mode에 들어가지 않고 프리팹을
+    /// Instantiate해 실제 컴포넌트를 그대로 돌린다 - 만든 오브젝트는 전부 TearDown에서 지운다.
+    /// 로컬라이징 문자열은 비동기라 EditMode에서 도착을 기다릴 수 없으므로, <b>참조가 없는
     /// 아이템의 대체 경로</b>는 그대로 확인하고 <b>문자열이 도착했을 때의 경로</b>는 뷰의 콜백을
     /// 직접 불러 확인한다(구독 자체가 걸리고 풀리는지는 내부 플래그로 본다).
+    ///
+    /// <b>배선만은 씬을 열어서 본다.</b> 컨트롤러가 하나뿐이라는 것은 프리팹 하나로는 확인할 수 없는
+    /// 사실이고, 세 화면이 <b>같은</b> 컨트롤러에 닿는지도 셋이 함께 놓인 씬에서만 보인다. 씬은
+    /// Additive로 열고 <b>저장하지 않고</b> 닫으므로 프로젝트 파일은 바뀌지 않는다.
     /// </summary>
     public sealed class ItemTooltipTests
     {
@@ -32,6 +39,18 @@ namespace CommonEditor.Tests
         private const string InventoryPrefabPath = "Assets/Art/UI/Prefab/panel/pn_Inventory.prefab";
         private const string SlotPrefabPath = "Assets/Art/UI/Prefab/Inventory/list_item.prefab";
         private const string UiSharedDataPath = "Assets/Localization/Tables/01_UI/01_UI Shared Data.asset";
+
+        /// <summary>컨트롤러가 하나만 있어야 하는 자리. 툴팁의 주인은 패널이 아니라 <b>씬</b>이다.</summary>
+        private const string ScenePath = "Assets/Scenes/desktopScene_ReSize.unity";
+
+        private const string PanelUiObjectName = "Panel_UI";
+
+        /// <summary>던전 상세의 대표 보상 한 칸과 정산 결과의 아이템 한 줄. 인벤토리 슬롯과 함께
+        /// <b>같은</b> 컨트롤러를 쓰는 세 주인이다.</summary>
+        private const string RewardPreviewPrefabPath = "Assets/Art/UI/Prefab/Dungeon/item_DungeonReward.prefab";
+
+        private const string ResultRewardPrefabPath =
+            "Assets/Art/UI/Prefab/Dungeon/DungeonReward/item_DungeonResultReward.prefab";
 
         /// <summary>툴팁 제목이 가리켜야 하는 01_UI의 숫자 키("Information" / "아이템 정보").</summary>
         private const string TitleNumericKey = "39";
@@ -158,22 +177,107 @@ namespace CommonEditor.Tests
         }
 
         [Test]
-        public void InventoryPrefab_HasTheControllerWiredToTheTooltipPrefab()
+        public void InventoryPrefab_OwnsNoTooltipControllerOfItsOwn()
         {
             GameObject panel = LoadPrefab(InventoryPrefabPath);
 
-            var controller = panel.GetComponent<ItemTooltipController>();
-            Assert.IsNotNull(controller, "pn_Inventory 루트에 ItemTooltipController가 있어야 한다.");
+            Assert.AreEqual(0, panel.GetComponentsInChildren<ItemTooltipController>(true).Length,
+                "pn_Inventory는 자기 컨트롤러를 갖지 않는다 - 세 화면이 씬 Panel_UI의 하나를 함께 쓴다. " +
+                "패널마다 붙이면 툴팁 인스턴스가 패널 수만큼 생긴다.");
             Assert.IsNull(panel.GetComponent<HoverTooltipController>(),
                 "메뉴바 툴팁 컨트롤러를 다시 쓰지 않는다 - 아이템 툴팁은 전용 컨트롤러를 쓴다.");
+        }
 
-            var serialized = new SerializedObject(controller);
-            Assert.AreEqual(
-                AssetDatabase.LoadAssetAtPath<GameObject>(TooltipPrefabPath),
-                serialized.FindProperty("tooltipPrefab").objectReferenceValue,
-                "컨트롤러가 item_ToolTip 프리팹을 가리켜야 한다.");
-            Assert.AreEqual(0f, serialized.FindProperty("tooltipDelay").floatValue,
-                "인벤토리 툴팁의 기본 대기시간은 0(즉시)이다.");
+        // ---- 씬 배선: 컨트롤러는 하나뿐이고 세 화면이 함께 쓴다 (읽기 전용) ----
+
+        [Test]
+        public void Scene_PanelUiOwnsTheOnlyTooltipController()
+        {
+            Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Additive);
+            try
+            {
+                ItemTooltipController[] controllersInScene = ControllersIn(scene);
+                Assert.AreEqual(1, controllersInScene.Length,
+                    "씬의 ItemTooltipController는 정확히 하나여야 한다 - 둘이면 툴팁 인스턴스도 둘이 된다.");
+
+                ItemTooltipController controller = controllersInScene[0];
+                Assert.AreEqual(PanelUiObjectName, controller.gameObject.name,
+                    "컨트롤러는 Panel_UI가 소유한다 - 패널(pn_*)이 아니라 그 부모다.");
+
+                var serialized = new SerializedObject(controller);
+                Assert.AreEqual(
+                    AssetDatabase.LoadAssetAtPath<GameObject>(TooltipPrefabPath),
+                    serialized.FindProperty("tooltipPrefab").objectReferenceValue,
+                    "컨트롤러가 item_ToolTip 프리팹을 가리켜야 한다.");
+                Assert.AreSame(
+                    (RectTransform)controller.transform,
+                    serialized.FindProperty("tooltipRoot").objectReferenceValue,
+                    "툴팁을 붙일 부모는 Panel_UI 자신이어야 한다 - 패널 안쪽은 Mask 아래라 잘린다.");
+                Assert.AreEqual(0f, serialized.FindProperty("tooltipDelay").floatValue,
+                    "아이템 툴팁의 기본 대기시간은 0(즉시)이다.");
+            }
+            finally
+            {
+                EditorSceneManager.CloseScene(scene, true);
+            }
+        }
+
+        [Test]
+        public void Scene_EveryHoverOwnerResolvesTheSameSharedController()
+        {
+            Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Additive);
+            var spawned = new List<GameObject>();
+            try
+            {
+                ItemTooltipController[] controllersInScene = ControllersIn(scene);
+                Assert.AreEqual(1, controllersInScene.Length);
+                ItemTooltipController shared = controllersInScene[0];
+
+                InventorySlotView slot = Array.Find(
+                    UnityEngine.Object.FindObjectsOfType<InventorySlotView>(true),
+                    value => value.gameObject.scene == scene);
+                Assert.IsNotNull(slot, "씬의 pn_Inventory에 슬롯이 하나도 없습니다.");
+
+                var dungeonPanel = Array.Find(
+                    UnityEngine.Object.FindObjectsOfType<DungeonPanel>(true),
+                    value => value.gameObject.scene == scene);
+                Assert.IsNotNull(dungeonPanel, "씬에 pn_Dungeon이 없습니다.");
+
+                var resultPanel = Array.Find(
+                    UnityEngine.Object.FindObjectsOfType<DungeonResultPanel>(true),
+                    value => value.gameObject.scene == scene);
+                Assert.IsNotNull(resultPanel, "씬에 pn_DungeonResult가 없습니다.");
+
+                // 두 던전 칸은 런타임에 만들어지는 것이라 씬에 미리 놓여 있지 않다 - 실제와 같은 자리에
+                // 하나씩 만들어 부모 탐색이 같은 컨트롤러에 닿는지 본다.
+                GameObject preview = UnityEngine.Object.Instantiate(
+                    LoadPrefab(RewardPreviewPrefabPath), dungeonPanel.transform, false);
+                spawned.Add(preview);
+
+                GameObject resultItem = UnityEngine.Object.Instantiate(
+                    LoadPrefab(ResultRewardPrefabPath), resultPanel.transform, false);
+                spawned.Add(resultItem);
+
+                Assert.AreSame(shared, ItemTooltipController.FindSharedController(slot),
+                    "인벤토리 슬롯이 씬의 공용 컨트롤러에 닿아야 한다.");
+                Assert.AreSame(shared,
+                    ItemTooltipController.FindSharedController(
+                        preview.GetComponent<DungeonRewardPreviewView>()),
+                    "던전 대표 보상 칸이 같은 공용 컨트롤러에 닿아야 한다.");
+                Assert.AreSame(shared,
+                    ItemTooltipController.FindSharedController(
+                        resultItem.GetComponent<DungeonResultRewardItemView>()),
+                    "던전 정산 결과 줄이 같은 공용 컨트롤러에 닿아야 한다.");
+            }
+            finally
+            {
+                for (int i = spawned.Count - 1; i >= 0; i--)
+                {
+                    if (spawned[i] != null) UnityEngine.Object.DestroyImmediate(spawned[i]);
+                }
+
+                EditorSceneManager.CloseScene(scene, true);
+            }
         }
 
         [Test]
@@ -566,6 +670,339 @@ namespace CommonEditor.Tests
             Assert.IsFalse(controller.View.gameObject.activeSelf);
         }
 
+        // ---- 뷰: 수량이 없는 화면과 long 수량 ----
+
+        [Test]
+        public void Bind_WithoutACount_EmptiesAndTurnsOffTheCountObject()
+        {
+            ItemTooltipView view = NewTooltipInstance();
+
+            view.Bind(NewItem("50002", "더미아이템3"));
+
+            var count = (TextMeshProUGUI)GetPrivate(view, "countText");
+            Assert.IsFalse(view.HasBoundCount, "수량 없는 표시에서는 수량을 그리지 않는다.");
+            Assert.AreEqual(string.Empty, count.text, "수량 칸에 글자가 남으면 안 된다.");
+            Assert.IsFalse(count.enabled);
+            Assert.IsFalse(count.gameObject.activeSelf,
+                "글자만 비우면 빈 줄만큼의 자리가 남는다 - 오브젝트까지 꺼야 한다.");
+        }
+
+        [Test]
+        public void Bind_WithoutACount_LeavesNoStaleNumberFromThePreviousItem()
+        {
+            ItemTooltipView view = NewTooltipInstance();
+            view.Bind(NewItem("50000", "더미아이템1"), 7);
+
+            view.Bind(NewItem("50002", "더미아이템3"));
+
+            var count = (TextMeshProUGUI)GetPrivate(view, "countText");
+            Assert.AreEqual(string.Empty, count.text, "직전 아이템의 숫자가 남으면 안 된다.");
+            Assert.IsFalse(count.gameObject.activeSelf);
+            Assert.AreEqual(0L, view.BoundCount);
+        }
+
+        [Test]
+        public void Bind_WithACountAgain_TurnsTheCountBackOn()
+        {
+            ItemTooltipView view = NewTooltipInstance();
+            view.Bind(NewItem("50002", "더미아이템3"));
+
+            view.Bind(NewItem("50000", "더미아이템1"), 3);
+
+            var count = (TextMeshProUGUI)GetPrivate(view, "countText");
+            Assert.IsTrue(count.gameObject.activeSelf,
+                "수량 없는 표시를 지나온 뒤에도 다시 보여야 한다 - 컴포넌트만 켜면 화면에 나오지 않는다.");
+            Assert.IsTrue(count.enabled);
+            Assert.AreEqual("3", count.text);
+        }
+
+        [Test]
+        public void Bind_KeepsALongCountExactly()
+        {
+            ItemTooltipView view = NewTooltipInstance();
+
+            view.Bind(NewItem("50000", "더미아이템1"), long.MaxValue);
+
+            Assert.AreEqual(long.MaxValue, view.BoundCount, "long 수량이 좁혀지면 안 된다.");
+            Assert.AreEqual("9223372036854775807", Text(view, "countText"));
+        }
+
+        // ---- 던전 대표 보상 미리보기: 수량 없는 툴팁 ----
+
+        [Test]
+        public void RewardPreview_RemembersWhatItDraws()
+        {
+            BuildScene(out ItemTooltipController _, out InventorySlotView _1, out InventorySlotView _2);
+            DungeonRewardPreviewView preview = NewRewardPreview(new Vector2(-300f, 0f));
+            ItemDefinition item = NewItem("50002", "더미아이템3");
+
+            preview.Bind(item);
+
+            Assert.AreSame(item, preview.BoundItem);
+        }
+
+        [Test]
+        public void RewardPreview_ClearsWhatItDraws()
+        {
+            BuildScene(out ItemTooltipController _, out InventorySlotView _1, out InventorySlotView _2);
+            DungeonRewardPreviewView preview = NewRewardPreview(new Vector2(-300f, 0f));
+            preview.Bind(NewItem("50002", "더미아이템3"));
+
+            preview.Clear();
+
+            Assert.IsNull(preview.BoundItem, "빈 칸에 예전 보상의 툴팁이 뜨면 안 된다.");
+        }
+
+        [Test]
+        public void RewardPreview_AsksForATooltipWithoutACount()
+        {
+            BuildScene(out ItemTooltipController controller, out InventorySlotView _1, out InventorySlotView _2);
+            DungeonRewardPreviewView preview = NewRewardPreview(new Vector2(-300f, 0f));
+            ItemDefinition item = NewItem("50002", "더미아이템3");
+            preview.Bind(item);
+
+            preview.OnPointerEnter(null);
+
+            Assert.AreSame(preview, controller.VisibleOwner);
+            Assert.AreSame(item, controller.View.BoundDefinition);
+            Assert.IsFalse(controller.View.HasBoundCount,
+                "미리보기에는 보여줄 수량이 없다 - 인벤토리 보유 수량을 끌어오지 않는다.");
+
+            var count = (TextMeshProUGUI)GetPrivate(controller.View, "countText");
+            Assert.AreEqual(string.Empty, count.text);
+            Assert.IsFalse(count.gameObject.activeSelf);
+        }
+
+        [Test]
+        public void RewardPreview_WithNothingToShow_DoesNotAskForATooltip()
+        {
+            BuildScene(out ItemTooltipController controller, out InventorySlotView _1, out InventorySlotView _2);
+            DungeonRewardPreviewView preview = NewRewardPreview(new Vector2(-300f, 0f));
+
+            preview.OnPointerEnter(null);
+
+            Assert.IsNull(controller.View, "빈 칸에서는 툴팁 인스턴스를 만들지도 않는다.");
+        }
+
+        [Test]
+        public void RewardPreview_HidesTheTooltipOnPointerExit()
+        {
+            BuildScene(out ItemTooltipController controller, out InventorySlotView _1, out InventorySlotView _2);
+            DungeonRewardPreviewView preview = NewRewardPreview(new Vector2(-300f, 0f));
+            preview.Bind(NewItem("50002", "더미아이템3"));
+            preview.OnPointerEnter(null);
+
+            preview.OnPointerExit(null);
+
+            Assert.IsFalse(controller.IsVisible);
+        }
+
+        [Test]
+        public void RewardPreview_HidesTheTooltipWhenItIsCleared()
+        {
+            BuildScene(out ItemTooltipController controller, out InventorySlotView _1, out InventorySlotView _2);
+            DungeonRewardPreviewView preview = NewRewardPreview(new Vector2(-300f, 0f));
+            preview.Bind(NewItem("50002", "더미아이템3"));
+            preview.OnPointerEnter(null);
+
+            preview.Clear();
+
+            Assert.IsFalse(controller.IsVisible);
+        }
+
+        [Test]
+        public void RewardPreview_HidesTheTooltipWhenItIsReboundToAnotherItem()
+        {
+            BuildScene(out ItemTooltipController controller, out InventorySlotView _1, out InventorySlotView _2);
+            DungeonRewardPreviewView preview = NewRewardPreview(new Vector2(-300f, 0f));
+            preview.Bind(NewItem("50002", "더미아이템3"));
+            preview.OnPointerEnter(null);
+
+            preview.Bind(NewItem("50003", "더미아이템4"));
+
+            Assert.IsFalse(controller.IsVisible,
+                "던전 선택이 바뀌면 같은 자리의 칸이 다른 보상을 그린다 - 예전 툴팁이 남으면 안 된다.");
+        }
+
+        [Test]
+        public void RewardPreview_HidesTheTooltipWhenItIsDisabled()
+        {
+            BuildScene(out ItemTooltipController controller, out InventorySlotView _1, out InventorySlotView _2);
+            DungeonRewardPreviewView preview = NewRewardPreview(new Vector2(-300f, 0f));
+            preview.Bind(NewItem("50002", "더미아이템3"));
+            preview.OnPointerEnter(null);
+
+            // EditMode에서는 SetActive가 OnDisable을 부르지 않으므로 그 경로를 직접 지나간다.
+            preview.gameObject.SetActive(false);
+            InvokeLifecycle(preview, "OnDisable");
+
+            Assert.IsFalse(controller.IsVisible, "꺼진 칸은 Exit를 받지 못한다 - 스스로 내려야 한다.");
+        }
+
+        // ---- 던전 정산 결과 줄: 이번 세션 획득 수량 ----
+
+        [Test]
+        public void ResultRewardItem_ShowsTheSessionCountExactly()
+        {
+            BuildScene(out ItemTooltipController controller, out InventorySlotView _1, out InventorySlotView _2);
+            DungeonResultRewardItemView item = NewResultRewardItem(new Vector2(-300f, 0f));
+            ItemDefinition definition = NewItem("50000", "더미아이템1");
+            item.Bind(new DungeonSessionItemReward(definition, "50000", long.MaxValue));
+
+            item.OnPointerEnter(null);
+
+            Assert.AreSame(item, controller.VisibleOwner);
+            Assert.AreSame(definition, controller.View.BoundDefinition);
+            Assert.IsTrue(controller.View.HasBoundCount);
+            Assert.AreEqual(long.MaxValue, controller.View.BoundCount,
+                "정산 화면의 숫자와 툴팁의 숫자는 같아야 한다 - 스냅샷 값을 그대로 넘긴다.");
+            Assert.AreEqual("9223372036854775807", Text(controller.View, "countText"));
+        }
+
+        [Test]
+        public void ResultRewardItem_WithoutADefinition_DoesNotAskForATooltip()
+        {
+            BuildScene(out ItemTooltipController controller, out InventorySlotView _1, out InventorySlotView _2);
+            DungeonResultRewardItemView item = NewResultRewardItem(new Vector2(-300f, 0f));
+            item.Bind(new DungeonSessionItemReward(null, "50000", 3L));
+
+            item.OnPointerEnter(null);
+
+            Assert.IsNull(controller.View, "정의가 없으면 툴팁이 그릴 내용 자체가 없다.");
+        }
+
+        [Test]
+        public void ResultRewardItem_HidesTheTooltipOnPointerExit()
+        {
+            BuildScene(out ItemTooltipController controller, out InventorySlotView _1, out InventorySlotView _2);
+            DungeonResultRewardItemView item = NewResultRewardItem(new Vector2(-300f, 0f));
+            item.Bind(new DungeonSessionItemReward(NewItem("50000", "더미아이템1"), "50000", 3L));
+            item.OnPointerEnter(null);
+
+            item.OnPointerExit(null);
+
+            Assert.IsFalse(controller.IsVisible);
+        }
+
+        [Test]
+        public void ResultRewardItem_HidesTheTooltipWhenItIsClearedOrDisabled()
+        {
+            BuildScene(out ItemTooltipController controller, out InventorySlotView _1, out InventorySlotView _2);
+            DungeonResultRewardItemView item = NewResultRewardItem(new Vector2(-300f, 0f));
+            item.Bind(new DungeonSessionItemReward(NewItem("50000", "더미아이템1"), "50000", 3L));
+            item.OnPointerEnter(null);
+
+            item.Clear();
+            Assert.IsFalse(controller.IsVisible);
+
+            item.Bind(new DungeonSessionItemReward(NewItem("50002", "더미아이템3"), "50002", 5L));
+            item.OnPointerEnter(null);
+            Assert.IsTrue(controller.IsVisible);
+
+            // EditMode에서는 SetActive가 OnDisable을 부르지 않으므로 그 경로를 직접 지나간다.
+            item.gameObject.SetActive(false);
+            InvokeLifecycle(item, "OnDisable");
+            Assert.IsFalse(controller.IsVisible, "꺼진 줄은 Exit를 받지 못한다 - 스스로 내려야 한다.");
+        }
+
+        // ---- 세 화면이 함께 쓰는 인스턴스 하나 ----
+
+        [Test]
+        public void Controller_ReusesASingleInstanceAcrossAllThreeOwners()
+        {
+            BuildScene(out ItemTooltipController controller, out InventorySlotView slotA, out InventorySlotView _);
+            DungeonRewardPreviewView preview = NewRewardPreview(new Vector2(-200f, 0f));
+            DungeonResultRewardItemView result = NewResultRewardItem(new Vector2(-100f, 0f));
+
+            slotA.SetItem(NewItem("50000", "더미아이템1"), 2);
+            slotA.OnPointerEnter(null);
+            ItemTooltipView first = controller.View;
+            slotA.OnPointerExit(null);
+
+            preview.Bind(NewItem("50002", "더미아이템3"));
+            preview.OnPointerEnter(null);
+            Assert.AreSame(first, controller.View);
+            preview.OnPointerExit(null);
+
+            result.Bind(new DungeonSessionItemReward(NewItem("50003", "더미아이템4"), "50003", 9L));
+            result.OnPointerEnter(null);
+            Assert.AreSame(first, controller.View);
+
+            Assert.AreEqual(1, tooltipParent.GetComponentsInChildren<ItemTooltipView>(true).Length,
+                "세 화면을 오가도 툴팁 인스턴스는 하나뿐이어야 한다.");
+        }
+
+        [Test]
+        public void Controller_IgnoresALateExitFromAnotherScreensOwner()
+        {
+            BuildScene(out ItemTooltipController controller, out InventorySlotView slotA, out InventorySlotView _);
+            DungeonRewardPreviewView preview = NewRewardPreview(new Vector2(-200f, 0f));
+
+            slotA.SetItem(NewItem("50000", "더미아이템1"), 1);
+            slotA.OnPointerEnter(null);
+
+            preview.Bind(NewItem("50002", "더미아이템3"));
+            preview.OnPointerEnter(null);
+
+            // 같은 프레임에 뒤늦게 도착한 슬롯의 Exit가 이미 뜬 미리보기의 툴팁을 지우면 안 된다.
+            slotA.OnPointerExit(null);
+
+            Assert.IsTrue(controller.IsVisible);
+            Assert.AreSame(preview, controller.VisibleOwner);
+        }
+
+        // ---- 패널이 앞으로 나와도 툴팁이 맨 앞에 남는다 ----
+
+        [Test]
+        public void Controller_ReturnsToTheTopSiblingAfterAPanelIsBroughtForward()
+        {
+            BuildScene(out ItemTooltipController controller, out InventorySlotView slotA, out InventorySlotView _);
+            ItemDefinition item = NewItem("50000", "더미아이템1");
+            slotA.SetItem(item, 4);
+            slotA.OnPointerEnter(null);
+
+            RectTransform instance = (RectTransform)controller.View.transform;
+
+            // PopupPanelManager.FocusPanel이 하는 일과 같다 - 패널을 Panel_UI 안에서 맨 뒤 형제로 보낸다.
+            panelRoot.SetAsLastSibling();
+            Assert.AreNotEqual(tooltipParent.childCount - 1, instance.GetSiblingIndex(),
+                "이 시험의 전제: 패널이 앞으로 나오면 툴팁이 그 뒤로 밀린다.");
+
+            InvokeLifecycle(controller, "LateUpdate");
+
+            Assert.AreEqual(tooltipParent.childCount - 1, instance.GetSiblingIndex(),
+                "떠 있는 툴팁은 프레임 끝에 다시 맨 앞으로 돌아와야 한다.");
+            Assert.IsTrue(controller.IsVisible, "순서만 되돌린다 - 클릭 때문에 숨기지 않는다.");
+            Assert.AreSame(slotA, controller.VisibleOwner, "주인은 그대로다 - 다시 바인딩하지 않는다.");
+            Assert.AreSame(item, controller.View.BoundDefinition);
+            Assert.AreSame(instance, (RectTransform)controller.View.transform,
+                "인스턴스를 새로 만들지 않는다.");
+        }
+
+        [Test]
+        public void Controller_WithNothingShown_CreatesNoInstanceInLateUpdate()
+        {
+            BuildScene(out ItemTooltipController controller, out InventorySlotView _1, out InventorySlotView _2);
+
+            InvokeLifecycle(controller, "LateUpdate");
+
+            Assert.IsNull(controller.View, "떠 있는 것이 없으면 인스턴스를 만들 이유가 없다.");
+            Assert.IsFalse(controller.IsVisible);
+        }
+
+        [Test]
+        public void Controller_AfterExit_StaysHiddenThroughLateUpdate()
+        {
+            BuildScene(out ItemTooltipController controller, out InventorySlotView slotA, out InventorySlotView _);
+            slotA.SetItem(NewItem("50000", "더미아이템1"), 1);
+            slotA.OnPointerEnter(null);
+            slotA.OnPointerExit(null);
+
+            InvokeLifecycle(controller, "LateUpdate");
+
+            Assert.IsFalse(controller.IsVisible, "내려간 툴팁을 프레임 끝에 다시 올리지 않는다.");
+        }
+
         // ---- 도우미 ----
 
         private static GameObject LoadPrefab(string path)
@@ -611,11 +1048,14 @@ namespace CommonEditor.Tests
             canvasRect.sizeDelta = new Vector2(800f, 600f);
             canvasRect.position = Vector3.zero;
 
-            tooltipParent = NewStretchedChild(canvasRect, "Panel_UI");
+            tooltipParent = NewStretchedChild(canvasRect, PanelUiObjectName);
             panelRoot = NewStretchedChild(tooltipParent, "pn_Inventory");
 
-            controller = panelRoot.gameObject.AddComponent<ItemTooltipController>();
+            // 실제 배선과 같은 자리다 - 컨트롤러는 패널이 아니라 Panel_UI가 소유하고, 세 화면은
+            // 부모 탐색으로 이 하나에 닿는다.
+            controller = tooltipParent.gameObject.AddComponent<ItemTooltipController>();
             SetPrivate(controller, "tooltipPrefab", LoadPrefab(TooltipPrefabPath));
+            SetPrivate(controller, "tooltipRoot", tooltipParent);
             controllers.Add(controller);
 
             slotA = NewSlot("slotA", new Vector2(-300f, 0f));
@@ -640,6 +1080,43 @@ namespace CommonEditor.Tests
         private static void MoveSlot(InventorySlotView slot, Vector2 position)
         {
             ((RectTransform)slot.transform).anchoredPosition = position;
+        }
+
+        /// <summary>던전 상세의 대표 보상 한 칸. 실제와 같이 패널 아래에 놓아 부모 탐색이 통하게 한다.</summary>
+        private DungeonRewardPreviewView NewRewardPreview(Vector2 position)
+        {
+            GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(
+                LoadPrefab(RewardPreviewPrefabPath), panelRoot);
+            PlaceOwner(instance, position);
+            return instance.GetComponent<DungeonRewardPreviewView>();
+        }
+
+        /// <summary>던전 정산 결과의 아이템 한 줄. 같은 이유로 패널 아래에 놓는다.</summary>
+        private DungeonResultRewardItemView NewResultRewardItem(Vector2 position)
+        {
+            GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(
+                LoadPrefab(ResultRewardPrefabPath), panelRoot);
+            PlaceOwner(instance, position);
+            return instance.GetComponent<DungeonResultRewardItemView>();
+        }
+
+        private static void PlaceOwner(GameObject instance, Vector2 position)
+        {
+            var rect = (RectTransform)instance.transform;
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(40f, 40f);
+            rect.anchoredPosition = position;
+        }
+
+        /// <summary><paramref name="scene"/>에 속한 컨트롤러만 고른다 - 다른 씬이나 이 시험이 만든
+        /// 메모리 위 오브젝트가 섞이면 "하나뿐"이라는 판정이 흐려진다.</summary>
+        private static ItemTooltipController[] ControllersIn(Scene scene)
+        {
+            return Array.FindAll(
+                UnityEngine.Object.FindObjectsOfType<ItemTooltipController>(true),
+                value => value.gameObject.scene == scene);
         }
 
         private static RectTransform NewStretchedChild(RectTransform parent, string name)

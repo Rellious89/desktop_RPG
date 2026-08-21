@@ -210,6 +210,30 @@ namespace Common
             Place(target);
         }
 
+        /// <summary>
+        /// 떠 있는 툴팁을 형제 중 맨 뒤로 되돌린다. <see cref="PopupPanelManager.FocusPanel"/>이 클릭이나
+        /// 열기로 패널을 맨 뒤 형제로 보내면, 같은 부모(Panel_UI)에 붙어 있는 툴팁이 그 패널 <b>뒤로</b>
+        /// 밀려 가려지기 때문이다.
+        ///
+        /// <b>프레임의 끝에서 한 번만 본다.</b> 패널 순서를 바꾸는 쪽이 <c>Update</c>에서 도니, 같은
+        /// 프레임의 <c>LateUpdate</c>에서 되돌리면 화면에 한 프레임도 가려진 모습이 나가지 않는다.
+        ///
+        /// <b>떠 있을 때만, 순서를 바꿀 때만 손댄다.</b> 인스턴스를 만들지도, 다시 바인딩하지도, 클릭
+        /// 때문에 숨기지도 않는다 - 이미 맨 뒤면 <c>SetAsLastSibling</c>조차 부르지 않아 Hover와
+        /// 레이아웃 재계산을 건드리지 않는다.
+        /// </summary>
+        private void LateUpdate()
+        {
+            if (!IsVisible) return;
+
+            Transform parent = instanceRect.parent;
+            if (parent == null) return;
+
+            if (instanceRect.GetSiblingIndex() == parent.childCount - 1) return;
+
+            instanceRect.SetAsLastSibling();
+        }
+
         /// <summary>로컬라이징 문자열이 뒤늦게 도착해 높이가 달라졌을 때 위치를 다시 잡는다.
         /// 이 신호가 없으면 설명이 길어진 만큼 툴팁의 아래쪽이 화면 밖으로 나간다.</summary>
         private void OnViewLayoutChanged()
