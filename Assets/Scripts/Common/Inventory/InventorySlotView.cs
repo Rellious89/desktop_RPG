@@ -20,8 +20,10 @@ namespace Common
     /// 아이템의 툴팁이 뜬다.
     ///
     /// <b>툴팁을 띄우는 것은 이 슬롯이 아니다.</b> 여기서는 "이 슬롯 위에 마우스가 들어왔다/나갔다"만
-    /// 알리고, 하나뿐인 인스턴스와 위치는 <see cref="ItemTooltipController"/>가 소유한다. 클릭과
-    /// 스크롤은 건드리지 않는다 - Enter/Exit만 구현하므로 슬롯의 다른 입력 동작은 그대로다.
+    /// 알리고, 하나뿐인 인스턴스와 위치는 <see cref="ItemTooltipController"/>가 소유한다. 그 컨트롤러는
+    /// 씬의 Panel_UI에 하나만 있고 던전 화면들과 <b>함께 쓴다</b> - 슬롯은 그것을 부모 쪽에서 찾을 뿐
+    /// 만들지 않는다. 클릭과 스크롤은 건드리지 않는다 - Enter/Exit만 구현하므로 슬롯의 다른 입력
+    /// 동작은 그대로다.
     ///
     /// 참조를 비워두면 프리팹의 기존 오브젝트 이름(sp_ItemIcon / lb_count)으로 자동 탐색한다.
     /// </summary>
@@ -157,14 +159,7 @@ namespace Common
             if (tooltipControllerResolved) return tooltipController;
             tooltipControllerResolved = true;
 
-            tooltipController = GetComponentInParent<ItemTooltipController>(true);
-
-            if (tooltipController == null)
-            {
-                Debug.LogWarning($"[InventorySlotView] '{name}': 부모에서 ItemTooltipController를 찾지 못해 " +
-                                 "아이템 툴팁이 표시되지 않습니다 - 인벤토리 패널 루트에 컴포넌트를 붙이세요.", this);
-            }
-
+            tooltipController = ItemTooltipController.FindSharedController(this);
             return tooltipController;
         }
 

@@ -251,6 +251,10 @@ namespace Dungeon
             {
                 DungeonResultRewardItemView item = spawnedItems[i];
                 if (item == null) continue;
+
+                // Destroy는 프레임 끝에 실행된다 - 그 전에 그리던 보상을 비워, 마우스를 올린 채 패널이
+                // 갱신돼도 사라질 줄의 툴팁이 화면에 남지 않게 한다.
+                item.Clear();
                 item.gameObject.SetActive(false);
                 Destroy(item.gameObject);
             }

@@ -22,6 +22,15 @@ namespace Common
     /// 비어 있으면 Item Id)로 대신하고 설명은 빈 줄로 둔다 - 툴팁이 통째로 안 뜨는 것보다 이름만이라도
     /// 보이는 편이 무엇이 잘못됐는지 알기 쉽다.
     ///
+    /// <b>수량은 있을 수도 없을 수도 있다.</b> 인벤토리는 보유 수량을, 던전 귀환 결과는 이번 세션에
+    /// 얻은 수량을 보여주지만, 던전 대표 보상 미리보기에는 <b>보여줄 수량 자체가 없다</b>(획득 개수도
+    /// 확률도 정해져 있지 않다). 그래서 "수량 0"이 아니라 <b>수량 없음</b>을 따로 받아, 없을 때는
+    /// lb_ItemCount의 글자를 비우고 오브젝트까지 끈다 - 글자만 비우면 직전 아이템의 숫자가 한 프레임
+    /// 남거나, 빈 줄만큼의 자리가 그대로 남는다.
+    ///
+    /// <b>수량은 long으로 받는다.</b> 던전 세션 누적 획득량(<c>DungeonSessionItemReward.Count</c>)이
+    /// long이므로 int로 좁히면 큰 값이 조용히 뒤집힌다 - 인벤토리의 int는 손실 없이 long으로 넓어진다.
+    ///
     /// <b>제목(Title)과 Bottom은 건드리지 않는다.</b> 제목은 프리팹의 LocalizedTMPText가 이미
     /// 01_UI/39를 가리키고 있고, Bottom은 꺼진 채로 저장되어 있다 - 둘 다 이 컴포넌트의 관심사가 아니다.
     /// </summary>
@@ -56,7 +65,8 @@ namespace Common
         private bool resolved;
 
         private ItemDefinition boundDefinition;
-        private int boundCount;
+        private long boundCount;
+        private bool hasBoundCount;
         private bool subscribed;
 
         /// <summary>컨트롤러가 위치를 잡을 대상. 내용에 따라 높이가 달라지는 바로 그 사각형이다.</summary>
@@ -71,6 +81,12 @@ namespace Common
 
         /// <summary>지금 그리고 있는 아이템. 아무것도 그리지 않으면 null이다.</summary>
         public ItemDefinition BoundDefinition => boundDefinition;
+
+        /// <summary>지금 수량을 그리고 있는지. false면 lb_ItemCount는 비어 있고 꺼져 있다.</summary>
+        public bool HasBoundCount => hasBoundCount;
+
+        /// <summary>지금 그리고 있는 수량. <see cref="HasBoundCount"/>가 false면 0이다.</summary>
+        public long BoundCount => boundCount;
 
         /// <summary>로컬라이징 문자열이 도착해 크기가 달라졌을 때 알린다 - 컨트롤러는 이 신호를 받아
         /// 위치를 다시 잡는다. 구독 시점에는 아직 값이 없을 수 있어서, 한 번 잡은 위치를 그대로 두면
@@ -96,13 +112,26 @@ namespace Common
         /// <summary><paramref name="definition"/>을 <paramref name="count"/>개 가진 것으로 그린다.
         /// 이전에 그리던 아이템의 구독은 여기서 끊긴다 - 같은 아이템을 다시 넘겨도 마찬가지라,
         /// 구독이 두 번 걸리는 경로가 없다.</summary>
-        public void Bind(ItemDefinition definition, int count)
+        public void Bind(ItemDefinition definition, long count)
+        {
+            Bind(definition, count, hasCount: true);
+        }
+
+        /// <summary><paramref name="definition"/>을 <b>수량 없이</b> 그린다 - 던전 대표 보상
+        /// 미리보기처럼 보여줄 수량 자체가 없는 화면이 쓴다. 수량 칸은 비고 꺼진다.</summary>
+        public void Bind(ItemDefinition definition)
+        {
+            Bind(definition, 0L, hasCount: false);
+        }
+
+        private void Bind(ItemDefinition definition, long count, bool hasCount)
         {
             ResolveReferences();
             Unsubscribe();
 
             boundDefinition = definition;
-            boundCount = count;
+            boundCount = hasCount ? count : 0L;
+            hasBoundCount = hasCount;
 
             ApplyIcon();
             ApplyCount();
@@ -129,7 +158,8 @@ namespace Common
         {
             Unsubscribe();
             boundDefinition = null;
-            boundCount = 0;
+            boundCount = 0L;
+            hasBoundCount = false;
         }
 
         /// <summary>지금 내용 기준으로 크기를 다시 계산한다. ContentSizeFitter는 다음 프레임에야
@@ -231,6 +261,9 @@ namespace Common
         /// 없으면 <b>숫자만</b> 쓴다 - 형식이 잘못됐다고 수량 자체를 안 보여 주지는 않는다.
         /// 자릿수 표기는 실행 환경의 지역 설정과 무관하게 같도록 InvariantCulture로 고정한다.
         ///
+        /// <b>수량이 없으면 글자와 오브젝트를 함께 끈다.</b> 글자만 비우면 직전에 그리던 숫자가
+        /// 오브젝트에 남아 다음 표시에서 한 프레임 스쳐 지나가고, 빈 줄만큼의 자리도 그대로 남는다.
+        ///
         /// <b>자리표시자의 존재는 직접 확인한다.</b> <c>string.Format</c>은 "보유 수량"처럼 중괄호가
         /// 아예 없는 문구를 예외 없이 <b>그대로</b> 돌려주므로, 예외만 붙잡아서는 수량이 통째로
         /// 사라진 화면을 잡을 수 없다. 예외 처리는 <c>{0}</c>은 있는데 <c>{1}</c>이 함께 있거나
@@ -238,6 +271,18 @@ namespace Common
         private void ApplyCount()
         {
             if (countText == null) return;
+
+            if (!hasBoundCount)
+            {
+                countText.text = string.Empty;
+                countText.enabled = false;
+                countText.gameObject.SetActive(false);
+                return;
+            }
+
+            // 수량 없는 표시를 지나온 뒤에도 다시 보이게 한다 - 컴포넌트만 켜면 화면에 나오지 않는다.
+            countText.gameObject.SetActive(true);
+            countText.enabled = true;
 
             string number = boundCount.ToString(CultureInfo.InvariantCulture);
 

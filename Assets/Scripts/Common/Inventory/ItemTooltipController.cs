@@ -26,6 +26,17 @@ namespace Common
     /// <b>표시 요청의 주인을 항상 기억한다.</b> 마우스가 슬롯 A에서 B로 빠르게 넘어가면 EventSystem이
     /// 같은 프레임에 A의 Exit와 B의 Enter를 보내는데, 순서가 어느 쪽이든 <see cref="CancelShow"/>는
     /// 자기가 주인일 때만 동작한다 - 뒤늦게 도착한 A의 Exit가 이미 뜬 B의 툴팁을 지우지 않는다.
+    ///
+    /// <b>주인은 인벤토리 슬롯만이 아니다.</b> 던전 대표 보상 미리보기와 던전 귀환 결과의 아이템 줄도
+    /// 같은 컨트롤러 하나를 쓰므로, 주인의 타입은 세 화면이 함께 만족할 수 있는 <see cref="MonoBehaviour"/>로
+    /// 둔다. 주인에게서 필요한 것은 "아직 살아 있고 켜져 있는가"(파괴 여부와 <see cref="Behaviour.isActiveAndEnabled"/>)
+    /// 뿐이고, 그 둘은 MonoBehaviour가 이미 답할 수 있다 - 화면마다 인터페이스를 새로 만들면 컨트롤러가
+    /// 각 화면의 사정을 알게 된다.
+    ///
+    /// <b>패널이 앞으로 나와도 툴팁이 그 아래로 가지 않는다.</b> <see cref="PopupPanelManager"/>는 패널을
+    /// 클릭할 때 그 패널을 Panel_UI 안에서 맨 뒤 형제로 보내는데, 툴팁 인스턴스도 같은 Panel_UI의 자식이라
+    /// 그 순간 패널에 가려진다. 그래서 <b>떠 있는 동안에만</b> 프레임 끝(<c>LateUpdate</c>)에 형제 순서를
+    /// 다시 맨 뒤로 되돌린다 - 다시 만들지도, 다시 바인딩하지도, 클릭 때문에 숨기지도 않는다.
     /// </summary>
     [DisallowMultipleComponent]
     public class ItemTooltipController : MonoBehaviour
@@ -52,25 +63,69 @@ namespace Common
         private RectTransform instanceRect;
         private bool instantiateFailed;
 
-        // 표시를 예약했거나 이미 표시 중인 슬롯. 둘 중 하나만 값을 가진다.
-        private InventorySlotView pendingOwner;
-        private InventorySlotView visibleOwner;
+        // 표시를 예약했거나 이미 표시 중인 주인. 둘 중 하나만 값을 가진다.
+        private MonoBehaviour pendingOwner;
+        private MonoBehaviour visibleOwner;
         private RectTransform visibleTarget;
         private Coroutine showRoutine;
 
         /// <summary>Inspector에 설정된 대기시간(초). 0이면 즉시 표시다.</summary>
         public float TooltipDelay => tooltipDelay;
 
-        /// <summary>지금 툴팁을 띄우고 있는 슬롯. 아무것도 떠 있지 않으면 null이다.</summary>
-        public InventorySlotView VisibleOwner => visibleOwner;
+        /// <summary>지금 툴팁을 띄우고 있는 주인. 아무것도 떠 있지 않으면 null이다.</summary>
+        public MonoBehaviour VisibleOwner => visibleOwner;
+
+        /// <summary>툴팁이 지금 화면에 떠 있는지. 인스턴스를 아직 만들지 않았으면 false다.</summary>
+        public bool IsVisible => instanceRect != null && instanceRect.gameObject.activeSelf;
 
         /// <summary>지금 만들어진 툴팁 인스턴스의 내용. 아직 한 번도 띄우지 않았으면 null이다.</summary>
         public ItemTooltipView View => view;
 
-        /// <summary><paramref name="owner"/> 슬롯의 툴팁 표시를 예약한다. 이전 예약이나 표시 중인
-        /// 툴팁은 즉시 정리되므로, 같은 순간에 살아 있는 툴팁은 항상 하나뿐이다.</summary>
-        public void RequestShow(InventorySlotView owner, ItemDefinition definition, int count, RectTransform target)
+        /// <summary>
+        /// <paramref name="owner"/>를 담고 있는 <b>하나뿐인</b> 컨트롤러를 부모 쪽으로 올라가며 찾는다.
+        /// 인벤토리 슬롯, 던전 보상 미리보기, 던전 결과 아이템 줄이 모두 이 한 곳을 지나므로 <b>새 컨트롤러를
+        /// 만들지 않는다</b> - 화면마다 만들면 툴팁 인스턴스도 화면 수만큼 생긴다.
+        ///
+        /// 세 화면의 패널(pn_*)은 전부 Panel_UI의 자식이고 컨트롤러는 그 Panel_UI에 붙어 있으므로, 부모
+        /// 탐색 하나로 셋 다 같은 인스턴스에 닿는다. 꺼져 있는 부모도 함께 보는 것은(<c>includeInactive</c>)
+        /// 패널이 닫힌 상태에서 만들어지는 칸이 있기 때문이다.
+        /// </summary>
+        public static ItemTooltipController FindSharedController(Component owner)
         {
+            if (owner == null) return null;
+
+            var controller = owner.GetComponentInParent<ItemTooltipController>(true);
+            if (controller == null)
+            {
+                Debug.LogWarning($"[ItemTooltipController] '{owner.name}': 부모에서 ItemTooltipController를 " +
+                                 "찾지 못해 아이템 툴팁이 표시되지 않습니다 - 씬의 Panel_UI에 컴포넌트를 " +
+                                 "붙이세요(패널마다 새로 붙이지 않습니다).", owner);
+            }
+
+            return controller;
+        }
+
+        /// <summary><paramref name="owner"/>의 툴팁 표시를 <b>수량과 함께</b> 예약한다. 이전 예약이나
+        /// 표시 중인 툴팁은 즉시 정리되므로, 같은 순간에 살아 있는 툴팁은 항상 하나뿐이다.
+        ///
+        /// 수량이 <c>long</c>인 것은 던전 세션 누적 획득량이 long이기 때문이다 - 인벤토리의 int는
+        /// 손실 없이 넓어진다.</summary>
+        public void RequestShow(MonoBehaviour owner, ItemDefinition definition, long count, RectTransform target)
+        {
+            RequestShow(owner, definition, count, hasCount: true, target);
+        }
+
+        /// <summary><paramref name="owner"/>의 툴팁 표시를 <b>수량 없이</b> 예약한다 - 던전 대표 보상
+        /// 미리보기처럼 보여줄 수량 자체가 없는 화면이 쓴다.</summary>
+        public void RequestShow(MonoBehaviour owner, ItemDefinition definition, RectTransform target)
+        {
+            RequestShow(owner, definition, 0L, hasCount: false, target);
+        }
+
+        private void RequestShow(
+            MonoBehaviour owner, ItemDefinition definition, long count, bool hasCount, RectTransform target)
+        {
+            // owner가 파괴된 경우도 Unity의 == 규칙이 null로 잡아 준다.
             if (owner == null || definition == null || target == null) return;
             if (!isActiveAndEnabled) return;
 
@@ -83,16 +138,16 @@ namespace Common
 
             if (tooltipDelay <= 0f)
             {
-                ShowNow(owner, definition, count, target);
+                ShowNow(owner, definition, count, hasCount, target);
                 return;
             }
 
-            showRoutine = StartCoroutine(ShowAfterDelay(owner, definition, count, target));
+            showRoutine = StartCoroutine(ShowAfterDelay(owner, definition, count, hasCount, target));
         }
 
         /// <summary><paramref name="owner"/>가 지금 툴팁의 주인일 때만 예약을 취소하고 툴팁을 지운다.
-        /// 다른 슬롯이 이미 주인이 되었다면 아무것도 하지 않는다.</summary>
-        public void CancelShow(InventorySlotView owner)
+        /// 다른 주인이 이미 자리를 넘겨받았다면 아무것도 하지 않는다.</summary>
+        public void CancelShow(MonoBehaviour owner)
         {
             if (owner == null) return;
             if (pendingOwner != owner && visibleOwner != owner) return;
@@ -117,18 +172,19 @@ namespace Common
         }
 
         private IEnumerator ShowAfterDelay(
-            InventorySlotView owner, ItemDefinition definition, int count, RectTransform target)
+            MonoBehaviour owner, ItemDefinition definition, long count, bool hasCount, RectTransform target)
         {
             // Time.timeScale과 무관하게 항상 같은 체감 대기시간이 되도록 실제 시간으로 센다.
             yield return new WaitForSecondsRealtime(tooltipDelay);
 
             showRoutine = null;
-            ShowNow(owner, definition, count, target);
+            ShowNow(owner, definition, count, hasCount, target);
         }
 
-        private void ShowNow(InventorySlotView owner, ItemDefinition definition, int count, RectTransform target)
+        private void ShowNow(
+            MonoBehaviour owner, ItemDefinition definition, long count, bool hasCount, RectTransform target)
         {
-            // 대기 중에 슬롯이 꺼졌거나(패널이 닫힘) 파괴됐으면 띄우지 않는다.
+            // 대기 중에 주인이 꺼졌거나(패널이 닫힘) 파괴됐으면 띄우지 않는다.
             if (owner == null || !owner.isActiveAndEnabled || target == null || definition == null)
             {
                 Hide();
@@ -148,7 +204,9 @@ namespace Common
             instanceRect.gameObject.SetActive(true);
             instanceRect.SetAsLastSibling();
 
-            view.Bind(definition, count);
+            if (hasCount) view.Bind(definition, count);
+            else view.Bind(definition);
+
             Place(target);
         }
 
