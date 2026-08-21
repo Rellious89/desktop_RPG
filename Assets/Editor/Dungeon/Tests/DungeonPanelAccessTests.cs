@@ -441,8 +441,8 @@ namespace DungeonEditor.Tests
 
             RectTransform root = prefab.GetComponent<RectTransform>();
             Assert.IsNotNull(root);
-            Assert.AreEqual(164f, root.sizeDelta.x, 0.01f);
-            Assert.AreEqual(40f, root.sizeDelta.y, 0.01f);
+            Assert.AreEqual(78f, root.sizeDelta.x, 0.01f);
+            Assert.AreEqual(20f, root.sizeDelta.y, 0.01f);
         }
 
         [Test]
