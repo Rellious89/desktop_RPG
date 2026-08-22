@@ -191,6 +191,10 @@ MonoBehaviour:
     m_Localized: Not Enough Cost
     m_Metadata:
       m_Items: []
+  - m_Id: 8970130103984129
+    m_Localized: "\uAC74\uC124\uC744 \uC2DC\uC791\uD588\uC2B5\uB2C8\uB2E4."
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

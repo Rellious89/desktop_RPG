@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Building;
 using Common;
 using Inventory;
@@ -8,6 +9,7 @@ using NUnit.Framework;
 using TMPro;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.TestTools;
 using UnityEngine.UI;
 using Object = UnityEngine.Object;
 
@@ -141,7 +143,7 @@ namespace BuildingEditor.Tests
 
             Assert.IsNotNull(confirm);
             Assert.AreEqual(0, confirm.onClick.GetPersistentEventCount(),
-                "확인 버튼은 이번 단계에서 아무 것도 하지 않아야 한다");
+                "확인 동작은 런타임 리스너로만 걸린다 - 버튼에 영구 호출을 저작하지 않는다");
         }
 
         // ---- 확인/취소 ----
@@ -696,24 +698,30 @@ namespace BuildingEditor.Tests
         }
 
         [Test]
-        public void 낼_수_있어도_확인은_아직_아무것도_바꾸지_않는다()
+        public void 건설_서비스가_없으면_확인이_아무것도_바꾸지_않고_경고를_켠다()
         {
+            // 팝업 스스로는 차감도 저장도 하지 않는다 - 그 일은 전부 건설 서비스의 몫이라, 서비스가
+            // 없으면 낼 수 있어 보여도 아무 일도 일어나지 않는다. 그 상태를 조용히 두지 않는다.
             CreateInventory();
             SaveSystem.Data.currency = 2190;
             SaveSystem.Data.items.Clear();
             int writes = storage.WriteCalls;
 
-            BuildingPopupPanel panel = CreatePanel(out Button confirm, out _, out _, out _, out _);
+            BuildingPopupPanel panel = CreatePanel(out Button confirm, out _, out TextMeshProUGUI warning,
+                out _, out _);
             panel.Bind(CreateBuilding(costAmount: 2000));
             OpenPanel(panel);
             Assert.IsTrue(confirm.interactable);
 
+            LogAssert.Expect(LogType.Error, new Regex("건설 서비스가 연결되지 않아"));
             confirm.onClick.Invoke();
 
-            Assert.IsTrue(panel.gameObject.activeSelf, "확인은 팝업을 닫지도 않는다");
-            Assert.AreEqual(2190, SaveSystem.Data.currency, "이번 단계에서 확인은 비용을 내지 않는다");
+            Assert.IsTrue(panel.gameObject.activeSelf, "실패한 확인은 팝업을 닫지 않는다");
+            Assert.AreEqual(2190, SaveSystem.Data.currency, "팝업이 직접 비용을 내는 경로는 없다");
             Assert.AreEqual(0, SaveSystem.Data.items.Count);
             Assert.AreEqual(writes, storage.WriteCalls, "확인으로 저장이 일어나면 안 된다");
+            Assert.IsTrue(warning.gameObject.activeSelf, "실패는 화면에 남아야 한다");
+            Assert.IsFalse(confirm.interactable);
         }
 
         // ---- 자리 잡기 ----

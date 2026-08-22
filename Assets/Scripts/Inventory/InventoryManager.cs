@@ -53,6 +53,141 @@ namespace Inventory
     }
 
     /// <summary>
+    /// <see cref="InventoryManager.TrySpendCostWithoutSave"/>가 <b>무엇을 뺐고, 빼기 <i>직전</i>의
+    /// 인벤토리가 어떤 모양이었는지</b>를 함께 담는 영수증.
+    ///
+    /// <b>되돌리기는 "뺀 만큼 더하기"가 아니라 "찍어 둔 모양으로 되돌리기"다.</b> 뺀 값만 들고 있다가
+    /// 다시 더하면 <b>수량이 정확히 0이 되어 지워졌던 항목</b>이 목록 <b>맨 뒤</b>에 새로 생긴다 -
+    /// 저장 목록의 순서가 곧 획득 순서이자 인벤토리 표시 순서이므로, 실패한 지불 하나가 플레이어의
+    /// 아이템 배치를 영구히 바꿔 놓는 셈이다. 그래서 여기서는 빼기 직전의 <b>목록 전체</b>를 찍어
+    /// 둔다 - 순서, 같은 Id가 두 줄인 손상된 파일, null 항목, 각 항목의 수량, 그리고 <b>항목 객체의
+    /// 정체성</b>까지 그대로 되살아난다(다른 코드가 들고 있던 항목 참조가 끊기지 않는다).
+    ///
+    /// 밖에서 만들 수 없다 - 이 값을 손으로 지어내
+    /// <see cref="InventoryManager.RefundCostWithoutSave"/>에 넘기면 <b>내지도 않은 것을 돌려받거나</b>
+    /// 남의 인벤토리 모양을 덮어쓰는 경로가 생긴다.
+    /// </summary>
+    public sealed class InventoryCostReceipt
+    {
+        /// <summary>아무것도 빼지 않았다는 영수증. 되돌려도 아무 일도 일어나지 않는다.</summary>
+        public static readonly InventoryCostReceipt Empty =
+            new InventoryCostReceipt(0, Array.Empty<ItemLine>(), 0, Array.Empty<ItemSlot>());
+
+        /// <summary>실제로 빠진 아이템 한 줄(합산이 끝난 값). 보고용이며, 되돌리기는 이 값을 쓰지 않는다.</summary>
+        public readonly struct ItemLine
+        {
+            public ItemLine(string itemId, int count)
+            {
+                ItemId = itemId;
+                Count = count;
+            }
+
+            public string ItemId { get; }
+            public int Count { get; }
+        }
+
+        /// <summary>
+        /// 빼기 직전 저장 목록의 한 칸. <b>항목 객체와 그때의 수량을 함께</b> 들고 있다 - 차감은 항목의
+        /// <c>count</c>를 <b>제자리에서</b> 고치므로, 객체만 들고 있으면 되돌릴 값이 이미 사라진다.
+        /// 빈 칸(null 항목)도 그대로 한 칸을 차지한다.
+        /// </summary>
+        internal readonly struct ItemSlot
+        {
+            public ItemSlot(InventoryItemState state, int count)
+            {
+                State = state;
+                Count = count;
+            }
+
+            public InventoryItemState State { get; }
+            public int Count { get; }
+        }
+
+        private readonly ReadOnlyCollection<ItemLine> items;
+
+        /// <summary>빼기 직전의 잔액. "뺀 만큼 더하기"가 아니라 이 값으로 <b>되돌린다</b> - 포화나
+        /// 자르기가 끼어들 자리를 남기지 않는다.</summary>
+        private readonly int currencyBefore;
+
+        /// <summary>빼기 직전의 목록 전체(순서 그대로).</summary>
+        private readonly ItemSlot[] itemsBefore;
+
+        private InventoryCostReceipt(
+            int currency, ItemLine[] itemLines, int currencyBefore, ItemSlot[] itemsBefore)
+        {
+            Currency = currency;
+            items = Array.AsReadOnly(itemLines);
+            this.currencyBefore = currencyBefore;
+            this.itemsBefore = itemsBefore;
+        }
+
+        internal InventoryCostReceipt(
+            int currency, List<InventoryItemRequirement> requirements,
+            int currencyBefore, ItemSlot[] itemsBefore)
+        {
+            Currency = currency;
+
+            var lines = new ItemLine[requirements?.Count ?? 0];
+            for (int i = 0; i < lines.Length; i++)
+            {
+                lines[i] = new ItemLine(requirements[i].ItemId, requirements[i].Count);
+            }
+
+            items = Array.AsReadOnly(lines);
+            this.currencyBefore = currencyBefore;
+            this.itemsBefore = itemsBefore ?? Array.Empty<ItemSlot>();
+        }
+
+        /// <summary>실제로 빠진 재화.</summary>
+        public int Currency { get; }
+
+        /// <summary>실제로 빠진 아이템 줄들(차감한 순서 그대로). 절대 null이 아니다.</summary>
+        public IReadOnlyList<ItemLine> Items => items;
+
+        /// <summary>되돌릴 것이 하나라도 있는가. 비용이 아예 없던 요청은 false다.</summary>
+        public bool Changed => Currency > 0 || items.Count > 0;
+
+        /// <summary>
+        /// 찍어 둔 모양으로 문서를 되돌린다. 목록은 <b>새로 만들지 않고 제자리에서</b> 다시 채운다 -
+        /// 다른 코드가 이 목록 자체를 들고 있을 수 있기 때문이다. 항목도 새로 만들지 않고 <b>찍어 둔
+        /// 그 객체</b>를 수량까지 되돌려 그대로 다시 넣으므로, 지워졌던 칸이 원래 자리로 돌아온다.
+        /// </summary>
+        internal void Restore(SaveData data)
+        {
+            if (data == null) return;
+
+            data.currency = currencyBefore;
+
+            if (data.items == null) data.items = new List<InventoryItemState>();
+
+            data.items.Clear();
+            for (int i = 0; i < itemsBefore.Length; i++)
+            {
+                ItemSlot slot = itemsBefore[i];
+
+                // 차감이 제자리에서 고친 수량을 먼저 되돌린 뒤 그 객체를 그대로 다시 넣는다.
+                if (slot.State != null) slot.State.count = slot.Count;
+                data.items.Add(slot.State);
+            }
+        }
+
+        /// <summary>지금 목록의 모양을 그대로 찍는다(항목 객체 + 그때의 수량, null 칸 포함).</summary>
+        internal static ItemSlot[] Capture(List<InventoryItemState> states)
+        {
+            if (states == null || states.Count == 0) return Array.Empty<ItemSlot>();
+
+            var snapshot = new ItemSlot[states.Count];
+            for (int i = 0; i < states.Count; i++)
+            {
+                InventoryItemState state = states[i];
+                snapshot[i] = new ItemSlot(state, state?.count ?? 0);
+            }
+
+            return snapshot;
+        }
+    }
+
+    /// <summary>
     /// 보유 재화와 보유 아이템을 소유하는 <b>단일 관리자</b>. 값이 바뀌는 경로는 이 컴포넌트의
     /// 메서드뿐이고, UI(InventoryPanel)는 여기서 읽기만 한다 - 씬에 배치된 오브젝트나 프리팹 상태를
     /// 인벤토리의 근거로 삼지 않는다. CharacterRoster와 같은 구조다.
@@ -475,6 +610,13 @@ namespace Inventory
         /// <b>전혀 건드리지 않은 채</b> 실패 이유를 돌려준다(저장 0회, <see cref="InventoryChanged"/>
         /// 0회). 통과했을 때만 재화와 모든 아이템을 함께 빼고 <b>저장 1회, 알림 1회</b>로 끝낸다.
         ///
+        /// <b>기록에 실패하면 낸 것도 없다.</b> 예전에는 쓰기가 실패해도 오류만 남기고 성공을
+        /// 돌려주었는데, 그러면 값은 빠졌고 파일에는 남지 않은 상태로 호출부가 "샀다"고 믿는다 -
+        /// 그 판단으로 무언가를 지급하면 앱을 다시 켰을 때 <b>낸 것만 되살아나고 받은 것은 사라진다</b>.
+        /// 지금은 저장이 실패하면 재화와 아이템을 전부 되돌리고
+        /// <see cref="InventoryCostFailureReason.SaveFailed"/>로 실패를 알리며,
+        /// <see cref="InventoryChanged"/>도 보내지 않는다(바뀐 것이 없으므로 알릴 것도 없다).
+        ///
         /// 수량이 정확히 0이 된 아이템은 저장 항목째 지워지고, 남은 항목들은 순서도 값도 그대로다 -
         /// 표시 순서가 "처음 획득한 순서"라는 규칙이 소비 때문에 흔들리지 않는다.
         ///
@@ -485,11 +627,62 @@ namespace Inventory
         /// </summary>
         public InventoryCostResult TrySpendCost(InventoryCostRequest request)
         {
-            var requirements = new List<InventoryItemRequirement>();
-            InventoryCostResult evaluation = EvaluateCost(request, requirements);
+            InventoryCostResult evaluation = TrySpendCostWithoutSave(request, out InventoryCostReceipt receipt);
             if (!evaluation.Success) return evaluation;
 
-            bool changed = false;
+            // 낼 것이 없었던 요청은 바뀐 것도 없다 - 예전과 똑같이 저장도 알림도 하지 않는다.
+            if (!receipt.Changed) return evaluation;
+
+            if (!PersistToDisk())
+            {
+                RefundCostWithoutSave(receipt);
+
+                Debug.LogError("[InventoryManager] 비용 지불을 저장하지 못해 되돌렸습니다 - 재화와 아이템은 " +
+                               "지불을 시도하기 전 그대로입니다.", this);
+                return InventoryCostResult.SaveFailed(receipt.Currency, SaveSystem.Data.currency);
+            }
+
+            NotifyChangedAfterExternalSave();
+            return evaluation;
+        }
+
+        /// <summary>
+        /// <see cref="TrySpendCost"/>와 <b>똑같이 판정하고 똑같이 차감하지만 저장도 알림도 하지
+        /// 않는다</b>. 비용 차감과 다른 저장 값 변경(건설 기록 등)이 한 트랜잭션이어서 그 사이에
+        /// 저장이 두 번 일어나면 안 되는 호출부를 위한 경로이며,
+        /// <see cref="TrySpendCurrencyWithoutSave"/>가 재화 하나에 대해 하던 일을 재화 + 아이템
+        /// 여러 종으로 넓힌 것이다.
+        ///
+        /// 호출부의 의무는 셋이다.
+        /// <list type="number">
+        ///   <item>이어서 <c>SaveSystem.Save()</c>를 <b>한 번</b> 한다.</item>
+        ///   <item>저장이 성공하면 <see cref="NotifyChangedAfterExternalSave"/>로 알린다(여기서는
+        ///         알리지 않는다 - 아직 기록되지 않은 값을 화면에 확정으로 보여 줄 수 없다).</item>
+        ///   <item>저장이 실패하면 <see cref="RefundCostWithoutSave"/>에 <paramref name="receipt"/>를
+        ///         그대로 넘겨 되돌린다.</item>
+        /// </list>
+        ///
+        /// 실패하면 <paramref name="receipt"/>는 <see cref="InventoryCostReceipt.Changed"/>가 false인
+        /// 빈 영수증이라, 되돌리기를 불러도 아무 일도 일어나지 않는다.
+        /// </summary>
+        public InventoryCostResult TrySpendCostWithoutSave(
+            InventoryCostRequest request, out InventoryCostReceipt receipt)
+        {
+            var requirements = new List<InventoryItemRequirement>();
+            InventoryCostResult evaluation = EvaluateCost(request, requirements);
+            if (!evaluation.Success)
+            {
+                receipt = InventoryCostReceipt.Empty;
+                return evaluation;
+            }
+
+            // 값을 건드리기 <b>전에</b> 지금 모양을 찍어 둔다 - 되돌리기는 "뺀 만큼 더하기"가 아니라
+            // 이 사진으로 되돌리는 일이라, 지워진 항목도 원래 자리로 돌아온다.
+            int currencyBefore = SaveSystem.Data.currency;
+            InventoryCostReceipt.ItemSlot[] itemsBefore =
+                InventoryCostReceipt.Capture(SaveSystem.Data.items);
+
+            int spentCurrency = 0;
 
             if (request.Currency > 0)
             {
@@ -498,19 +691,39 @@ namespace Inventory
                 // 유일하게 안전한 처리이기 때문이다(재화 차감 경로는 실패 시 값을 바꾸지 않는다).
                 if (!TrySpendCurrencyWithoutSave(request.Currency))
                 {
+                    receipt = InventoryCostReceipt.Empty;
                     return InventoryCostResult.InsufficientCurrency(request.Currency, SaveSystem.Data.currency);
                 }
-                changed = true;
+                spentCurrency = request.Currency;
             }
 
             for (int i = 0; i < requirements.Count; i++)
             {
                 SpendItemWithoutSave(requirements[i].ItemId, requirements[i].Count);
-                changed = true;
             }
 
-            if (changed) SaveAndNotify();
+            receipt = new InventoryCostReceipt(spentCurrency, requirements, currencyBefore, itemsBefore);
             return evaluation;
+        }
+
+        /// <summary>
+        /// <see cref="TrySpendCostWithoutSave"/>가 뺀 것을 되돌린다(저장/알림 없음). 트랜잭션 취소
+        /// 전용이며, 아이템 지급에는 <see cref="AddItem"/>을 쓴다.
+        ///
+        /// <b>되돌리기는 빼기 직전의 모양을 그대로 복원하는 일이다</b> - 뺀 값을 다시 더하는 것이
+        /// 아니다. 수량이 정확히 0이 되어 지워졌던 항목을 다시 <i>더하면</i> 그 항목이 목록 맨 뒤에
+        /// 붙어, 실패한 지불 하나가 <b>획득 순서(= 인벤토리 표시 순서)를 영구히 바꿔</b> 놓는다.
+        /// 그래서 영수증이 들고 있는 사진으로 잔액과 목록(순서·중복·null 칸·수량·항목 객체까지)을
+        /// 그대로 되돌린다. 카탈로그 등록 여부도 다시 따지지 않는다 - 뺄 때 이미 통과한 값이고,
+        /// 되돌리기가 막히면 <b>플레이어가 낸 것이 사라진다</b>.
+        ///
+        /// 빈 영수증이면 아무 일도 하지 않는다.
+        /// </summary>
+        public void RefundCostWithoutSave(InventoryCostReceipt receipt)
+        {
+            if (receipt == null || !receipt.Changed) return;
+
+            receipt.Restore(SaveSystem.Data);
         }
 
         /// <summary>

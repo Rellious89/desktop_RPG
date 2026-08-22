@@ -13,11 +13,14 @@ namespace Building
     /// 시스템을 새로 만들지 않는다. 이 클래스가 하는 일은 <b>건물 정의 하나를 받아 문구를 그리고,
     /// 지금 그 비용을 낼 수 있는지 보여 주고, 누른 버튼 옆에 자리를 잡는 것</b>이다.
     ///
-    /// <b>여기에는 아직 건설이 없다.</b> 비용을 <b>판정만</b> 하고 내지는 않는다 -
-    /// <see cref="InventoryManager.EvaluateCost"/>는 저장 항목을 만들지도, 값을 바꾸지도, 저장하지도,
-    /// 알림을 보내지도 않는 읽기 전용 경로다. <see cref="InventoryManager.TrySpendCost"/>는 <b>부르지
-    /// 않는다</b>. 확인 버튼은 낼 수 있을 때만 눌리게 되지만, 눌러서 일어나는 일(건설 시작·차감·저장)은
-    /// 다음 단계의 몫이라 지금은 <b>다시 판정하고 끝난다</b>.
+    /// <b>그리는 동안에는 아무것도 바꾸지 않는다.</b> 열려 있는 내내 비용을 <b>판정만</b> 하고 내지
+    /// 않는다 - <see cref="InventoryManager.EvaluateCost"/>는 저장 항목을 만들지도, 값을 바꾸지도,
+    /// 저장하지도, 알림을 보내지도 않는 읽기 전용 경로다.
+    ///
+    /// <b>실제로 무언가가 바뀌는 자리는 확인 버튼 하나뿐이며, 그것도 이 클래스가 하지 않는다.</b>
+    /// 차감·기록·저장은 <see cref="BuildingConstructionService"/>가 한 덩어리로 처리하고, 여기서는
+    /// 그 결과를 화면에 옮길 뿐이다 - 성공이면 닫고, 실패면 열어 둔 채 경고를 켠다. 이 클래스에
+    /// 재화를 읽거나 저장을 부르는 코드는 여전히 한 줄도 없다.
     ///
     /// <b>닫기는 btn_cancle 하나다.</b> ModalPanel의 닫기 버튼 칸에 btn_cancle을 연결해 두었으므로
     /// 취소 버튼도 ESC도 <see cref="ModalPanel.Close"/>라는 같은 경로를 지난다 - 닫는 방법마다 다른
@@ -101,6 +104,20 @@ namespace Building
         /// <summary>마지막으로 자리를 잡을 때 고른 후보. 진단용이다.</summary>
         public BuildingPopupSide LastPlacementSide { get; private set; }
 
+        /// <summary>
+        /// 확인을 눌렀을 때 건설을 맡길 서비스. 여는 쪽
+        /// (<see cref="TownBuildingInteractionController"/>)이 <see cref="SetConstructionService"/>로
+        /// 넘겨 준다 - 순수 C# 객체라 Inspector 칸으로 둘 수 없고, 팝업이 스스로 만들면 씬마다 다른
+        /// 서비스가 생겨 "건설 규칙은 한 곳"이라는 규칙이 무너진다.
+        ///
+        /// 비어 있으면 확인은 <b>아무것도 하지 않는다</b>(경고를 켜고 버튼을 닫는다) - 낼 수 있는
+        /// 것처럼 보이는데 눌러도 아무 일이 없는 자리를 남기지 않는다.
+        /// </summary>
+        private BuildingConstructionService constructionService;
+
+        /// <summary>마지막 건설 시작 요청의 결과. 아직 눌린 적이 없으면 null이다(진단용).</summary>
+        public BuildingConstructionStartResult? LastStartResult { get; private set; }
+
         // 구독 중인 참조들. 구독을 건 대상을 그대로 들고 있다가 짝지어 해제한다 - 해제할 때 다시
         // 정의에서 찾아오면, 그 사이에 정의가 바뀐 경우 엉뚱한 참조에서 해제하게 된다.
         private LocalizedTextReference boundNameReference;
@@ -136,6 +153,12 @@ namespace Building
         private bool missingFormatWarned;
         private bool missingInventoryWarned;
 
+        /// <summary>직전 확인이 실패해서 경고를 켜 둔 상태인가. 판정만으로는 알 수 없는 실패(저장
+        /// 실패처럼 <b>보유량은 충분한데</b> 시작하지 못한 경우)에도 경고가 남아 있게 하려고 따로
+        /// 들고 있으며, 다시 바인딩하거나 열거나 인벤토리가 바뀌면 풀린다 - 그때는 새로 판정한
+        /// 결과가 화면의 근거가 된다.</summary>
+        private bool startFailureBlocked;
+
         /// <summary>닫기 버튼을 자동으로 찾아야 할 때 쓰는 이름. 이 팝업의 닫기는 btn_cancle이다
         /// (에셋 철자를 그대로 쓴다 - 'cancel'로 고치지 않는다).</summary>
         protected override string CloseButtonName => "btn_cancle";
@@ -170,6 +193,18 @@ namespace Building
             BindInternal(building, sourceButton);
         }
 
+        /// <summary>
+        /// 확인을 눌렀을 때 건설을 맡길 서비스를 정한다. 여는 쪽이 <see cref="Bind(BuildingDefinition,
+        /// RectTransform)"/> 앞뒤 어느 쪽에서 불러도 되며, 같은 서비스를 다시 넘겨도 안전하다.
+        ///
+        /// null을 넘기면 확인이 아무 일도 하지 않는 상태로 되돌아간다 - 그 상태를 조용히 두지 않고
+        /// 눌렀을 때 경고를 켠다.
+        /// </summary>
+        public void SetConstructionService(BuildingConstructionService service)
+        {
+            constructionService = service;
+        }
+
         /// <summary>기준 버튼을 정하고 <see cref="ModalPanel.Open"/>을 부른다 - 여는 쪽이 두 줄을
         /// 순서대로 쓰다가 하나를 빠뜨리는 자리를 없앤다.</summary>
         public void Open(RectTransform sourceButton)
@@ -195,6 +230,10 @@ namespace Building
             SourceRect = sourceButton;
             hasTrackedGeometry = false;
 
+            // 다른 건물을 그리기 시작하는 순간 직전 실패 표시는 남의 이야기가 된다.
+            startFailureBlocked = false;
+            LastStartResult = null;
+
             // 닫혀 있으면 여기서 구독하지 않는다 - 열릴 때 OnModalOpened가 구독하고 그 시점의
             // 언어와 인벤토리로 그린다. 열려 있으면 지금 바로 다시 그린다.
             if (isActiveAndEnabled)
@@ -207,6 +246,10 @@ namespace Building
         protected override void OnModalOpened()
         {
             ValidateReferences();
+
+            // 다시 열 때는 언제나 지금 보유량이 근거다 - 지난번에 켜 두고 닫은 경고를 들고 오지 않는다.
+            startFailureBlocked = false;
+
             SubscribeLocalization();
             SubscribeInventory();
             AttachConfirmListener();
@@ -217,6 +260,31 @@ namespace Building
             UnsubscribeLocalization();
             UnsubscribeInventory();
             DetachConfirmListener();
+
+            // 닫힌 팝업에 경고가 켜진 채로 남아 있으면 다음에 열릴 때 한 프레임 동안 그 경고가 보인다.
+            // 판정은 열릴 때 다시 하므로, 여기서는 <b>표시만</b> 초기 상태로 되돌린다 - 인벤토리도
+            // 저장도 건드리지 않는다.
+            startFailureBlocked = false;
+            ResetCostDisplay();
+        }
+
+        /// <summary>
+        /// 비용 표시를 저작된 초기 상태(<b>경고 꺼짐 + 확인 닫힘</b>)로 되돌린다.
+        ///
+        /// <see cref="ApplyCostState"/>에 false를 넘기는 것과 <b>다르다</b> - 그쪽은 "낼 수 없다"를
+        /// 그리는 것이라 경고를 <b>켠다</b>. 여기서는 "아직 판정한 적이 없다"를 그리므로 둘 다 끈다.
+        /// </summary>
+        private void ResetCostDisplay()
+        {
+            IsCostPayable = false;
+
+            if (warningText != null)
+            {
+                GameObject warningObject = warningText.gameObject;
+                if (warningObject.activeSelf) warningObject.SetActive(false);
+            }
+
+            if (confirmButton != null && confirmButton.interactable) confirmButton.interactable = false;
         }
 
         protected override void OnDestroy()
@@ -351,6 +419,9 @@ namespace Building
         /// </summary>
         private void HandleInventoryChanged()
         {
+            // 보유량이 실제로 달라졌으므로 직전 실패 표시는 근거를 잃는다 - 지금 값으로 다시 판정한다.
+            startFailureBlocked = false;
+
             RefreshCostState();
             UpdatePlacement();
         }
@@ -500,7 +571,10 @@ namespace Building
 
             InventoryCostResult result = inventory.EvaluateCost(building.ToCostRequest());
             LastCostEvaluation = result;
-            ApplyCostState(result != null && result.IsPayable);
+
+            // 직전 시작이 실패해서 경고를 켜 둔 상태라면 판정이 통과해도 켜 둔 채로 남긴다 - 그 표시를
+            // 푸는 것은 다시 열거나 다시 바인딩하거나 인벤토리가 실제로 바뀌었을 때뿐이다.
+            ApplyCostState(result != null && result.IsPayable && !startFailureBlocked);
         }
 
         /// <summary>판정 결과를 화면에 옮긴다. 규칙은 하나다 - <b>낼 수 있을 때만</b> 경고가 꺼지고
@@ -555,18 +629,63 @@ namespace Building
         /// 열려 있는 동안 다른 경로가 재화를 썼을 수 있으므로, 화면에 남아 있던 판정을 근거로 진행하면
         /// "보이기엔 낼 수 있었는데" 모자란 채로 지나가는 자리가 생긴다.
         ///
-        /// <b>이번 단계에서는 낼 수 있어도 아무 일도 하지 않는다.</b> 실제 건설(차감·시작·저장)은 다음
-        /// 단계의 몫이며, 그때 이 자리에 <see cref="InventoryManager.TrySpendCost"/> 호출이 붙는다 -
-        /// 지금 여기서 인벤토리를 바꾸거나 저장하는 코드는 한 줄도 돌지 않는다.
+        /// 낼 수 있으면 <see cref="BuildingConstructionService.TryStartConstruction"/>에 넘긴다.
+        /// <b>여기서 차감하거나 저장하지 않는다</b> - 비용과 건설 기록을 한 번의 저장으로 함께 남기는
+        /// 것은 서비스 하나의 일이고, 이 클래스는 그 답을 화면에 옮기기만 한다.
+        ///
+        /// <list type="bullet">
+        ///   <item><b>성공</b>: 평소의 닫기 경로로 닫는다(구독 해제와 ESC 목록 정리가 함께 지나간다).</item>
+        ///   <item><b>실패</b>: 닫지 않는다. 곧바로 다시 판정해 화면을 실제 보유량에 맞추고, 그러고도
+        ///         낼 수 있다고 나오면(저장 실패처럼 보유량 문제가 아닌 실패) <b>경고를 켠 채로</b>
+        ///         확인을 닫아 둔다 - 실패했는데 아무 표시도 없이 눌리는 버튼을 남기지 않는다.</item>
+        /// </list>
+        ///
+        /// 서비스가 없으면 시작할 방법이 없으므로 같은 실패로 다룬다(코드가 대신 차감하지 않는다).
         /// </summary>
         private void HandleConfirmClicked()
         {
+            // 다시 판정하기 전에 직전 실패 표시를 푼다 - 지금 보유량이 근거가 되어야 한다.
+            startFailureBlocked = false;
+
             RefreshCostState();
             UpdatePlacement();
 
             if (!IsCostPayable) return;
 
-            // 낼 수 있다 - 건설을 시작하는 코드는 다음 단계에서 이 자리에 붙는다.
+            BuildingDefinition building = BoundBuilding;
+
+            if (constructionService == null)
+            {
+                Debug.LogError($"[BuildingPopupPanel] '{name}': 건설 서비스가 연결되지 않아 건설을 시작할 " +
+                               "수 없습니다 - 팝업을 여는 쪽이 SetConstructionService로 넘겨야 합니다.", this);
+                BlockAfterStartFailure();
+                return;
+            }
+
+            BuildingConstructionStartResult result = constructionService.TryStartConstruction(building);
+            LastStartResult = result;
+
+            if (result.Success)
+            {
+                // 성공했으니 이 팝업이 할 일은 끝났다. 닫기는 언제나 같은 경로다.
+                Close();
+                return;
+            }
+
+            // 실패는 열어 둔 채로 알린다. 보유량이 실제로 모자랐다면 다시 판정하는 것만으로 경고가
+            // 켜지고, 그렇지 않은 실패(저장 실패/중복 시작)는 아래에서 강제로 켠다.
+            RefreshCostState();
+            UpdatePlacement();
+
+            if (IsCostPayable) BlockAfterStartFailure();
+        }
+
+        /// <summary>판정으로는 드러나지 않는 실패를 화면에 남긴다 - 경고를 켜고 확인을 닫는다.</summary>
+        private void BlockAfterStartFailure()
+        {
+            startFailureBlocked = true;
+            ApplyCostState(false);
+            UpdatePlacement();
         }
 
         // ---- 자리 잡기 ----

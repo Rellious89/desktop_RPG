@@ -28,6 +28,12 @@ namespace Common
             data.characters = CompactCharacters(data.characters);
             data.items = CompactItems(data.items);
 
+            // 건설 기록도 buildingId로 찾으므로 null 항목은 아무것도 가리키지 않는 쓰레기다. 지우는
+            // 것은 <b>null 항목뿐</b>이다 - 모르는 buildingId(표에서 잠시 빠진 건물)도, 같은 id가 두 줄
+            // 있는 손상된 파일도 그대로 둔다. 여기서 걸러 내면 다시 들어온 건물을 또 짓게 되고, 순서를
+            // 바꾸면 "먼저 시작한 순서"라는 목록의 뜻이 흔들린다.
+            data.buildingConstructions = CompactBuildingConstructions(data.buildingConstructions);
+
             // 회복 슬롯만 규칙이 다르다. 여기서는 <b>목록의 인덱스가 곧 슬롯 번호</b>라서 null을 지우면
             // 뒤 슬롯들이 앞으로 밀려 남의 진행이 다른 슬롯으로 옮겨간다. 그래서 지우지 않고 빈 슬롯으로
             // 갈아 끼우며, 그 처리와 최소 개수 채우기는 SaveData가 이미 갖고 있는 규칙을 그대로 쓴다.
@@ -56,6 +62,19 @@ namespace Common
         private static List<InventoryItemState> CompactItems(List<InventoryItemState> source)
         {
             if (source == null) return new List<InventoryItemState>();
+
+            for (int i = source.Count - 1; i >= 0; i--)
+            {
+                if (source[i] == null) source.RemoveAt(i);
+            }
+
+            return source;
+        }
+
+        private static List<BuildingConstructionSaveState> CompactBuildingConstructions(
+            List<BuildingConstructionSaveState> source)
+        {
+            if (source == null) return new List<BuildingConstructionSaveState>();
 
             for (int i = source.Count - 1; i >= 0; i--)
             {

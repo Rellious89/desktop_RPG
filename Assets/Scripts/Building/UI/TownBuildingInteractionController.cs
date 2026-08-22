@@ -1,4 +1,7 @@
+using System;
+using Common;
 using Field;
+using Inventory;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -6,13 +9,25 @@ namespace Building
 {
     /// <summary>
     /// 마을의 건물 슬롯 위에 떠 있는 상호작용 UI(btn_Build_Inn)를 <b>월드 앵커에 붙여 두는</b> 컨트롤러.
-    /// 하는 일은 셋뿐이다 - (1) 앵커의 월드 좌표를 화면 좌표로 옮겨 버튼 위치를 맞추고, (2) 보여야 할
-    /// 상황인지 판정해 상호작용 루트를 켜고 끄고, (3) 버튼이 눌리면 건물 정의 하나를 팝업에 넘겨 연다.
+    /// 하는 일은 다섯이다 - (1) 앵커의 월드 좌표를 화면 좌표로 옮겨 버튼 위치를 맞추고, (2) 보여야 할
+    /// 상황인지 판정해 상호작용 루트를 켜고 끄고, (3) 버튼이 눌리면 건물 정의 하나를 팝업에 넘겨 열고,
+    /// (4) <b>이미 시작된 건물의 건설 버튼을 감추고</b>, (5) 건설이 실제로 시작되면 안내 토스트를
+    /// 한 번 띄운다.
     ///
-    /// <b>여기에 건설은 없다.</b> 비용을 평가하지도 내지도 않고 저장도 하지 않는다 - 클릭은
-    /// <see cref="BuildingPopupPanel.Bind(BuildingDefinition, RectTransform)"/> +
-    /// <see cref="Common.ModalPanel.Open"/>까지다. 팝업이 <b>어디에</b> 뜨는지도 여기서 정하지 않는다 -
-    /// 기준이 될 버튼 사각형만 넘기고, 자리 계산은 팝업이 혼자 한다.
+    /// <b>건설의 규칙은 여기에 없다.</b> 비용을 평가하거나 내는 코드도, 저장을 부르는 코드도 한 줄도
+    /// 없다 - 그 전부는 <see cref="BuildingConstructionService"/> 하나가 갖고 있고, 이 컨트롤러는
+    /// 씬의 <see cref="InventoryManager"/>로 그 서비스를 <b>만들어 팝업에 건네</b> 줄 뿐이다.
+    /// 팝업이 <b>어디에</b> 뜨는지도 여기서 정하지 않는다 - 기준이 될 버튼 사각형만 넘기고, 자리
+    /// 계산은 팝업이 혼자 한다.
+    ///
+    /// <b>이미 시작된 건물의 버튼은 다시 켜지지 않는다.</b> 판정의 근거는 저장 문서의 건설 기록
+    /// 하나이며(<see cref="BuildingConstructionService.HasConstruction(string)"/>), 그래서 앱을 껐다
+    /// 켜도, 완성 시각이 지나도 건설 버튼은 계속 숨은 채로 남는다 - 기록이 있다는 것 자체가 "이미
+    /// 시작했다"이기 때문이다. 여관 입장 버튼은 이번 단계에서도 계속 꺼진 채로 둔다.
+    ///
+    /// <b>안내 문구를 코드가 짓지 않는다.</b> 토스트에 실을 문장은 01_UI 표(42번)에서 오며, 아직
+    /// 도착하지 않았으면 <b>토스트를 띄우지 않는다</b> - 대체 문구를 코드가 지어내면 표를 고쳐도
+    /// 화면이 바뀌지 않는 자리가 생긴다.
     ///
     /// <b>이 컴포넌트는 자기가 끄는 오브젝트 안에 있으면 안 된다.</b> 상호작용 루트를 끄는 순간 그
     /// 안의 컴포넌트는 Update를 받지 못하므로, 한 번 숨기면 다시 켜 줄 주체가 사라진다. 그래서 이
@@ -79,9 +94,32 @@ namespace Building
                  "이 참조 하나가 '이 버튼이 어떤 건물인가'를 정한다.")]
         [SerializeField] private BuildingDefinition building;
 
+        [Header("Construction")]
+        [Tooltip("비용의 소유자(씬의 InventoryManager). 이 참조로 건설 서비스를 만든다 - 비워두면 " +
+                 "건설을 시작할 수 없고 확인 버튼이 아무 일도 하지 않는다. Find/이름 탐색을 쓰지 " +
+                 "않는다는 이 컴포넌트의 규칙 그대로, 정적 Instance로 대신 찾지도 않는다.")]
+        [SerializeField] private InventoryManager inventoryManager;
+
+        [Tooltip("건설을 시작했을 때 띄울 안내 문구(01_UI / 42). 비워두거나 번역이 아직 도착하지 " +
+                 "않았으면 토스트를 띄우지 않는다 - 코드가 대체 문구를 지어내지 않는다.")]
+        [SerializeField] private LocalizedTextReference constructionStartedMessage = new LocalizedTextReference();
+
         private RectTransform buildButtonRect;
         private Canvas interactionCanvas;
         private bool referencesValidated;
+
+        /// <summary>건설 규칙의 소유자. 이 컨트롤러가 만들고, 팝업에 건네주고, 시작 신호를 받는다.
+        /// 인벤토리가 없으면 만들지 못하므로 null이며, 그때는 팝업의 확인이 아무 일도 하지 않는다.</summary>
+        private BuildingConstructionService constructionService;
+
+        /// <summary>지금 구독 중인 안내 문구 참조. 걸어 둔 대상을 그대로 들고 있다가 짝지어 해제한다
+        /// (팝업이 번역 구독을 다루는 방식과 같다).</summary>
+        private LocalizedTextReference boundStartedMessage;
+
+        /// <summary>도착한 안내 문구. null은 "아직 오지 않았다"는 뜻이며 빈 문자열과 구분한다.</summary>
+        private string localizedStartedMessage;
+
+        private bool missingToastWarned;
 
         /// <summary>마지막 판정에서 상호작용 UI가 보여야 했는지 여부. 읽기 전용 진단값이며 이 값을
         /// 바꿔서 표시를 바꿀 수는 없다 - 표시를 정하는 것은 언제나 <see cref="UpdateInteraction"/>이다.</summary>
@@ -90,6 +128,8 @@ namespace Building
         private void OnEnable()
         {
             ValidateReferences();
+            EnsureConstructionService();
+            SubscribeStartedMessage();
 
             if (buildButton != null)
             {
@@ -104,7 +144,52 @@ namespace Building
         private void OnDisable()
         {
             if (buildButton != null) buildButton.onClick.RemoveListener(HandleBuildClicked);
+
+            UnsubscribeStartedMessage();
+            DetachConstructionService();
         }
+
+        // ---- 건설 서비스 ----
+
+        /// <summary>
+        /// 건설 서비스를 <b>한 번만</b> 만든다. 만들 수 있는 조건은 씬의 인벤토리 하나뿐이며, 없으면
+        /// 만들지 않는다(그 사실은 <see cref="ValidateReferences"/>가 이미 오류로 남겼다).
+        ///
+        /// 저장 문서와 저장 함수, 시계는 여기서 <see cref="SaveSystem"/>과 <see cref="DateTime.UtcNow"/>에
+        /// 이어 붙인다 - 서비스 자신은 엔진도 파일도 모르는 순수 객체로 두어야 시험이 고정된 시계와
+        /// 가짜 저장으로 그 규칙을 그대로 돌려 볼 수 있다(<see cref="Recovery.RecoveryService"/>와 같다).
+        /// </summary>
+        private void EnsureConstructionService()
+        {
+            if (constructionService != null) return;
+            if (inventoryManager == null) return;
+
+            constructionService = new BuildingConstructionService(
+                inventoryManager,
+                () => SaveSystem.Data,
+                SaveSystem.Save,
+                () => DateTime.UtcNow);
+
+            constructionService.ConstructionStarted += HandleConstructionStarted;
+        }
+
+        private void DetachConstructionService()
+        {
+            if (constructionService == null) return;
+
+            constructionService.ConstructionStarted -= HandleConstructionStarted;
+            constructionService = null;
+        }
+
+        /// <summary>이 컨트롤러가 쓰는 건설 서비스. 인벤토리가 연결되지 않았으면 null이다(진단용).</summary>
+        public BuildingConstructionService ConstructionService => constructionService;
+
+        /// <summary>이 버튼이 맡은 건물의 건설이 이미 시작됐는지. 판정의 근거는 저장 기록 하나이며,
+        /// <b>완성 시각이 지났는지는 보지 않는다</b> - 기록이 있으면 건설 버튼은 다시 나오지 않는다.
+        /// 서비스나 정의가 없으면 "아직 시작하지 않았다"로 본다(감출 근거가 없다).</summary>
+        public bool IsConstructionStarted =>
+            constructionService != null && building != null &&
+            constructionService.HasConstruction(building.BuildingId);
 
         /// <summary>스테이지와 캐릭터가 모두 움직인 뒤에 위치를 맞춘다.</summary>
         private void LateUpdate()
@@ -124,6 +209,7 @@ namespace Building
         private void UpdateInteraction()
         {
             KeepOpenInnButtonInactive();
+            ApplyBuildButtonVisibility();
 
             bool townReady = IsTownReady();
             if (!townReady) CloseOpenPopup();
@@ -214,11 +300,28 @@ namespace Building
         }
 
         /// <summary>여관 입장 버튼은 이번 단계에서 켜지지 않는다. 저작 실수로 켜져 있어도 여기서
-        /// 한 번 되돌린다 - "지어지지 않은 건물에 들어가는 버튼"이 보이는 경로를 만들지 않는다.</summary>
+        /// 한 번 되돌린다 - "지어지지 않은 건물에 들어가는 버튼"이 보이는 경로를 만들지 않는다.
+        /// <b>건설이 시작된 뒤에도 마찬가지다</b> - 이 버튼이 켜지는 것은 다음 단계의 몫이다.</summary>
         private void KeepOpenInnButtonInactive()
         {
             if (openInnButton == null) return;
             if (openInnButton.activeSelf) openInnButton.SetActive(false);
+        }
+
+        /// <summary>
+        /// 이미 시작된 건물이면 건설 버튼을 감춘다. 켜고 끄는 것은 <b>버튼 오브젝트</b>이며 상호작용
+        /// 루트는 건드리지 않는다 - 루트를 끄면 이 컨트롤러가 다루는 다른 UI까지 함께 사라진다.
+        ///
+        /// 매 프레임 판정하는 이유는 이 사실이 <b>저장 문서</b>에서 오기 때문이다. 시작 이벤트를
+        /// 놓쳤든, 앱을 다시 켰든, 다른 경로가 기록을 남겼든 결과는 언제나 같다.
+        /// </summary>
+        private void ApplyBuildButtonVisibility()
+        {
+            if (buildButton == null) return;
+
+            bool shouldShow = !IsConstructionStarted;
+            GameObject buttonObject = buildButton.gameObject;
+            if (buttonObject.activeSelf != shouldShow) buttonObject.SetActive(shouldShow);
         }
 
         /// <summary>열려 있는 건물 팝업을 <b>평소의 닫기 경로</b>로 닫는다 - 오브젝트를 직접 끄지 않는다
@@ -231,12 +334,96 @@ namespace Building
             buildingPopup.Close();
         }
 
-        /// <summary>건설 버튼 클릭. <b>정의 하나와 누른 버튼을 넘기고 여는 것이 전부</b>다 - 비용을
-        /// 확인하지도, 내지도, 저장하지도 않는다.
+        // ---- 시작 안내 토스트 ----
+
+        /// <summary>
+        /// 건설이 실제로 시작되어 <b>파일에 남은 뒤에만</b> 온다(실패한 시작에서는 오지 않는다).
+        /// 그래서 여기서 하는 일은 안내 하나뿐이며, 저장도 인벤토리도 건드리지 않는다.
+        ///
+        /// 버튼을 감추는 것은 여기서 하지 않는다 - 그 판정은 매 프레임 저장 기록을 보고 하므로
+        /// (<see cref="ApplyBuildButtonVisibility"/>) 이벤트를 놓쳐도 결과가 같아야 한다.
+        /// </summary>
+        private void HandleConstructionStarted(
+            BuildingDefinition startedBuilding, BuildingConstructionSaveState state)
+        {
+            ShowStartedToast();
+        }
+
+        /// <summary>지금까지 띄운 시작 안내 토스트 수. 읽기 전용 진단값이다 - "한 번의 시작에 안내도
+        /// 한 번"이라는 성질은 화면만 봐서는 확인하기 어려워 밖에서 셀 수 있어야 한다
+        /// (<see cref="IsInteractionVisible"/>과 같은 성격의 값이다).</summary>
+        public int StartedToastCount { get; private set; }
+
+        /// <summary>지금 도착해 있는 안내 문구. 아직 오지 않았으면 null이며, 이 값이 없으면 토스트를
+        /// 띄우지 않는다(진단용 - 코드가 문구를 지어내지 않는다는 것을 밖에서 확인할 수 있다).</summary>
+        public string StartedToastMessage => localizedStartedMessage;
+
+        /// <summary>안내 토스트를 <b>한 번</b> 띄운다. 문구가 아직 오지 않았거나 토스트 관리자가 없는
+        /// 구성에서는 띄우지 않고 한 번만 알린다 - 코드가 문구를 지어내지 않는다.</summary>
+        private void ShowStartedToast()
+        {
+            if (string.IsNullOrEmpty(localizedStartedMessage))
+            {
+                if (!missingToastWarned)
+                {
+                    missingToastWarned = true;
+                    Debug.LogWarning($"[TownBuildingInteractionController] '{name}': 건설 시작 안내 문구" +
+                                     "(01_UI / 42)가 아직 없어 토스트를 띄우지 않습니다 - Inspector에서 " +
+                                     "Category와 Key를 지정하세요.", this);
+                }
+                return;
+            }
+
+            if (ToastManager.Instance == null)
+            {
+                if (!missingToastWarned)
+                {
+                    missingToastWarned = true;
+                    Debug.LogWarning($"[TownBuildingInteractionController] '{name}': 씬에 ToastManager가 없어 " +
+                                     "건설 시작 안내를 띄우지 못했습니다.", this);
+                }
+                return;
+            }
+
+            StartedToastCount++;
+            ToastManager.Instance.Show(localizedStartedMessage);
+        }
+
+        private void SubscribeStartedMessage()
+        {
+            // 어떤 경로로 들어와도 두 번 걸리지 않게, 걸기 전에 항상 끊는다(팝업과 같은 규칙).
+            UnsubscribeStartedMessage();
+
+            if (constructionStartedMessage == null || !constructionStartedMessage.HasReference) return;
+
+            boundStartedMessage = constructionStartedMessage;
+            boundStartedMessage.StringChanged += ApplyStartedMessage;
+        }
+
+        private void UnsubscribeStartedMessage()
+        {
+            if (boundStartedMessage == null) return;
+
+            boundStartedMessage.StringChanged -= ApplyStartedMessage;
+            boundStartedMessage = null;
+            localizedStartedMessage = null;
+        }
+
+        /// <summary>번역이 도착했다(언어를 바꾸면 다시 온다). 값을 들고 있다가 시작할 때 쓴다.</summary>
+        private void ApplyStartedMessage(string value)
+        {
+            localizedStartedMessage = value;
+        }
+
+        /// <summary>건설 버튼 클릭. <b>정의 하나와 누른 버튼, 그리고 건설 서비스를 넘기고 여는 것이
+        /// 전부</b>다 - 비용을 확인하지도, 내지도, 저장하지도 않는다.
         ///
         /// 버튼의 사각형을 함께 넘기는 이유는 팝업이 <b>누른 버튼 옆에</b> 떠야 하기 때문이다. 어디에
         /// 뜰지는 팝업이 혼자 정하며(<see cref="BuildingPopupPanel.Bind(BuildingDefinition, RectTransform)"/>),
-        /// 이 컨트롤러는 기준이 되는 버튼을 알려 주기만 한다 - 좌표 규칙이 두 곳으로 갈라지지 않게 한다.</summary>
+        /// 이 컨트롤러는 기준이 되는 버튼을 알려 주기만 한다 - 좌표 규칙이 두 곳으로 갈라지지 않게 한다.
+        ///
+        /// 서비스를 <b>열 때마다</b> 넘기는 이유는 팝업이 여러 버튼에 공용으로 쓰이기 때문이다 -
+        /// 마지막으로 연 쪽의 서비스가 확인 버튼이 쓸 서비스여야 한다.</summary>
         private void HandleBuildClicked()
         {
             if (buildingPopup == null)
@@ -253,7 +440,10 @@ namespace Building
                 return;
             }
 
+            EnsureConstructionService();
+
             buildingPopup.Bind(building, buildButtonRect);
+            buildingPopup.SetConstructionService(constructionService);
             buildingPopup.Open();
         }
 
@@ -309,6 +499,17 @@ namespace Building
             {
                 Debug.LogError($"[TownBuildingInteractionController] '{name}': 건물 정의(Building_1)가 " +
                                "연결되지 않았습니다.", this);
+            }
+            if (inventoryManager == null)
+            {
+                Debug.LogError($"[TownBuildingInteractionController] '{name}': InventoryManager가 연결되지 " +
+                               "않아 건설을 시작할 수 없습니다 - 확인 버튼을 눌러도 아무 일도 일어나지 " +
+                               "않습니다.", this);
+            }
+            if (constructionStartedMessage == null || !constructionStartedMessage.HasReference)
+            {
+                Debug.LogWarning($"[TownBuildingInteractionController] '{name}': 건설 시작 안내 문구" +
+                                 "(01_UI / 42)가 지정되지 않아 시작해도 토스트가 뜨지 않습니다.", this);
             }
         }
     }

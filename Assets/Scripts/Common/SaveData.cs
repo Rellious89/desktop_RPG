@@ -107,6 +107,28 @@ namespace Common
         /// 시간이 흐르기 시작한 슬롯만 저장한다.</summary>
         public List<RecoverySlotSaveState> recoverySlots = new List<RecoverySlotSaveState>();
 
+        /// <summary>
+        /// 진행 중이거나 이미 끝난 <b>건설 기록</b>. 항목 하나는 "이 건물의 건설이 시작됐다"는 사실
+        /// 하나를 말하며, <b>항목의 존재 자체가 곧 그 사실</b>이다 - 시작 여부를 적는 별도의 플래그는
+        /// 없다. id 비교는 <see cref="StringComparer.Ordinal"/> 완전 일치이므로 '1'과 ' 1 '은 서로
+        /// 다른 건물이다(BuildingDefinition.BuildingId와 같은 규칙).
+        ///
+        /// <b>완료 여부는 저장하지 않는다.</b> 회복 슬롯과 같은 이유다 -
+        /// <see cref="BuildingConstructionSaveState.completeAtUtc"/>와 현재 시각의 비교로 파생되며,
+        /// 상태 문자열을 따로 적으면 실제 시각과 어긋난 상태가 파일에 남는다. 그래서 <b>완성 시각이
+        /// 지난 항목도 그대로 남는다</b> - 지워 버리면 다시 켰을 때 "지은 적이 없는 건물"이 된다.
+        ///
+        /// <b>모르는 buildingId도 그대로 남긴다.</b> 표에서 잠시 빠진 건물의 기록을 저장 계층이 지우면
+        /// 그 건물이 돌아왔을 때 이미 지은 건물을 다시 지어야 한다. 순서도 바꾸지 않는다(먼저 시작한
+        /// 순서가 그대로 남는다).
+        ///
+        /// 이 목록이 없던 예전 저장 파일은 JsonUtility가 빈 목록으로 채우며, 그것이 곧 "아직 아무것도
+        /// 짓지 않았다"라서 그대로 옳다 - 그래서 이 칸을 더하면서
+        /// <see cref="CurrentSaveVersion"/>을 올리지 않았다.
+        /// </summary>
+        public List<BuildingConstructionSaveState> buildingConstructions =
+            new List<BuildingConstructionSaveState>();
+
         /// <summary>저장 계층이 보장하는 최소 슬롯 수. 실제 사용 가능한 슬롯 수는 회복 밸런스 테이블의
         /// Max Slots가 정하며, 그 값이 더 크면 회복소가 목록을 더 늘린다.</summary>
         public const int DefaultRecoverySlotCount = 3;
@@ -263,6 +285,30 @@ namespace Common
             completeAtUtc = null;
             completionNotified = false;
         }
+    }
+
+    /// <summary>
+    /// 건설 기록 하나. <b>건물 하나가 시작된 사실 + 그 시각 두 개</b>가 전부다.
+    ///
+    /// <b>진행률도 완료 여부도 담지 않는다.</b> 지금 얼마나 지어졌는지는 <see cref="startedAtUtc"/>와
+    /// <see cref="completeAtUtc"/>만으로 다시 계산되고, 그래야 앱을 꺼 둔 동안 흐른 시간이 그대로
+    /// 반영된다(<see cref="RecoverySlotSaveState"/>와 같은 규칙이다).
+    ///
+    /// 두 시각 모두 <see cref="SaveData.TimestampFormat"/>("o", InvariantCulture)로 적으므로 저장 파일
+    /// 안에서 시각을 적는 방법은 여전히 하나뿐이다.
+    /// </summary>
+    [Serializable]
+    public class BuildingConstructionSaveState
+    {
+        /// <summary>BuildingDefinition.BuildingId와 같은 값. 이 문자열이 저장 항목의 유일한 키이며
+        /// <b>적힌 그대로</b> 대조한다(대소문자와 앞뒤 공백까지).</summary>
+        public string buildingId;
+
+        /// <summary>건설을 시작한 시각(UTC). 서식은 <see cref="SaveData.lastSavedAtUtc"/>와 같다.</summary>
+        public string startedAtUtc;
+
+        /// <summary>건설이 끝나는 시각(UTC). 건설 시간이 0초면 <see cref="startedAtUtc"/>와 같다.</summary>
+        public string completeAtUtc;
     }
 
     /// <summary>

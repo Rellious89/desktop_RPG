@@ -30,6 +30,17 @@ namespace Inventory
 
         /// <summary>아이템 하나가 모자란다(어느 것인지는 <see cref="InventoryCostResult.ItemId"/>).</summary>
         InsufficientItem = 4,
+
+        /// <summary>
+        /// 낼 수는 있었지만 <b>기록에 실패했다</b> - 판정도 보유량도 문제가 없었고, 값을 뺀 뒤 저장이
+        /// 실패해서 <b>전부 되돌렸다</b>는 뜻이다. 그래서 이 결과를 받은 시점의 재화와 아이템은
+        /// 지불을 시도하기 전과 한 글자도 다르지 않다.
+        ///
+        /// 다른 이유들과 결정적으로 다른 점은 <b>호출부가 고칠 수 있는 것이 없다</b>는 것이다(더 모아
+        /// 오거나 요청을 고쳐서 될 일이 아니다). 그래도 성공과 나누어 두는 이유는, 이것을 성공으로
+        /// 흘려보내면 <b>값은 그대로인데 산 것으로 취급되는</b> 상태가 만들어지기 때문이다.
+        /// </summary>
+        SaveFailed = 5,
     }
 
     /// <summary>
@@ -297,6 +308,15 @@ namespace Inventory
         {
             return new InventoryCostResult(
                 false, InventoryCostFailureReason.InsufficientCurrency, string.Empty, requiredAmount, currentAmount);
+        }
+
+        /// <summary>값을 뺐다가 저장에 실패해 <b>전부 되돌린</b> 결과. 되돌린 뒤의 상태를 그대로
+        /// 적으므로 <see cref="RequiredAmount"/>는 내려던 재화, <see cref="CurrentAmount"/>는
+        /// 되돌아온 잔액이다.</summary>
+        internal static InventoryCostResult SaveFailed(int requiredAmount, int currentAmount)
+        {
+            return new InventoryCostResult(
+                false, InventoryCostFailureReason.SaveFailed, string.Empty, requiredAmount, currentAmount);
         }
 
         internal static InventoryCostResult InsufficientItem(string itemId, int requiredAmount, int currentAmount)

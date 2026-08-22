@@ -237,6 +237,7 @@ namespace Common
             target.characters = CopyCharacters(source.characters);
             target.items = CopyItems(source.items);
             target.recoverySlots = CopyRecoverySlots(source.recoverySlots);
+            target.buildingConstructions = CopyBuildingConstructions(source.buildingConstructions);
         }
 
         private static List<CharacterSaveState> CopyCharacters(List<CharacterSaveState> source)
@@ -275,6 +276,29 @@ namespace Common
                     {
                         itemId = item.itemId,
                         count = item.count,
+                    });
+            }
+
+            return copy;
+        }
+
+        private static List<BuildingConstructionSaveState> CopyBuildingConstructions(
+            List<BuildingConstructionSaveState> source)
+        {
+            List<BuildingConstructionSaveState> copy = new List<BuildingConstructionSaveState>();
+            if (source == null) return copy;
+
+            foreach (BuildingConstructionSaveState state in source)
+            {
+                // 다른 목록과 같은 규칙이다 - null 항목도 그대로 옮기고(목록 보정은 정규화의 일이다),
+                // 항목 자체는 새로 만들어 호출부의 문서와 끊어 둔다.
+                copy.Add(state == null
+                    ? null
+                    : new BuildingConstructionSaveState
+                    {
+                        buildingId = state.buildingId,
+                        startedAtUtc = state.startedAtUtc,
+                        completeAtUtc = state.completeAtUtc,
                     });
             }
 

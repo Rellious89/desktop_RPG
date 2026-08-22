@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Common;
 using Inventory;
 using NUnit.Framework;
@@ -605,6 +606,137 @@ namespace InventoryEditor.Tests
             Assert.AreEqual(0, changedCount);
         }
 
+        // ---- 저장 실패 - 되돌리기 ----
+        //
+        // 저장에 실패했는데 성공을 돌려주면 <b>값은 빠졌고 파일에는 남지 않은</b> 상태로 호출부가
+        // "샀다"고 믿는다. 그 판단으로 무언가를 지급하면 앱을 다시 켰을 때 낸 것만 되살아나고 받은
+        // 것은 사라진다. 그래서 이 경로는 전부 되돌리고 실패를 알린다.
+
+        [Test]
+        public void Spend_SaveFails_RollsBackCurrencyAndReportsSaveFailed()
+        {
+            SaveSystem.Data.currency = 100;
+            FailSaves();
+
+            LogAssert.Expect(LogType.Error, new Regex("저장하지 못해 되돌렸습니다"));
+            InventoryCostResult result = inventory.TrySpendCost(new InventoryCostRequest(30));
+
+            Assert.IsFalse(result.Success, "기록에 실패했으면 낸 것도 없다");
+            Assert.AreEqual(InventoryCostFailureReason.SaveFailed, result.Reason);
+            Assert.AreEqual(30, result.RequiredAmount, "내려던 금액이 그대로 남는다");
+            Assert.AreEqual(100, result.CurrentAmount, "되돌린 뒤의 잔액을 알려 준다");
+            Assert.AreEqual(100, SaveSystem.Data.currency, "재화가 되돌아와야 합니다.");
+            Assert.AreEqual(1, saveCount, "저장은 정확히 한 번만 시도합니다.");
+            Assert.AreEqual(0, changedCount, "바뀐 것이 없으므로 InventoryChanged도 없습니다.");
+            Assert.AreEqual(0, rewardAppliedCount, "비용 지불은 RewardApplied를 발생시키지 않습니다.");
+        }
+
+        [Test]
+        public void Spend_SaveFails_RestoresExactItemListOrderAndCounts()
+        {
+            RegisterItems("item_a", "item_b", "item_c");
+            SaveSystem.Data.currency = 100;
+            Hold("item_a", 1);
+            Hold("item_b", 5);   // 정확히 0이 되어 <b>지워질</b> 항목
+            Hold("item_c", 7);
+
+            InventoryItemState first = SaveSystem.Data.items[0];
+            InventoryItemState depleted = SaveSystem.Data.items[1];
+            InventoryItemState last = SaveSystem.Data.items[2];
+
+            FailSaves();
+            LogAssert.Expect(LogType.Error, new Regex("저장하지 못해 되돌렸습니다"));
+
+            InventoryCostResult result = inventory.TrySpendCost(InventoryCostRequest.Of(
+                30, InventoryItemCost.ById("item_b", 5), InventoryItemCost.ById("item_c", 2)));
+
+            Assert.AreEqual(InventoryCostFailureReason.SaveFailed, result.Reason);
+            Assert.AreEqual(100, SaveSystem.Data.currency);
+
+            Assert.AreEqual(3, SaveSystem.Data.items.Count,
+                "지워졌던 항목이 되살아나야 합니다(맨 뒤에 새로 붙는 것이 아닙니다).");
+            Assert.AreEqual("item_a", SaveSystem.Data.items[0].itemId);
+            Assert.AreEqual("item_b", SaveSystem.Data.items[1].itemId,
+                "되돌리기가 획득 순서를 바꾸면 실패한 지불 하나가 인벤토리 배치를 영구히 바꿉니다.");
+            Assert.AreEqual("item_c", SaveSystem.Data.items[2].itemId);
+            Assert.AreEqual(1, SaveSystem.Data.items[0].count);
+            Assert.AreEqual(5, SaveSystem.Data.items[1].count);
+            Assert.AreEqual(7, SaveSystem.Data.items[2].count);
+
+            Assert.AreSame(first, SaveSystem.Data.items[0], "항목 객체까지 그대로여야 합니다.");
+            Assert.AreSame(depleted, SaveSystem.Data.items[1],
+                "지워졌던 항목도 <b>새로 만들지 않고</b> 원래 객체가 제자리로 돌아옵니다.");
+            Assert.AreSame(last, SaveSystem.Data.items[2]);
+
+            Assert.AreEqual(1, saveCount);
+            Assert.AreEqual(0, changedCount);
+            Assert.AreEqual(0, rewardAppliedCount);
+        }
+
+        [Test]
+        public void Spend_SaveFails_KeepsNullAndDuplicateEntriesInPlace()
+        {
+            // 손상된 저장 파일(같은 Id 두 줄 + null 칸)에서도 되돌리기는 <b>모양을 그대로</b> 되살린다.
+            RegisterItems("item_a");
+            SaveSystem.Data.currency = 10;
+            Hold("item_a", 2);
+            SaveSystem.Data.items.Add(null);
+            Hold("item_a", 3);
+
+            InventoryItemState firstRow = SaveSystem.Data.items[0];
+            InventoryItemState secondRow = SaveSystem.Data.items[2];
+
+            FailSaves();
+            LogAssert.Expect(LogType.Error, new Regex("저장하지 못해 되돌렸습니다"));
+
+            InventoryCostResult result = inventory.TrySpendCost(InventoryCostRequest.ForItem("item_a", 2));
+
+            Assert.AreEqual(InventoryCostFailureReason.SaveFailed, result.Reason);
+            Assert.AreEqual(3, SaveSystem.Data.items.Count);
+            Assert.AreSame(firstRow, SaveSystem.Data.items[0]);
+            Assert.IsNull(SaveSystem.Data.items[1], "null 칸도 자리를 그대로 지킵니다.");
+            Assert.AreSame(secondRow, SaveSystem.Data.items[2]);
+            Assert.AreEqual(2, SaveSystem.Data.items[0].count, "판정이 본 그 줄의 수량이 되돌아옵니다.");
+            Assert.AreEqual(3, SaveSystem.Data.items[2].count);
+            Assert.AreEqual(0, changedCount);
+        }
+
+        [Test]
+        public void Spend_SaveFails_ThenSucceeds_LeavesNoTrace()
+        {
+            RegisterItems("item_a");
+            SaveSystem.Data.currency = 100;
+            Hold("item_a", 2);
+
+            FailSaves();
+            LogAssert.Expect(LogType.Error, new Regex("저장하지 못해 되돌렸습니다"));
+            Assert.IsFalse(inventory.TrySpendCost(InventoryCostRequest.Of(
+                30, InventoryItemCost.ById("item_a", 2))).Success);
+
+            SucceedSaves();
+            InventoryCostResult second = inventory.TrySpendCost(InventoryCostRequest.Of(
+                30, InventoryItemCost.ById("item_a", 2)));
+
+            Assert.IsTrue(second.Success, "되돌린 뒤에는 처음과 같은 상태여야 합니다.");
+            Assert.AreEqual(70, SaveSystem.Data.currency, "두 번 빠지면 안 됩니다.");
+            Assert.AreEqual(0, SaveSystem.Data.items.Count);
+            Assert.AreEqual(2, saveCount, "실패 1회 + 성공 1회");
+            Assert.AreEqual(1, changedCount, "성공한 한 번만 알립니다.");
+        }
+
+        [Test]
+        public void Spend_NoCost_SaveFailureCannotHappen()
+        {
+            // 낼 것이 없으면 저장 자체를 하지 않으므로 저장 실패로 실패할 일도 없다(기존 동작 그대로).
+            FailSaves();
+
+            InventoryCostResult result = inventory.TrySpendCost(InventoryCostRequest.Empty);
+
+            Assert.IsTrue(result.Success);
+            Assert.AreEqual(0, saveCount);
+            Assert.AreEqual(0, changedCount);
+        }
+
         // ---- 9.1 저장 항목 정리 / 순서 유지 ----
 
         [Test]
@@ -917,6 +1049,18 @@ namespace InventoryEditor.Tests
             serializedManager.ApplyModifiedPropertiesWithoutUndo();
             Invoke(inventory, "BuildDefinitionLookup");
             return items;
+        }
+
+        /// <summary>다음 저장부터 실패시킨다(파일은 여전히 건드리지 않는다).</summary>
+        private void FailSaves()
+        {
+            SaveOverrideField.SetValue(null, new Func<bool>(() => { saveCount++; return false; }));
+        }
+
+        /// <summary>다시 성공하도록 되돌린다.</summary>
+        private void SucceedSaves()
+        {
+            SaveOverrideField.SetValue(null, new Func<bool>(() => { saveCount++; return true; }));
         }
 
         private static object Invoke(object target, string method, params object[] args)

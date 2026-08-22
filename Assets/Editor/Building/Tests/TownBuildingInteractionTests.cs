@@ -1,12 +1,17 @@
+using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Building;
+using Common;
 using Field;
+using Inventory;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.TestTools;
 using UnityEngine.UI;
 using Object = UnityEngine.Object;
 
@@ -28,16 +33,48 @@ namespace BuildingEditor.Tests
         private const int PixelWidth = 256;
         private const int PixelHeight = 256;
 
+        /// <summary>01_UI 테이블 GUID.</summary>
+        private const string UiTableGuid = "GUID:32fd067a20b754a50b20446b9c78d2ae";
+
+        /// <summary>01_UI / 42(건설 시작 안내)의 실제 Entry Id.</summary>
+        private const long ConstructionStartedKeyId = 8970130103984129L;
+
+        private static readonly MethodInfo ConfigureSaveMethod = typeof(SaveSystem).GetMethod(
+            "ConfigureForTests", BindingFlags.NonPublic | BindingFlags.Static);
+
         private readonly List<Object> created = new List<Object>();
+        private FakeStorage storage;
+        private InventoryManager testInventory;
+        private ToastManager toastManager;
+
+        [SetUp]
+        public void SetUp()
+        {
+            // 컨트롤러가 건설 기록을 보려면 저장 문서를 읽는다 - 실제 저장 파일 근처에도 가지 않도록
+            // 메모리 위의 가짜 저장소를 끼워 넣는다(건물 팝업 시험과 같은 방식이다).
+            Assert.IsNotNull(ConfigureSaveMethod,
+                "SaveSystem.ConfigureForTests를 찾지 못했습니다 - 그대로 두면 시험이 실제 저장 파일을 읽고 씁니다.");
+
+            storage = new FakeStorage();
+            ConfigureSaveMethod.Invoke(null, new object[] { storage, null, null });
+        }
 
         [TearDown]
         public void TearDown()
         {
+            if (testInventory != null) EditModeLifecycle.Invoke(testInventory, "OnDestroy");
+            testInventory = null;
+
+            if (toastManager != null) EditModeLifecycle.Invoke(toastManager, "OnDestroy");
+            toastManager = null;
+
             for (int i = created.Count - 1; i >= 0; i--)
             {
                 if (created[i] != null) Object.DestroyImmediate(created[i]);
             }
             created.Clear();
+
+            ConfigureSaveMethod.Invoke(null, new object[] { null, null, null });
         }
 
         // ---- 좌표 계산 ----
@@ -305,6 +342,105 @@ namespace BuildingEditor.Tests
             Assert.IsFalse(fixture.OpenInnButton.activeSelf);
         }
 
+        // ---- 건설 기록에 따른 표시 ----
+
+        [Test]
+        public void 기록이_없으면_건설_버튼은_그대로_보인다()
+        {
+            Fixture fixture = CreateFixture();
+
+            Assert.IsTrue(fixture.BuildButton.gameObject.activeSelf);
+            Assert.IsFalse(fixture.Controller.IsConstructionStarted);
+            Assert.IsTrue(fixture.InteractionRoot.activeSelf);
+        }
+
+        [Test]
+        public void 같은_buildingId_기록이_있으면_건설_버튼이_숨는다()
+        {
+            AddConstruction(BuildingIdOfAsset());
+
+            Fixture fixture = CreateFixture();
+
+            Assert.IsTrue(fixture.Controller.IsConstructionStarted);
+            Assert.IsFalse(fixture.BuildButton.gameObject.activeSelf,
+                "이미 시작된 건물의 건설 버튼은 나오지 않는다");
+            Assert.IsFalse(fixture.OpenInnButton.activeSelf,
+                "여관 입장 버튼은 이번 단계에서도 계속 꺼져 있다");
+        }
+
+        [Test]
+        public void 완성_시각이_지난_기록도_건설_버튼을_계속_숨긴다()
+        {
+            // 앱을 껐다 켠 상황 그대로 - 기록만 저장 문서에 남아 있다.
+            SaveSystem.Data.buildingConstructions.Add(new BuildingConstructionSaveState
+            {
+                buildingId = BuildingIdOfAsset(),
+                startedAtUtc = "2020-01-01T00:00:00.0000000Z",
+                completeAtUtc = "2020-01-01T00:01:00.0000000Z",
+            });
+
+            Fixture fixture = CreateFixture();
+            Update(fixture);
+
+            Assert.IsFalse(fixture.BuildButton.gameObject.activeSelf,
+                "완성 시각이 지났다고 다시 지을 수 있게 되면 안 된다");
+        }
+
+        [Test]
+        public void 다른_buildingId_기록은_이_버튼을_숨기지_않는다()
+        {
+            AddConstruction(BuildingIdOfAsset() + "_다른건물");
+
+            Fixture fixture = CreateFixture();
+
+            Assert.IsFalse(fixture.Controller.IsConstructionStarted);
+            Assert.IsTrue(fixture.BuildButton.gameObject.activeSelf);
+        }
+
+        [Test]
+        public void 건설이_시작되면_숨김이_그_자리에서_반영된다()
+        {
+            Fixture fixture = CreateFixture();
+            Assert.IsTrue(fixture.BuildButton.gameObject.activeSelf);
+
+            // 서비스가 기록을 남긴 것과 같은 상태를 만든다(판정의 근거는 언제나 저장 기록이다).
+            AddConstruction(BuildingIdOfAsset());
+            Update(fixture);
+
+            Assert.IsFalse(fixture.BuildButton.gameObject.activeSelf);
+        }
+
+        // ---- 시작 안내 토스트 ----
+
+        [Test]
+        public void 안내_문구가_오기_전에는_토스트를_띄우지_않고_한_번만_알린다()
+        {
+            Fixture fixture = CreateFixture();
+
+            // 문구가 도착하지 않은 상태에서 시작 신호가 왔다 - 코드가 대체 문구를 지어내지 않는다.
+            LogAssert.Expect(LogType.Warning, new Regex("건설 시작 안내 문구"));
+            RaiseConstructionStarted(fixture);
+            RaiseConstructionStarted(fixture);
+
+            Assert.AreEqual(0, fixture.Controller.StartedToastCount);
+            Assert.IsNull(fixture.Controller.StartedToastMessage);
+        }
+
+        [Test]
+        public void 문구가_도착하면_시작마다_안내를_한_번씩_띄운다()
+        {
+            Fixture fixture = CreateFixture();
+            CreateToastManager();
+
+            DeliverStartedMessage(fixture, "건설을 시작했습니다.");
+            Assert.AreEqual("건설을 시작했습니다.", fixture.Controller.StartedToastMessage,
+                "문구는 표에서 온다 - 코드가 짓지 않는다");
+
+            RaiseConstructionStarted(fixture);
+
+            Assert.AreEqual(1, fixture.Controller.StartedToastCount, "한 번의 시작에 안내도 한 번이다");
+        }
+
         // ---- 씬 ----
 
         [Test]
@@ -373,6 +509,19 @@ namespace BuildingEditor.Tests
 
                 Assert.AreEqual(0, buildButton.onClick.GetPersistentEventCount(),
                     "클릭은 런타임 리스너로만 걸린다 - 버튼에 영구 호출을 저작하지 않는다");
+
+                // 건설 배선. 서비스는 이 인벤토리 하나로 만들어지고, 안내 문구는 표에서 온다.
+                var sceneInventory = so.FindProperty("inventoryManager").objectReferenceValue as InventoryManager;
+                Assert.IsNotNull(sceneInventory,
+                    "InventoryManager가 연결되지 않으면 확인 버튼을 눌러도 건설이 시작되지 않는다");
+                Assert.AreEqual(scene, sceneInventory.gameObject.scene, "같은 씬의 InventoryManager여야 한다");
+
+                Assert.AreEqual(UiTableGuid,
+                    so.FindProperty("constructionStartedMessage.m_TableReference.m_TableCollectionName")
+                        .stringValue);
+                Assert.AreEqual(ConstructionStartedKeyId,
+                    so.FindProperty("constructionStartedMessage.m_TableEntryReference.m_KeyId").longValue,
+                    "건설 시작 안내는 01_UI / 42여야 한다");
 
                 Canvas canvas = interactionParent.GetComponentInParent<Canvas>();
                 Assert.IsNotNull(canvas);
@@ -463,6 +612,21 @@ namespace BuildingEditor.Tests
             public Transform Anchor;
             public BuildingPopupPanel Popup;
             public BuildingDefinition Building;
+            public InventoryManager Inventory;
+        }
+
+        /// <summary>씬에 하나 있는 InventoryManager를 흉내낸다. EditMode에서는 Awake가 오지 않으므로
+        /// 정적 Instance 등록을 직접 재현한다 - 저장 파일은 가짜 저장소가 이미 막고 있다.</summary>
+        private InventoryManager CreateInventory()
+        {
+            var go = new GameObject("TestInventoryManager");
+            go.SetActive(false);
+            created.Add(go);
+
+            var manager = go.AddComponent<InventoryManager>();
+            EditModeLifecycle.Invoke(manager, "Awake");
+            testInventory = manager;
+            return manager;
         }
 
         private Fixture CreateFixture(bool perspective = false)
@@ -505,12 +669,15 @@ namespace BuildingEditor.Tests
             fixture.Building = AssetDatabase.LoadAssetAtPath<BuildingDefinition>(BuildingAssetPath);
             Assert.IsNotNull(fixture.Building, BuildingAssetPath);
 
+            fixture.Inventory = CreateInventory();
+
             var controllerGo = new GameObject("TestBuildingController");
             controllerGo.SetActive(false);
             created.Add(controllerGo);
             fixture.Controller = controllerGo.AddComponent<TownBuildingInteractionController>();
 
             var so = new SerializedObject(fixture.Controller);
+            so.FindProperty("inventoryManager").objectReferenceValue = fixture.Inventory;
             so.FindProperty("fieldModeManager").objectReferenceValue = fixture.FieldModeManager;
             so.FindProperty("transitionSequencer").objectReferenceValue = fixture.Sequencer;
             so.FindProperty("stageCamera").objectReferenceValue = camera;
@@ -612,6 +779,81 @@ namespace BuildingEditor.Tests
                 "<IsPlaying>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.IsNotNull(field);
             field.SetValue(sequencer, value);
+        }
+
+        /// <summary>씬에 연결된 Building_1의 Building Id. 표가 바뀌어도 시험이 같은 값을 본다.</summary>
+        private static string BuildingIdOfAsset()
+        {
+            var building = AssetDatabase.LoadAssetAtPath<BuildingDefinition>(BuildingAssetPath);
+            Assert.IsNotNull(building, BuildingAssetPath);
+            return building.BuildingId;
+        }
+
+        /// <summary>건설 기록 한 줄을 저장 문서에 직접 넣는다(시작 경로를 거치지 않는다) - 여기서
+        /// 확인하려는 것은 "기록이 있으면 어떻게 보이는가"뿐이다.</summary>
+        private static void AddConstruction(string buildingId)
+        {
+            SaveSystem.Data.buildingConstructions.Add(new BuildingConstructionSaveState
+            {
+                buildingId = buildingId,
+                startedAtUtc = "2026-08-22T10:30:00.0000000Z",
+                completeAtUtc = "2026-08-22T10:31:00.0000000Z",
+            });
+        }
+
+        /// <summary>서비스가 시작을 알린 것과 같은 경로를 재현한다.</summary>
+        private static void RaiseConstructionStarted(Fixture fixture)
+        {
+            MethodInfo method = typeof(TownBuildingInteractionController).GetMethod(
+                "HandleConstructionStarted", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(method);
+            method.Invoke(fixture.Controller, new object[] { fixture.Building, null });
+        }
+
+        /// <summary>번역이 도착한 상황을 그대로 재현한다(Locale이 선택되어 있지 않아도 확인할 수 있다).</summary>
+        private static void DeliverStartedMessage(Fixture fixture, string value)
+        {
+            MethodInfo method = typeof(TownBuildingInteractionController).GetMethod(
+                "ApplyStartedMessage", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(method);
+            method.Invoke(fixture.Controller, new object[] { value });
+        }
+
+        /// <summary>토스트 관리자 하나를 세운다. 템플릿이 없어 실제로 그리지는 않으므로 코루틴도 돌지
+        /// 않는다 - 여기서 확인하는 것은 "안내를 몇 번 요청했는가"다.</summary>
+        private ToastManager CreateToastManager()
+        {
+            var go = new GameObject("TestToastManager");
+            created.Add(go);
+
+            var manager = go.AddComponent<ToastManager>();
+            LogAssert.Expect(LogType.Error, new Regex("template"));
+            EditModeLifecycle.Invoke(manager, "Awake");
+            toastManager = manager;
+            return manager;
+        }
+
+        /// <summary>메모리 위의 가짜 저장소. 이 시험은 실제 저장 파일을 읽거나 쓰지 않는다.</summary>
+        private sealed class FakeStorage : ISaveStorage
+        {
+            public int WriteCalls;
+
+            public bool WritesBlocked => false;
+
+            public string BlockedReason => null;
+
+            public SaveReadResult ReadPrimary() => SaveReadResult.Missing("fake://primary");
+
+            public SaveReadResult ReadBackup() => SaveReadResult.Missing("fake://backup");
+
+            public SaveWriteResult Write(string text)
+            {
+                WriteCalls++;
+                return SaveWriteResult.Written(false);
+            }
+
+            public SaveQuarantineResult QuarantinePrimary(string reason) =>
+                SaveQuarantineResult.Moved("fake://corrupted/primary");
         }
     }
 }

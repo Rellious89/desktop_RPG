@@ -824,6 +824,15 @@ namespace CommonEditor.Tests
                         completionNotified = true,
                     },
                 },
+                buildingConstructions = new List<BuildingConstructionSaveState>
+                {
+                    new BuildingConstructionSaveState
+                    {
+                        buildingId = "1",
+                        startedAtUtc = "2026-01-02T03:04:05.0000000Z",
+                        completeAtUtc = "2026-01-02T03:05:05.0000000Z",
+                    },
+                },
             };
         }
 
@@ -846,6 +855,10 @@ namespace CommonEditor.Tests
 
             Assert.AreEqual(1, data.recoverySlots.Count, $"{because} (recoverySlots 개수)");
             Assert.AreEqual("barbarian", data.recoverySlots[0].characterId, $"{because} (recoverySlots[0])");
+
+            Assert.AreEqual(1, data.buildingConstructions.Count, $"{because} (buildingConstructions 개수)");
+            Assert.AreEqual("1", data.buildingConstructions[0].buildingId,
+                $"{because} (buildingConstructions[0])");
         }
 
         [Test]
@@ -930,6 +943,10 @@ namespace CommonEditor.Tests
             Assert.AreEqual(2, data.recoverySlots[0].startStamina);
             Assert.AreEqual("2026-01-02T05:04:05.0000000Z", data.recoverySlots[0].completeAtUtc);
             Assert.IsTrue(data.recoverySlots[0].completionNotified);
+            Assert.AreEqual("1", data.buildingConstructions[0].buildingId,
+                "사본이 건설 기록을 빠뜨리면 안 된다.");
+            Assert.AreEqual("2026-01-02T03:04:05.0000000Z", data.buildingConstructions[0].startedAtUtc);
+            Assert.AreEqual("2026-01-02T03:05:05.0000000Z", data.buildingConstructions[0].completeAtUtc);
         }
 
         [Test]
@@ -941,7 +958,7 @@ namespace CommonEditor.Tests
             {
                 "saveVersion", "saveRevision", "lastSavedAtUtc",
                 "currentLevel", "currentExp", "totalKillCount",
-                "characters", "currency", "items", "recoverySlots",
+                "characters", "currency", "items", "recoverySlots", "buildingConstructions",
             };
 
             List<string> actual = new List<string>();

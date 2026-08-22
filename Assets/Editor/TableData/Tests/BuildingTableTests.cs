@@ -667,7 +667,8 @@ namespace TableDataEditor.Tests
         [Test]
         public void SaveVersion_IsUnchanged()
         {
-            // 이번 단계는 저장 형식을 건드리지 않는다 - 건물의 진행 상태는 아직 저장되지 않는다.
+            // 건설 기록이 생긴 뒤에도 형식 번호는 그대로다 - 칸을 <b>추가</b>하기만 했으므로
+            // 예전 파일이 그대로 유효하다(없는 칸은 기본값으로 읽힌다).
             Assert.AreEqual(2, SaveData.CurrentSaveVersion,
                 "Building 표를 더하면서 저장 형식 번호가 올라가면 안 됩니다.");
         }

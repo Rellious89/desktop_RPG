@@ -2459,6 +2459,19 @@ MonoBehaviour:
   openInnButton: {fileID: 940358989}
   buildingPopup: {fileID: 6072216787366258619}
   building: {fileID: 11400000, guid: 1e0e90600454446e8980563a44db5bef, type: 2}
+  inventoryManager: {fileID: 1047247884}
+  constructionStartedMessage:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 8970130103984129
+      m_Key:
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  references:
+    version: 2
+    RefIds: []
 --- !u!1 &471919068
 GameObject:
   m_ObjectHideFlags: 0
