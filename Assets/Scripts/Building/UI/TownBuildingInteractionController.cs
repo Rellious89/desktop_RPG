@@ -10,7 +10,9 @@ namespace Building
     /// 상황인지 판정해 상호작용 루트를 켜고 끄고, (3) 버튼이 눌리면 건물 정의 하나를 팝업에 넘겨 연다.
     ///
     /// <b>여기에 건설은 없다.</b> 비용을 평가하지도 내지도 않고 저장도 하지 않는다 - 클릭은
-    /// <see cref="BuildingPopupPanel.Bind"/> + <see cref="Common.ModalPanel.Open"/>까지다.
+    /// <see cref="BuildingPopupPanel.Bind(BuildingDefinition, RectTransform)"/> +
+    /// <see cref="Common.ModalPanel.Open"/>까지다. 팝업이 <b>어디에</b> 뜨는지도 여기서 정하지 않는다 -
+    /// 기준이 될 버튼 사각형만 넘기고, 자리 계산은 팝업이 혼자 한다.
     ///
     /// <b>이 컴포넌트는 자기가 끄는 오브젝트 안에 있으면 안 된다.</b> 상호작용 루트를 끄는 순간 그
     /// 안의 컴포넌트는 Update를 받지 못하므로, 한 번 숨기면 다시 켜 줄 주체가 사라진다. 그래서 이
@@ -60,7 +62,8 @@ namespace Building
         [SerializeField] private RectTransform interactionParent;
 
         [Tooltip("건설 버튼(Interaction/btn_Build_Inn). 위치를 옮기고 클릭 리스너를 런타임으로 건다 - " +
-                 "버튼의 OnClick에 영구 호출을 저작하지 않는다.")]
+                 "버튼의 OnClick에 영구 호출을 저작하지 않는다. 이 버튼의 사각형이 팝업이 뜰 자리의 " +
+                 "기준이 된다.")]
         [SerializeField] private Button buildButton;
 
         [Tooltip("여관 입장 버튼(Interaction/btn_Open_Inn). 이번 단계에서는 <b>언제나 꺼진 채로</b> " +
@@ -228,8 +231,12 @@ namespace Building
             buildingPopup.Close();
         }
 
-        /// <summary>건설 버튼 클릭. <b>정의 하나를 넘기고 여는 것이 전부</b>다 - 비용을 확인하지도,
-        /// 내지도, 저장하지도 않는다.</summary>
+        /// <summary>건설 버튼 클릭. <b>정의 하나와 누른 버튼을 넘기고 여는 것이 전부</b>다 - 비용을
+        /// 확인하지도, 내지도, 저장하지도 않는다.
+        ///
+        /// 버튼의 사각형을 함께 넘기는 이유는 팝업이 <b>누른 버튼 옆에</b> 떠야 하기 때문이다. 어디에
+        /// 뜰지는 팝업이 혼자 정하며(<see cref="BuildingPopupPanel.Bind(BuildingDefinition, RectTransform)"/>),
+        /// 이 컨트롤러는 기준이 되는 버튼을 알려 주기만 한다 - 좌표 규칙이 두 곳으로 갈라지지 않게 한다.</summary>
         private void HandleBuildClicked()
         {
             if (buildingPopup == null)
@@ -246,7 +253,7 @@ namespace Building
                 return;
             }
 
-            buildingPopup.Bind(building);
+            buildingPopup.Bind(building, buildButtonRect);
             buildingPopup.Open();
         }
 

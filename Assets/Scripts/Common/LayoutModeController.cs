@@ -99,7 +99,14 @@ namespace Common
             {
                 // Layout Mode 종료 시 한 번 더 저장(드래그 종료 시 이미 저장되지만, 요구사항이 명시적으로
                 // "Layout Mode 종료 시" 저장을 요구하므로 안전하게 한 번 더 시도한다).
+                //
+                // SaveOverlayPlacement는 TransparentWindowController의 Win32 전용 블록 안에만 존재하므로
+                // (BeginManualDrag/RegisterInputRegion처럼 #if 밖으로 노출된 진입점이 아니다) 이 호출만
+                // 플랫폼 가드로 감싼다 - Windows 빌드 동작은 그대로고, 그 밖(macOS Editor 등)에서는
+                // 저장 대상 네이티브 창 자체가 없으므로 아무 일도 하지 않는 것이 맞다.
+#if UNITY_STANDALONE_WIN
                 TransparentWindowController.Instance?.SaveOverlayPlacement();
+#endif
             }
 
             Debug.Log(active

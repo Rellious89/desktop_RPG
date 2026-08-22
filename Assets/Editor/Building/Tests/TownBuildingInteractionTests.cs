@@ -247,6 +247,18 @@ namespace BuildingEditor.Tests
         }
 
         [Test]
+        public void 건설_버튼을_누르면_버튼_사각형도_함께_넘긴다()
+        {
+            Fixture fixture = CreateFixture();
+            Assert.IsNull(fixture.Popup.SourceRect, "누르기 전에는 기준 버튼이 없다");
+
+            fixture.BuildButton.onClick.Invoke();
+
+            Assert.AreSame(fixture.BuildButtonRect, fixture.Popup.SourceRect,
+                "팝업이 어디에 뜰지는 팝업이 정한다 - 컨트롤러는 기준이 되는 버튼만 알려 준다");
+        }
+
+        [Test]
         public void 던전으로_나가면_열린_팝업이_정상_닫기_경로로_닫힌다()
         {
             Fixture fixture = CreateFixture();
@@ -262,6 +274,8 @@ namespace BuildingEditor.Tests
             EditModeLifecycle.RaiseDisable(fixture.Popup);
             Assert.IsFalse(fixture.Popup.HasLocalizationSubscriptions,
                 "정상 Close 경로를 지났다면 구독도 함께 끊겨야 한다");
+            Assert.IsFalse(fixture.Popup.HasInventorySubscription,
+                "인벤토리 구독도 같은 경로에서 끊겨야 한다 - 닫힌 팝업이 계속 판정하면 안 된다");
         }
 
         [Test]
@@ -386,6 +400,42 @@ namespace BuildingEditor.Tests
 
                 Assert.AreEqual(1, inScene.Count);
                 Assert.AreEqual(PrefabSource(inScene[0]), PopupPrefabPath);
+            }
+            finally
+            {
+                EditorSceneManager.CloseScene(scene, true);
+            }
+        }
+
+        [Test]
+        public void 씬의_팝업은_경고와_자리_사각형까지_그대로_물려받는다()
+        {
+            Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Additive);
+            try
+            {
+                BuildingPopupPanel target = null;
+                foreach (BuildingPopupPanel panel in Object.FindObjectsOfType<BuildingPopupPanel>(true))
+                {
+                    if (panel.gameObject.scene == scene) target = panel;
+                }
+
+                Assert.IsNotNull(target, "씬에 건물 팝업이 있어야 한다");
+
+                var so = new SerializedObject(target);
+                var warning = so.FindProperty("warningText").objectReferenceValue as TMPro.TextMeshProUGUI;
+                var placement = so.FindProperty("placementRect").objectReferenceValue as RectTransform;
+
+                Assert.IsNotNull(warning, "경고 TMP 참조가 씬 인스턴스까지 닿아야 한다");
+                Assert.AreEqual("lb_warningMSG", warning.name);
+                Assert.IsFalse(warning.gameObject.activeSelf, "씬에서도 경고는 꺼진 채로 시작한다");
+                Assert.IsFalse(warning.raycastTarget);
+
+                Assert.IsNotNull(placement, "자리를 옮길 사각형 참조가 씬 인스턴스까지 닿아야 한다");
+                Assert.AreEqual("bg", placement.name);
+                Assert.AreNotSame(target.transform, placement,
+                    "전체 화면을 덮는 팝업 루트를 옮기면 입력 영역까지 화면 밖으로 나간다");
+                Assert.AreEqual("Dialog_UI", target.transform.parent.name,
+                    "팝업이 붙는 부모는 그대로 Dialog_UI다");
             }
             finally
             {

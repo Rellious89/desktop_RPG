@@ -187,6 +187,10 @@ MonoBehaviour:
     m_Localized: "\uC6A9\uBCD1 \uBAA8\uC9D1"
     m_Metadata:
       m_Items: []
+  - m_Id: 8970130103984128
+    m_Localized: Not Enough Cost
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
