@@ -40,13 +40,14 @@ namespace TableDataEditor.Tests
             TableDataPaths.DungeonOutputFolder,
         };
 
-        /// <summary>여덟 도메인의 생성 폴더 전부.</summary>
+        /// <summary>아홉 도메인의 생성 폴더 전부.</summary>
         private static readonly string[] AllOutputFolders =
         {
             TableDataPaths.WorldOutputFolder, TableDataPaths.CurrencyOutputFolder,
             TableDataPaths.ItemOutputFolder, TableDataPaths.MonsterOutputFolder,
             TableDataPaths.DungeonOutputFolder, TableDataPaths.CharacterOutputFolder,
             TableDataPaths.SkillOutputFolder, TableDataPaths.CharacterSkillOutputFolder,
+            TableDataPaths.BuildingOutputFolder,
         };
 
         private const string TempRootName = "__TableDataTestsTemp";
@@ -149,9 +150,17 @@ namespace TableDataEditor.Tests
         [Test]
         public void RebuildScope_OffersOnlyWholeReferenceClosures()
         {
-            // 임의의 부분집합을 허용하면 범위 밖 표를 가리키던 참조가 null로 덮어써진다.
+            // 임의의 부분집합을 허용하면 범위 밖 표를 가리키던 참조가 null로 덮어써진다. 값이 늘어날
+            // 수 있는 유일한 조건은 <b>참조가 닫히는 묶음</b>이라는 것이다 - Building이 더해진 것도
+            // 그 조건을 지켰기 때문이다(가리키는 Currency/Item 생성 에셋이 없으면 Validate가 쓰기 전에
+            // 오류로 막는다). 새 값을 더할 때마다 여기가 실패하므로, 그 근거를 적지 않고 늘릴 수 없다.
             CollectionAssert.AreEquivalent(
-                new[] { TableDataRebuildScope.All, TableDataRebuildScope.CharacterSkillTables },
+                new[]
+                {
+                    TableDataRebuildScope.All,
+                    TableDataRebuildScope.CharacterSkillTables,
+                    TableDataRebuildScope.BuildingTable,
+                },
                 Enum.GetValues(typeof(TableDataRebuildScope)),
                 "Rebuild 범위가 늘어나면 참조가 조용히 지워지는 경로가 생긴다.");
         }
@@ -214,6 +223,9 @@ namespace TableDataEditor.Tests
                 targeted,
                 "좁은 범위의 출력 점검은 새 세 폴더만 열어야 한다.");
 
+            CollectionAssert.DoesNotContain(targeted, TableDataPaths.BuildingOutputFolder,
+                "캐릭터 쪽 좁은 범위는 Building 생성 폴더도 열지 않는다.");
+
             foreach (string legacy in LegacyOutputFolders)
             {
                 CollectionAssert.DoesNotContain(targeted, legacy,
@@ -227,7 +239,7 @@ namespace TableDataEditor.Tests
             CollectionAssert.AreEquivalent(
                 AllOutputFolders,
                 TableDataValidator.GeneratedOutputFolders(TableDataRebuildScope.All),
-                "전체 범위는 여덟 도메인을 모두 본다(기존 동작).");
+                "전체 범위는 아홉 도메인을 모두 본다(기존 동작).");
         }
 
         [Test]

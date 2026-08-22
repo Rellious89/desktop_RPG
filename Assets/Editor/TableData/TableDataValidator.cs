@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using Building;
 using Character;
 using Dungeon;
 using Inventory;
@@ -26,7 +27,7 @@ namespace TableDataEditor
 
         public TableDataDiagnosticLog Log { get; }
 
-        /// <summary>여덟 표가 모두 읽힌 경우의 파싱 결과. 파일/헤더 단계에서 실패하면 null이다.</summary>
+        /// <summary>아홉 표가 모두 읽힌 경우의 파싱 결과. 파일/헤더 단계에서 실패하면 null이다.</summary>
         public TableDataSnapshot Snapshot { get; }
 
         public TableDataAssetIndex Assets { get; }
@@ -49,18 +50,20 @@ namespace TableDataEditor
             $"Dungeon {Snapshot?.Dungeons.Count ?? 0} / " +
             $"Character {Snapshot?.Characters.Count ?? 0} / " +
             $"Skill {Snapshot?.Skills.Count ?? 0} / " +
-            $"CharacterSkill {Snapshot?.CharacterSkills.Count ?? 0} 행, 오류 {ErrorCount}건, 경고 {WarningCount}건";
+            $"CharacterSkill {Snapshot?.CharacterSkills.Count ?? 0} / " +
+            $"Building {Snapshot?.Buildings.Count ?? 0} 행, 오류 {ErrorCount}건, 경고 {WarningCount}건";
     }
 
     /// <summary>
-    /// CSV 여덟 장을 읽고 <b>모든</b> 문제를 모아 보고한다. <b>에셋도 폴더도 CSV도 만들지 않고 고치지도
+    /// CSV 아홉 장을 읽고 <b>모든</b> 문제를 모아 보고한다. <b>에셋도 폴더도 CSV도 만들지 않고 고치지도
     /// 않는다</b> - Validate는 순수하게 읽기만 하는 동작이라, 사람이 결과를 보고 판단할 때까지
     /// 프로젝트 상태가 한 글자도 바뀌지 않는다.
     ///
     /// <b>첫 오류에서 멈추지 않는다.</b> World → Currency → Item → Monster → Dungeon → Character →
-    /// Skill → CharacterSkill 순서로 끝까지 읽고, 참조 무결성까지 검사한 뒤 한 번에 돌려준다. 순서가
-    /// 정해져 있는 이유는 뒤의 표가 앞의 표를 참조하기 때문이다(Monster는 World / Currency / Item을,
-    /// Dungeon은 World / Monster / Item을, CharacterSkill은 Character / Skill을 가리킨다).
+    /// Skill → CharacterSkill → Building 순서로 끝까지 읽고, 참조 무결성까지 검사한 뒤 한 번에
+    /// 돌려준다. 순서가 정해져 있는 이유는 뒤의 표가 앞의 표를 참조하기 때문이다(Monster는
+    /// World / Currency / Item을, Dungeon은 World / Monster / Item을, CharacterSkill은
+    /// Character / Skill을, Building은 Currency / Item을 가리킨다).
     /// 가리켜지는 표가 언제나 먼저 읽히므로, 참조를 확인할 때 스냅샷은 이미 완성되어 있다.
     ///
     /// 파일/헤더 단계에서 실패한 표는 행 검증을 건너뛴다 - 헤더가 어긋난 채 행을 읽으면 엉뚱한 칸을
@@ -83,7 +86,7 @@ namespace TableDataEditor
         public const int ItemDescriptionKeyOffset = 10000;
 
         /// <summary>메뉴와 테스트가 함께 쓰는 진입점. 부작용이 전혀 없다.
-        /// 생성 에셋 쪽 점검까지 <b>여덟 도메인 전부</b>를 본다(기존 동작 그대로).</summary>
+        /// 생성 에셋 쪽 점검까지 <b>아홉 도메인 전부</b>를 본다(기존 동작 그대로).</summary>
         public static TableDataValidationResult Validate()
         {
             return Validate(TableDataRebuildScope.All);
@@ -92,7 +95,7 @@ namespace TableDataEditor
         /// <summary>
         /// <paramref name="outputScope"/>는 <b>생성 에셋 쪽 점검의 범위만</b> 정한다.
         ///
-        /// <b>CSV 입력 검증은 범위와 무관하게 언제나 여덟 표 전부다.</b> 파일/헤더/행/값/표 사이의
+        /// <b>CSV 입력 검증은 범위와 무관하게 언제나 아홉 표 전부다.</b> 파일/헤더/행/값/표 사이의
         /// 참조와 Localization·Motion Profile·Sprite 같은 <b>입력 자산</b> 조회는 하나도 줄어들지
         /// 않는다 - 범위를 좁혔다고 검사가 느슨해지면 "좁게 돌렸더니 통과했다"는 상태가 생긴다.
         ///
@@ -126,11 +129,15 @@ namespace TableDataEditor
             CsvTable characterSkillTable = TableDataCsvReader.Read(
                 TableDataPaths.CharacterSkillCsvPath, TableDataPaths.CharacterSkillCsvFileName,
                 TableDataColumns.CharacterSkill, log);
+            CsvTable buildingTable = TableDataCsvReader.Read(
+                TableDataPaths.BuildingCsvPath, TableDataPaths.BuildingCsvFileName,
+                TableDataColumns.Building, log);
 
             var snapshot = new TableDataSnapshot();
             bool allTablesRead = worldTable != null && currencyTable != null && itemTable != null
                                  && monsterTable != null && dungeonTable != null
-                                 && characterTable != null && skillTable != null && characterSkillTable != null;
+                                 && characterTable != null && skillTable != null && characterSkillTable != null
+                                 && buildingTable != null;
 
             try
             {
@@ -142,6 +149,9 @@ namespace TableDataEditor
                 if (characterTable != null) ValidateCharacters(characterTable, snapshot, assets, log);
                 if (skillTable != null) ValidateSkills(skillTable, snapshot, assets, log);
                 if (characterSkillTable != null) ValidateCharacterSkills(characterSkillTable, snapshot, log);
+
+                // Building은 Currency와 Item을 가리키므로 두 표가 모두 읽힌 뒤에 온다.
+                if (buildingTable != null) ValidateBuildings(buildingTable, snapshot, log);
 
                 // 출력 쪽 충돌과 orphan은 표가 다 읽힌 뒤에만 의미가 있다. 절반만 읽힌 상태에서 orphan을
                 // 세면 "CSV에서 사라졌다"가 아니라 "아직 못 읽었다"를 보고하게 된다.
@@ -1309,6 +1319,290 @@ namespace TableDataEditor
             }
         }
 
+        // ---- Building ----
+
+        /// <summary>
+        /// Building.csv 한 장. 기본 골격은 다른 표와 같고(id 형식/중복, 순서, 이름), 이 표에만 있는
+        /// 규칙이 셋이다.
+        ///
+        /// 첫째, <b>기능 이름이 활성 행에서 필수</b>다. 건물 팝업은 "무엇을 짓는가"와 "그러면 무엇이
+        /// 열리는가" 두 줄이 모두 있어야 성립하므로, 한쪽만 있는 상태를 "아직 안 정했다"는 정상으로
+        /// 두지 않는다(Item.csv의 설명과 같은 판정이다). 기능 이름이 <b>다른 카테고리</b>를 가리키는
+        /// 것은 정상이다 - 여관은 07_Building, 그 기능인 용병 모집은 01_UI에 있다.
+        ///
+        /// 둘째, <b>비용 재화 두 칸이 한 덩어리</b>다. id가 비면 금액도 비어야 하고, id가 있으면
+        /// Currency.csv에 실제로 있는 <b>활성</b> 행을 가리켜야 한다 - 카탈로그에 없는 재화를 비용으로
+        /// 받으면 화면에 이름도 아이콘도 없는 값을 내라고 하게 된다.
+        ///
+        /// 셋째, <b>비용 아이템 두 칸도 한 덩어리</b>다. 둘 다 비어 있는 것은 정상(재화만 내는 건물)
+        /// 이고, 한쪽만 채워지거나 항목 수가 다르면 오류다 - 어느 아이템이 몇 개인지 정할 수 없는
+        /// 상태를 조용히 넘기면 공짜로 지어지는 건물이 생긴다.
+        ///
+        /// <b>영어와 한국어 번역이 같거나 한국어가 들어 있는 것은 여기서 보지 않는다.</b> 그것은
+        /// 번역의 내용이고, 이 표가 확인하는 것은 "그 Entry가 실제로 있는가"까지다.
+        /// </summary>
+        private static void ValidateBuildings(CsvTable table, TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            string file = table.FileName;
+            var displayOrders = new Dictionary<int, int>();
+
+            foreach (CsvRecord record in table.Records)
+            {
+                int line = record.Line;
+                var row = new BuildingRow { Line = line };
+
+                string idRaw = table.Get(record, TableDataColumns.BuildingId);
+                bool idOk = TableDataFieldRules.TryReadRequiredId(
+                    file, line, TableDataColumns.BuildingId, idRaw, log, out string id);
+                row.Id = id;
+
+                if (idOk && snapshot.BuildingsById.TryGetValue(id, out BuildingRow existing))
+                {
+                    log.Error(file, line, TableDataColumns.BuildingId, id,
+                        $"building_id가 {existing.Line}행과 중복됩니다 - 먼저 나온 행만 사용됩니다.");
+                    idOk = false;
+                }
+
+                if (TableDataFieldRules.TryReadEnabled(
+                        file, line, TableDataColumns.Enabled, table.Get(record, TableDataColumns.Enabled), log,
+                        out bool enabled))
+                {
+                    row.Enabled = enabled;
+                }
+
+                if (TableDataFieldRules.TryReadInt(
+                        file, line, TableDataColumns.DisplayOrder,
+                        table.Get(record, TableDataColumns.DisplayOrder), log, out int order))
+                {
+                    row.DisplayOrder = order;
+                    TableDataFieldRules.CheckDuplicateDisplayOrder(file, line, order, displayOrders, log);
+                }
+
+                row.Name = ReadLocalizedName(
+                    table, record, file, line, row.Enabled, nameRequiredWhenEnabled: true, log);
+
+                row.FunctionName = ReadBuildingFunctionName(table, record, file, line, row.Enabled, log);
+
+                if (TableDataFieldRules.TryReadIntAtLeast(
+                        file, line, TableDataColumns.BuildTime,
+                        table.Get(record, TableDataColumns.BuildTime), 0, log, out int buildTime))
+                {
+                    row.BuildTimeSeconds = buildTime;
+                }
+
+                ReadBuildingCostCurrency(table, record, file, line, snapshot, row, log);
+                ReadBuildingCostItems(table, record, file, line, snapshot, row, log);
+
+                // memo는 사람이 읽는 칸이라 검증하지 않는다.
+
+                if (!idOk) continue;
+
+                snapshot.Buildings.Add(row);
+                snapshot.BuildingsById[row.Id] = row;
+            }
+        }
+
+        /// <summary>
+        /// function_category / function_key 두 칸. 판정은 이름 칸과 <b>완전히 같다</b>(활성 행에서
+        /// 필수, 한쪽만 채워진 것은 오류, 둘 다 있으면 실재까지 확인) - 그래서
+        /// <see cref="ReadLocalizedName"/>의 규칙을 그대로 다시 쓰되 컬럼 이름만 바꿔서 부른다.
+        /// </summary>
+        private static LocalizedEntryRef ReadBuildingFunctionName(
+            CsvTable table, CsvRecord record, string file, int line, bool enabled, TableDataDiagnosticLog log)
+        {
+            string categoryRaw = table.Get(record, TableDataColumns.FunctionCategory);
+            string keyRaw = table.Get(record, TableDataColumns.FunctionKey);
+
+            bool hasCategory = !string.IsNullOrEmpty(categoryRaw);
+            bool hasKey = !string.IsNullOrEmpty(keyRaw);
+
+            if (hasCategory && hasKey)
+            {
+                TableDataFieldRules.TryResolveLocalizedEntry(
+                    file, line, TableDataColumns.FunctionCategory, categoryRaw,
+                    TableDataColumns.FunctionKey, keyRaw, log, out LocalizedEntryRef entry);
+                return entry;
+            }
+
+            if (!hasCategory && !hasKey)
+            {
+                if (enabled)
+                {
+                    log.Error(file, line, TableDataColumns.FunctionCategory, categoryRaw,
+                        "enabled=1인 행은 function_category와 function_key가 모두 필요합니다 - " +
+                        "건물 팝업은 해금되는 기능 이름 없이 성립하지 않습니다.");
+                }
+
+                return LocalizedEntryRef.None;
+            }
+
+            string emptyColumn = hasCategory ? TableDataColumns.FunctionKey : TableDataColumns.FunctionCategory;
+            string emptyValue = hasCategory ? keyRaw : categoryRaw;
+
+            log.Error(file, line, emptyColumn, emptyValue,
+                "function_category와 function_key는 함께 있어야 합니다 - 한쪽만으로는 참조를 만들 수 없습니다.");
+
+            return LocalizedEntryRef.None;
+        }
+
+        /// <summary>
+        /// 비용 재화 두 칸. <b>둘이 한 덩어리</b>라 함께 비거나 함께 차 있어야 한다 - 한쪽만 적힌 행은
+        /// "얼마인지 모르는 비용"이거나 "무엇을 내는지 모르는 금액"이고, 둘 다 조용히 넘길 수 없다.
+        /// 금액 0은 <b>형식 오류가 아니다</b>(무료 건물을 재화 칸으로 적을 수 있다).
+        ///
+        /// 실재 확인은 <see cref="TableDataSnapshot.CurrenciesById"/>로 하며 <b>다듬지 않은 값끼리의
+        /// Ordinal 완전 일치</b>다 - Currency.csv가 Building.csv보다 먼저 읽히므로 이 시점의 스냅샷은
+        /// 이미 완성되어 있다. 비활성 재화를 가리키는 것도 오류이며, 건물 자신이 enabled=0이어도
+        /// 마찬가지로 본다(비활성 행의 잘못된 참조를 통과시키면 다시 켜는 순간 조용히 깨진다).
+        /// </summary>
+        private static void ReadBuildingCostCurrency(
+            CsvTable table, CsvRecord record, string file, int line,
+            TableDataSnapshot snapshot, BuildingRow row, TableDataDiagnosticLog log)
+        {
+            string idRaw = table.Get(record, TableDataColumns.CostCurrencyId);
+            string amountRaw = table.Get(record, TableDataColumns.CostCurrencyAmount);
+
+            bool hasId = !string.IsNullOrEmpty(idRaw);
+            bool hasAmount = !string.IsNullOrEmpty(amountRaw);
+
+            if (!hasId && !hasAmount) return;
+
+            if (!hasId)
+            {
+                log.Error(file, line, TableDataColumns.CostCurrencyId, idRaw,
+                    $"{TableDataColumns.CostCurrencyAmount}만 적혀 있습니다 - 어떤 재화를 낼지 알 수 없으므로 " +
+                    "두 칸을 함께 적거나 함께 비우세요.");
+                return;
+            }
+
+            if (!hasAmount)
+            {
+                log.Error(file, line, TableDataColumns.CostCurrencyAmount, amountRaw,
+                    $"{TableDataColumns.CostCurrencyId}를 적었으면 금액도 있어야 합니다 - " +
+                    "두 칸을 함께 적거나 함께 비우세요.");
+                return;
+            }
+
+            if (!TableDataFieldRules.IsValidId(idRaw))
+            {
+                log.Error(file, line, TableDataColumns.CostCurrencyId, idRaw,
+                    $"cost_currency_id 형식이 맞지 않습니다 - {TableDataFieldRules.IdPatternText} 를 만족해야 합니다.");
+                return;
+            }
+
+            if (!TableDataFieldRules.TryReadIntAtLeast(
+                    file, line, TableDataColumns.CostCurrencyAmount, amountRaw, 0, log, out int amount))
+            {
+                return;
+            }
+
+            if (!snapshot.CurrenciesById.TryGetValue(idRaw, out CurrencyRow currency))
+            {
+                log.Error(file, line, TableDataColumns.CostCurrencyId, idRaw,
+                    $"{TableDataPaths.CurrencyCsvFileName}에 없는 currency_id입니다 - " +
+                    "건설 비용은 그 표에 실제로 있는 행만 가리킬 수 있습니다(대소문자를 구분합니다).");
+                return;
+            }
+
+            if (!currency.Enabled)
+            {
+                log.Error(file, line, TableDataColumns.CostCurrencyId, idRaw,
+                    $"enabled=0인 재화({TableDataPaths.CurrencyCsvFileName} {currency.Line}행)를 비용으로 받습니다 - " +
+                    "건설 비용에는 활성 재화만 넣을 수 있습니다.");
+                return;
+            }
+
+            row.CostCurrencyId = idRaw;
+            row.CostCurrencyAmount = amount;
+        }
+
+        /// <summary>
+        /// 비용 아이템 두 칸. <b>둘 다 비어 있는 것이 정상</b>이며 그때는 아무것도 알리지 않는다 -
+        /// 재화만 내는 건물은 흔하고, 경고를 남기면 정상 상태가 매번 눈에 걸린다.
+        ///
+        /// 값이 있으면 <b>두 목록의 항목 수가 같아야 한다</b>. 비교는 <c>|</c>로 자른 <b>원본 토큰
+        /// 수</b>로 하며, 형식 오류로 버려진 토큰 때문에 "개수가 다르다"는 두 번째 오류가 딸려 나오지
+        /// 않게 한다 - 원인 하나에 진단 하나가 원칙이다. 개수는 <b>1 이상</b>이어야 한다: 0개짜리
+        /// 비용은 낼 것이 없다는 뜻이라 표에 적을 이유가 없고, 조용히 통과시키면 비용이 적혀 있는데도
+        /// 공짜인 행이 생긴다.
+        /// </summary>
+        private static void ReadBuildingCostItems(
+            CsvTable table, CsvRecord record, string file, int line,
+            TableDataSnapshot snapshot, BuildingRow row, TableDataDiagnosticLog log)
+        {
+            string idsRaw = table.Get(record, TableDataColumns.CostItemIds);
+            string countsRaw = table.Get(record, TableDataColumns.CostItemCounts);
+
+            bool hasIds = !string.IsNullOrEmpty(idsRaw);
+            bool hasCounts = !string.IsNullOrEmpty(countsRaw);
+
+            // 아이템 비용이 없는 건물. 두 칸이 함께 비어 있는 것은 정상이라 진단을 남기지 않는다.
+            if (!hasIds && !hasCounts) return;
+
+            if (!hasIds)
+            {
+                log.Error(file, line, TableDataColumns.CostItemIds, idsRaw,
+                    $"{TableDataColumns.CostItemCounts}만 적혀 있습니다 - 어떤 아이템을 낼지 알 수 없으므로 " +
+                    "두 칸을 함께 적거나 함께 비우세요.");
+                return;
+            }
+
+            if (!hasCounts)
+            {
+                log.Error(file, line, TableDataColumns.CostItemCounts, countsRaw,
+                    $"{TableDataColumns.CostItemIds}를 적었으면 개수도 있어야 합니다 - " +
+                    "두 칸을 함께 적거나 함께 비우세요.");
+                return;
+            }
+
+            string[] idTokens = idsRaw.Split('|');
+            string[] countTokens = countsRaw.Split('|');
+
+            if (idTokens.Length != countTokens.Length)
+            {
+                log.Error(file, line, TableDataColumns.CostItemCounts, countsRaw,
+                    $"아이템 {idTokens.Length}개에 개수 {countTokens.Length}개가 적혀 있습니다 - " +
+                    "두 목록의 항목 수가 같아야 어느 아이템이 몇 개인지 정할 수 있습니다.");
+                return;
+            }
+
+            var ids = new List<string>();
+            TableDataFieldRules.ReadIdList(file, line, TableDataColumns.CostItemIds, idsRaw, log, ids);
+
+            // 형식/중복으로 버려진 토큰이 있으면 짝을 맞출 수 없다. 원인은 이미 보고됐으므로 여기서
+            // 두 번째 오류를 덧붙이지 않는다.
+            if (ids.Count != idTokens.Length) return;
+
+            for (int i = 0; i < ids.Count; i++)
+            {
+                string itemId = ids[i];
+
+                if (!TableDataFieldRules.TryReadIntAtLeast(
+                        file, line, TableDataColumns.CostItemCounts, countTokens[i].Trim(), 1, log, out int count))
+                {
+                    continue;
+                }
+
+                if (!snapshot.ItemsById.TryGetValue(itemId, out ItemRow item))
+                {
+                    log.Error(file, line, TableDataColumns.CostItemIds, itemId,
+                        $"{TableDataPaths.ItemCsvFileName}에 없는 item_id입니다 - " +
+                        "건설 비용은 그 표에 실제로 있는 행만 가리킬 수 있습니다.");
+                    continue;
+                }
+
+                if (!item.Enabled)
+                {
+                    log.Error(file, line, TableDataColumns.CostItemIds, itemId,
+                        $"enabled=0인 아이템({TableDataPaths.ItemCsvFileName} {item.Line}행)을 비용으로 받습니다 - " +
+                        "건설 비용에는 활성 아이템만 넣을 수 있습니다.");
+                    continue;
+                }
+
+                row.ItemCosts.Add(new BuildingItemCostRow { ItemId = itemId, Count = count });
+            }
+        }
+
         // ---- 공용 칸 읽기 ----
 
         /// <summary>
@@ -1500,9 +1794,18 @@ namespace TableDataEditor
                 folders.Add(TableDataPaths.DungeonOutputFolder);
             }
 
-            folders.Add(TableDataPaths.CharacterOutputFolder);
-            folders.Add(TableDataPaths.SkillOutputFolder);
-            folders.Add(TableDataPaths.CharacterSkillOutputFolder);
+            if (TableDataRebuildScopes.IncludesCharacterTables(outputScope))
+            {
+                folders.Add(TableDataPaths.CharacterOutputFolder);
+                folders.Add(TableDataPaths.SkillOutputFolder);
+                folders.Add(TableDataPaths.CharacterSkillOutputFolder);
+            }
+
+            if (TableDataRebuildScopes.IncludesBuildingTable(outputScope))
+            {
+                folders.Add(TableDataPaths.BuildingOutputFolder);
+            }
+
             return folders;
         }
 
@@ -1677,6 +1980,33 @@ namespace TableDataEditor
                     TableDataColumns.FilePseudoColumn, TableDataPaths.SkillCatalogAssetName, log);
             }
 
+            if (InScope(selected, TableDataPaths.BuildingOutputFolder))
+            {
+                CheckDuplicateGenerated(
+                    TableDataAssetIndex.LoadGeneratedById<BuildingDefinition>(
+                        TableDataPaths.BuildingOutputFolder, b => b.BuildingId),
+                    TableDataPaths.BuildingCsvFileName, TableDataColumns.BuildingId, log);
+
+                foreach (BuildingRow row in snapshot.Buildings)
+                {
+                    CheckOutputPath<BuildingDefinition>(
+                        TableDataPaths.BuildingAssetPath(row.Id), row.Id, b => b.BuildingId,
+                        TableDataPaths.BuildingCsvFileName, row.Line, TableDataColumns.BuildingId, row.Id, log);
+                }
+
+                CheckOutputPath<BuildingCatalog>(
+                    TableDataPaths.BuildingCatalogAssetPath, null, null,
+                    TableDataPaths.BuildingCsvFileName, TableDataDiagnostic.FileLevelRow,
+                    TableDataColumns.FilePseudoColumn, TableDataPaths.BuildingCatalogAssetName, log);
+
+                // 좁은 범위(Building만)에서는 이번 Rebuild가 Currency/Item 에셋을 만들지 않는다.
+                // 그러면 비용 참조를 어디서 가져올지가 문제가 되므로 <b>여기서 미리</b> 확인한다.
+                if (!TableDataRebuildScopes.IncludesLegacyDomains(outputScope))
+                {
+                    CheckBuildingCostSourcesAreGenerated(snapshot, log);
+                }
+            }
+
             if (!InScope(selected, TableDataPaths.CharacterSkillOutputFolder)) return;
 
             CheckDuplicateGenerated(
@@ -1821,6 +2151,73 @@ namespace TableDataEditor
                     snapshot.CharacterSkillsByPairId.Keys, TableDataPaths.CharacterSkillCsvFileName,
                     TableDataColumns.CharacterId, log);
             }
+
+            if (InScope(selected, TableDataPaths.BuildingOutputFolder))
+            {
+                ReportOrphans(
+                    TableDataAssetIndex.LoadGeneratedById<BuildingDefinition>(TableDataPaths.BuildingOutputFolder, b => b.BuildingId),
+                    snapshot.BuildingsById.Keys, TableDataPaths.BuildingCsvFileName,
+                    TableDataColumns.BuildingId, log);
+            }
+        }
+
+        /// <summary>
+        /// Building만 다시 만드는 좁은 범위에서, 비용이 가리키는 <b>CurrencyDefinition /
+        /// ItemDefinition 생성 에셋이 이미 있는지</b>를 쓰기 전에 확인한다.
+        ///
+        /// 이 범위는 Currency/Item 표를 다시 만들지 않으므로 참조할 대상이 이번 Rebuild의 메모리에
+        /// 없다. 그래서 Rebuild는 <b>이미 만들어져 있는 생성 에셋</b>을 읽어 참조를 잇는데, 그 에셋이
+        /// 없으면 참조가 조용히 비어 버린다 - "비용이 적혀 있는데 아무것도 안 내는 건물"이 그 결과다.
+        /// 여기서 오류로 잡으면 아무것도 쓰이지 않으므로 그런 에셋이 만들어질 자리가 없다.
+        ///
+        /// <b>읽기만 한다.</b> Currency/Item 생성 폴더를 <see cref="AssetDatabase"/>로 로드할 뿐
+        /// <c>SetDirty</c>도 저장도 하지 않으므로 그 도메인의 파일은 한 바이트도 달라지지 않는다 -
+        /// 범위가 막는 것은 <b>쓰기</b>이지 읽기가 아니다(입력 자산을 읽는 것과 같은 성격이다).
+        /// 전체 범위에서는 두 표가 같은 Rebuild에서 함께 만들어지므로 이 확인 자체가 필요 없다.
+        /// </summary>
+        private static void CheckBuildingCostSourcesAreGenerated(
+            TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            Dictionary<string, List<CurrencyDefinition>> currencies =
+                TableDataAssetIndex.LoadGeneratedById<CurrencyDefinition>(
+                    TableDataPaths.CurrencyOutputFolder, c => c.CurrencyId);
+            Dictionary<string, List<ItemDefinition>> items =
+                TableDataAssetIndex.LoadGeneratedById<ItemDefinition>(
+                    TableDataPaths.ItemOutputFolder, i => i.ItemId);
+
+            foreach (BuildingRow row in snapshot.Buildings)
+            {
+                if (!string.IsNullOrEmpty(row.CostCurrencyId))
+                {
+                    RequireSingleGenerated(
+                        currencies, row.CostCurrencyId, TableDataPaths.CurrencyOutputFolder,
+                        nameof(CurrencyDefinition), row.Line, TableDataColumns.CostCurrencyId, log);
+                }
+
+                foreach (BuildingItemCostRow cost in row.ItemCosts)
+                {
+                    RequireSingleGenerated(
+                        items, cost.ItemId, TableDataPaths.ItemOutputFolder,
+                        nameof(ItemDefinition), row.Line, TableDataColumns.CostItemIds, log);
+                }
+            }
+        }
+
+        /// <summary>그 ID의 생성 에셋이 <b>정확히 하나</b> 있는지. 없으면(0개) 참조를 이을 수 없고,
+        /// 여럿이면 어느 것을 이을지 정할 수 없다 - 둘 다 오류이며 어느 쪽이든 아무것도 쓰이지 않는다.</summary>
+        private static void RequireSingleGenerated<T>(
+            Dictionary<string, List<T>> generated, string id, string folder, string typeName,
+            int line, string column, TableDataDiagnosticLog log) where T : ScriptableObject
+        {
+            int count = generated.TryGetValue(id, out List<T> matches) ? matches.Count : 0;
+            if (count == 1) return;
+
+            log.Error(TableDataPaths.BuildingCsvFileName, line, column, id, count == 0
+                ? $"'{folder}' 아래에 ID가 '{id}'인 {typeName} 생성 에셋이 없습니다 - " +
+                  "Building만 다시 만드는 범위는 그 에셋을 만들지 않으므로, 먼저 전체 Rebuild로 " +
+                  "그 표의 생성 에셋을 만든 뒤 다시 실행하세요."
+                : $"'{folder}' 아래에 ID가 '{id}'인 {typeName} 생성 에셋이 {count}개 있어 " +
+                  "어느 것을 참조할지 정할 수 없습니다 - 하나만 남기세요.");
         }
 
         private static void ReportOrphans<T>(

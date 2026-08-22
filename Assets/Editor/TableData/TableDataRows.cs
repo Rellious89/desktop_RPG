@@ -252,11 +252,69 @@ namespace TableDataEditor
     }
 
     /// <summary>
-    /// 파싱과 검증을 마친 여덟 표. Rebuild는 이 스냅샷만 보고 에셋을 만든다 - CSV를 다시 읽지 않으므로
+    /// 건설 비용의 아이템 한 칸이 실제로 채워진 경우의 값. <b>빈 칸은 아예 만들지 않는다</b> -
+    /// "비었음"을 나타내는 특별한 값을 두면 읽는 쪽마다 그 규칙을 다시 알아야 한다
+    /// (<see cref="MonsterDropRow"/>와 같은 방식이다).
+    ///
+    /// 아이템은 에셋이 아니라 <see cref="ItemId"/> 문자열로 들고 있다. 에셋 연결은 Rebuild가 한다.
+    /// </summary>
+    public struct BuildingItemCostRow
+    {
+        /// <summary>CSV에 적힌 그대로의 item_id. Item.csv에 있는 활성 행만 여기까지 온다.</summary>
+        public string ItemId;
+
+        /// <summary>낼 개수. <b>1 이상만</b> 여기까지 온다 - 0개짜리 비용은 낼 것이 없다는 뜻이라
+        /// 표에 적을 이유가 없고, 조용히 통과시키면 "비용이 있는데 공짜인" 행이 생긴다.</summary>
+        public int Count;
+    }
+
+    /// <summary>
+    /// Building.csv 한 행. <b>진행 상태는 여기에 없다</b> - 표가 말하는 것은 "이 게임에 어떤 건물이
+    /// 있고 무엇을 내야 지을 수 있는가"이고, 지었는지와 남은 시간은 저장 데이터의 몫이다.
+    /// </summary>
+    public sealed class BuildingRow
+    {
+        public int Line;
+        public string Id = string.Empty;
+        public LocalizedEntryRef Name;
+
+        /// <summary>이 건물을 지으면 열리는 기능의 이름 참조. 활성 행에서는 이름과 함께 <b>반드시
+        /// 있어야 한다</b> - 건물 팝업은 "무엇을 짓는가"와 "무엇이 열리는가" 두 줄이 모두 있어야
+        /// 성립하기 때문이다(Item.csv의 설명이 필수인 것과 같은 판정이다).</summary>
+        public LocalizedEntryRef FunctionName;
+
+        /// <summary>건설에 걸리는 시간(초). <b>0 이상만</b> 여기까지 온다 - 0은 "즉시 완성"이라는
+        /// 뜻이며 유효한 값이다.</summary>
+        public int BuildTimeSeconds;
+
+        /// <summary>
+        /// 건설 비용 재화의 재화 id. 비어 있으면 <b>이 건물은 표에서 재화 비용을 지정하지 않은 것</b>
+        /// 이며, 그때 <see cref="CostCurrencyAmount"/>는 0이다(CSV의 금액 칸도 비어 있어야 한다 -
+        /// 0을 적어 두는 것도 오류다).
+        ///
+        /// 값이 있으면 <b>Currency.csv에 실제로 있는 활성 행</b>을 가리켜야 한다 - 비교는 다듬지 않은
+        /// 값끼리의 Ordinal 완전 일치다.
+        /// </summary>
+        public string CostCurrencyId = string.Empty;
+
+        /// <summary>낼 재화 금액. <b>0 이상만</b> 여기까지 온다.</summary>
+        public int CostCurrencyAmount;
+
+        /// <summary>채워진 비용 아이템 칸만 CSV에 적힌 순서 그대로. 비어 있는 것이 정상이다.</summary>
+        public readonly List<BuildingItemCostRow> ItemCosts = new List<BuildingItemCostRow>();
+
+        public int DisplayOrder;
+        public bool Enabled;
+    }
+
+    /// <summary>
+    /// 파싱과 검증을 마친 아홉 표. Rebuild는 이 스냅샷만 보고 에셋을 만든다 - CSV를 다시 읽지 않으므로
     /// "검증한 내용"과 "쓰는 내용"이 어긋날 수 없다.
     ///
     /// 목록의 순서는 <b>World → Currency → Item → Monster → Dungeon → Character → Skill →
-    /// CharacterSkill</b>이고, 이것이 검증과 생성 순서이기도 하다. 뒤의 표가 앞의 표를 참조하므로
+    /// CharacterSkill → Building</b>이고, 이것이 검증과 생성 순서이기도 하다. Building을 <b>맨 뒤에</b>
+    /// 붙인 것은 이 표가 Currency와 Item을 가리키기 때문이다 - 가리켜지는 두 표가 이미 앞에 있으므로
+    /// 기존 순서를 한 칸도 건드리지 않고 그대로 이어 붙일 수 있다. 뒤의 표가 앞의 표를 참조하므로
     /// (Monster는 Currency와 Item을, Dungeon은 Item과 Monster를, CharacterSkill은 Character와 Skill을
     /// 가리킨다), 가리켜지는 표가 언제나 먼저 온다. Currency를 Item보다 앞에 둔 것은 재화가
     /// 무엇도 참조하지 않는 가장 바깥 표라서다 - 아이템/몬스터가 재화를 가리키게 되어도 순서를 다시
@@ -276,6 +334,7 @@ namespace TableDataEditor
         public readonly List<CharacterRow> Characters = new List<CharacterRow>();
         public readonly List<SkillRow> Skills = new List<SkillRow>();
         public readonly List<CharacterSkillRow> CharacterSkills = new List<CharacterSkillRow>();
+        public readonly List<BuildingRow> Buildings = new List<BuildingRow>();
 
         public readonly Dictionary<string, WorldRow> WorldsById = new Dictionary<string, WorldRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, CurrencyRow> CurrenciesById = new Dictionary<string, CurrencyRow>(StringComparer.Ordinal);
@@ -293,5 +352,8 @@ namespace TableDataEditor
         /// 있으므로 어느 한쪽 id로는 행을 특정할 수 없다.</summary>
         public readonly Dictionary<string, CharacterSkillRow> CharacterSkillsByPairId =
             new Dictionary<string, CharacterSkillRow>(StringComparer.Ordinal);
+
+        public readonly Dictionary<string, BuildingRow> BuildingsById =
+            new Dictionary<string, BuildingRow>(StringComparer.Ordinal);
     }
 }

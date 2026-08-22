@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4c958528fe24418fa439aa5dc1cf6961, type: 3}
+  m_Name: Building_1
+  m_EditorClassIdentifier:
+  buildingId: 1
+  localizedName:
+    m_TableReference:
+      m_TableCollectionName: GUID:161824df6b6eb43a1a6fa7c55deea323
+    m_TableEntryReference:
+      m_KeyId: 288458006528
+      m_Key:
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  localizedFunctionName:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 8908411117756417
+      m_Key:
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  buildTimeSeconds: 60
+  costCurrencyId: jewel
+  costCurrency: {fileID: 11400000, guid: 25530e3cfd6944ca4873f62520cd7d22, type: 2}
+  costCurrencyAmount: 2000
+  costItems: []
+  displayOrder: 10
+  enabled: 1
+  references:
+    version: 2
+    RefIds: []

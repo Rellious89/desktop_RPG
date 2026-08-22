@@ -44,6 +44,8 @@ namespace TableDataEditor.Tests
         /// </summary>
         private static readonly (string RelativePath, string Guid)[] GeneratedGuids =
         {
+            ("Building/Building_1.asset", "1e0e90600454446e8980563a44db5bef"),
+            ("Building/BuildingCatalog.asset", "d0ec875d301594c0cb66130069403d35"),
             ("Character/Character_Barbarian.asset", "248d14fc02c4142c49d3913832fb519e"),
             ("Character/Character_CatKnight.asset", "342e077c6a6894f169a84d989ea37a84"),
             ("Character/Character_CatMage.asset", "0af03590e26f24a0fa9976bcb738f27b"),

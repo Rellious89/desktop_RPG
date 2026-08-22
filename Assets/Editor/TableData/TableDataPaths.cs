@@ -23,6 +23,7 @@ namespace TableDataEditor
         public const string CharacterCsvFileName = "Character.csv";
         public const string SkillCsvFileName = "Skill.csv";
         public const string CharacterSkillCsvFileName = "CharacterSkill.csv";
+        public const string BuildingCsvFileName = "Building.csv";
 
         public const string WorldCsvPath = InputRoot + "/" + WorldCsvFileName;
         public const string CurrencyCsvPath = InputRoot + "/" + CurrencyCsvFileName;
@@ -32,6 +33,7 @@ namespace TableDataEditor
         public const string CharacterCsvPath = InputRoot + "/" + CharacterCsvFileName;
         public const string SkillCsvPath = InputRoot + "/" + SkillCsvFileName;
         public const string CharacterSkillCsvPath = InputRoot + "/" + CharacterSkillCsvFileName;
+        public const string BuildingCsvPath = InputRoot + "/" + BuildingCsvFileName;
 
         /// <summary>
         /// <c>icon_key</c>가 가리키는 아이콘을 찾는 <b>유일한</b> 폴더. 프로젝트 전체에서 이름으로 찾지
@@ -80,6 +82,13 @@ namespace TableDataEditor
         public const string SkillOutputFolder = OutputRoot + "/Skill";
         public const string CharacterSkillOutputFolder = OutputRoot + "/CharacterSkill";
 
+        /// <summary>
+        /// 건물 표의 출력 폴더. <b>기존 여덟 도메인과 나란한 형제 폴더</b>이며 서로의 안쪽을 절대
+        /// 건드리지 않는다 - Building만 다시 만드는 좁은 범위가 다른 도메인의 생성 파일을 한 바이트도
+        /// 바꾸지 않는다는 것이 코드로 보이는 자리가 여기다.
+        /// </summary>
+        public const string BuildingOutputFolder = OutputRoot + "/Building";
+
         /// <summary>생성 에셋 파일 이름의 고정 접두사. 원본 ID를 그대로 뒤에 붙인다 - <b>ID 자체는
         /// 절대 바꾸지 않는다</b>. ID가 <see cref="TableDataFieldRules.IdPatternText"/>(양의 정수 또는
         /// snake_case)만 허용되므로 접두사와 합쳐도 파일 이름은 항상 안전하고, 서로 다른 ID가 같은
@@ -93,6 +102,7 @@ namespace TableDataEditor
         public const string CharacterAssetPrefix = "Character_";
         public const string SkillAssetPrefix = "Skill_";
         public const string CharacterSkillAssetPrefix = "CharacterSkill_";
+        public const string BuildingAssetPrefix = "Building_";
 
         public const string WorldCatalogAssetName = "WorldCatalog";
         public const string CurrencyCatalogAssetName = "CurrencyCatalog";
@@ -102,6 +112,7 @@ namespace TableDataEditor
         public const string CharacterCatalogAssetName = "CharacterCatalog";
         public const string SkillCatalogAssetName = "SkillCatalog";
         public const string CharacterSkillCatalogAssetName = "CharacterSkillCatalog";
+        public const string BuildingCatalogAssetName = "BuildingCatalog";
 
         public static string WorldAssetPath(string worldId)
         {
@@ -152,6 +163,13 @@ namespace TableDataEditor
             return CharacterSkillOutputFolder + "/" + CharacterSkillAssetPrefix + pairId + ".asset";
         }
 
+        /// <summary>건물 생성 에셋의 경로. <b>CSV에 적힌 building_id를 한 글자도 바꾸지 않고</b> 파일
+        /// 이름에 붙인다 - 형식 검사를 통과한 값만 여기까지 온다.</summary>
+        public static string BuildingAssetPath(string buildingId)
+        {
+            return BuildingOutputFolder + "/" + BuildingAssetPrefix + buildingId + ".asset";
+        }
+
         public static string WorldCatalogAssetPath => WorldOutputFolder + "/" + WorldCatalogAssetName + ".asset";
 
         public static string CurrencyCatalogAssetPath => CurrencyOutputFolder + "/" + CurrencyCatalogAssetName + ".asset";
@@ -169,5 +187,8 @@ namespace TableDataEditor
 
         public static string CharacterSkillCatalogAssetPath =>
             CharacterSkillOutputFolder + "/" + CharacterSkillCatalogAssetName + ".asset";
+
+        public static string BuildingCatalogAssetPath =>
+            BuildingOutputFolder + "/" + BuildingCatalogAssetName + ".asset";
     }
 }

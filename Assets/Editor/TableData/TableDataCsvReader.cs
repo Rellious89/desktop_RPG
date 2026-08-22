@@ -6,7 +6,7 @@ using System.IO;
 namespace TableDataEditor
 {
     /// <summary>
-    /// CSV 여덟 장의 <b>컬럼 이름</b>. CSV는 이 이름을 그대로 써야 한다 -
+    /// CSV 아홉 장의 <b>컬럼 이름</b>. CSV는 이 이름을 그대로 써야 한다 -
     /// 헤더가 어긋나면 값을 추측해 읽지 않고 오류로 멈춘다.
     /// </summary>
     public static class TableDataColumns
@@ -175,6 +175,48 @@ namespace TableDataEditor
         public static readonly string[] CharacterSkill =
         {
             CharacterId, SkillId, RequiredCharacterLevel, DisplayOrder, Enabled, Memo,
+        };
+
+        // Building.csv
+        //
+        // 사람이 읽는 이름/기능/시간/재화/아이템은 <c>$building_name</c> / <c>$function_description</c> /
+        // <c>$build_time</c> / <c>$cost_currency</c> / <c>$cost_item</c>이라는 참조 컬럼으로 따로 두며
+        // 여기 넣지 않는다 - 넣으면 필수 컬럼이 되고 임포터가 값을 읽는 칸처럼 보인다. 특히
+        // <c>$build_time</c>은 <c>00:01:00</c> 같은 사람용 표기라, 초 단위 정수인 <c>build_time</c>과
+        // <b>같은 값을 두 표기로</b> 적어 둔 것이다 - 임포터가 읽는 것은 언제나 초 쪽 하나뿐이다.
+        //
+        // 비용 재화 칸의 이름은 Monster.csv의 <c>currency_id</c>와 <b>일부러 다르다</b>. 같은 표에
+        // "보상 재화"와 "비용 재화"가 함께 오게 되면 어느 쪽인지 이름만으로 갈리지 않으므로,
+        // 처음부터 <c>cost_</c> 접두사로 뜻을 붙여 둔다.
+        public const string BuildingId = "building_id";
+
+        /// <summary>이 건물을 지으면 열리는 기능의 이름 참조. 이름과 <b>다른 카테고리를 가리켜도 된다</b>
+        /// (여관은 07_Building, 그 기능인 용병 모집은 01_UI에 있다).</summary>
+        public const string FunctionCategory = "function_category";
+
+        public const string FunctionKey = "function_key";
+
+        /// <summary>건설에 걸리는 시간(초). 사람이 읽는 <c>00:01:00</c> 표기는 <c>$build_time</c> 참조
+        /// 컬럼의 몫이며 임포터는 그 칸을 읽지 않는다.</summary>
+        public const string BuildTime = "build_time";
+
+        /// <summary>건설 비용 재화 두 칸. <b>두 칸이 한 덩어리</b>다 - id가 비면 금액 칸도 비어야 하고,
+        /// id가 있으면 금액 칸이 있어야 한다(Monster.csv의 보상 재화 세 칸과 같은 규칙이다).</summary>
+        public const string CostCurrencyId = "cost_currency_id";
+
+        public const string CostCurrencyAmount = "cost_currency_amount";
+
+        /// <summary>건설 비용 아이템 두 칸. <b>두 칸이 한 덩어리</b>이며 <c>|</c>로 구분한 목록이다 -
+        /// 둘 다 비어 있는 것은 정상(재화만 내는 건물)이고, 한쪽만 채워지거나 길이가 다르면 오류다.</summary>
+        public const string CostItemIds = "cost_item_ids";
+
+        public const string CostItemCounts = "cost_item_counts";
+
+        public static readonly string[] Building =
+        {
+            BuildingId, NameCategory, NameKey, FunctionCategory, FunctionKey, BuildTime,
+            CostCurrencyId, CostCurrencyAmount, CostItemIds, CostItemCounts,
+            DisplayOrder, Enabled, Memo,
         };
 
         /// <summary>

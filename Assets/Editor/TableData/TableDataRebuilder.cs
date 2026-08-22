@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Building;
 using Character;
 using CommonEditor;
 using Dungeon;
@@ -21,7 +22,7 @@ namespace TableDataEditor
     /// </summary>
     public enum TableDataRebuildScope
     {
-        /// <summary>여덟 표 전부. 기존 Rebuild와 완전히 같은 동작이다.</summary>
+        /// <summary>아홉 표 전부. 기존 Rebuild와 완전히 같은 동작이다.</summary>
         All = 0,
 
         /// <summary>
@@ -34,6 +35,20 @@ namespace TableDataEditor
         /// 없다는 것이 이 값의 존재 이유다.
         /// </summary>
         CharacterSkillTables = 1,
+
+        /// <summary>
+        /// Building 한 표만. 이 표는 Currency와 Item을 가리키지만, 그 둘을 <b>함께 다시 쓰지 않고도</b>
+        /// 참조를 이을 수 있다 - 이미 만들어져 있는 <c>CurrencyDefinition</c> /
+        /// <c>ItemDefinition</c> 생성 에셋을 <b>읽어서</b> 가리키기 때문이다. 그 에셋이 없거나 여럿이면
+        /// <see cref="TableDataValidator"/>가 <b>쓰기 전에</b> 오류로 잡으므로
+        /// (<c>CheckBuildingCostSourcesAreGenerated</c>), "참조가 조용히 비는" 경로는 존재하지 않는다.
+        /// 이것이 임의의 부분집합을 허용하지 않는 규칙을 지키면서도 이 범위를 열어 둘 수 있는 이유다.
+        ///
+        /// World/Currency/Item/Monster/Dungeon/Character/Skill/CharacterSkill의 생성 에셋은
+        /// <b>쓰지도 SetDirty하지도 않는다</b> - 읽기만 하며, 그 도메인의 파일은 한 바이트도 달라지지
+        /// 않는다는 것이 이 값의 존재 이유다.
+        /// </summary>
+        BuildingTable = 2,
     }
 
     /// <summary>
@@ -46,7 +61,9 @@ namespace TableDataEditor
     {
         public static bool IsSupported(TableDataRebuildScope scope)
         {
-            return scope == TableDataRebuildScope.All || scope == TableDataRebuildScope.CharacterSkillTables;
+            return scope == TableDataRebuildScope.All
+                   || scope == TableDataRebuildScope.CharacterSkillTables
+                   || scope == TableDataRebuildScope.BuildingTable;
         }
 
         /// <summary>지원하지 않는 값이면 <b>아무것도 하기 전에</b> 던진다.</summary>
@@ -56,7 +73,8 @@ namespace TableDataEditor
 
             throw new ArgumentOutOfRangeException(parameterName, scope,
                 "지원하지 않는 Rebuild 범위입니다 - " +
-                $"{nameof(TableDataRebuildScope.All)} 또는 {nameof(TableDataRebuildScope.CharacterSkillTables)}만 " +
+                $"{nameof(TableDataRebuildScope.All)}, {nameof(TableDataRebuildScope.CharacterSkillTables)}, " +
+                $"{nameof(TableDataRebuildScope.BuildingTable)}만 " +
                 "쓸 수 있습니다. 임의의 부분집합을 허용하면 범위 밖 표를 가리키던 참조가 지워집니다.");
         }
 
@@ -65,6 +83,20 @@ namespace TableDataEditor
         {
             EnsureSupported(scope, nameof(scope));
             return scope == TableDataRebuildScope.All;
+        }
+
+        /// <summary>이 범위가 Character/Skill/CharacterSkill 세 표를 포함하는지.</summary>
+        public static bool IncludesCharacterTables(TableDataRebuildScope scope)
+        {
+            EnsureSupported(scope, nameof(scope));
+            return scope == TableDataRebuildScope.All || scope == TableDataRebuildScope.CharacterSkillTables;
+        }
+
+        /// <summary>이 범위가 Building 표를 포함하는지.</summary>
+        public static bool IncludesBuildingTable(TableDataRebuildScope scope)
+        {
+            EnsureSupported(scope, nameof(scope));
+            return scope == TableDataRebuildScope.All || scope == TableDataRebuildScope.BuildingTable;
         }
     }
 
@@ -126,12 +158,23 @@ namespace TableDataEditor
         // boolValue에 넣은 값이 조용히 버려져 아무도 처음부터 가지지 못한 채로 만들어진다.
         private const string InitiallyOwnedField = "initiallyOwned";
 
+        // 건설 비용 칸들. 재화는 <b>id 문자열과 정의 참조를 함께</b> 쓰고(저장 키는 언제나 id 쪽이다),
+        // 아이템 비용은 목록 안쪽 세 칸을 모두 덮어쓴다 - 드롭 칸과 같은 이유로 상수를 한 곳에 둔다.
+        private const string BuildingCostCurrencyIdField = "costCurrencyId";
+        private const string BuildingCostCurrencyField = "costCurrency";
+        private const string BuildingCostCurrencyAmountField = "costCurrencyAmount";
+        private const string BuildingCostItemsField = "costItems";
+        private const string BuildingCostItemIdField = "itemId";
+        private const string BuildingCostItemField = "item";
+        private const string BuildingCostItemCountField = "count";
+        private const string BuildingEnabledField = "enabled";
+
         // 관계가 가리키는 두 참조 칸. 문자열로 되돌아가 있으면 objectReferenceValue에 넣은 값이
         // 조용히 버려지므로, 이름뿐 아니라 타입까지 미리 확인한다(재화 칸과 같은 이유다).
         private const string RelationCharacterField = "character";
         private const string RelationSkillField = "skill";
 
-        /// <summary>여덟 표 전부를 다시 만든다. 기존 진입점의 동작을 그대로 둔다.</summary>
+        /// <summary>아홉 표 전부를 다시 만든다. 기존 진입점의 동작을 그대로 둔다.</summary>
         public static TableDataRebuildResult Rebuild()
         {
             return Rebuild(TableDataRebuildScope.All);
@@ -140,7 +183,7 @@ namespace TableDataEditor
         /// <summary>
         /// 정해진 <paramref name="scope"/>의 도메인만 다시 만든다.
         ///
-        /// <b>검증은 범위와 무관하게 언제나 여덟 표 전부를 본다.</b> 좁은 범위로 실행한다고 해서
+        /// <b>검증은 범위와 무관하게 언제나 아홉 표 전부를 본다.</b> 좁은 범위로 실행한다고 해서
         /// 검사가 느슨해지지 않으며, 어느 표에든 오류가 하나라도 있으면 <b>아무것도 쓰지 않고</b>
         /// 끝낸다 - 범위는 "무엇을 쓸지"만 정하고 "무엇을 확인할지"는 정하지 않는다.
         /// </summary>
@@ -165,11 +208,11 @@ namespace TableDataEditor
             if (!VerifySerializedLayout(result.Validation.Log)) return result;
 
             TableDataSnapshot snapshot = result.Validation.Snapshot;
-            bool legacy = TableDataRebuildScopes.IncludesLegacyDomains(scope);
 
             EnsureFolders(scope);
 
-            if (!legacy) return RebuildCharacterTables(result, snapshot);
+            if (scope == TableDataRebuildScope.CharacterSkillTables) return RebuildCharacterTables(result, snapshot);
+            if (scope == TableDataRebuildScope.BuildingTable) return RebuildBuildingTable(result, snapshot);
 
             var worldAssets = ResolveTargets<WorldDefinition>(
                 TableDataPaths.WorldOutputFolder, w => w.WorldId,
@@ -199,6 +242,7 @@ namespace TableDataEditor
             var dungeonCatalog = ResolveSingleton<DungeonCatalog>(TableDataPaths.DungeonCatalogAssetPath, result);
 
             CharacterTableTargets characterTargets = ResolveCharacterTableTargets(snapshot, result);
+            BuildingTableTargets buildingTargets = ResolveBuildingTableTargets(snapshot, result);
 
             AssetDatabase.StartAssetEditing();
             try
@@ -221,6 +265,9 @@ namespace TableDataEditor
 
                 // Character -> Skill -> CharacterSkill. 관계 표가 앞의 둘을 가리키므로 순서가 이렇다.
                 WriteCharacterTables(snapshot, characterTargets);
+
+                // Building은 맨 뒤다 - Currency와 Item을 가리키므로 그 둘이 이미 채워져 있어야 한다.
+                WriteBuildingTable(snapshot, buildingTargets, currencyAssets, itemAssets);
             }
             finally
             {
@@ -239,9 +286,185 @@ namespace TableDataEditor
             monsterCatalog.MarkDirty();
             dungeonCatalog.MarkDirty();
             characterTargets.MarkDirty();
+            buildingTargets.MarkDirty();
 
             result.Wrote = true;
             return result;
+        }
+
+        // ---- Building ----
+
+        /// <summary>Building 한 표의 생성 대상. 다른 도메인과 <b>완전히 분리해</b> 들고 다닌다 -
+        /// 좁은 범위의 Rebuild가 다른 도메인의 사전을 아예 만들지 않게 하기 위해서다.</summary>
+        private sealed class BuildingTableTargets
+        {
+            public Dictionary<string, BuildingDefinition> Buildings;
+            public BuildingCatalog Catalog;
+
+            public void MarkDirty()
+            {
+                Catalog.MarkDirty();
+            }
+
+            /// <summary>이번 범위가 실제로 건드린 에셋 <b>전부</b>를 한 번씩(중복도 누락도 없이).</summary>
+            public List<UnityEngine.Object> AllTargets()
+            {
+                var all = new List<UnityEngine.Object>();
+                var seen = new HashSet<int>();
+
+                void Add(UnityEngine.Object asset)
+                {
+                    if (asset == null) return;
+                    if (!seen.Add(asset.GetInstanceID())) return;
+                    all.Add(asset);
+                }
+
+                foreach (BuildingDefinition building in Buildings.Values) Add(building);
+                Add(Catalog);
+                return all;
+            }
+        }
+
+        /// <summary>
+        /// Building 한 표만 다시 만든다. <b>다른 여덟 도메인의 생성 에셋은 쓰지도 SetDirty하지도
+        /// 않는다</b> - Currency와 Item만 <b>읽어서</b> 비용 참조를 잇고, 그 파일은 한 바이트도
+        /// 달라지지 않는다.
+        ///
+        /// <b>여기서도 <see cref="AssetDatabase.SaveAssets"/>를 부르지 않는다.</b> 그것은 프로젝트의
+        /// 모든 dirty 에셋을 디스크에 쓰는 전역 동작이라, 사람이 인스펙터에서 고쳐 두고 아직 저장하지
+        /// 않은 무관한 에셋까지 이 Rebuild의 이름으로 함께 커밋된다 - "이 범위 밖은 건드리지 않는다"는
+        /// 약속이 저장 단계에서 깨진다(<see cref="RebuildCharacterTables"/>와 같은 이유다).
+        /// </summary>
+        private static TableDataRebuildResult RebuildBuildingTable(
+            TableDataRebuildResult result, TableDataSnapshot snapshot)
+        {
+            BuildingTableTargets targets = ResolveBuildingTableTargets(snapshot, result);
+
+            // 비용이 가리킬 대상은 <b>이미 만들어져 있는</b> 생성 에셋에서 읽는다. 없거나 여럿이면
+            // Validate가 이미 오류로 잡아 여기까지 오지 못한다.
+            Dictionary<string, CurrencyDefinition> currencies = LoadGeneratedSingles<CurrencyDefinition>(
+                TableDataPaths.CurrencyOutputFolder, c => c.CurrencyId);
+            Dictionary<string, ItemDefinition> items = LoadGeneratedSingles<ItemDefinition>(
+                TableDataPaths.ItemOutputFolder, i => i.ItemId);
+
+            AssetDatabase.StartAssetEditing();
+            try
+            {
+                WriteBuildingTable(snapshot, targets, currencies, items);
+            }
+            finally
+            {
+                // 예외가 나도 반드시 풀어 준다. 예외로 빠져나가는 경우 아래 저장 단계는 실행되지 않는다.
+                AssetDatabase.StopAssetEditing();
+            }
+
+            foreach (UnityEngine.Object asset in targets.AllTargets())
+            {
+                AssetDatabase.SaveAssetIfDirty(asset);
+            }
+
+            targets.MarkDirty();
+
+            result.Wrote = true;
+            return result;
+        }
+
+        private static BuildingTableTargets ResolveBuildingTableTargets(
+            TableDataSnapshot snapshot, TableDataRebuildResult result)
+        {
+            return new BuildingTableTargets
+            {
+                Buildings = ResolveTargets<BuildingDefinition>(
+                    TableDataPaths.BuildingOutputFolder, b => b.BuildingId,
+                    snapshot.Buildings.ConvertAll(r => r.Id), TableDataPaths.BuildingAssetPath,
+                    TableDataPaths.BuildingCsvFileName, TableDataColumns.BuildingId, result),
+
+                Catalog = ResolveSingleton<BuildingCatalog>(TableDataPaths.BuildingCatalogAssetPath, result),
+            };
+        }
+
+        private static void WriteBuildingTable(
+            TableDataSnapshot snapshot, BuildingTableTargets targets,
+            Dictionary<string, CurrencyDefinition> currencies, Dictionary<string, ItemDefinition> items)
+        {
+            foreach (BuildingRow row in snapshot.Buildings)
+            {
+                WriteBuilding(targets.Buildings[row.Id], row, currencies, items);
+            }
+
+            WriteCatalog(targets.Catalog, "buildings",
+                SortForCatalog(snapshot.Buildings, r => r.Enabled, r => r.DisplayOrder, r => r.Id, targets.Buildings));
+        }
+
+        /// <summary>
+        /// 건물 하나. building_id는 <b>CSV에 적힌 값을 한 글자도 바꾸지 않고</b> 쓴다.
+        ///
+        /// <c>enabled</c>는 <b>모든 행에</b> 적어 둔다 - 꺼진 행도 정의 에셋은 만들어지므로, 그 에셋을
+        /// 열었을 때 표와 같은 값이 보여야 한다. 이 값이 목록을 만들지는 않는다: 카탈로그에 무엇이
+        /// 들어가는지는 바로 위 <see cref="WriteBuildingTable"/>의 <see cref="SortForCatalog{TRow,TAsset}"/>가
+        /// 켜진 행만 골라 정하며, 여기서는 표에 적힌 값을 옮겨 적을 뿐이다.
+        ///
+        /// 비용 재화는 <b>세 칸을 언제나 함께</b> 쓴다 - CSV에서 지웠는데 에셋에 예전 참조나 금액이
+        /// 남아 있으면 "표에 없는 비용"을 계속 받게 되므로, 지정이 없는 행에는 빈 문자열/빈 참조/0을
+        /// 적어 둔다(Monster의 처치 재화 보상과 같은 규칙이다). 비용 아이템 목록도 마찬가지로 <b>매번
+        /// 통째로</b> 다시 쓴다.
+        ///
+        /// 참조는 넘어온 사전에서만 찾는다(프로젝트를 뒤지지 않는다) - 전체 범위에서는 이번 Rebuild가
+        /// 방금 만든 정의이고, Building만 다시 만드는 범위에서는 이미 만들어져 있던 생성 에셋이다.
+        /// 어느 쪽이든 Validate가 실재를 이미 확인했고, 그래도 조회가 빗나가면 <b>비워 둔다</b>
+        /// (있지도 않은 대상을 가리키는 참조를 만들지 않는다) - 다만 id 문자열은 그대로 남으므로
+        /// 무엇을 가리키려 했는지는 에셋만 보고도 알 수 있다.
+        /// </summary>
+        private static void WriteBuilding(
+            BuildingDefinition asset, BuildingRow row,
+            Dictionary<string, CurrencyDefinition> currencies, Dictionary<string, ItemDefinition> items)
+        {
+            var serialized = new SerializedObject(asset);
+            serialized.FindProperty("buildingId").stringValue = row.Id;
+            serialized.FindProperty("displayOrder").intValue = row.DisplayOrder;
+            serialized.FindProperty(BuildingEnabledField).boolValue = row.Enabled;
+            serialized.FindProperty("buildTimeSeconds").intValue = row.BuildTimeSeconds;
+            ApplyLocalizedName(serialized.FindProperty("localizedName"), row.Name);
+            ApplyLocalizedName(serialized.FindProperty("localizedFunctionName"), row.FunctionName);
+
+            serialized.FindProperty(BuildingCostCurrencyIdField).stringValue = row.CostCurrencyId;
+            serialized.FindProperty(BuildingCostCurrencyField).objectReferenceValue =
+                Lookup(currencies, row.CostCurrencyId);
+            serialized.FindProperty(BuildingCostCurrencyAmountField).intValue = row.CostCurrencyAmount;
+
+            SerializedProperty costList = serialized.FindProperty(BuildingCostItemsField);
+            costList.arraySize = row.ItemCosts.Count;
+            for (int i = 0; i < row.ItemCosts.Count; i++)
+            {
+                BuildingItemCostRow cost = row.ItemCosts[i];
+                SerializedProperty element = costList.GetArrayElementAtIndex(i);
+
+                // 배열을 늘리면 Unity가 바로 앞 칸을 복사해 넣기도 하므로 세 칸을 모두 덮어쓴다.
+                element.FindPropertyRelative(BuildingCostItemIdField).stringValue = cost.ItemId;
+                element.FindPropertyRelative(BuildingCostItemField).objectReferenceValue = Lookup(items, cost.ItemId);
+                element.FindPropertyRelative(BuildingCostItemCountField).intValue = cost.Count;
+            }
+
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(asset);
+        }
+
+        /// <summary>
+        /// 생성 폴더에서 <b>ID가 겹치지 않는 에셋만</b> 사전으로 읽는다. 읽기만 하며 아무것도
+        /// 고치지 않는다 - 겹치는 ID는 어느 것을 가리킬지 정할 수 없으므로 <b>넣지 않는다</b>(그 상황은
+        /// Validate가 이미 오류로 잡았고, 여기서 임의로 하나를 고르면 그 판단이 코드에서 사라진다).
+        /// </summary>
+        private static Dictionary<string, T> LoadGeneratedSingles<T>(string folder, Func<T, string> idSelector)
+            where T : ScriptableObject
+        {
+            var singles = new Dictionary<string, T>(StringComparer.Ordinal);
+
+            foreach (KeyValuePair<string, List<T>> pair in TableDataAssetIndex.LoadGeneratedById(folder, idSelector))
+            {
+                if (pair.Value.Count == 1) singles[pair.Key] = pair.Value[0];
+            }
+
+            return singles;
         }
 
         // ---- Character / Skill / CharacterSkill ----
@@ -394,7 +617,7 @@ namespace TableDataEditor
             EnsureFolder("Assets", "Generated");
             EnsureFolder(TableDataPaths.GeneratedRoot, "TableData");
 
-            if (scope == TableDataRebuildScope.All)
+            if (TableDataRebuildScopes.IncludesLegacyDomains(scope))
             {
                 EnsureFolder(TableDataPaths.OutputRoot, "World");
                 EnsureFolder(TableDataPaths.OutputRoot, "Currency");
@@ -403,9 +626,17 @@ namespace TableDataEditor
                 EnsureFolder(TableDataPaths.OutputRoot, "Dungeon");
             }
 
-            EnsureFolder(TableDataPaths.OutputRoot, "Character");
-            EnsureFolder(TableDataPaths.OutputRoot, "Skill");
-            EnsureFolder(TableDataPaths.OutputRoot, "CharacterSkill");
+            if (TableDataRebuildScopes.IncludesCharacterTables(scope))
+            {
+                EnsureFolder(TableDataPaths.OutputRoot, "Character");
+                EnsureFolder(TableDataPaths.OutputRoot, "Skill");
+                EnsureFolder(TableDataPaths.OutputRoot, "CharacterSkill");
+            }
+
+            if (TableDataRebuildScopes.IncludesBuildingTable(scope))
+            {
+                EnsureFolder(TableDataPaths.OutputRoot, "Building");
+            }
         }
 
         private static void EnsureFolder(string parent, string child)
@@ -858,6 +1089,24 @@ namespace TableDataEditor
             ok &= VerifyFields<CharacterCatalog>(log, "characters");
             ok &= VerifyFields<SkillCatalog>(log, "skills");
             ok &= VerifyFields<CharacterSkillCatalog>(log, "relations");
+
+            ok &= VerifyFields<BuildingDefinition>(log, "buildingId", "localizedName", "localizedFunctionName",
+                "buildTimeSeconds", BuildingCostCurrencyIdField, BuildingCostCurrencyField,
+                BuildingCostCurrencyAmountField, BuildingCostItemsField, "displayOrder",
+                BuildingEnabledField);
+            ok &= VerifyPropertyType<BuildingDefinition>(
+                log, BuildingCostCurrencyIdField, SerializedPropertyType.String,
+                "비용 재화의 id 칸은 문자열이어야 합니다 - 저장 파일이 재화를 가리키는 키는 언제나 id입니다.");
+            ok &= VerifyPropertyType<BuildingDefinition>(
+                log, BuildingCostCurrencyField, SerializedPropertyType.ObjectReference,
+                $"비용 재화 칸은 {nameof(CurrencyDefinition)}을 가리키는 참조여야 합니다(id 문자열이 아닙니다).");
+            ok &= VerifyPropertyType<BuildingDefinition>(
+                log, BuildingEnabledField, SerializedPropertyType.Boolean,
+                "표의 enabled 값은 참/거짓 칸이어야 합니다 - 숫자나 문자열 칸이 되면 Rebuild가 적어 둔 " +
+                "값이 조용히 버려져, 꺼진 건물의 에셋이 켜져 있는 것처럼 보입니다.");
+            ok &= VerifyBuildingCostItemFields(log);
+
+            ok &= VerifyFields<BuildingCatalog>(log, "buildings");
             return ok;
         }
 
@@ -881,6 +1130,64 @@ namespace TableDataEditor
                 log.Error(RuntimeSchemaPseudoFile, TableDataDiagnostic.FileLevelRow, field, typeof(T).Name,
                     $"{typeof(T).Name}의 '{field}'가 {expected} 칸이 아닙니다({property.propertyType}) - {reason}");
                 return false;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(probe);
+            }
+        }
+
+        /// <summary>
+        /// 건설 비용 아이템 칸 안쪽 필드 이름과 타입까지 확인한다. 목록 필드가 있다는 것만으로는
+        /// 부족하다 - 안쪽 이름이 어긋나면 <c>FindPropertyRelative</c>가 null을 돌려주고, 그때는 이미
+        /// 앞선 건물 몇 개를 쓴 뒤라 프로젝트가 반쯤 갱신된 상태로 남는다(드롭 칸과 같은 이유다).
+        /// 임시 인스턴스에서 칸을 하나 늘려 확인하며, 인스턴스는 곧바로 버리므로 프로젝트에는 아무것도
+        /// 남지 않는다.
+        /// </summary>
+        private static bool VerifyBuildingCostItemFields(TableDataDiagnosticLog log)
+        {
+            var probe = ScriptableObject.CreateInstance<BuildingDefinition>();
+            try
+            {
+                var serialized = new SerializedObject(probe);
+                SerializedProperty list = serialized.FindProperty(BuildingCostItemsField);
+                if (list == null) return false; // 목록 자체가 없는 경우는 VerifyFields가 이미 보고했다.
+
+                list.arraySize = 1;
+                SerializedProperty element = list.GetArrayElementAtIndex(0);
+
+                bool ok = true;
+                var expected = new[]
+                {
+                    (Field: BuildingCostItemIdField, Type: SerializedPropertyType.String),
+                    (Field: BuildingCostItemField, Type: SerializedPropertyType.ObjectReference),
+                    (Field: BuildingCostItemCountField, Type: SerializedPropertyType.Integer),
+                };
+
+                foreach ((string field, SerializedPropertyType type) in expected)
+                {
+                    SerializedProperty property = element.FindPropertyRelative(field);
+
+                    if (property == null)
+                    {
+                        log.Error(RuntimeSchemaPseudoFile, TableDataDiagnostic.FileLevelRow,
+                            field, nameof(BuildingDefinition.ItemCostEntry),
+                            $"{nameof(BuildingDefinition.ItemCostEntry)}에 직렬화 필드 '{field}'가 없습니다 - " +
+                            "런타임 클래스가 바뀌었으니 임포터를 함께 고쳐야 합니다.");
+                        ok = false;
+                        continue;
+                    }
+
+                    if (property.propertyType == type) continue;
+
+                    log.Error(RuntimeSchemaPseudoFile, TableDataDiagnostic.FileLevelRow,
+                        field, nameof(BuildingDefinition.ItemCostEntry),
+                        $"{nameof(BuildingDefinition.ItemCostEntry)}의 '{field}'가 {type} 칸이 아닙니다" +
+                        $"({property.propertyType}) - 값이 조용히 버려집니다.");
+                    ok = false;
+                }
+
+                return ok;
             }
             finally
             {
