@@ -1,0 +1,2 @@
+building_id,name_category,name_key,$building_name,function_category,function_key,$function_description,build_time,$build_time,cost_currency_id,$cost_currency,cost_currency_amount,cost_item_ids,$cost_item,cost_item_counts,display_order,enabled,memo
+1,7,1,여관,1,1001,용병 모집,60,00:01:00,jewel,주얼,2000,,,,10,1,

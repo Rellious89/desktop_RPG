@@ -38,3 +38,11 @@ Key,Id,English(en),Korean (South Korea)(ko-KR)
 37,,획득한 아이템,획득한 아이템
 38,,1일 이상,1일 이상
 39,,Information,아이템 정보
+40,,"Unlock - {0}
+
+Time - {1}
+Cost - {2}","해금 기능 - {0}
+
+소요 시간 - {1}
+비용 - {2}"
+1001,,용병 모집,용병 모집
