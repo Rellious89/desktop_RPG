@@ -210,6 +210,29 @@ namespace Common
 
             return utc.ToString(TimestampFormat, CultureInfo.InvariantCulture);
         }
+
+        /// <summary>
+        /// <see cref="FormatTimestamp"/>가 적은 문자열을 UTC <see cref="DateTime"/>으로 되돌린다.
+        /// 비어 있거나 서식이 어긋나면 false이며 <b>예외를 던지지 않는다</b> - 손상된 저장 값 하나가
+        /// 화면 전체를 멈추게 하면 안 된다.
+        ///
+        /// 파싱도 <see cref="CultureInfo.InvariantCulture"/>로 한다. 적을 때만 문화권을 고정하고 읽을
+        /// 때 풀어 주면, 지역 설정이 다른 기기에서 방금 적은 값을 못 읽는 자리가 생긴다.
+        /// </summary>
+        public static bool TryParseTimestamp(string text, out DateTime utc)
+        {
+            utc = default;
+            if (string.IsNullOrEmpty(text)) return false;
+
+            if (!DateTime.TryParseExact(text, TimestampFormat, CultureInfo.InvariantCulture,
+                                        DateTimeStyles.RoundtripKind, out DateTime parsed))
+            {
+                return false;
+            }
+
+            utc = parsed.Kind == DateTimeKind.Utc ? parsed : parsed.ToUniversalTime();
+            return true;
+        }
     }
 
     /// <summary>
@@ -309,6 +332,20 @@ namespace Common
 
         /// <summary>건설이 끝나는 시각(UTC). 건설 시간이 0초면 <see cref="startedAtUtc"/>와 같다.</summary>
         public string completeAtUtc;
+
+        /// <summary>
+        /// 완성 안내를 <b>이미 한 번 띄웠는가</b>. 진행률이 아니라 <b>알림을 보냈다는 사실</b>만
+        /// 담는다 - 완성 여부 자체는 여전히 <see cref="completeAtUtc"/>와 현재 시각의 비교로만
+        /// 파생되며, 이 칸은 그 판정에 끼어들지 않는다.
+        ///
+        /// <b>이 칸이 있어야 앱을 다시 켤 때 같은 안내가 되풀이되지 않는다.</b> "완성됐다"는 사실은
+        /// 시각 비교라서 켤 때마다 참이지만, 안내는 한 번뿐이어야 하기 때문이다.
+        ///
+        /// 이 칸이 없던 저장 파일은 JsonUtility가 false로 채우며, 그것이 곧 "아직 안내하지 않았다"라서
+        /// 그대로 옳다(이미 완성된 건물이라면 다음에 켤 때 안내가 한 번 뜨고 끝난다) - 그래서 이 칸을
+        /// 더하면서 <see cref="SaveData.CurrentSaveVersion"/>을 올리지 않았다.
+        /// </summary>
+        public bool completionNotified;
     }
 
     /// <summary>

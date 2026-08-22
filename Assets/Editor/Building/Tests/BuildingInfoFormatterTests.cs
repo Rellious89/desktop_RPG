@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Building;
 using NUnit.Framework;
@@ -39,6 +40,36 @@ namespace BuildingEditor.Tests
         public void 음수_시간은_예외없이_0으로_표시된다(long seconds)
         {
             Assert.AreEqual(BuildingInfoFormatter.ZeroTime, BuildingInfoFormatter.FormatBuildTime(seconds));
+        }
+
+        // ---- 남은 시간 ----
+
+        [Test]
+        public void 남은_시간은_건설_시간과_같은_서식을_쓴다()
+        {
+            Assert.AreEqual("00:01:00", BuildingInfoFormatter.FormatRemaining(TimeSpan.FromSeconds(60)));
+            Assert.AreEqual("25:00:00", BuildingInfoFormatter.FormatRemaining(TimeSpan.FromHours(25)),
+                "남은 시간도 24시간에서 되감기지 않는다");
+        }
+
+        [Test]
+        public void 초보다_짧게_남은_시간은_1초로_올림된다()
+        {
+            Assert.AreEqual(1L, BuildingInfoFormatter.ToDisplaySeconds(TimeSpan.FromMilliseconds(1)));
+            Assert.AreEqual("00:00:01", BuildingInfoFormatter.FormatRemaining(TimeSpan.FromMilliseconds(400)),
+                "0.4초가 남았는데 00:00:00이 보이면 이미 끝난 것으로 읽힌다");
+            Assert.AreEqual("00:01:00", BuildingInfoFormatter.FormatRemaining(TimeSpan.FromSeconds(59.2)),
+                "올림이므로 59.2초는 60초로 보인다");
+        }
+
+        [TestCase(0)]
+        [TestCase(-1)]
+        [TestCase(-3600)]
+        public void 다_지난_시간은_0초다(int seconds)
+        {
+            Assert.AreEqual(0L, BuildingInfoFormatter.ToDisplaySeconds(TimeSpan.FromSeconds(seconds)));
+            Assert.AreEqual(BuildingInfoFormatter.ZeroTime,
+                BuildingInfoFormatter.FormatRemaining(TimeSpan.FromSeconds(seconds)));
         }
 
         // ---- 금액 ----

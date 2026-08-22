@@ -87,6 +87,33 @@ namespace Building
         }
 
         /// <summary>
+        /// 남은 시간을 화면에 적을 <b>초 수</b>로 만든다. <b>올림</b>이다 - 0.4초가 남았을 때
+        /// "00:00:00"이 보이면 이미 끝난 것으로 읽히지만 실제로는 아직 끝나지 않았기 때문이다
+        /// (회복소 타이머가 남은 시간을 올림으로 보여 주는 규칙과 같다).
+        ///
+        /// 0 이하는 0이다 - 완성 판정은 표시가 아니라 시각 비교가 하므로, 여기서 음수를 그대로
+        /// 흘려보내면 "-00:00:01" 같은 표시가 생긴다.
+        /// </summary>
+        public static long ToDisplaySeconds(TimeSpan remaining)
+        {
+            double totalSeconds = remaining.TotalSeconds;
+            if (totalSeconds <= 0d) return 0L;
+            if (totalSeconds >= long.MaxValue) return long.MaxValue;
+
+            return (long)Math.Ceiling(totalSeconds);
+        }
+
+        /// <summary>
+        /// 남은 시간을 <c>HH:mm:ss</c>로 만든다. 서식 규칙은 <see cref="FormatBuildTime"/>과 <b>같은 것
+        /// 하나</b>를 쓴다 - 건설 시간과 남은 시간이 서로 다른 모양으로 보이면 안 되고, 24시간에서
+        /// 되감기지 않는 성질도 그대로 따라와야 한다(25시간은 "25:00:00"이다).
+        /// </summary>
+        public static string FormatRemaining(TimeSpan remaining)
+        {
+            return FormatBuildTime(ToDisplaySeconds(remaining));
+        }
+
+        /// <summary>
         /// 금액/개수를 천 단위 구분과 함께 만든다. "N0" + <see cref="CultureInfo.InvariantCulture"/>라서
         /// 실행 환경의 지역 설정이 점(.)이나 공백을 쓰더라도 언제나 쉼표로 고정된다
         /// (<see cref="Common.InventoryPanel"/>의 재화 표시와 같은 규칙).

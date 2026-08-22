@@ -299,6 +299,7 @@ namespace Common
                         buildingId = state.buildingId,
                         startedAtUtc = state.startedAtUtc,
                         completeAtUtc = state.completeAtUtc,
+                        completionNotified = state.completionNotified,
                     });
             }
 

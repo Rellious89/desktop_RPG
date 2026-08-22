@@ -2,17 +2,30 @@ using System;
 using Common;
 using Field;
 using Inventory;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace Building
 {
     /// <summary>
-    /// 마을의 건물 슬롯 위에 떠 있는 상호작용 UI(btn_Build_Inn)를 <b>월드 앵커에 붙여 두는</b> 컨트롤러.
-    /// 하는 일은 다섯이다 - (1) 앵커의 월드 좌표를 화면 좌표로 옮겨 버튼 위치를 맞추고, (2) 보여야 할
-    /// 상황인지 판정해 상호작용 루트를 켜고 끄고, (3) 버튼이 눌리면 건물 정의 하나를 팝업에 넘겨 열고,
-    /// (4) <b>이미 시작된 건물의 건설 버튼을 감추고</b>, (5) 건설이 실제로 시작되면 안내 토스트를
-    /// 한 번 띄운다.
+    /// 마을의 건물 슬롯 위에 떠 있는 상호작용 UI(btn_Build_Inn / pn_ConstructionTimer / btn_Open_Inn)를
+    /// <b>월드 앵커에 붙여 두는</b> 컨트롤러. 하는 일은 여섯이다 - (1) 앵커의 월드 좌표를 화면 좌표로
+    /// 옮겨 건설 버튼과 타이머의 위치를 맞추고, (2) 보여야 할 상황인지 판정해 상호작용 루트를 켜고 끄고,
+    /// (3) 버튼이 눌리면 건물 정의 하나를 팝업에 넘겨 열고, (4) <b>건설 단계에 따라 셋 중 하나만
+    /// 보이게 하고</b>, (5) 짓는 중이면 남은 시간을 1초에 한 번 고쳐 쓰고, (6) 건설이 시작되거나
+    /// 완성되면 안내 토스트를 <b>한 번씩</b> 띄운다.
+    ///
+    /// <b>보이는 것은 언제나 셋 중 하나뿐이다.</b> 아직 안 지었으면 건설 버튼만, 짓는 중이면 타이머만,
+    /// 다 지었으면 입장 버튼만 보인다. 단계의 근거는 저장 기록과 시각 비교 하나이며
+    /// (<see cref="BuildingConstructionService.GetStatus(string)"/>), 그래서 앱을 꺼 둔 동안 흐른
+    /// 시간이 그대로 반영된다. 완성 시각을 읽을 수 없는 손상된 기록에서는 셋 다 보이지 않는다 -
+    /// <b>건설 버튼은 그때도 돌아오지 않는다</b>(기록이 있다는 것 자체가 "이미 시작했다"이다).
+    ///
+    /// <b>남은 시간은 저장하지 않는다.</b> 매 프레임 다시 계산할 뿐이고, 파일에 쓰는 것은 완성이
+    /// 확정되는 <b>단 한 번</b>뿐이다(<see cref="BuildingConstructionService.TryNotifyCompletion(string)"/>).
+    /// 계산에 엔진 시간이 없으므로 <see cref="Time.timeScale"/>이 0이어도 남은 시간은 계속 줄어들며,
+    /// 타이머 연출도 Unscaled Time으로 돌린다.
     ///
     /// <b>건설의 규칙은 여기에 없다.</b> 비용을 평가하거나 내는 코드도, 저장을 부르는 코드도 한 줄도
     /// 없다 - 그 전부는 <see cref="BuildingConstructionService"/> 하나가 갖고 있고, 이 컨트롤러는
@@ -23,11 +36,17 @@ namespace Building
     /// <b>이미 시작된 건물의 버튼은 다시 켜지지 않는다.</b> 판정의 근거는 저장 문서의 건설 기록
     /// 하나이며(<see cref="BuildingConstructionService.HasConstruction(string)"/>), 그래서 앱을 껐다
     /// 켜도, 완성 시각이 지나도 건설 버튼은 계속 숨은 채로 남는다 - 기록이 있다는 것 자체가 "이미
-    /// 시작했다"이기 때문이다. 여관 입장 버튼은 이번 단계에서도 계속 꺼진 채로 둔다.
+    /// 시작했다"이기 때문이다.
     ///
-    /// <b>안내 문구를 코드가 짓지 않는다.</b> 토스트에 실을 문장은 01_UI 표(42번)에서 오며, 아직
-    /// 도착하지 않았으면 <b>토스트를 띄우지 않는다</b> - 대체 문구를 코드가 지어내면 표를 고쳐도
-    /// 화면이 바뀌지 않는 자리가 생긴다.
+    /// <b>완성 안내는 한 번뿐이다.</b> 완성됐다는 사실은 시각 비교라 켤 때마다 참이지만, 안내를
+    /// 띄웠다는 사실은 저장 기록에 남는다
+    /// (<see cref="Common.BuildingConstructionSaveState.completionNotified"/>) - 그래서 앱을 다시
+    /// 켜도 같은 안내가 되풀이되지 않는다. 표식을 남기지 못했으면(저장 실패) 안내도 띄우지 않고
+    /// 다음 갱신에서 다시 시도한다 - "안내했다고 적혔는데 화면은 못 본" 상태를 만들지 않는다.
+    ///
+    /// <b>안내 문구를 코드가 짓지 않는다.</b> 토스트에 실을 문장은 01_UI 표(시작 42번, 완성 43번)에서
+    /// 오며, 아직 도착하지 않았으면 <b>토스트를 띄우지 않는다</b> - 대체 문구를 코드가 지어내면 표를
+    /// 고쳐도 화면이 바뀌지 않는 자리가 생긴다.
     ///
     /// <b>이 컴포넌트는 자기가 끄는 오브젝트 안에 있으면 안 된다.</b> 상호작용 루트를 끄는 순간 그
     /// 안의 컴포넌트는 Update를 받지 못하므로, 한 번 숨기면 다시 켜 줄 주체가 사라진다. 그래서 이
@@ -81,9 +100,21 @@ namespace Building
                  "기준이 된다.")]
         [SerializeField] private Button buildButton;
 
-        [Tooltip("여관 입장 버튼(Interaction/btn_Open_Inn). 이번 단계에서는 <b>언제나 꺼진 채로</b> " +
-                 "둔다 - 건물이 실제로 지어지는 다음 단계에서 켜진다.")]
+        [Tooltip("여관 입장 버튼(Interaction/btn_Open_Inn). 건설이 완성된 뒤에만 켜진다. 이번 " +
+                 "단계에서는 눌러도 하는 일이 없다 - 무엇이 열릴지는 다음 단계의 몫이다.")]
         [SerializeField] private GameObject openInnButton;
+
+        [Tooltip("건설 타이머 묶음(Interaction/pn_ConstructionTimer). 짓는 중에만 켜지며, 켜지는 " +
+                 "자리는 건설 버튼과 같은 월드 앵커다. 시작 시 꺼져 있어야 한다.")]
+        [SerializeField] private GameObject constructionTimerRoot;
+
+        [Tooltip("남은 시간 텍스트(pn_ConstructionTimer/lb_ConstructionTimer). 표시는 HH:mm:ss이며 " +
+                 "번역 대상이 아니다(숫자와 콜론뿐).")]
+        [SerializeField] private TextMeshProUGUI constructionTimerText;
+
+        [Tooltip("타이머 회전 연출(pn_ConstructionTimer/ani_Timer)의 Animator. 이 컴포넌트가 " +
+                 "Update Mode를 Unscaled Time으로 맞춘다 - 화면이 멈춰도(timeScale 0) 연출은 돈다.")]
+        [SerializeField] private Animator constructionTimerAnimator;
 
         [Header("Popup")]
         [Tooltip("건설 버튼을 누르면 열릴 팝업(Dialog_UI/dialog_BuildingPopup). 시작 시 꺼져 있어야 " +
@@ -104,13 +135,31 @@ namespace Building
                  "않았으면 토스트를 띄우지 않는다 - 코드가 대체 문구를 지어내지 않는다.")]
         [SerializeField] private LocalizedTextReference constructionStartedMessage = new LocalizedTextReference();
 
+        [Tooltip("건설이 끝났을 때 띄울 안내 문구(01_UI / 43). 시작 안내와 같은 규칙이다 - 비워두거나 " +
+                 "번역이 아직 도착하지 않았으면 토스트를 띄우지 않는다.")]
+        [SerializeField] private LocalizedTextReference constructionCompletedMessage = new LocalizedTextReference();
+
         private RectTransform buildButtonRect;
+        private RectTransform constructionTimerRect;
         private Canvas interactionCanvas;
         private bool referencesValidated;
+
+        /// <summary>아직 한 번도 쓰지 않았음을 뜻하는 표시 초 수. 0초는 실제로 쓰는 값이라
+        /// (완성 직전) 구분이 필요하다.</summary>
+        private const long UnwrittenSeconds = -1L;
+
+        /// <summary>마지막으로 텍스트에 써 넣은 초 수. 같은 값이면 문자열을 다시 만들지 않는다 -
+        /// 매 프레임 갱신하지만 실제 쓰기는 <b>1초에 한 번</b>이 되게 한다(회복소 슬롯과 같은 규칙).</summary>
+        private long lastDisplayedSeconds = UnwrittenSeconds;
 
         /// <summary>건설 규칙의 소유자. 이 컨트롤러가 만들고, 팝업에 건네주고, 시작 신호를 받는다.
         /// 인벤토리가 없으면 만들지 못하므로 null이며, 그때는 팝업의 확인이 아무 일도 하지 않는다.</summary>
         private BuildingConstructionService constructionService;
+
+        /// <summary>서비스에 넘길 시계. 실제 실행에서는 언제나 UTC 시계이며, 시험만 고정된 순간을
+        /// 끼워 넣어 남은 시간과 완성 경계를 글자 그대로 확인한다 - 그래서 서비스를 다시 만들지 않고
+        /// 이 함수 하나만 갈아 끼울 수 있게 <b>한 겹</b>을 두었다.</summary>
+        private Func<DateTime> utcNowProvider = () => DateTime.UtcNow;
 
         /// <summary>지금 구독 중인 안내 문구 참조. 걸어 둔 대상을 그대로 들고 있다가 짝지어 해제한다
         /// (팝업이 번역 구독을 다루는 방식과 같다).</summary>
@@ -119,7 +168,15 @@ namespace Building
         /// <summary>도착한 안내 문구. null은 "아직 오지 않았다"는 뜻이며 빈 문자열과 구분한다.</summary>
         private string localizedStartedMessage;
 
+        /// <summary>완성 안내 문구의 같은 짝. 시작 안내와 <b>따로</b> 구독한다 - 한쪽이 비어 있어도
+        /// 다른 쪽은 그대로 동작해야 한다.</summary>
+        private LocalizedTextReference boundCompletedMessage;
+
+        private string localizedCompletedMessage;
+
         private bool missingToastWarned;
+
+        private bool missingCompletedToastWarned;
 
         /// <summary>마지막 판정에서 상호작용 UI가 보여야 했는지 여부. 읽기 전용 진단값이며 이 값을
         /// 바꿔서 표시를 바꿀 수는 없다 - 표시를 정하는 것은 언제나 <see cref="UpdateInteraction"/>이다.</summary>
@@ -128,8 +185,10 @@ namespace Building
         private void OnEnable()
         {
             ValidateReferences();
+            ApplyTimerAnimatorUpdateMode();
             EnsureConstructionService();
             SubscribeStartedMessage();
+            SubscribeCompletedMessage();
 
             if (buildButton != null)
             {
@@ -146,7 +205,19 @@ namespace Building
             if (buildButton != null) buildButton.onClick.RemoveListener(HandleBuildClicked);
 
             UnsubscribeStartedMessage();
+            UnsubscribeCompletedMessage();
             DetachConstructionService();
+        }
+
+        /// <summary>타이머 연출을 <see cref="AnimatorUpdateMode.UnscaledTime"/>으로 맞춘다. 저작에서
+        /// 이미 그렇게 지정돼 있어도 여기서 한 번 더 확인한다 - 이 성질은 "화면이 멈춰도 타이머는
+        /// 돈다"라는 규칙이지 저작 취향이 아니다.</summary>
+        private void ApplyTimerAnimatorUpdateMode()
+        {
+            if (constructionTimerAnimator == null) return;
+            if (constructionTimerAnimator.updateMode == AnimatorUpdateMode.UnscaledTime) return;
+
+            constructionTimerAnimator.updateMode = AnimatorUpdateMode.UnscaledTime;
         }
 
         // ---- 건설 서비스 ----
@@ -168,9 +239,10 @@ namespace Building
                 inventoryManager,
                 () => SaveSystem.Data,
                 SaveSystem.Save,
-                () => DateTime.UtcNow);
+                () => utcNowProvider());
 
             constructionService.ConstructionStarted += HandleConstructionStarted;
+            constructionService.ConstructionCompleted += HandleConstructionCompleted;
         }
 
         private void DetachConstructionService()
@@ -178,6 +250,7 @@ namespace Building
             if (constructionService == null) return;
 
             constructionService.ConstructionStarted -= HandleConstructionStarted;
+            constructionService.ConstructionCompleted -= HandleConstructionCompleted;
             constructionService = null;
         }
 
@@ -191,6 +264,16 @@ namespace Building
             constructionService != null && building != null &&
             constructionService.HasConstruction(building.BuildingId);
 
+        /// <summary>마지막 갱신에서 판정한 건설 단계. 읽기 전용 진단값이며, 이 값을 바꿔서 표시를
+        /// 바꿀 수는 없다 - 표시를 정하는 것은 언제나 <see cref="UpdateInteraction"/>이다.</summary>
+        public BuildingConstructionPhase ConstructionPhase { get; private set; } =
+            BuildingConstructionPhase.NotStarted;
+
+        /// <summary>지금 타이머에 적혀 있는 문자열. 텍스트가 연결되지 않았으면 null이다(진단용).</summary>
+        public string ConstructionTimerDisplay => constructionTimerText != null
+            ? constructionTimerText.text
+            : null;
+
         /// <summary>스테이지와 캐릭터가 모두 움직인 뒤에 위치를 맞춘다.</summary>
         private void LateUpdate()
         {
@@ -199,29 +282,126 @@ namespace Building
 
         /// <summary>
         /// 한 프레임분의 판정과 반영을 한 번에 한다. 순서가 중요하다:
-        ///   1. 마을이고 전환 연출이 멈춰 있는가(<see cref="IsTownReady"/>) - 아니면 <b>열린 팝업을 닫는다</b>.
-        ///   2. 앵커가 카메라 앞에 있고 화면 안에 있는가 - 아니면 숨기기만 한다(팝업은 그대로 둔다).
-        ///   3. 보여야 하면 버튼 위치를 옮기고 루트를 켠다.
+        ///   1. 지금 어느 단계인가(저장 기록 + 시각 비교). <b>여기서만</b> 단계를 읽는다.
+        ///   2. 완성으로 넘어갔으면 그 사실을 한 번 확정한다 - 마을 밖이라고 미루지 않는다.
+        ///   3. 단계에 맞는 하나만 켜고 나머지를 끈다(건설 버튼 / 타이머 / 입장 버튼).
+        ///   4. 짓는 중이면 남은 시간을 고쳐 쓴다(값이 그대로면 쓰지 않는다).
+        ///   5. 마을이고 전환 연출이 멈춰 있는가(<see cref="IsTownReady"/>) - 아니면 <b>열린 팝업을 닫는다</b>.
+        ///   6. 앵커가 카메라 앞에 있고 화면 안에 있는가 - 아니면 숨기기만 한다(팝업은 그대로 둔다).
+        ///   7. 보여야 하면 건설 버튼과 타이머의 위치를 옮기고 루트를 켠다.
         ///
         /// 팝업을 닫는 조건과 버튼을 숨기는 조건을 <b>일부러 다르게</b> 두었다 - 마을 안에서 앵커가
         /// 화면 밖으로 잠깐 밀려났다고 사용자가 보고 있던 정보 창을 닫아 버리면 안 되기 때문이다.
+        ///
+        /// 상호작용 루트 하나를 끄면 그 안의 건설 버튼도 타이머도 입장 버튼도 함께 사라진다 -
+        /// 던전이거나 전환 연출 중이면 이 UI가 하나도 보이지 않는 이유다.
         /// </summary>
         private void UpdateInteraction()
         {
-            KeepOpenInnButtonInactive();
-            ApplyBuildButtonVisibility();
+            BuildingConstructionStatus status = ResolveConstructionStatus();
+            ConstructionPhase = status.Phase;
+
+            NotifyCompletionOnce(status);
+            ApplyConstructionVisibility(status);
+            ApplyTimerText(status);
 
             bool townReady = IsTownReady();
             if (!townReady) CloseOpenPopup();
 
             bool visible = false;
-            if (townReady && buildButtonRect != null && TryProjectAnchor(out Vector2 localPoint))
+            if (townReady && HasPositionableRect() && TryProjectAnchor(out Vector2 localPoint))
             {
-                buildButtonRect.anchoredPosition = localPoint;
+                ApplyAnchoredPosition(localPoint);
                 visible = true;
             }
 
             SetInteractionVisible(visible);
+        }
+
+        /// <summary>지금 단계를 서비스에 물어본다. 서비스나 정의가 없으면 "아직 시작하지 않았다"로
+        /// 본다 - 감출 근거가 없다.</summary>
+        private BuildingConstructionStatus ResolveConstructionStatus()
+        {
+            if (constructionService == null || building == null) return default;
+            return constructionService.GetStatus(building.BuildingId);
+        }
+
+        private bool HasPositionableRect()
+        {
+            return buildButtonRect != null || constructionTimerRect != null;
+        }
+
+        /// <summary>건설 버튼과 타이머를 <b>같은 자리</b>로 옮긴다. 둘은 서로 자리를 물려받는 사이이므로
+        /// (짓기 시작하면 버튼 자리에 타이머가 뜬다) 좌표를 따로 계산하지 않는다. 지금 꺼져 있는 쪽도
+        /// 함께 옮겨 두어야 켜지는 순간 제자리에서 나타난다.</summary>
+        private void ApplyAnchoredPosition(Vector2 localPoint)
+        {
+            if (buildButtonRect != null) buildButtonRect.anchoredPosition = localPoint;
+            if (constructionTimerRect != null) constructionTimerRect.anchoredPosition = localPoint;
+        }
+
+        /// <summary>
+        /// 단계에 맞는 하나만 켠다. 켜고 끄는 것은 <b>각 오브젝트</b>이며 상호작용 루트는 건드리지
+        /// 않는다 - 루트를 끄면 이 컨트롤러가 다루는 다른 UI까지 함께 사라진다.
+        ///
+        /// 매 프레임 판정하는 이유는 이 사실이 <b>저장 문서와 시각</b>에서 오기 때문이다. 시작이나
+        /// 완성 이벤트를 놓쳤든, 앱을 다시 켰든, 다른 경로가 기록을 남겼든 결과는 언제나 같다.
+        /// 손상된 기록(<see cref="BuildingConstructionPhase.Unreadable"/>)에서는 셋 다 꺼진다.
+        /// </summary>
+        private void ApplyConstructionVisibility(BuildingConstructionStatus status)
+        {
+            SetActiveIfNeeded(
+                buildButton != null ? buildButton.gameObject : null,
+                status.Phase == BuildingConstructionPhase.NotStarted);
+            SetActiveIfNeeded(
+                constructionTimerRoot, status.Phase == BuildingConstructionPhase.InProgress);
+            SetActiveIfNeeded(
+                openInnButton, status.Phase == BuildingConstructionPhase.Completed);
+        }
+
+        /// <summary>
+        /// 남은 시간을 적는다. <b>표시 초 수가 그대로면 문자열을 다시 만들지 않는다</b> - 매 프레임
+        /// 불려도 실제 쓰기는 1초에 한 번이고, 프레임마다 문자열 할당이 생기지 않는다.
+        ///
+        /// 짓는 중이 아니면 마지막 표시값을 잊는다 - 다시 켜졌을 때 지난번 값이 남아 있어 첫 1초 동안
+        /// 낡은 시간이 보이는 일이 없게 한다.
+        /// </summary>
+        private void ApplyTimerText(BuildingConstructionStatus status)
+        {
+            if (constructionTimerText == null) return;
+
+            if (status.Phase != BuildingConstructionPhase.InProgress)
+            {
+                lastDisplayedSeconds = UnwrittenSeconds;
+                return;
+            }
+
+            long seconds = BuildingInfoFormatter.ToDisplaySeconds(status.Remaining);
+            if (seconds == lastDisplayedSeconds) return;
+
+            lastDisplayedSeconds = seconds;
+            constructionTimerText.text = BuildingInfoFormatter.FormatBuildTime(seconds);
+        }
+
+        /// <summary>
+        /// 완성을 <b>한 번만</b> 확정한다. 실제 판정과 저장은 서비스가 하고(그래서 앱을 다시 켜도
+        /// 되풀이되지 않는다), 여기서는 완성 단계일 때 물어보기만 한다.
+        ///
+        /// 마을 밖이거나 전환 연출 중이어도 물어본다 - 완성은 화면이 아니라 시각이 정하는 사실이고,
+        /// 저장이 실패하면 서비스가 표식을 되돌리므로 다음 갱신이 그대로 다시 시도한다.
+        /// </summary>
+        private void NotifyCompletionOnce(BuildingConstructionStatus status)
+        {
+            if (constructionService == null || building == null) return;
+            if (status.Phase != BuildingConstructionPhase.Completed) return;
+
+            constructionService.TryNotifyCompletion(building.BuildingId);
+        }
+
+        private static void SetActiveIfNeeded(GameObject target, bool active)
+        {
+            if (target == null) return;
+            if (target.activeSelf != active) target.SetActive(active);
         }
 
         /// <summary>마을이면서 전환 연출이 돌지 않는 상태인지. 매니저가 없으면 판정할 근거가 없으므로
@@ -299,31 +479,6 @@ namespace Building
             if (interactionRoot.activeSelf != visible) interactionRoot.SetActive(visible);
         }
 
-        /// <summary>여관 입장 버튼은 이번 단계에서 켜지지 않는다. 저작 실수로 켜져 있어도 여기서
-        /// 한 번 되돌린다 - "지어지지 않은 건물에 들어가는 버튼"이 보이는 경로를 만들지 않는다.
-        /// <b>건설이 시작된 뒤에도 마찬가지다</b> - 이 버튼이 켜지는 것은 다음 단계의 몫이다.</summary>
-        private void KeepOpenInnButtonInactive()
-        {
-            if (openInnButton == null) return;
-            if (openInnButton.activeSelf) openInnButton.SetActive(false);
-        }
-
-        /// <summary>
-        /// 이미 시작된 건물이면 건설 버튼을 감춘다. 켜고 끄는 것은 <b>버튼 오브젝트</b>이며 상호작용
-        /// 루트는 건드리지 않는다 - 루트를 끄면 이 컨트롤러가 다루는 다른 UI까지 함께 사라진다.
-        ///
-        /// 매 프레임 판정하는 이유는 이 사실이 <b>저장 문서</b>에서 오기 때문이다. 시작 이벤트를
-        /// 놓쳤든, 앱을 다시 켰든, 다른 경로가 기록을 남겼든 결과는 언제나 같다.
-        /// </summary>
-        private void ApplyBuildButtonVisibility()
-        {
-            if (buildButton == null) return;
-
-            bool shouldShow = !IsConstructionStarted;
-            GameObject buttonObject = buildButton.gameObject;
-            if (buttonObject.activeSelf != shouldShow) buttonObject.SetActive(shouldShow);
-        }
-
         /// <summary>열려 있는 건물 팝업을 <b>평소의 닫기 경로</b>로 닫는다 - 오브젝트를 직접 끄지 않는다
         /// (그러면 PopupPanelManager의 ESC 목록 정리와 구독 해제가 함께 지나가지 않는다).</summary>
         private void CloseOpenPopup()
@@ -341,7 +496,7 @@ namespace Building
         /// 그래서 여기서 하는 일은 안내 하나뿐이며, 저장도 인벤토리도 건드리지 않는다.
         ///
         /// 버튼을 감추는 것은 여기서 하지 않는다 - 그 판정은 매 프레임 저장 기록을 보고 하므로
-        /// (<see cref="ApplyBuildButtonVisibility"/>) 이벤트를 놓쳐도 결과가 같아야 한다.
+        /// (<see cref="ApplyConstructionVisibility"/>) 이벤트를 놓쳐도 결과가 같아야 한다.
         /// </summary>
         private void HandleConstructionStarted(
             BuildingDefinition startedBuilding, BuildingConstructionSaveState state)
@@ -415,6 +570,84 @@ namespace Building
             localizedStartedMessage = value;
         }
 
+        // ---- 완성 안내 토스트 ----
+
+        /// <summary>
+        /// 완성이 <b>파일에 확정된 뒤에만</b> 온다(저장이 실패한 확정에서는 오지 않는다). 그래서
+        /// 여기서 하는 일은 안내 하나뿐이며, 저장도 인벤토리도 건드리지 않는다.
+        ///
+        /// 입장 버튼을 켜는 것은 여기서 하지 않는다 - 그 판정도 매 프레임 저장 기록과 시각을 보고
+        /// 하므로(<see cref="ApplyConstructionVisibility"/>) 이벤트를 놓쳐도 결과가 같아야 한다.
+        /// </summary>
+        private void HandleConstructionCompleted(BuildingConstructionSaveState state)
+        {
+            ShowCompletedToast();
+        }
+
+        /// <summary>지금까지 띄운 완성 안내 토스트 수. 읽기 전용 진단값이다 - "완성 한 번에 안내도
+        /// 한 번, 앱을 다시 켜도 더는 없다"라는 성질은 화면만 봐서는 확인하기 어렵다.</summary>
+        public int CompletedToastCount { get; private set; }
+
+        /// <summary>지금 도착해 있는 완성 안내 문구. 아직 오지 않았으면 null이며, 이 값이 없으면
+        /// 토스트를 띄우지 않는다.</summary>
+        public string CompletedToastMessage => localizedCompletedMessage;
+
+        /// <summary>완성 안내 토스트를 <b>한 번</b> 띄운다. 규칙은 시작 안내와 같다 - 문구가 아직
+        /// 오지 않았거나 토스트 관리자가 없으면 띄우지 않고 한 번만 알린다.</summary>
+        private void ShowCompletedToast()
+        {
+            if (string.IsNullOrEmpty(localizedCompletedMessage))
+            {
+                if (!missingCompletedToastWarned)
+                {
+                    missingCompletedToastWarned = true;
+                    Debug.LogWarning($"[TownBuildingInteractionController] '{name}': 건설 완성 안내 문구" +
+                                     "(01_UI / 43)가 아직 없어 토스트를 띄우지 않습니다 - Inspector에서 " +
+                                     "Category와 Key를 지정하세요.", this);
+                }
+                return;
+            }
+
+            if (ToastManager.Instance == null)
+            {
+                if (!missingCompletedToastWarned)
+                {
+                    missingCompletedToastWarned = true;
+                    Debug.LogWarning($"[TownBuildingInteractionController] '{name}': 씬에 ToastManager가 없어 " +
+                                     "건설 완성 안내를 띄우지 못했습니다.", this);
+                }
+                return;
+            }
+
+            CompletedToastCount++;
+            ToastManager.Instance.Show(localizedCompletedMessage);
+        }
+
+        private void SubscribeCompletedMessage()
+        {
+            UnsubscribeCompletedMessage();
+
+            if (constructionCompletedMessage == null || !constructionCompletedMessage.HasReference) return;
+
+            boundCompletedMessage = constructionCompletedMessage;
+            boundCompletedMessage.StringChanged += ApplyCompletedMessage;
+        }
+
+        private void UnsubscribeCompletedMessage()
+        {
+            if (boundCompletedMessage == null) return;
+
+            boundCompletedMessage.StringChanged -= ApplyCompletedMessage;
+            boundCompletedMessage = null;
+            localizedCompletedMessage = null;
+        }
+
+        /// <summary>번역이 도착했다(언어를 바꾸면 다시 온다). 값을 들고 있다가 완성할 때 쓴다.</summary>
+        private void ApplyCompletedMessage(string value)
+        {
+            localizedCompletedMessage = value;
+        }
+
         /// <summary>건설 버튼 클릭. <b>정의 하나와 누른 버튼, 그리고 건설 서비스를 넘기고 여는 것이
         /// 전부</b>다 - 비용을 확인하지도, 내지도, 저장하지도 않는다.
         ///
@@ -453,6 +686,10 @@ namespace Building
             referencesValidated = true;
 
             if (buildButton != null) buildButtonRect = buildButton.transform as RectTransform;
+            if (constructionTimerRoot != null)
+            {
+                constructionTimerRect = constructionTimerRoot.transform as RectTransform;
+            }
 
             if (fieldModeManager == null)
             {
@@ -506,10 +743,32 @@ namespace Building
                                "않아 건설을 시작할 수 없습니다 - 확인 버튼을 눌러도 아무 일도 일어나지 " +
                                "않습니다.", this);
             }
+            if (constructionTimerRoot == null)
+            {
+                Debug.LogError($"[TownBuildingInteractionController] '{name}': 건설 타이머" +
+                               "(pn_ConstructionTimer)가 연결되지 않아 짓는 동안 아무것도 보이지 " +
+                               "않습니다.", this);
+            }
+            if (constructionTimerText == null)
+            {
+                Debug.LogError($"[TownBuildingInteractionController] '{name}': 남은 시간 텍스트" +
+                               "(lb_ConstructionTimer)가 연결되지 않아 시간이 표시되지 않습니다.", this);
+            }
+            if (constructionTimerAnimator == null)
+            {
+                Debug.LogWarning($"[TownBuildingInteractionController] '{name}': 타이머 Animator" +
+                                 "(ani_Timer)가 연결되지 않아 Update Mode를 Unscaled Time으로 맞출 수 " +
+                                 "없습니다 - 화면이 멈추면 연출도 멈춥니다.", this);
+            }
             if (constructionStartedMessage == null || !constructionStartedMessage.HasReference)
             {
                 Debug.LogWarning($"[TownBuildingInteractionController] '{name}': 건설 시작 안내 문구" +
                                  "(01_UI / 42)가 지정되지 않아 시작해도 토스트가 뜨지 않습니다.", this);
+            }
+            if (constructionCompletedMessage == null || !constructionCompletedMessage.HasReference)
+            {
+                Debug.LogWarning($"[TownBuildingInteractionController] '{name}': 건설 완성 안내 문구" +
+                                 "(01_UI / 43)가 지정되지 않아 완성해도 토스트가 뜨지 않습니다.", this);
             }
         }
     }

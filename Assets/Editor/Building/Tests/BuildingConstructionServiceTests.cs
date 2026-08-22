@@ -20,12 +20,14 @@ namespace BuildingEditor.Tests
     /// <see cref="SaveData"/>이고, 저장 함수와 시계는 서비스에 <b>주입</b>한다 - 그래서 여기서
     /// 확인하는 "저장 몇 번 / 어떤 시각이 적히는가"가 실행 환경에 따라 달라지지 않는다.
     ///
-    /// 확인하는 계약은 넷이다.
+    /// 확인하는 계약은 여섯이다.
     /// <list type="number">
     ///   <item>비용을 낼 수 없으면 <b>아무것도</b> 바뀌지 않는다(기록도, 값도, 저장도, 알림도).</item>
     ///   <item>낼 수 있으면 비용과 기록이 <b>한 번의 저장</b>으로 함께 남는다.</item>
     ///   <item>저장이 실패하면 <b>전부 되돌아간다</b> - 성공을 뜻하는 신호는 하나도 나가지 않는다.</item>
     ///   <item>같은 건물은 두 번 시작되지 않는다(중복 클릭도, 재진입도).</item>
+    ///   <item>단계와 남은 시간은 <b>기록과 시각에서만</b> 파생되며 조회는 파일을 건드리지 않는다.</item>
+    ///   <item>완성 안내는 <b>한 번뿐</b>이고, 그 사실이 파일에 남아 앱을 다시 켜도 되풀이되지 않는다.</item>
     /// </list>
     /// </summary>
     public sealed class BuildingConstructionServiceTests
@@ -583,7 +585,221 @@ namespace BuildingEditor.Tests
             Assert.AreEqual(0, saveCalls);
         }
 
+        // ---- 진행 단계 ----
+
+        [Test]
+        public void 기록이_없으면_아직_시작하지_않은_단계다()
+        {
+            BuildingConstructionService service = CreateService();
+
+            BuildingConstructionStatus status = service.GetStatus("1");
+
+            Assert.AreEqual(BuildingConstructionPhase.NotStarted, status.Phase);
+            Assert.IsFalse(status.HasRecord);
+            Assert.AreEqual(TimeSpan.Zero, status.Remaining);
+            Assert.IsNull(status.State);
+        }
+
+        [Test]
+        public void 완성_시각이_남아_있으면_짓는_중이고_남은_시간을_돌려준다()
+        {
+            AddConstruction("1", completeAtUtc: FixedNowUtc.AddSeconds(60));
+            BuildingConstructionService service = CreateService();
+
+            BuildingConstructionStatus status = service.GetStatus("1");
+
+            Assert.AreEqual(BuildingConstructionPhase.InProgress, status.Phase);
+            Assert.AreEqual(60d, status.Remaining.TotalSeconds, 0.001d);
+            Assert.AreEqual("00:01:00", BuildingInfoFormatter.FormatRemaining(status.Remaining));
+        }
+
+        [Test]
+        public void 하루를_넘게_남아도_되감기지_않는다()
+        {
+            AddConstruction("1", completeAtUtc: FixedNowUtc.AddHours(25));
+            BuildingConstructionService service = CreateService();
+
+            Assert.AreEqual("25:00:00",
+                BuildingInfoFormatter.FormatRemaining(service.GetStatus("1").Remaining));
+        }
+
+        [Test]
+        public void 남은_시간이_1초보다_짧으면_1초로_보이고_아직_짓는_중이다()
+        {
+            AddConstruction("1", completeAtUtc: FixedNowUtc.AddMilliseconds(400));
+            BuildingConstructionService service = CreateService();
+
+            BuildingConstructionStatus status = service.GetStatus("1");
+
+            Assert.AreEqual(BuildingConstructionPhase.InProgress, status.Phase,
+                "아직 완성 시각이 오지 않았다");
+            Assert.AreEqual("00:00:01", BuildingInfoFormatter.FormatRemaining(status.Remaining));
+        }
+
+        [Test]
+        public void 완성_시각과_같은_순간부터_완성이다()
+        {
+            AddConstruction("1", completeAtUtc: FixedNowUtc);
+            BuildingConstructionService service = CreateService();
+
+            Assert.AreEqual(BuildingConstructionPhase.Completed, service.GetStatus("1").Phase);
+
+            nowUtc = FixedNowUtc.AddSeconds(1);
+            Assert.AreEqual(BuildingConstructionPhase.Completed, service.GetStatus("1").Phase);
+        }
+
+        [Test]
+        public void 완성_시각을_읽을_수_없으면_읽을_수_없는_단계이고_기록은_남아_있다()
+        {
+            SaveSystem.Data.buildingConstructions.Add(new BuildingConstructionSaveState
+            {
+                buildingId = "1",
+                startedAtUtc = FixedNowText,
+                completeAtUtc = "읽을 수 없는 값",
+            });
+            BuildingConstructionService service = CreateService();
+
+            BuildingConstructionStatus status = service.GetStatus("1");
+
+            Assert.AreEqual(BuildingConstructionPhase.Unreadable, status.Phase);
+            Assert.IsTrue(status.HasRecord, "손상된 기록도 '이미 시작했다'이다 - 건설 버튼은 돌아오지 않는다");
+            Assert.AreEqual(TimeSpan.Zero, status.Remaining);
+        }
+
+        [Test]
+        public void 단계_조회는_저장도_기록_변경도_하지_않는다()
+        {
+            AddConstruction("1", completeAtUtc: FixedNowUtc.AddSeconds(60));
+            BuildingConstructionService service = CreateService();
+
+            service.GetStatus("1");
+            service.GetStatus("1");
+
+            Assert.AreEqual(0, saveCalls, "남은 시간을 볼 때마다 파일을 쓰면 안 된다");
+            Assert.AreEqual(1, SaveSystem.Data.buildingConstructions.Count);
+            Assert.IsFalse(SaveSystem.Data.buildingConstructions[0].completionNotified);
+        }
+
+        // ---- 완성 확정 ----
+
+        [Test]
+        public void 완성을_확정하면_표식이_남고_저장은_한_번뿐이다()
+        {
+            AddConstruction("1", completeAtUtc: FixedNowUtc.AddSeconds(-1));
+            BuildingConstructionService service = CreateService();
+
+            int completed = 0;
+            service.ConstructionCompleted += _ => completed++;
+
+            Assert.AreEqual(BuildingConstructionCompleteCode.Notified, service.TryNotifyCompletion("1"));
+
+            Assert.IsTrue(SaveSystem.Data.buildingConstructions[0].completionNotified);
+            Assert.AreEqual(1, saveCalls);
+            Assert.AreEqual(1, completed);
+        }
+
+        [Test]
+        public void 완성_확정은_두_번_일어나지_않는다()
+        {
+            AddConstruction("1", completeAtUtc: FixedNowUtc.AddSeconds(-1));
+            BuildingConstructionService service = CreateService();
+
+            int completed = 0;
+            service.ConstructionCompleted += _ => completed++;
+
+            service.TryNotifyCompletion("1");
+            Assert.AreEqual(BuildingConstructionCompleteCode.AlreadyNotified, service.TryNotifyCompletion("1"));
+            Assert.AreEqual(BuildingConstructionCompleteCode.AlreadyNotified, service.TryNotifyCompletion("1"));
+
+            Assert.AreEqual(1, saveCalls, "확정은 한 번만 저장한다");
+            Assert.AreEqual(1, completed);
+        }
+
+        [Test]
+        public void 앱을_다시_켜도_이미_안내한_완성은_다시_안내되지_않는다()
+        {
+            // 저장 파일에 표식이 남아 있는 상태 그대로 - 서비스는 새로 만들어진다.
+            AddConstruction("1", completeAtUtc: FixedNowUtc.AddDays(-3), completionNotified: true);
+            BuildingConstructionService service = CreateService();
+
+            int completed = 0;
+            service.ConstructionCompleted += _ => completed++;
+
+            Assert.AreEqual(BuildingConstructionCompleteCode.AlreadyNotified, service.TryNotifyCompletion("1"));
+            Assert.AreEqual(0, saveCalls);
+            Assert.AreEqual(0, completed);
+        }
+
+        [Test]
+        public void 아직_짓는_중이면_확정하지_않는다()
+        {
+            AddConstruction("1", completeAtUtc: FixedNowUtc.AddSeconds(1));
+            BuildingConstructionService service = CreateService();
+
+            Assert.AreEqual(BuildingConstructionCompleteCode.NotComplete, service.TryNotifyCompletion("1"));
+            Assert.IsFalse(SaveSystem.Data.buildingConstructions[0].completionNotified);
+            Assert.AreEqual(0, saveCalls);
+        }
+
+        [Test]
+        public void 기록이_없거나_읽을_수_없으면_확정하지_않는다()
+        {
+            BuildingConstructionService service = CreateService();
+            Assert.AreEqual(BuildingConstructionCompleteCode.NotStarted, service.TryNotifyCompletion("1"));
+
+            SaveSystem.Data.buildingConstructions.Add(new BuildingConstructionSaveState
+            {
+                buildingId = "1",
+                startedAtUtc = FixedNowText,
+                completeAtUtc = null,
+            });
+
+            Assert.AreEqual(BuildingConstructionCompleteCode.Unreadable, service.TryNotifyCompletion("1"));
+            Assert.AreEqual(0, saveCalls);
+        }
+
+        [Test]
+        public void 확정_저장이_실패하면_표식을_되돌리고_다음_시도에서_다시_확정한다()
+        {
+            AddConstruction("1", completeAtUtc: FixedNowUtc.AddSeconds(-1));
+            BuildingConstructionService service = CreateService();
+
+            int completed = 0;
+            service.ConstructionCompleted += _ => completed++;
+
+            saveSucceeds = false;
+            LogAssert.Expect(LogType.Error, new Regex("완성 표식을 저장하지"));
+
+            Assert.AreEqual(BuildingConstructionCompleteCode.SaveFailed, service.TryNotifyCompletion("1"));
+            Assert.IsFalse(SaveSystem.Data.buildingConstructions[0].completionNotified,
+                "저장하지 못한 표식이 메모리에 남으면 안내를 보지도 못한 채 잃는다");
+            Assert.AreEqual(0, completed, "실패한 확정은 알리지 않는다");
+
+            // 같은 실패가 이어져도 기록은 한 번뿐이다(다시 시도하는 것은 그대로다).
+            Assert.AreEqual(BuildingConstructionCompleteCode.SaveFailed, service.TryNotifyCompletion("1"));
+
+            saveSucceeds = true;
+            Assert.AreEqual(BuildingConstructionCompleteCode.Notified, service.TryNotifyCompletion("1"));
+            Assert.IsTrue(SaveSystem.Data.buildingConstructions[0].completionNotified);
+            Assert.AreEqual(1, completed);
+            Assert.AreEqual(3, saveCalls, "실패 두 번과 성공 한 번");
+        }
+
         // ---- 도우미 ----
+
+        /// <summary>건설 기록 한 줄을 저장 문서에 직접 넣는다(시작 경로를 거치지 않는다) - 여기서
+        /// 확인하려는 것은 "기록이 이렇게 있을 때 어떤 단계인가"뿐이다.</summary>
+        private static void AddConstruction(
+            string buildingId, DateTime completeAtUtc, bool completionNotified = false)
+        {
+            SaveSystem.Data.buildingConstructions.Add(new BuildingConstructionSaveState
+            {
+                buildingId = buildingId,
+                startedAtUtc = SaveData.FormatTimestamp(completeAtUtc.AddMinutes(-1)),
+                completeAtUtc = SaveData.FormatTimestamp(completeAtUtc),
+                completionNotified = completionNotified,
+            });
+        }
 
         private BuildingConstructionService CreateService()
         {

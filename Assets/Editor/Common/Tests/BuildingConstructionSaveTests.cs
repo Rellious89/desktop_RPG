@@ -11,7 +11,7 @@ namespace CommonEditor.Tests
     ///
     /// <b>파일도 엔진 수명주기도 건드리지 않는다.</b> 여기서 확인하는 것은 셋뿐이다 -
     /// (1) 이 칸이 없던 예전 파일이 그대로 열리는가, (2) 정규화가 <b>null만</b> 치우는가,
-    /// (3) 변환의 작업 사본이 세 값을 전부 옮기고 원본과 끊는가.
+    /// (3) 변환의 작업 사본이 네 값을 전부 옮기고 원본과 끊는가.
     ///
     /// <b>저장 형식 번호는 그대로 2다.</b> 필드를 <i>추가</i>하기만 했으므로 예전 파일이 그대로
     /// 유효하며(JsonUtility가 없는 칸을 기본값으로 채운다), 그 사실 자체를 아래에서 확인한다.
@@ -176,7 +176,7 @@ namespace CommonEditor.Tests
         {
             // CopyBuildingConstructions도 손으로 쓴 코드다. 칸을 늘리고 사본을 빠뜨리면 그 값이
             // 변환을 지날 때마다 조용히 사라진다.
-            string[] expected = { "buildingId", "startedAtUtc", "completeAtUtc" };
+            string[] expected = { "buildingId", "startedAtUtc", "completeAtUtc", "completionNotified" };
 
             var actual = new List<string>();
             foreach (FieldInfo field in typeof(BuildingConstructionSaveState).GetFields(
@@ -191,7 +191,7 @@ namespace CommonEditor.Tests
         }
 
         [Test]
-        public void 깊은_사본은_세_값을_모두_옮기고_원본과_끊어_둔다()
+        public void 깊은_사본은_네_값을_모두_옮기고_원본과_끊어_둔다()
         {
             var data = new SaveData
             {
@@ -203,6 +203,7 @@ namespace CommonEditor.Tests
                         buildingId = "1",
                         startedAtUtc = "2026-08-22T10:00:00.0000000Z",
                         completeAtUtc = "2026-08-22T10:01:00.0000000Z",
+                        completionNotified = true,
                     },
                 },
             };
@@ -216,9 +217,66 @@ namespace CommonEditor.Tests
             Assert.AreEqual("1", data.buildingConstructions[0].buildingId);
             Assert.AreEqual("2026-08-22T10:00:00.0000000Z", data.buildingConstructions[0].startedAtUtc);
             Assert.AreEqual("2026-08-22T10:01:00.0000000Z", data.buildingConstructions[0].completeAtUtc);
+            Assert.IsTrue(data.buildingConstructions[0].completionNotified,
+                "완성 안내 표식을 사본이 빠뜨리면 변환을 지날 때마다 같은 안내가 다시 뜬다");
 
             Assert.AreNotSame(original, data.buildingConstructions[0],
                 "목록 안의 항목까지 새로 만들어야 얕은 사본이 아니다");
+        }
+
+        [Test]
+        public void 깊은_사본은_완성_표식을_true도_false도_그대로_옮긴다()
+        {
+            // 이 한 줄(CopyBuildingConstructions의 completionNotified)이 빠지면 변환을 지날 때마다
+            // 표식이 false로 되돌아가고, 이미 본 완성 안내가 다시 뜬다.
+            var data = new SaveData
+            {
+                saveVersion = SaveData.CurrentSaveVersion,
+                buildingConstructions = new List<BuildingConstructionSaveState>
+                {
+                    new BuildingConstructionSaveState
+                    {
+                        buildingId = "이미_안내함",
+                        startedAtUtc = "2026-08-22T10:00:00.0000000Z",
+                        completeAtUtc = "2026-08-22T10:01:00.0000000Z",
+                        completionNotified = true,
+                    },
+                    new BuildingConstructionSaveState
+                    {
+                        buildingId = "아직_안내_안_함",
+                        startedAtUtc = "2026-08-22T10:00:00.0000000Z",
+                        completeAtUtc = "2026-08-22T10:01:00.0000000Z",
+                        completionNotified = false,
+                    },
+                },
+            };
+
+            SaveMigrationResult result = SaveMigrationRunner.Default.Migrate(data, SaveData.CurrentSaveVersion);
+
+            Assert.IsTrue(result.Succeeded);
+            Assert.AreEqual(2, data.buildingConstructions.Count);
+            Assert.IsTrue(data.buildingConstructions[0].completionNotified,
+                "이미 안내한 건물의 표식이 변환에서 사라지면 안내가 되풀이된다");
+            Assert.IsFalse(data.buildingConstructions[1].completionNotified,
+                "아직 안내하지 않은 건물에 표식이 생기면 안내를 영영 못 본다");
+        }
+
+        [Test]
+        public void 완성_표식이_없던_저장_파일은_아직_안내하지_않은_것으로_읽힌다()
+        {
+            // 이 칸이 없던 파일(형식 번호는 그대로 2다) - JsonUtility가 false로 채우고, 그 값이
+            // 곧 "아직 안내하지 않았다"라서 그대로 옳다.
+            string json =
+                "{\"saveVersion\":2,\"buildingConstructions\":[{\"buildingId\":\"1\"," +
+                "\"startedAtUtc\":\"2026-08-22T10:00:00.0000000Z\"," +
+                "\"completeAtUtc\":\"2026-08-22T10:01:00.0000000Z\"}]}";
+
+            SaveData data = JsonUtility.FromJson<SaveData>(json);
+
+            Assert.AreEqual(1, data.buildingConstructions.Count);
+            Assert.IsFalse(data.buildingConstructions[0].completionNotified);
+            Assert.AreEqual(SaveData.CurrentSaveVersion, data.saveVersion,
+                "칸 하나를 더했다고 저장 형식 번호를 올리지 않는다");
         }
 
         [Test]

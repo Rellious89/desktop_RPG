@@ -7,6 +7,7 @@ using Common;
 using Field;
 using Inventory;
 using NUnit.Framework;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -18,11 +19,14 @@ using Object = UnityEngine.Object;
 namespace BuildingEditor.Tests
 {
     /// <summary>
-    /// 마을 상호작용 UI의 좌표 계산과 표시/숨김 정책 시험.
+    /// 마을 상호작용 UI의 좌표 계산과 표시/숨김 정책, 그리고 건설 타이머/완성 안내 시험.
     ///
     /// <b>Play Mode를 쓰지 않는다.</b> 카메라의 픽셀 사각형을 직접 지정하고 프레임 한 번분의 갱신
     /// (<c>UpdateInteraction</c>)을 직접 불러 확인하므로, 실행 환경의 화면 크기나 프레임 수에
     /// 결과가 달라지지 않는다.
+    ///
+    /// <b>시각도 진짜를 쓰지 않는다.</b> 컨트롤러의 시계를 고정값으로 갈아 끼우고 시험이 직접 밀기
+    /// 때문에, 남은 시간과 완성 경계가 시험을 언제 돌리느냐에 따라 달라지지 않는다.
     /// </summary>
     public sealed class TownBuildingInteractionTests
     {
@@ -39,6 +43,17 @@ namespace BuildingEditor.Tests
         /// <summary>01_UI / 42(건설 시작 안내)의 실제 Entry Id.</summary>
         private const long ConstructionStartedKeyId = 8970130103984129L;
 
+        /// <summary>01_UI / 43(건설 완성 안내)의 실제 Entry Id.</summary>
+        private const long ConstructionCompletedKeyId = 8970130103984130L;
+
+        /// <summary>타이머 연출 클립. 자리도 크기도 건드리지 않는 <b>스프라이트 교체</b>여야 한다.</summary>
+        private const string TimerClipPath = "Assets/Art/UI/Building/LoadingTimer.anim";
+
+        /// <summary>시험이 쓰는 고정 시각. 남은 시간과 완성 경계를 글자 그대로 확인하기 위해
+        /// 컨트롤러의 시계를 이 값으로 갈아 끼운다 - 실제 시각에 따라 결과가 달라지지 않는다.</summary>
+        private static readonly DateTime FixedNowUtc =
+            new DateTime(2026, 8, 22, 10, 30, 0, DateTimeKind.Utc);
+
         private static readonly MethodInfo ConfigureSaveMethod = typeof(SaveSystem).GetMethod(
             "ConfigureForTests", BindingFlags.NonPublic | BindingFlags.Static);
 
@@ -47,9 +62,14 @@ namespace BuildingEditor.Tests
         private InventoryManager testInventory;
         private ToastManager toastManager;
 
+        /// <summary>컨트롤러가 읽는 지금 시각. 시험이 이 값을 밀어 시간을 흘려보낸다.</summary>
+        private DateTime nowUtc;
+
         [SetUp]
         public void SetUp()
         {
+            nowUtc = FixedNowUtc;
+
             // 컨트롤러가 건설 기록을 보려면 저장 문서를 읽는다 - 실제 저장 파일 근처에도 가지 않도록
             // 메모리 위의 가짜 저장소를 끼워 넣는다(건물 팝업 시험과 같은 방식이다).
             Assert.IsNotNull(ConfigureSaveMethod,
@@ -330,16 +350,269 @@ namespace BuildingEditor.Tests
         // ---- 여관 입장 버튼 ----
 
         [Test]
-        public void 여관_입장_버튼은_언제나_꺼진_채로_남는다()
+        public void 짓지_않은_건물의_입장_버튼은_꺼진_채로_남는다()
         {
             Fixture fixture = CreateFixture();
             Assert.IsFalse(fixture.OpenInnButton.activeSelf);
 
-            // 저작 실수로 켜져 있어도 되돌린다.
+            // 저작 실수로 켜져 있어도 되돌린다 - "지어지지 않은 건물에 들어가는 버튼"은 보이지 않는다.
             fixture.OpenInnButton.SetActive(true);
             Update(fixture);
 
             Assert.IsFalse(fixture.OpenInnButton.activeSelf);
+        }
+
+        // ---- 단계별 표시(건설 버튼 / 타이머 / 입장 버튼) ----
+
+        [Test]
+        public void 아직_짓지_않았으면_건설_버튼만_보인다()
+        {
+            Fixture fixture = CreateFixture();
+
+            AssertOnlyOneVisible(fixture, build: true, timer: false, open: false);
+            Assert.AreEqual(BuildingConstructionPhase.NotStarted, fixture.Controller.ConstructionPhase);
+        }
+
+        [Test]
+        public void 짓는_중이면_타이머만_보인다()
+        {
+            AddConstruction(BuildingIdOfAsset(), FixedNowUtc.AddSeconds(60));
+
+            Fixture fixture = CreateFixture();
+
+            AssertOnlyOneVisible(fixture, build: false, timer: true, open: false);
+            Assert.AreEqual(BuildingConstructionPhase.InProgress, fixture.Controller.ConstructionPhase);
+        }
+
+        [Test]
+        public void 완성되면_타이머가_사라지고_입장_버튼만_보인다()
+        {
+            AddConstruction(BuildingIdOfAsset(), FixedNowUtc.AddSeconds(60));
+            Fixture fixture = CreateFixture();
+            Assert.IsTrue(fixture.TimerRoot.activeSelf);
+
+            // 시간만 흘렀다 - 저장 기록은 그대로다.
+            nowUtc = FixedNowUtc.AddSeconds(60);
+            Update(fixture);
+
+            AssertOnlyOneVisible(fixture, build: false, timer: false, open: true);
+            Assert.AreEqual(BuildingConstructionPhase.Completed, fixture.Controller.ConstructionPhase);
+        }
+
+        [Test]
+        public void 완성_시각을_읽을_수_없으면_셋_다_보이지_않는다()
+        {
+            AddUnreadableConstruction(BuildingIdOfAsset());
+
+            Fixture fixture = CreateFixture();
+
+            AssertOnlyOneVisible(fixture, build: false, timer: false, open: false);
+            Assert.AreEqual(BuildingConstructionPhase.Unreadable, fixture.Controller.ConstructionPhase);
+            Assert.IsTrue(fixture.Controller.IsConstructionStarted,
+                "손상된 기록도 '이미 시작했다'이다 - 건설 버튼이 돌아오면 두 번 짓게 된다");
+        }
+
+        [Test]
+        public void 타이머는_건설_버튼과_같은_자리에_놓인다()
+        {
+            AddConstruction(BuildingIdOfAsset(), FixedNowUtc.AddSeconds(60));
+            Fixture fixture = CreateFixture();
+
+            fixture.Anchor.position = new Vector3(1f, 0.5f, 0f);
+            Update(fixture);
+
+            Assert.Greater(fixture.TimerRect.anchoredPosition.x, 0f, "타이머도 월드 앵커를 따라간다");
+            Assert.AreEqual(fixture.BuildButtonRect.anchoredPosition, fixture.TimerRect.anchoredPosition,
+                "건설 버튼과 타이머는 서로 자리를 물려받는 사이다 - 좌표를 따로 계산하지 않는다");
+        }
+
+        [Test]
+        public void 던전이면_타이머도_입장_버튼도_함께_사라진다()
+        {
+            AddConstruction(BuildingIdOfAsset(), FixedNowUtc.AddSeconds(60));
+            Fixture fixture = CreateFixture();
+            Assert.IsTrue(fixture.InteractionRoot.activeSelf);
+
+            SetFieldMode(fixture.FieldModeManager, FieldMode.Dungeon);
+            Update(fixture);
+
+            Assert.IsFalse(fixture.InteractionRoot.activeSelf,
+                "루트 하나가 꺼지면 그 안의 건설 버튼도 타이머도 입장 버튼도 함께 사라진다");
+            Assert.IsFalse(fixture.TimerRoot.activeInHierarchy);
+        }
+
+        [Test]
+        public void 전환_연출_중에도_타이머가_보이지_않는다()
+        {
+            AddConstruction(BuildingIdOfAsset(), FixedNowUtc.AddSeconds(60));
+            Fixture fixture = CreateFixture();
+
+            SetSequencerPlaying(fixture.Sequencer, true);
+            Update(fixture);
+
+            Assert.IsFalse(fixture.InteractionRoot.activeSelf);
+            Assert.IsFalse(fixture.TimerRoot.activeInHierarchy);
+        }
+
+        // ---- 남은 시간 표시 ----
+
+        [Test]
+        public void 남은_시간은_HH_mm_ss로_표시된다()
+        {
+            AddConstruction(BuildingIdOfAsset(), FixedNowUtc.AddSeconds(60));
+            Fixture fixture = CreateFixture();
+
+            Assert.AreEqual("00:01:00", fixture.TimerText.text);
+
+            nowUtc = FixedNowUtc.AddSeconds(1);
+            Update(fixture);
+            Assert.AreEqual("00:00:59", fixture.TimerText.text);
+        }
+
+        [Test]
+        public void 하루를_넘는_남은_시간도_되감기지_않는다()
+        {
+            AddConstruction(BuildingIdOfAsset(), FixedNowUtc.AddHours(25));
+
+            Fixture fixture = CreateFixture();
+
+            Assert.AreEqual("25:00:00", fixture.TimerText.text,
+                "24시간에서 되감긴 값은 '곧 끝난다'로 잘못 읽힌다");
+        }
+
+        [Test]
+        public void 한_초보다_짧게_남으면_1초로_보인다()
+        {
+            AddConstruction(BuildingIdOfAsset(), FixedNowUtc.AddMilliseconds(400));
+
+            Fixture fixture = CreateFixture();
+
+            Assert.AreEqual("00:00:01", fixture.TimerText.text,
+                "0.4초 남았는데 00:00:00이 보이면 이미 끝난 것으로 읽힌다");
+            Assert.IsTrue(fixture.TimerRoot.activeSelf, "아직 완성 시각이 오지 않았다");
+        }
+
+        [Test]
+        public void 표시_초가_그대로면_텍스트를_다시_쓰지_않는다()
+        {
+            AddConstruction(BuildingIdOfAsset(), FixedNowUtc.AddSeconds(60));
+            Fixture fixture = CreateFixture();
+            Assert.AreEqual("00:01:00", fixture.TimerText.text);
+
+            // 같은 초 안에서 여러 프레임이 지나가도 문자열을 다시 만들지 않는다는 것을, 밖에서 써 둔
+            // 표식이 살아남는지로 확인한다.
+            fixture.TimerText.text = "표식";
+            nowUtc = FixedNowUtc.AddMilliseconds(200);
+            Update(fixture);
+            nowUtc = FixedNowUtc.AddMilliseconds(400);
+            Update(fixture);
+            Assert.AreEqual("표식", fixture.TimerText.text, "1초에 한 번만 고쳐 쓴다");
+
+            nowUtc = FixedNowUtc.AddSeconds(1);
+            Update(fixture);
+            Assert.AreEqual("00:00:59", fixture.TimerText.text, "초가 바뀌면 그때 고쳐 쓴다");
+        }
+
+        [Test]
+        public void 남은_시간을_보여도_저장하지_않는다()
+        {
+            AddConstruction(BuildingIdOfAsset(), FixedNowUtc.AddSeconds(60));
+            Fixture fixture = CreateFixture();
+
+            int before = storage.WriteCalls;
+            for (int i = 1; i <= 5; i++)
+            {
+                nowUtc = FixedNowUtc.AddSeconds(i);
+                Update(fixture);
+            }
+
+            Assert.AreEqual(before, storage.WriteCalls, "타이머가 흐를 때마다 파일을 쓰면 안 된다");
+        }
+
+        [Test]
+        public void 타이머_연출은_시간_배속과_무관하게_돈다()
+        {
+            Fixture fixture = CreateFixture();
+
+            Assert.AreEqual(AnimatorUpdateMode.UnscaledTime, fixture.TimerAnimator.updateMode,
+                "화면이 멈춰도(timeScale 0) 타이머 연출은 돌아야 한다");
+        }
+
+        // ---- 완성 안내 토스트 ----
+
+        [Test]
+        public void 완성되면_안내를_한_번만_띄우고_그_사실이_파일에_남는다()
+        {
+            AddConstruction(BuildingIdOfAsset(), FixedNowUtc.AddSeconds(60));
+            Fixture fixture = CreateFixture();
+            CreateToastManager();
+            DeliverCompletedMessage(fixture, "건설이 완료되었습니다.");
+
+            nowUtc = FixedNowUtc.AddSeconds(60);
+            Update(fixture);
+            Update(fixture);
+            nowUtc = FixedNowUtc.AddSeconds(120);
+            Update(fixture);
+
+            Assert.AreEqual(1, fixture.Controller.CompletedToastCount, "완성 한 번에 안내도 한 번이다");
+            Assert.IsTrue(SaveSystem.Data.buildingConstructions[0].completionNotified);
+        }
+
+        [Test]
+        public void 앱을_다시_켜도_완성_안내는_다시_뜨지_않는다()
+        {
+            // 이미 안내를 마친 기록 그대로 - 컨트롤러는 새로 만들어진다.
+            AddConstruction(BuildingIdOfAsset(), FixedNowUtc.AddDays(-1), completionNotified: true);
+
+            Fixture fixture = CreateFixture();
+            CreateToastManager();
+            DeliverCompletedMessage(fixture, "건설이 완료되었습니다.");
+
+            int before = storage.WriteCalls;
+            Update(fixture);
+
+            Assert.AreEqual(0, fixture.Controller.CompletedToastCount);
+            Assert.AreEqual(before, storage.WriteCalls, "다시 저장하지도 않는다");
+            Assert.IsTrue(fixture.OpenInnButton.activeSelf, "안내는 끝났어도 입장 버튼은 그대로 켜진다");
+        }
+
+        [Test]
+        public void 완성_저장이_실패하면_안내하지_않고_다음_갱신에서_다시_시도한다()
+        {
+            AddConstruction(BuildingIdOfAsset(), FixedNowUtc.AddSeconds(60));
+            Fixture fixture = CreateFixture();
+            CreateToastManager();
+            DeliverCompletedMessage(fixture, "건설이 완료되었습니다.");
+
+            storage.WritesFail = true;
+            LogAssert.Expect(LogType.Error, new Regex("완성 표식을 저장하지"));
+            nowUtc = FixedNowUtc.AddSeconds(60);
+            Update(fixture);
+
+            Assert.AreEqual(0, fixture.Controller.CompletedToastCount, "실패한 확정은 안내하지 않는다");
+            Assert.IsFalse(SaveSystem.Data.buildingConstructions[0].completionNotified);
+
+            storage.WritesFail = false;
+            Update(fixture);
+
+            Assert.AreEqual(1, fixture.Controller.CompletedToastCount, "다음 갱신에서 다시 시도한다");
+            Assert.IsTrue(SaveSystem.Data.buildingConstructions[0].completionNotified);
+        }
+
+        [Test]
+        public void 완성_안내_문구가_오기_전에는_토스트를_띄우지_않고_한_번만_알린다()
+        {
+            AddConstruction(BuildingIdOfAsset(), FixedNowUtc.AddSeconds(60));
+            Fixture fixture = CreateFixture();
+
+            // 문구가 도착하지 않은 상태에서 완성됐다 - 코드가 대체 문구를 지어내지 않는다.
+            LogAssert.Expect(LogType.Warning, new Regex("아직 없어 토스트를 띄우지 않습니다"));
+            nowUtc = FixedNowUtc.AddSeconds(60);
+            Update(fixture);
+            Update(fixture);
+
+            Assert.AreEqual(0, fixture.Controller.CompletedToastCount);
+            Assert.IsNull(fixture.Controller.CompletedToastMessage);
         }
 
         // ---- 건설 기록에 따른 표시 ----
@@ -365,7 +638,7 @@ namespace BuildingEditor.Tests
             Assert.IsFalse(fixture.BuildButton.gameObject.activeSelf,
                 "이미 시작된 건물의 건설 버튼은 나오지 않는다");
             Assert.IsFalse(fixture.OpenInnButton.activeSelf,
-                "여관 입장 버튼은 이번 단계에서도 계속 꺼져 있다");
+                "아직 짓는 중이므로 여관 입장 버튼은 나오지 않는다");
         }
 
         [Test]
@@ -507,6 +780,57 @@ namespace BuildingEditor.Tests
                 Assert.IsFalse(openInn.activeSelf, "여관 입장 버튼은 시작 시 꺼져 있어야 한다");
                 Assert.IsTrue(buildButton.gameObject.activeSelf);
 
+                // 건설 타이머 배선. 셋 다 같은 묶음 안에 있어야 한 번에 켜고 끌 수 있다.
+                var timerRoot = so.FindProperty("constructionTimerRoot").objectReferenceValue as GameObject;
+                var timerText = so.FindProperty("constructionTimerText").objectReferenceValue
+                    as TextMeshProUGUI;
+                var timerAnimator = so.FindProperty("constructionTimerAnimator").objectReferenceValue
+                    as Animator;
+
+                Assert.IsNotNull(timerRoot, "constructionTimerRoot");
+                Assert.IsNotNull(timerText, "constructionTimerText");
+                Assert.IsNotNull(timerAnimator, "constructionTimerAnimator");
+
+                Assert.AreEqual("pn_ConstructionTimer", timerRoot.name);
+                Assert.AreEqual("lb_ConstructionTimer", timerText.name);
+                Assert.AreEqual("ani_Timer", timerAnimator.name);
+
+                Assert.AreSame(interactionParent, timerRoot.transform.parent,
+                    "타이머도 건설 버튼과 같은 사각형을 기준으로 자리를 잡는다");
+                Assert.IsTrue(timerText.transform.IsChildOf(timerRoot.transform));
+                Assert.IsTrue(timerAnimator.transform.IsChildOf(timerRoot.transform));
+
+                Assert.IsFalse(timerRoot.activeSelf, "타이머는 시작 시 꺼져 있어야 한다");
+
+                Assert.AreEqual(AnimatorUpdateMode.UnscaledTime, timerAnimator.updateMode,
+                    "화면이 멈춰도(timeScale 0) 타이머 연출은 돌아야 한다");
+                Assert.IsNotNull(timerAnimator.runtimeAnimatorController,
+                    "ani_Timer에 Animator Controller가 연결되어 있어야 한다");
+
+                // 타이머는 <b>보여 주기만</b> 한다 - 클릭을 받아 그 아래의 입력을 가리면 안 된다.
+                Assert.IsFalse(timerText.raycastTarget, "남은 시간 텍스트는 클릭을 받지 않는다");
+                foreach (Graphic graphic in timerRoot.GetComponentsInChildren<Graphic>(true))
+                {
+                    Assert.IsFalse(graphic.raycastTarget,
+                        $"타이머의 '{graphic.name}'이 클릭을 받으면 그 아래가 눌리지 않는다");
+                }
+
+                // 이 묶음에서 상호작용하는 것은 두 버튼뿐이다(그중 입장 버튼은 완성 뒤에만 보인다).
+                Selectable[] selectables = interactionParent.GetComponentsInChildren<Selectable>(true);
+                Assert.AreEqual(2, selectables.Length,
+                    "건설 버튼과 여관 입장 버튼 말고 상호작용하는 것이 있으면 안 된다");
+                foreach (Selectable selectable in selectables)
+                {
+                    Assert.IsTrue(
+                        selectable.name == "btn_Build_Inn" || selectable.name == "btn_Open_Inn",
+                        $"'{selectable.name}'은 상호작용 대상이 아니다");
+                }
+
+                var openInnButton = openInn.GetComponent<Button>();
+                Assert.IsNotNull(openInnButton, "btn_Open_Inn에는 Button이 있어야 한다");
+                Assert.AreEqual(0, openInnButton.onClick.GetPersistentEventCount(),
+                    "이번 단계에서 입장 버튼은 켜지기만 한다 - 누를 때 할 일은 다음 단계의 몫이다");
+
                 Assert.AreEqual(0, buildButton.onClick.GetPersistentEventCount(),
                     "클릭은 런타임 리스너로만 걸린다 - 버튼에 영구 호출을 저작하지 않는다");
 
@@ -523,6 +847,13 @@ namespace BuildingEditor.Tests
                     so.FindProperty("constructionStartedMessage.m_TableEntryReference.m_KeyId").longValue,
                     "건설 시작 안내는 01_UI / 42여야 한다");
 
+                Assert.AreEqual(UiTableGuid,
+                    so.FindProperty("constructionCompletedMessage.m_TableReference.m_TableCollectionName")
+                        .stringValue);
+                Assert.AreEqual(ConstructionCompletedKeyId,
+                    so.FindProperty("constructionCompletedMessage.m_TableEntryReference.m_KeyId").longValue,
+                    "건설 완성 안내는 01_UI / 43이어야 한다");
+
                 Canvas canvas = interactionParent.GetComponentInParent<Canvas>();
                 Assert.IsNotNull(canvas);
                 Assert.AreEqual(RenderMode.ScreenSpaceOverlay, canvas.renderMode,
@@ -531,6 +862,24 @@ namespace BuildingEditor.Tests
             finally
             {
                 EditorSceneManager.CloseScene(scene, true);
+            }
+        }
+
+        [Test]
+        public void 타이머_연출은_자리도_크기도_건드리지_않는다()
+        {
+            var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(TimerClipPath);
+            Assert.IsNotNull(clip, TimerClipPath);
+
+            // 자리/크기/회전은 전부 float 곡선으로 저작된다 - 하나라도 있으면 연출이 UI를 움직인다.
+            Assert.AreEqual(0, AnimationUtility.GetCurveBindings(clip).Length,
+                "타이머 연출은 스프라이트만 갈아 끼운다 - 자리나 크기를 움직이면 앵커 계산과 싸운다");
+
+            EditorCurveBinding[] pptr = AnimationUtility.GetObjectReferenceCurveBindings(clip);
+            Assert.Greater(pptr.Length, 0, "스프라이트 교체 곡선은 있어야 한다");
+            foreach (EditorCurveBinding binding in pptr)
+            {
+                Assert.AreEqual("m_Sprite", binding.propertyName);
             }
         }
 
@@ -609,6 +958,10 @@ namespace BuildingEditor.Tests
             public GameObject OpenInnButton;
             public Button BuildButton;
             public RectTransform BuildButtonRect;
+            public GameObject TimerRoot;
+            public RectTransform TimerRect;
+            public TextMeshProUGUI TimerText;
+            public Animator TimerAnimator;
             public Transform Anchor;
             public BuildingPopupPanel Popup;
             public BuildingDefinition Building;
@@ -655,6 +1008,29 @@ namespace BuildingEditor.Tests
             openGo.SetActive(false);
             fixture.OpenInnButton = openGo;
 
+            // 실제 씬과 같은 모양으로 세운다 - 타이머 묶음은 꺼진 채로 시작하고, 그 안에 남은 시간
+            // 텍스트와 회전 연출이 하나씩 들어 있다.
+            var timerGo = new GameObject("TestConstructionTimer", typeof(RectTransform));
+            timerGo.SetActive(false);
+            timerGo.transform.SetParent(parent, false);
+            fixture.TimerRoot = timerGo;
+            fixture.TimerRect = (RectTransform)timerGo.transform;
+            fixture.TimerRect.anchorMin = new Vector2(0.5f, 0.5f);
+            fixture.TimerRect.anchorMax = new Vector2(0.5f, 0.5f);
+
+            var timerTextGo = new GameObject("TestConstructionTimerText",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            timerTextGo.transform.SetParent(timerGo.transform, false);
+            fixture.TimerText = timerTextGo.GetComponent<TextMeshProUGUI>();
+
+            var timerAnimatorGo = new GameObject("TestConstructionTimerAnimation",
+                typeof(RectTransform), typeof(Animator));
+            timerAnimatorGo.transform.SetParent(timerGo.transform, false);
+            fixture.TimerAnimator = timerAnimatorGo.GetComponent<Animator>();
+
+            // 저작이 잘못돼 있어도 컨트롤러가 되돌린다는 것을 확인하려고 일부러 어긋나게 둔다.
+            fixture.TimerAnimator.updateMode = AnimatorUpdateMode.Normal;
+
             var modeGo = new GameObject("TestFieldModeManager");
             modeGo.SetActive(false);
             created.Add(modeGo);
@@ -686,9 +1062,16 @@ namespace BuildingEditor.Tests
             so.FindProperty("interactionParent").objectReferenceValue = parent;
             so.FindProperty("buildButton").objectReferenceValue = fixture.BuildButton;
             so.FindProperty("openInnButton").objectReferenceValue = fixture.OpenInnButton;
+            so.FindProperty("constructionTimerRoot").objectReferenceValue = fixture.TimerRoot;
+            so.FindProperty("constructionTimerText").objectReferenceValue = fixture.TimerText;
+            so.FindProperty("constructionTimerAnimator").objectReferenceValue = fixture.TimerAnimator;
             so.FindProperty("buildingPopup").objectReferenceValue = fixture.Popup;
             so.FindProperty("building").objectReferenceValue = fixture.Building;
             so.ApplyModifiedPropertiesWithoutUndo();
+
+            // 시계를 갈아 끼운다 - 남은 시간과 완성 경계를 실제 시각과 무관하게 확인하기 위함이며,
+            // 서비스가 만들어지기 <b>전에</b> 넣어야 첫 갱신부터 이 시계를 쓴다.
+            SetClock(fixture.Controller);
 
             // EditMode에서는 엔진이 OnEnable을 부르지 않으므로 활성화 직후 직접 재현한다
             // (리스너 연결 + 첫 갱신). 대상 씬을 Play Mode로 켜지 않기 위한 최소한의 이음매다.
@@ -717,6 +1100,15 @@ namespace BuildingEditor.Tests
             Assert.IsTrue(fixture.Popup.gameObject.activeSelf);
             EditModeLifecycle.RaiseEnable(fixture.Popup);
             Assert.IsTrue(fixture.Popup.HasLocalizationSubscriptions);
+        }
+
+        /// <summary>단계마다 <b>셋 중 하나만</b> 보인다는 규칙을 한 줄로 확인한다 - 하나를 켜면서
+        /// 다른 하나를 끄는 것을 빠뜨리면 여기서 드러난다.</summary>
+        private static void AssertOnlyOneVisible(Fixture fixture, bool build, bool timer, bool open)
+        {
+            Assert.AreEqual(build, fixture.BuildButton.gameObject.activeSelf, "건설 버튼");
+            Assert.AreEqual(timer, fixture.TimerRoot.activeSelf, "건설 타이머");
+            Assert.AreEqual(open, fixture.OpenInnButton.activeSelf, "여관 입장 버튼");
         }
 
         private static void Update(Fixture fixture)
@@ -790,15 +1182,53 @@ namespace BuildingEditor.Tests
         }
 
         /// <summary>건설 기록 한 줄을 저장 문서에 직접 넣는다(시작 경로를 거치지 않는다) - 여기서
-        /// 확인하려는 것은 "기록이 있으면 어떻게 보이는가"뿐이다.</summary>
+        /// 확인하려는 것은 "기록이 있으면 어떻게 보이는가"뿐이다. 기본값은 고정 시각에서 1분 뒤에
+        /// 끝나는 기록이라 <b>짓는 중</b>이다.</summary>
         private static void AddConstruction(string buildingId)
+        {
+            AddConstruction(buildingId, FixedNowUtc.AddSeconds(60));
+        }
+
+        private static void AddConstruction(
+            string buildingId, DateTime completeAtUtc, bool completionNotified = false)
         {
             SaveSystem.Data.buildingConstructions.Add(new BuildingConstructionSaveState
             {
                 buildingId = buildingId,
-                startedAtUtc = "2026-08-22T10:30:00.0000000Z",
-                completeAtUtc = "2026-08-22T10:31:00.0000000Z",
+                startedAtUtc = SaveData.FormatTimestamp(FixedNowUtc),
+                completeAtUtc = SaveData.FormatTimestamp(completeAtUtc),
+                completionNotified = completionNotified,
             });
+        }
+
+        /// <summary>완성 시각을 읽을 수 없는 손상된 기록.</summary>
+        private static void AddUnreadableConstruction(string buildingId)
+        {
+            SaveSystem.Data.buildingConstructions.Add(new BuildingConstructionSaveState
+            {
+                buildingId = buildingId,
+                startedAtUtc = SaveData.FormatTimestamp(FixedNowUtc),
+                completeAtUtc = "읽을 수 없는 값",
+            });
+        }
+
+        /// <summary>컨트롤러의 시계를 시험이 미는 값으로 바꾼다. 실제 실행에서는 UTC 시계 하나뿐이며,
+        /// 이 이음매는 "지금 몇 시인가"에 따라 결과가 달라지는 시험을 없애기 위한 것이다.</summary>
+        private void SetClock(TownBuildingInteractionController controller)
+        {
+            FieldInfo field = typeof(TownBuildingInteractionController).GetField(
+                "utcNowProvider", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(field, "utcNowProvider를 찾지 못했습니다 - 시험이 실제 시각을 읽게 됩니다.");
+            field.SetValue(controller, new Func<DateTime>(() => nowUtc));
+        }
+
+        /// <summary>완성 안내 번역이 도착한 상황을 그대로 재현한다.</summary>
+        private static void DeliverCompletedMessage(Fixture fixture, string value)
+        {
+            MethodInfo method = typeof(TownBuildingInteractionController).GetMethod(
+                "ApplyCompletedMessage", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(method);
+            method.Invoke(fixture.Controller, new object[] { value });
         }
 
         /// <summary>서비스가 시작을 알린 것과 같은 경로를 재현한다.</summary>
@@ -838,6 +1268,9 @@ namespace BuildingEditor.Tests
         {
             public int WriteCalls;
 
+            /// <summary>쓰기를 실패시킨다 - "저장하지 못한 완성"의 경로를 확인하기 위한 스위치다.</summary>
+            public bool WritesFail;
+
             public bool WritesBlocked => false;
 
             public string BlockedReason => null;
@@ -849,7 +1282,9 @@ namespace BuildingEditor.Tests
             public SaveWriteResult Write(string text)
             {
                 WriteCalls++;
-                return SaveWriteResult.Written(false);
+                return WritesFail
+                    ? SaveWriteResult.Failed("시험이 저장을 실패시켰습니다.")
+                    : SaveWriteResult.Written(false);
             }
 
             public SaveQuarantineResult QuarantinePrimary(string reason) =>
