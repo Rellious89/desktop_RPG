@@ -11,6 +11,6 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c77d7b14eb9144c081dc3b6aa453e9c5, type: 3}
   m_Name: BuildingCatalog
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   buildings:
   - {fileID: 11400000, guid: 1e0e90600454446e8980563a44db5bef, type: 2}

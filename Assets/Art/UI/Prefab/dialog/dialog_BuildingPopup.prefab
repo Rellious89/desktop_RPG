@@ -652,8 +652,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 0
@@ -741,8 +741,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3245ec927659c4140ac4f8d17403cc18, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_HorizontalFit: 0
   m_VerticalFit: 2
 --- !u!114 &4853166110418513378
@@ -755,15 +755,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ac2fe041186f04abb8c0c248afb8f108, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   target: {fileID: 1261494017493714393}
   text:
     m_TableReference:
       m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
     m_TableEntryReference:
       m_KeyId: 8970130103984128
-      m_Key:
+      m_Key: 
     m_FallbackState: 0
     m_WaitForCompletion: 0
     m_LocalVariables: []
@@ -917,7 +917,6 @@ GameObject:
   - component: {fileID: 6228437471688048122}
   - component: {fileID: 2191614105380951432}
   - component: {fileID: 7198976265495435822}
-  - component: {fileID: 7221591193807288122}
   m_Layer: 5
   m_Name: lb_description
   m_TagString: Untagged
@@ -1056,31 +1055,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_HorizontalFit: 0
   m_VerticalFit: 2
---- !u!114 &7221591193807288122
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4527717934288135133}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ac2fe041186f04abb8c0c248afb8f108, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  target: {fileID: 2191614105380951432}
-  text:
-    m_TableReference:
-      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
-    m_TableEntryReference:
-      m_KeyId: 8908411117756416
-      m_Key:
-    m_FallbackState: 0
-    m_WaitForCompletion: 0
-    m_LocalVariables: []
-  references:
-    version: 2
-    RefIds: []
 --- !u!1 &4944028058923315613
 GameObject:
   m_ObjectHideFlags: 0
@@ -1388,8 +1362,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 063fb21bf91c45adb66daa87cd79ec30, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   closeButton: {fileID: 3655151819847534701}
   blockBackgroundInput: 0
   inputBlocker: {fileID: 0}
@@ -1402,7 +1376,7 @@ MonoBehaviour:
       m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
     m_TableEntryReference:
       m_KeyId: 8908411117756416
-      m_Key:
+      m_Key: 
     m_FallbackState: 0
     m_WaitForCompletion: 0
     m_LocalVariables: []
