@@ -1148,6 +1148,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1091482785634468710}
+  - component: {fileID: 535473150271559216}
   m_Layer: 5
   m_Name: dialog_BuildingPopup
   m_TagString: Untagged
@@ -1175,6 +1176,37 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &535473150271559216
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6433853162466313642}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 063fb21bf91c45adb66daa87cd79ec30, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  closeButton: {fileID: 3655151819847534701}
+  blockBackgroundInput: 0
+  inputBlocker: {fileID: 0}
+  inputBlockerColor: {r: 0, g: 0, b: 0, a: 0}
+  buildingNameText: {fileID: 6709835744047636418}
+  descriptionText: {fileID: 2191614105380951432}
+  descriptionFormat:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 8908411117756416
+      m_Key:
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  confirmButton: {fileID: 1980202992668186981}
+  references:
+    version: 2
+    RefIds: []
 --- !u!1 &6845460453508038162
 GameObject:
   m_ObjectHideFlags: 0

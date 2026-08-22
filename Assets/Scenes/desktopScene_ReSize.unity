@@ -2317,6 +2317,7 @@ GameObject:
   - component: {fileID: 468841864}
   - component: {fileID: 468841865}
   - component: {fileID: 468841866}
+  - component: {fileID: 468841867}
   m_Layer: 0
   m_Name: FieldSystem
   m_TagString: Untagged
@@ -2436,6 +2437,28 @@ MonoBehaviour:
   sessionTracker: {fileID: 468841865}
   resultPanel: {fileID: 5894670379954758321}
   transitionSequencer: {fileID: 119946296}
+--- !u!114 &468841867
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 468841860}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6f2fa8ab7ea5445d95fa687c30e9b6f0, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  fieldModeManager: {fileID: 468841861}
+  transitionSequencer: {fileID: 119946296}
+  stageCamera: {fileID: 2046182837}
+  uiAnchor: {fileID: 351379136}
+  interactionRoot: {fileID: 639766286}
+  interactionParent: {fileID: 2065249270}
+  buildButton: {fileID: 1017242664}
+  openInnButton: {fileID: 940358989}
+  buildingPopup: {fileID: 6072216787366258619}
+  building: {fileID: 11400000, guid: 1e0e90600454446e8980563a44db5bef, type: 2}
 --- !u!1 &471919068
 GameObject:
   m_ObjectHideFlags: 0
@@ -12740,6 +12763,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 2c6756ae12b664048bb0a4feec8bdae0, type: 3}
+--- !u!114 &6072216787366258619 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 535473150271559216, guid: 2c6756ae12b664048bb0a4feec8bdae0, type: 3}
+  m_PrefabInstance: {fileID: 6072216787366258618}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 063fb21bf91c45adb66daa87cd79ec30, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
 --- !u!1001 &7186970516406108001
 PrefabInstance:
   m_ObjectHideFlags: 0
