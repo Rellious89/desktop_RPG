@@ -28,6 +28,7 @@ namespace TableDataEditor
         public const string RecruitmentTypeCsvFileName = "RecruitmentType.csv";
         public const string RecruitmentPoolCsvFileName = "RecruitmentPool.csv";
         public const string RecruitmentAccessCsvFileName = "RecruitmentAccess.csv";
+        public const string PartyConfigCsvFileName = "PartyConfig.csv";
 
         public const string WorldCsvPath = InputRoot + "/" + WorldCsvFileName;
         public const string CurrencyCsvPath = InputRoot + "/" + CurrencyCsvFileName;
@@ -43,6 +44,8 @@ namespace TableDataEditor
         public const string RecruitmentTypeCsvPath = InputRoot + "/" + RecruitmentTypeCsvFileName;
         public const string RecruitmentPoolCsvPath = InputRoot + "/" + RecruitmentPoolCsvFileName;
         public const string RecruitmentAccessCsvPath = InputRoot + "/" + RecruitmentAccessCsvFileName;
+
+        public const string PartyConfigCsvPath = InputRoot + "/" + PartyConfigCsvFileName;
 
         /// <summary>
         /// <c>icon_key</c>가 가리키는 아이콘을 찾는 <b>유일한</b> 폴더. 프로젝트 전체에서 이름으로 찾지
@@ -112,6 +115,13 @@ namespace TableDataEditor
         public const string RecruitmentPoolOutputFolder = OutputRoot + "/RecruitmentPool";
         public const string RecruitmentAccessOutputFolder = OutputRoot + "/RecruitmentAccess";
 
+        /// <summary>
+        /// 파티 설정 표의 출력 폴더. <b>기존 열세 도메인과 나란한 형제 폴더</b>이며 서로의 안쪽을
+        /// 절대 건드리지 않는다 - 파티 표만 다시 만드는 좁은 범위가 다른 도메인의 생성 파일을 한
+        /// 바이트도 바꾸지 않는다는 것이 코드로 보이는 자리가 여기다.
+        /// </summary>
+        public const string PartyConfigOutputFolder = OutputRoot + "/PartyConfig";
+
         /// <summary>생성 에셋 파일 이름의 고정 접두사. 원본 ID를 그대로 뒤에 붙인다 - <b>ID 자체는
         /// 절대 바꾸지 않는다</b>. ID가 <see cref="TableDataFieldRules.IdPatternText"/>(양의 정수 또는
         /// snake_case)만 허용되므로 접두사와 합쳐도 파일 이름은 항상 안전하고, 서로 다른 ID가 같은
@@ -130,6 +140,7 @@ namespace TableDataEditor
         public const string RecruitmentTypeAssetPrefix = "RecruitmentType_";
         public const string RecruitmentPoolAssetPrefix = "RecruitmentPool_";
         public const string RecruitmentAccessAssetPrefix = "RecruitmentAccess_";
+        public const string PartyConfigAssetPrefix = "PartyConfig_";
 
         public const string WorldCatalogAssetName = "WorldCatalog";
         public const string CurrencyCatalogAssetName = "CurrencyCatalog";
@@ -144,6 +155,7 @@ namespace TableDataEditor
         public const string RecruitmentTypeCatalogAssetName = "RecruitmentTypeCatalog";
         public const string RecruitmentPoolCatalogAssetName = "RecruitmentPoolCatalog";
         public const string RecruitmentAccessCatalogAssetName = "RecruitmentAccessCatalog";
+        public const string PartyConfigCatalogAssetName = "PartyConfigCatalog";
 
         public static string WorldAssetPath(string worldId)
         {
@@ -262,5 +274,16 @@ namespace TableDataEditor
 
         public static string RecruitmentAccessCatalogAssetPath =>
             RecruitmentAccessOutputFolder + "/" + RecruitmentAccessCatalogAssetName + ".asset";
+
+        /// <summary>파티 설정 생성 에셋의 경로. <b>CSV에 적힌 party_config_id를 한 글자도 바꾸지 않고</b>
+        /// 파일 이름에 붙인다 - 표준 ID(<see cref="TableDataFieldRules.IdPatternText"/>)만 여기까지
+        /// 오므로 파일 이름에 그대로 쓸 수 있다.</summary>
+        public static string PartyConfigAssetPath(string partyConfigId)
+        {
+            return PartyConfigOutputFolder + "/" + PartyConfigAssetPrefix + partyConfigId + ".asset";
+        }
+
+        public static string PartyConfigCatalogAssetPath =>
+            PartyConfigOutputFolder + "/" + PartyConfigCatalogAssetName + ".asset";
     }
 }

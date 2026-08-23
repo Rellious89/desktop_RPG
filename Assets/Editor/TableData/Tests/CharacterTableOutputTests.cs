@@ -51,6 +51,7 @@ namespace TableDataEditor.Tests
             TableDataPaths.BuildingOutputFolder,
             TableDataPaths.CharacterAcquisitionOutputFolder, TableDataPaths.RecruitmentTypeOutputFolder,
             TableDataPaths.RecruitmentPoolOutputFolder, TableDataPaths.RecruitmentAccessOutputFolder,
+            TableDataPaths.PartyConfigOutputFolder,
         };
 
         private const string TempRootName = "__TableDataTestsTemp";
@@ -162,6 +163,9 @@ namespace TableDataEditor.Tests
             // 모두 이 묶음 안에 있고, 밖으로 나가는 유일한 참조인 Character는 이미 만들어져 있는 생성
             // 에셋을 읽어 잇는다(없거나 여럿이면 Validate가 쓰기 전에 오류로 막는다). 창구가 가리키는
             // 건물은 아예 참조가 아니라 문자열 두 칸이라 지워질 참조 자체가 없다.
+            //
+            // PartyConfigTable이 더해진 근거는 가장 단순하다 - 이 표는 어느 표도 <b>가리키지 않으므로</b>
+            // 지워질 참조 자체가 없고, 다른 도메인의 생성 에셋을 읽지도 쓰지도 않는다.
             CollectionAssert.AreEquivalent(
                 new[]
                 {
@@ -169,6 +173,7 @@ namespace TableDataEditor.Tests
                     TableDataRebuildScope.CharacterSkillTables,
                     TableDataRebuildScope.BuildingTable,
                     TableDataRebuildScope.RecruitmentTables,
+                    TableDataRebuildScope.PartyConfigTable,
                 },
                 Enum.GetValues(typeof(TableDataRebuildScope)),
                 "Rebuild 범위가 늘어나면 참조가 조용히 지워지는 경로가 생긴다.");
@@ -248,7 +253,7 @@ namespace TableDataEditor.Tests
             CollectionAssert.AreEquivalent(
                 AllOutputFolders,
                 TableDataValidator.GeneratedOutputFolders(TableDataRebuildScope.All),
-                "전체 범위는 열세 도메인을 모두 본다(기존 동작 그대로 넓어졌다).");
+                "전체 범위는 열네 도메인을 모두 본다(기존 동작 그대로 넓어졌다).");
         }
 
         [Test]

@@ -392,6 +392,24 @@ namespace TableDataEditor
     }
 
     /// <summary>
+    /// PartyConfig.csv 한 행 - "파티에 기본 몇 명까지 넣을 수 있는가".
+    ///
+    /// <b>다른 표를 하나도 가리키지 않는다.</b> 파티에 누가 들어 있는지는 저장 문서의 몫이고,
+    /// 이 표는 그 인원의 <b>상한</b>만 말한다.
+    /// </summary>
+    public sealed class PartyConfigRow
+    {
+        public int Line;
+        public string Id = string.Empty;
+
+        /// <summary>기본 정원. <b>1 이상만</b> 여기까지 온다 - 0명짜리 파티는 설정으로서 뜻이 없고,
+        /// 잘못된 값을 하한으로 끌어올려 통과시키지도 않는다.</summary>
+        public int BaseCapacity = 1;
+
+        public bool Enabled;
+    }
+
+    /// <summary>
     /// 파싱과 검증을 마친 아홉 표. Rebuild는 이 스냅샷만 보고 에셋을 만든다 - CSV를 다시 읽지 않으므로
     /// "검증한 내용"과 "쓰는 내용"이 어긋날 수 없다.
     ///
@@ -424,6 +442,10 @@ namespace TableDataEditor
         public readonly List<RecruitmentTypeRow> RecruitmentTypes = new List<RecruitmentTypeRow>();
         public readonly List<RecruitmentPoolRow> RecruitmentPools = new List<RecruitmentPoolRow>();
         public readonly List<RecruitmentAccessRow> RecruitmentAccesses = new List<RecruitmentAccessRow>();
+
+        /// <summary>파티 설정. 다른 표를 하나도 가리키지 않으므로 <b>맨 뒤에</b> 이어 붙여도 앞의
+        /// 순서를 한 칸도 건드리지 않는다.</summary>
+        public readonly List<PartyConfigRow> PartyConfigs = new List<PartyConfigRow>();
 
         public readonly Dictionary<string, WorldRow> WorldsById = new Dictionary<string, WorldRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, CurrencyRow> CurrenciesById = new Dictionary<string, CurrencyRow>(StringComparer.Ordinal);
@@ -463,5 +485,8 @@ namespace TableDataEditor
 
         public readonly Dictionary<string, RecruitmentAccessRow> RecruitmentAccessesById =
             new Dictionary<string, RecruitmentAccessRow>(StringComparer.Ordinal);
+
+        public readonly Dictionary<string, PartyConfigRow> PartyConfigsById =
+            new Dictionary<string, PartyConfigRow>(StringComparer.Ordinal);
     }
 }

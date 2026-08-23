@@ -298,6 +298,21 @@ namespace TableDataEditor
             ConsumeAmount, DisplayOrder, Enabled, Memo,
         };
 
+        // PartyConfig.csv
+        //
+        // 이 표에도 display_order도 이름 참조도 없다 - 화면에 줄지어 보이는 목록이 아니라 코드가
+        // 키로 하나를 집어 오는 <b>설정의 목록</b>이기 때문이다. 없는 칸을 지어내지 않는다.
+        public const string PartyConfigId = "party_config_id";
+
+        /// <summary>파티에 넣을 수 있는 기본 인원. <b>1 이상</b>만 뜻이 있다 - 0명짜리 파티는 설정으로서
+        /// 뜻이 없고, 조용히 통과시키면 "설정은 있는데 아무도 넣을 수 없는" 상태가 생긴다.</summary>
+        public const string BaseCapacity = "base_capacity";
+
+        public static readonly string[] PartyConfig =
+        {
+            PartyConfigId, BaseCapacity, Enabled, Memo,
+        };
+
         /// <summary>
         /// 작업자용 참조 컬럼의 머리글자. 헤더가 이 글자로 시작하면 <b>런타임 컬럼이 아니라 사람이
         /// 보라고 붙인 칸</b>이다(스프레드시트 함수로 채운 몬스터명/월드명 등). 임포터는 이 칸의 값을
