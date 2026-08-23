@@ -260,6 +260,8 @@ namespace Common
                         level = item.level,
                         currentExp = item.currentExp,
                         currentStamina = item.currentStamina,
+                        passiveStaminaLastCalculatedUtc = item.passiveStaminaLastCalculatedUtc,
+                        passiveStaminaProgress = item.passiveStaminaProgress,
                     });
             }
 

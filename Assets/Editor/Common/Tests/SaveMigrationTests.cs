@@ -1038,7 +1038,7 @@ namespace CommonEditor.Tests
         {
             // CopyCharacters도 손으로 쓴 코드다. 캐릭터 항목에 칸을 늘리고 사본을 빠뜨리면 그 값이
             // 변환을 지날 때마다 조용히 기본값으로 되돌아간다.
-            string[] expected = { "characterId", "level", "currentExp", "currentStamina" };
+            string[] expected = { "characterId", "level", "currentExp", "currentStamina", "passiveStaminaLastCalculatedUtc", "passiveStaminaProgress" };
 
             List<string> actual = new List<string>();
             foreach (System.Reflection.FieldInfo field in typeof(CharacterSaveState).GetFields(
@@ -1059,7 +1059,11 @@ namespace CommonEditor.Tests
                 saveVersion = SaveData.CurrentSaveVersion,
                 characters = new List<CharacterSaveState>
                 {
-                    new CharacterSaveState { characterId = "CatKnight", level = 4, currentExp = 7, currentStamina = 9 },
+                    new CharacterSaveState
+                    {
+                        characterId = "CatKnight", level = 4, currentExp = 7, currentStamina = 9,
+                        passiveStaminaLastCalculatedUtc = "2026-08-24T00:00:00.0000000Z", passiveStaminaProgress = 1234,
+                    },
                 },
                 partyCharacterIds = new List<string> { "CatKnight" },
             };
@@ -1073,6 +1077,8 @@ namespace CommonEditor.Tests
             Assert.AreEqual(4, data.characters[0].level);
             Assert.AreEqual(7, data.characters[0].currentExp, "사본이 경험치를 빠뜨리면 안 된다.");
             Assert.AreEqual(9, data.characters[0].currentStamina);
+            Assert.AreEqual("2026-08-24T00:00:00.0000000Z", data.characters[0].passiveStaminaLastCalculatedUtc);
+            Assert.AreEqual(1234, data.characters[0].passiveStaminaProgress);
 
             // 사본을 거쳤으므로 호출부의 문서에는 <b>새 항목</b>이 들어와 있어야 한다.
             Assert.AreNotSame(original, data.characters[0], "목록 안의 항목까지 새로 만들어야 얕은 사본이 아니다.");

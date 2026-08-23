@@ -39,13 +39,22 @@ namespace Recovery
         [Min(1)]
         [SerializeField] private int maxSlots = 3;
 
+        [Tooltip("출전 파티원의 자연 행동력 회복 효율(회복소 대비 백분율). 0이면 자연 회복을 끈다.")]
+        [Min(0)]
+        [SerializeField] private int partyPassiveRecoveryEfficiencyPercent = 30;
+
+        [Tooltip("보유하지만 출전하지 않은 캐릭터의 자연 행동력 회복 효율(회복소 대비 백분율). 0이면 자연 회복을 끈다.")]
+        [Min(0)]
+        [SerializeField] private int nonPartyPassiveRecoveryEfficiencyPercent = 10;
+
         public string RecoveryId => string.IsNullOrWhiteSpace(recoveryId) ? name : recoveryId;
 
         /// <summary>인스펙터 값을 도메인이 쓰는 읽기 전용 스냅샷으로 바꾼다. 값 보정(클램프)은 하지
         /// 않는다 - 잘못된 값은 <see cref="RecoveryBalance.IsValid"/>가 false로 드러내야 한다.</summary>
         public RecoveryBalance ToBalance()
         {
-            return new RecoveryBalance(RecoveryId, currencyId, costPerMissingStamina, secondsPerStamina, maxSlots);
+            return new RecoveryBalance(RecoveryId, currencyId, costPerMissingStamina, secondsPerStamina, maxSlots,
+                partyPassiveRecoveryEfficiencyPercent, nonPartyPassiveRecoveryEfficiencyPercent);
         }
     }
 }

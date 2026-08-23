@@ -435,5 +435,13 @@ namespace Common
         /// <summary>현재 행동력. -1은 "아직 한 번도 초기화되지 않음"을 뜻하며, CharacterRoster가
         /// 정의의 Max Stamina로 채운다 - 0(행동력 소진)과 구분하기 위해 0이 아닌 값을 쓴다.</summary>
         public int currentStamina = -1;
+
+        /// <summary>자연 행동력 회복을 마지막으로 계산한 UTC 시각(왕복 "o" 형식). 비어 있으면
+        /// 첫 자연 회복 Tick이 현재 시각을 기록하고 과거 시간은 소급하지 않는다.</summary>
+        public string passiveStaminaLastCalculatedUtc;
+
+        /// <summary>자연 회복 1칸에 아직 못 미친 정수 진행 분자. 부동소수점 누적 오차를 피하기 위해
+        /// RecoveryBalance.SecondsPerStamina와 UTC ticks를 공통 분모로 쓴다.</summary>
+        public long passiveStaminaProgress;
     }
 }

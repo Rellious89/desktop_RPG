@@ -29,25 +29,43 @@ namespace Recovery
         /// <summary>동시에 회복할 수 있는 슬롯 수.</summary>
         public readonly int MaxSlots;
 
+        /// <summary>출전 파티원의 자연 회복 효율(회복소 대비 백분율).</summary>
+        public readonly int PartyPassiveRecoveryEfficiencyPercent;
+
+        /// <summary>보유하지만 출전하지 않은 캐릭터의 자연 회복 효율(회복소 대비 백분율).</summary>
+        public readonly int NonPartyPassiveRecoveryEfficiencyPercent;
+
         public RecoveryBalance(string recoveryId, string currencyId, int costPerMissingStamina,
                                int secondsPerStamina, int maxSlots)
+            : this(recoveryId, currencyId, costPerMissingStamina, secondsPerStamina, maxSlots, 30, 10)
+        {
+        }
+
+        public RecoveryBalance(string recoveryId, string currencyId, int costPerMissingStamina,
+                               int secondsPerStamina, int maxSlots,
+                               int partyPassiveRecoveryEfficiencyPercent,
+                               int nonPartyPassiveRecoveryEfficiencyPercent)
         {
             RecoveryId = recoveryId;
             CurrencyId = currencyId;
             CostPerMissingStamina = costPerMissingStamina;
             SecondsPerStamina = secondsPerStamina;
             MaxSlots = maxSlots;
+            PartyPassiveRecoveryEfficiencyPercent = partyPassiveRecoveryEfficiencyPercent;
+            NonPartyPassiveRecoveryEfficiencyPercent = nonPartyPassiveRecoveryEfficiencyPercent;
         }
 
         /// <summary>프로젝트 기본값(default / Jewel / 100 / 30 / 3). 에셋이 연결되지 않았을 때 조용히
         /// 대신 쓰는 폴백이 <b>아니다</b> - 에셋 필드의 초기값과 검증 하네스가 참조하는 기준값이다.</summary>
-        public static RecoveryBalance Default => new RecoveryBalance("default", "Jewel", 100, 30, 3);
+        public static RecoveryBalance Default => new RecoveryBalance("default", "Jewel", 100, 30, 3, 30, 10);
 
         /// <summary>계산과 등록을 진행해도 되는 값인지. 하나라도 어긋나면 회복소는 등록/진행/완료를
         /// 전부 멈춘다 - 잘못된 값으로 0초 즉시 완료나 0으로 나누기가 일어나지 않게 하기 위함이다.</summary>
         public bool IsValid => SecondsPerStamina > 0
                                && CostPerMissingStamina >= 0
                                && MaxSlots > 0
+                               && PartyPassiveRecoveryEfficiencyPercent >= 0
+                               && NonPartyPassiveRecoveryEfficiencyPercent >= 0
                                && !string.IsNullOrWhiteSpace(CurrencyId);
 
         /// <summary>어디가 잘못됐는지 사람이 읽을 수 있는 한 줄. <see cref="IsValid"/>가 true면 빈 문자열이다.</summary>
@@ -66,6 +84,14 @@ namespace Recovery
             if (MaxSlots <= 0)
             {
                 return $"Max Slots가 {MaxSlots}입니다 - 1 이상이어야 합니다.";
+            }
+            if (PartyPassiveRecoveryEfficiencyPercent < 0)
+            {
+                return $"Party Passive Recovery Efficiency Percent가 {PartyPassiveRecoveryEfficiencyPercent}입니다 - 0 이상이어야 합니다.";
+            }
+            if (NonPartyPassiveRecoveryEfficiencyPercent < 0)
+            {
+                return $"Non-Party Passive Recovery Efficiency Percent가 {NonPartyPassiveRecoveryEfficiencyPercent}입니다 - 0 이상이어야 합니다.";
             }
             return "Currency Id가 비어 있습니다.";
         }

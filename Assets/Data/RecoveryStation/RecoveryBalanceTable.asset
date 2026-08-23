@@ -17,3 +17,5 @@ MonoBehaviour:
   costPerMissingStamina: 100
   secondsPerStamina: 30
   maxSlots: 3
+  partyPassiveRecoveryEfficiencyPercent: 30
+  nonPartyPassiveRecoveryEfficiencyPercent: 10
