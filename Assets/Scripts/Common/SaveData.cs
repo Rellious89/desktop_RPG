@@ -380,6 +380,14 @@ namespace Common
 
         /// <summary>용병 방문이 READY가 되는 경계 시각(UTC).</summary>
         public string readyAtUtc;
+
+        /// <summary>
+        /// 아직 등록하거나 돌려보내지 않은 모집 후보의 Character Id. 비어 있으면 대기 후보가 없다.
+        /// 이 값은 보유 목록이 아니며, 후보가 있는 동안에도 다음 방문 주기는 계속 흐른다. 모르는
+        /// Character Id도 저장 계층이 지우거나 보정하지 않는다 - 카탈로그가 잠시 빠진 경우에도 후보
+        /// 자체를 잃지 않기 위해서다.
+        /// </summary>
+        public string pendingCharacterId;
     }
 
     /// <summary>

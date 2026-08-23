@@ -280,6 +280,7 @@ namespace RecruitmentEditor.Tests
         public void 마이그레이션_사본은_모집_주기_목록과_항목을_깊게_복사한다()
         {
             RecruitmentCycleSaveState original = AddCycle(CompleteAt, CompleteAt.AddSeconds(3600));
+            original.pendingCharacterId = "CatMage";
             List<RecruitmentCycleSaveState> originalList = data.recruitmentCycles;
 
             SaveMigrationResult result = SaveMigrationRunner.Default.Migrate(data, SaveData.CurrentSaveVersion);
@@ -290,6 +291,7 @@ namespace RecruitmentEditor.Tests
             Assert.AreEqual(original.recruitmentAccessId, data.recruitmentCycles[0].recruitmentAccessId);
             Assert.AreEqual(original.startedAtUtc, data.recruitmentCycles[0].startedAtUtc);
             Assert.AreEqual(original.readyAtUtc, data.recruitmentCycles[0].readyAtUtc);
+            Assert.AreEqual(original.pendingCharacterId, data.recruitmentCycles[0].pendingCharacterId);
             Assert.AreEqual(2, SaveData.CurrentSaveVersion);
         }
 

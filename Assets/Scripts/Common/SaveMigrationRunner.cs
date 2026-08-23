@@ -344,6 +344,7 @@ namespace Common
                         recruitmentAccessId = state.recruitmentAccessId,
                         startedAtUtc = state.startedAtUtc,
                         readyAtUtc = state.readyAtUtc,
+                        pendingCharacterId = state.pendingCharacterId,
                     });
             }
 
