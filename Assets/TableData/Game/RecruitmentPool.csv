@@ -1,0 +1,7 @@
+recruitment_type_id,pool_entry_id,character_id,weight,enabled,memo
+Inn_Normal,1,CatKnight,100,1,
+Inn_Normal,2,ElfArcher,60,1,
+Inn_Normal,3,Barbarian,80,1,
+Inn_Normal,4,ElfGuardian,50,1,
+Inn_Normal,5,RabbitHealer,30,1,
+Inn_Normal,6,CatMage,60,1,

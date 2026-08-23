@@ -1,7 +1,8 @@
 Key,Id,English(en),Korean (South Korea)(ko-KR)
-1,347070464,CatKnight,CatKnight
-2,359653376,ElfArcher,ElfArcher
-3,359653377,Barbarian,Barbarian
-4,363847680,ElfGuardian,ElfGuardian
-5,363847681,RabbitHealer,RabbitHealer
-6,363847682,CatMage,CatMage
+1,,CatKnight,고양이기사
+2,,ElfArcher,엘프궁수
+3,,Barbarian,바바리안
+4,,ElfGuardian,엘프수호자
+5,,RabbitHealer,토끼힐러
+6,,CatMage,고양이마법사
+7,,,

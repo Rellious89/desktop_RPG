@@ -1,0 +1,2 @@
+recruitment_access_id,recruitment_type_id,source_type,source_id,$source_name,arrival_interval_seconds,consume_amount,display_order,enabled,memo
+Inn_Normal_Access,Inn_Normal,BUILDING,1,여관,60,0,10,1,여관 일반 용병 모집
