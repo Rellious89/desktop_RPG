@@ -55,8 +55,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
@@ -1488,6 +1488,7 @@ GameObject:
   - component: {fileID: 7501285020841143357}
   - component: {fileID: 812533834900089006}
   - component: {fileID: 6429017552012599152}
+  - component: {fileID: -490595621419538622}
   m_Layer: 5
   m_Name: dialog_CharacterDetailInfo
   m_TagString: Untagged
@@ -1600,6 +1601,26 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &-490595621419538622
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6652197113242028332}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 320740722def747d590370058a276bab, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  portrait: {fileID: 7794509433463804456}
+  characterNameText: {fileID: 3213961224866227947}
+  worldNameText: {fileID: 7370761310331351732}
+  selectButton: {fileID: 6429017552012599152}
+  partyMarker: {fileID: 6670727443364073486}
+  recoveryMarker: {fileID: 1704814062264956244}
+  activeMarker: {fileID: 3089544793707737741}
+  selectMarker: {fileID: 4352379228107574359}
 --- !u!1 &6670727443364073486
 GameObject:
   m_ObjectHideFlags: 0
