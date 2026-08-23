@@ -114,26 +114,76 @@ namespace Recruitment
             {
                 RecruitmentPoolEntryDefinition entry = entries[i];
 
-                if (entry == null || !entry.IsValid) continue;
-                if (!entry.Enabled) continue;
+                if (!PassesEntryRules(entry)) continue;
                 if (!seenCharacters.Add(entry.CharacterId)) continue;
-
-                CharacterAcquisitionDefinition acquisition =
-                    acquisitions != null ? acquisitions.FindByCharacterId(entry.CharacterId) : null;
-
-                // 획득 방식을 모르는 캐릭터는 뽑지 않는다 - 뽑아 놓고 줄 수 없는 것이 더 나쁘다.
-                if (acquisition == null) continue;
-                if (!acquisition.Enabled) continue;
-                if (!acquisition.IsRecruitable) continue;
-                if (acquisition.HasCondition) continue;
-
-                bool owned = ownership != null && ownership.IsOwned(entry.CharacterId);
-                if (owned && !acquisition.AllowDuplicateRecruitment) continue;
+                if (!PassesCharacterRules(entry.CharacterId, acquisitions, ownership)) continue;
 
                 eligible.Add(entry);
             }
 
             return eligible;
+        }
+
+        /// <summary>
+        /// 지금 뽑을 수 있는 후보가 <b>한 명이라도 있는지</b>만 답한다. <see cref="CollectEligible"/>와
+        /// <b>글자 그대로 같은 규칙</b>을 쓰지만(둘 다 <see cref="PassesEntryRules"/>와
+        /// <see cref="PassesCharacterRules"/>만을 본다) 목록도 HashSet도 만들지 않는다 - 매 프레임
+        /// 물어보는 화면이 쓰레기를 쌓지 않게 하기 위해서다.
+        ///
+        /// 겹친 캐릭터를 거르지 <b>않는데도</b> 답이 같은 이유는, 겹침 판정이 칸 규칙을 통과한 뒤에야
+        /// 일어나기 때문이다 - 어떤 칸이 모든 규칙을 통과했다면 그 캐릭터의 <b>첫 번째</b> 칸도
+        /// 반드시 통과하므로, <see cref="CollectEligible"/>의 목록도 비어 있지 않다.
+        ///
+        /// <b>아무것도 바꾸지 않는다.</b> 난수를 굴리지 않고, 저장 문서도 모집 주기도 건드리지 않는다.
+        /// </summary>
+        public static bool HasEligibleCandidate(
+            string recruitmentTypeId,
+            RecruitmentPoolCatalog pool,
+            CharacterAcquisitionCatalog acquisitions,
+            IRecruitmentOwnership ownership)
+        {
+            if (string.IsNullOrWhiteSpace(recruitmentTypeId) || pool == null) return false;
+
+            // EntriesFor는 부를 때마다 새 목록을 만든다. 여기서는 모집 종류를 직접 걸러, 카탈로그가
+            // 이미 들고 있는 목록을 그대로 훑는다 - 걸러내는 기준은 EntriesFor와 같은 BelongsTo다.
+            IReadOnlyList<RecruitmentPoolEntryDefinition> entries = pool.Entries;
+            if (entries == null) return false;
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                RecruitmentPoolEntryDefinition entry = entries[i];
+
+                if (entry == null || !entry.BelongsTo(recruitmentTypeId)) continue;
+                if (!PassesEntryRules(entry)) continue;
+                if (!PassesCharacterRules(entry.CharacterId, acquisitions, ownership)) continue;
+
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>칸 자체가 뽑기에 참여할 수 있는지 - 비었거나 가중치가 1 미만이거나 꺼져 있으면 안 된다.</summary>
+        private static bool PassesEntryRules(RecruitmentPoolEntryDefinition entry)
+        {
+            return entry != null && entry.IsValid && entry.Enabled;
+        }
+
+        /// <summary>그 캐릭터를 지금 지급할 수 있는지 - 획득 방식과 보유 여부를 본다.</summary>
+        private static bool PassesCharacterRules(
+            string characterId, CharacterAcquisitionCatalog acquisitions, IRecruitmentOwnership ownership)
+        {
+            CharacterAcquisitionDefinition acquisition =
+                acquisitions != null ? acquisitions.FindByCharacterId(characterId) : null;
+
+            // 획득 방식을 모르는 캐릭터는 뽑지 않는다 - 뽑아 놓고 줄 수 없는 것이 더 나쁘다.
+            if (acquisition == null) return false;
+            if (!acquisition.Enabled) return false;
+            if (!acquisition.IsRecruitable) return false;
+            if (acquisition.HasCondition) return false;
+
+            bool owned = ownership != null && ownership.IsOwned(characterId);
+            return !owned || acquisition.AllowDuplicateRecruitment;
         }
 
         /// <summary>

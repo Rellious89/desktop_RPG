@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Building;
 using Character;
 using Common;
@@ -10,6 +11,25 @@ using UnityEngine.UI;
 
 namespace Recruitment
 {
+    /// <summary>모집 화면이 지금 무엇을 보여 주는지. <b>한 번에 하나</b>이며, 겹쳐 켜지는 상태는 없다.</summary>
+    public enum RecruitmentUiState
+    {
+        /// <summary>모집 UI를 전부 감춘다.</summary>
+        Hidden = 0,
+
+        /// <summary>보존된 후보가 있다 - 등록/돌려보내기를 물어본다.</summary>
+        Result = 1,
+
+        /// <summary>지금 이 모집에서 뽑을 수 있는 용병이 하나도 없다.</summary>
+        Exhausted = 2,
+
+        /// <summary>다음 방문까지 기다리는 중이다.</summary>
+        Progress = 3,
+
+        /// <summary>뽑을 수 있다.</summary>
+        Standby = 4,
+    }
+
     /// <summary>Inn recruitment's read-only screen state. Only initialization and a successful draw save.</summary>
     [DisallowMultipleComponent]
     public sealed class RecruitmentUiController : MonoBehaviour
@@ -32,6 +52,7 @@ namespace Recruitment
         [SerializeField] private TextMeshProUGUI percentText;
         [SerializeField] private GameObject standbyRoot;
         [SerializeField] private Button recruitmentButton;
+        [SerializeField] private GameObject exhaustedRoot;
         [SerializeField] private GameObject resultRoot;
         [SerializeField] private Image portraitImage;
         [SerializeField] private TextMeshProUGUI characterNameText;
@@ -41,6 +62,10 @@ namespace Recruitment
         [SerializeField] private Button cancelButton;
         [SerializeField] private LocalizedTextReference acquiredToastMessage = new LocalizedTextReference();
         [SerializeField] private LocalizedTextReference returnedToastMessage = new LocalizedTextReference();
+
+        /// <summary>저장 문서를 <b>그때그때 읽는</b> 보유 판정. 매 프레임 새로 만들지 않으려고 하나만 둔다 -
+        /// HashSet을 미리 지어 두면 캐릭터를 얻은 순간과 화면이 어긋난다.</summary>
+        private static readonly IRecruitmentOwnership Ownership = new SaveDataOwnership();
 
         private RecruitmentCycleService cycle;
         private RecruitmentCandidateDrawService draw;
@@ -85,26 +110,70 @@ namespace Recruitment
         private void Refresh()
         {
             initializedThisRefresh = false;
-            if (!IsTownReady() || !TryPosition()) { HideAll(); return; }
+            if (!IsTownReady() || !TryPosition()) { Apply(RecruitmentUiState.Hidden); return; }
             EnsureServices();
             RecruitmentCycleStatus status = cycle.GetStatus(buildingId);
             if (status.Phase == RecruitmentCyclePhase.NotInitialized)
             {
-                if (initializedThisRefresh) { HideAll(); return; }
+                if (initializedThisRefresh) { Apply(RecruitmentUiState.Hidden); return; }
                 initializedThisRefresh = true;
                 RecruitmentCycleInitializeResult initialized = cycle.TryInitialize(buildingId);
                 if (!initialized.Success && initialized.Code != RecruitmentCycleInitializeCode.AlreadyInitialized)
                 {
-                    WarnUnreadable(initialized.Code.ToString()); HideAll(); return;
+                    WarnUnreadable(initialized.Code.ToString()); Apply(RecruitmentUiState.Hidden); return;
                 }
                 status = cycle.GetStatus(buildingId);
             }
-            if (status.Phase == RecruitmentCyclePhase.Unreadable) { WarnUnreadable(status.Access.Outcome.ToString()); HideAll(); return; }
-            if (status.Phase == RecruitmentCyclePhase.Locked) { HideAll(); return; }
-            if (status.State != null && !string.IsNullOrEmpty(status.State.pendingCharacterId)) { ShowResult(status.State.pendingCharacterId); return; }
-            if (status.Phase == RecruitmentCyclePhase.Waiting) { ShowProgress(status); return; }
-            if (status.Phase == RecruitmentCyclePhase.Ready) { ShowStandby(); return; }
-            HideAll();
+            if (status.Phase == RecruitmentCyclePhase.Unreadable) { WarnUnreadable(status.Access.Outcome.ToString()); Apply(RecruitmentUiState.Hidden); return; }
+
+            string pending = status.State != null ? status.State.pendingCharacterId : null;
+            RecruitmentUiState state = ResolveState(status.Phase, pending, HasEligibleCandidate(status.Access));
+            if (state == RecruitmentUiState.Result) { ShowResult(pending); return; }
+            if (state == RecruitmentUiState.Progress) { ShowProgress(status); return; }
+            Apply(state);
+        }
+
+        /// <summary>
+        /// 지금 켤 화면 하나를 고른다. <b>순수한 판정</b>이며 저장도 난수도 씬도 건드리지 않는다.
+        ///
+        /// 우선순위는 보존된 후보 → 후보 소진 → 대기 → 준비 완료다. 소진이 대기·준비보다 앞서는 이유는,
+        /// 뽑을 사람이 하나도 없는데 남은 시간을 세거나 누를 수 없는 모집 버튼을 보여 주는 것이
+        /// 거짓말이기 때문이다. 반대로 <b>보존된 후보는 소진보다 앞선다</b> - 이미 와 있는 용병을
+        /// "더 이상 소환할 수 없다"는 말로 덮어 버리면 등록도 돌려보내기도 할 수 없게 된다.
+        /// </summary>
+        public static RecruitmentUiState ResolveState(
+            RecruitmentCyclePhase phase, string pendingCharacterId, bool hasEligibleCandidate)
+        {
+            if (phase != RecruitmentCyclePhase.Waiting && phase != RecruitmentCyclePhase.Ready)
+            {
+                return RecruitmentUiState.Hidden;
+            }
+            if (!string.IsNullOrEmpty(pendingCharacterId)) return RecruitmentUiState.Result;
+            if (!hasEligibleCandidate) return RecruitmentUiState.Exhausted;
+            return phase == RecruitmentCyclePhase.Waiting ? RecruitmentUiState.Progress : RecruitmentUiState.Standby;
+        }
+
+        /// <summary>
+        /// 이 모집에서 지금 뽑을 수 있는 용병이 남아 있는지. <b>모든 캐릭터를 세지 않는다</b> - 뽑기와
+        /// 같은 <see cref="RecruitmentCandidateSelector"/> 규칙을 그대로 물어보므로, 중복 모집이
+        /// 허용된 캐릭터는 이미 보유 중이어도 후보로 남는다.
+        /// </summary>
+        private bool HasEligibleCandidate(RecruitmentAccessResolution access)
+        {
+            return RecruitmentCandidateSelector.HasEligibleCandidate(
+                access.RecruitmentTypeId, poolCatalog, acquisitionCatalog, Ownership);
+        }
+
+        /// <summary>고른 화면 하나만 켠다. 켜고 끄는 자리가 <b>여기 하나뿐</b>이어서, 새 화면을 더할 때
+        /// 다른 화면을 끄는 것을 잊을 수 없다.</summary>
+        private void Apply(RecruitmentUiState state)
+        {
+            if (state != RecruitmentUiState.Result) UnbindCharacter();
+            Set(progressRoot, state == RecruitmentUiState.Progress);
+            Set(standbyRoot, state == RecruitmentUiState.Standby);
+            Set(exhaustedRoot, state == RecruitmentUiState.Exhausted);
+            Set(resultRoot, state == RecruitmentUiState.Result);
+            Set(openInnButton, false);
         }
 
         private bool IsTownReady() => fieldModeManager != null && fieldModeManager.CurrentMode == FieldMode.Town &&
@@ -117,6 +186,7 @@ namespace Recruitment
                     TownBuildingInteractionController.ResolveEventCamera(interactionParent.GetComponentInParent<Canvas>()),
                     stageCamera.pixelWidth, stageCamera.pixelHeight, out Vector2 point)) return false;
             Position(progressRoot, point); Position(standbyRoot, point); Position(resultRoot, point);
+            Position(exhaustedRoot, point);
             return true;
         }
 
@@ -128,28 +198,28 @@ namespace Recruitment
         private void ShowProgress(RecruitmentCycleStatus status)
         {
             DateTime start; DateTime ready;
-            if (!SaveData.TryParseTimestamp(status.State.startedAtUtc, out start) || !SaveData.TryParseTimestamp(status.State.readyAtUtc, out ready)) { WarnUnreadable("timestamps"); HideAll(); return; }
+            if (!SaveData.TryParseTimestamp(status.State.startedAtUtc, out start) || !SaveData.TryParseTimestamp(status.State.readyAtUtc, out ready)) { WarnUnreadable("timestamps"); Apply(RecruitmentUiState.Hidden); return; }
             double total = Math.Max(0d, (ready - start).TotalSeconds);
             double elapsed = Math.Max(0d, (DateTime.UtcNow - start).TotalSeconds);
             float progress = total <= 0d ? 1f : Mathf.Clamp01((float)(elapsed / total));
             long seconds = Math.Max(0L, (long)Math.Ceiling(status.Remaining.TotalSeconds));
-            if (progress >= 1f) { ShowStandby(); return; }
+            // 여기까지 왔다면 뽑을 수 있는 후보가 남아 있다(없으면 Exhausted로 갈렸다).
+            if (progress >= 1f) { Apply(RecruitmentUiState.Standby); return; }
             if (progressSlider != null) progressSlider.value = progress;
             if (timerText != null) timerText.text = FormatSeconds(seconds);
             if (percentText != null) percentText.text = Mathf.FloorToInt(progress * 100f) + "%";
-            Set(progressRoot, true); Set(standbyRoot, false); Set(resultRoot, false); Set(openInnButton, false);
+            Apply(RecruitmentUiState.Progress);
         }
 
-        private void ShowStandby() { UnbindCharacter(); Set(progressRoot, false); Set(standbyRoot, true); Set(resultRoot, false); Set(openInnButton, false); }
         private void ShowResult(string id)
         {
             CharacterDefinition character = characterCatalog != null ? characterCatalog.Find(id) : null;
-            if (character == null) { WarnUnreadable("missing character " + id); HideAll(); return; }
+            if (character == null) { WarnUnreadable("missing character " + id); Apply(RecruitmentUiState.Hidden); return; }
             if (boundCharacter != character) BindCharacter(character);
             if (portraitImage != null) portraitImage.sprite = character.Portrait;
             if (newLabel != null) newLabel.SetActive(!Owned(id));
             SetResultButtonsInteractable(!resolving);
-            Set(progressRoot, false); Set(standbyRoot, false); Set(resultRoot, true); Set(openInnButton, false);
+            Apply(RecruitmentUiState.Result);
         }
         private void Draw()
         {
@@ -237,13 +307,7 @@ namespace Recruitment
             if (confirmButton != null) confirmButton.interactable = value;
             if (cancelButton != null) cancelButton.interactable = value;
         }
-        private bool Owned(string id)
-        {
-            if (SaveSystem.Data?.characters == null) return false;
-            foreach (CharacterSaveState state in SaveSystem.Data.characters) if (state != null && state.characterId == id) return true;
-            return false;
-        }
-        private void HideAll() { UnbindCharacter(); Set(progressRoot, false); Set(standbyRoot, false); Set(resultRoot, false); Set(openInnButton, false); }
+        private static bool Owned(string id) => Ownership.IsOwned(id);
         private static void Set(GameObject target, bool value) { if (target != null && target.activeSelf != value) target.SetActive(value); }
         private void WarnUnreadable(string cause) { if (warnedUnreadableCause == cause) return; warnedUnreadableCause = cause; Debug.LogWarning("[RecruitmentUiController] unreadable recruitment state: " + cause, this); }
         private void BindCharacter(CharacterDefinition character)
@@ -272,5 +336,33 @@ namespace Recruitment
         private void SetCharacterName(string value) { if (characterNameText != null) characterNameText.text = value; }
         private void SetWorldName(string value) { if (worldNameText != null) worldNameText.text = value; }
         private static string FormatSeconds(long seconds) { return string.Format("{0:00}:{1:00}:{2:00}", seconds / 3600, (seconds / 60) % 60, seconds % 60); }
+
+        /// <summary>
+        /// 저장 문서를 <b>물어볼 때마다 훑는</b> 보유 판정. 화면이 매 프레임 물어보므로 목록도 HashSet도
+        /// 만들지 않으며, 그래서 캐릭터를 등록한 <b>바로 그 프레임</b>에 답이 달라진다 - 미리 지어 둔
+        /// 집합이었다면 마지막 한 명을 얻고도 모집 화면이 한 박자 늦게 바뀌었을 것이다.
+        /// 비교는 <see cref="IRecruitmentOwnership"/>의 약속대로 <see cref="StringComparison.Ordinal"/>이다.
+        /// </summary>
+        private sealed class SaveDataOwnership : IRecruitmentOwnership
+        {
+            public bool IsOwned(string characterId)
+            {
+                if (string.IsNullOrEmpty(characterId)) return false;
+
+                List<CharacterSaveState> characters = SaveSystem.Data?.characters;
+                if (characters == null) return false;
+
+                for (int i = 0; i < characters.Count; i++)
+                {
+                    CharacterSaveState state = characters[i];
+                    if (state != null && string.Equals(state.characterId, characterId, StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
     }
 }

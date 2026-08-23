@@ -337,6 +337,134 @@ namespace RecruitmentEditor.Tests
                     InnNormal, null, Acquisitions(), RecruitmentOwnership.None, Roll(0)).Outcome);
         }
 
+        // ---- 후보가 남아 있는지만 묻기(9.3F) ----
+
+        /// <summary>
+        /// "한 명이라도 있는가"의 답은 <b>언제나</b> 후보 목록이 비었는지와 같아야 한다. 두 판정이
+        /// 어긋나면 화면이 소진을 알리는 순간에도 뽑기가 성공하거나 그 반대가 된다.
+        /// </summary>
+        [Test]
+        public void HasEligibleCandidate_AlwaysAgreesWithCollectEligible()
+        {
+            RecruitmentPoolCatalog pool = Pool(
+                Entry("1", "CatKnight", 100),
+                Entry("2", "ElfArcher", 0),                       // 가중치가 1 미만이다.
+                Entry("3", "Barbarian", 80, enabled: false),      // 칸이 꺼져 있다.
+                Entry("4", "CatMage", 40, recruitmentTypeId: "Inn_Rare"), // 다른 모집이다.
+                Entry("5", "ElfGuardian", 50),
+                Entry("6", "RabbitHealer", 30));
+
+            CharacterAcquisitionCatalog acquisitions = AcquisitionCatalog(
+                Acquisition("CatKnight"),
+                Acquisition("ElfArcher"),
+                Acquisition("Barbarian"),
+                Acquisition("CatMage"),
+                Acquisition("ElfGuardian", conditionId: "42"),    // 아직 구현되지 않은 조건이다.
+                Acquisition("RabbitHealer"));
+
+            string[] ownedSteps =
+            {
+                string.Empty, "CatKnight", "RabbitHealer", "ElfGuardian", "CatMage", "ElfArcher", "Barbarian",
+            };
+
+            var owned = new List<string>();
+            for (int i = 0; i < ownedSteps.Length; i++)
+            {
+                if (!string.IsNullOrEmpty(ownedSteps[i])) owned.Add(ownedSteps[i]);
+                IRecruitmentOwnership ownership = RecruitmentOwnership.Of(owned);
+
+                bool expected = RecruitmentCandidateSelector
+                    .CollectEligible(InnNormal, pool, acquisitions, ownership).Count > 0;
+
+                Assert.AreEqual(expected,
+                    RecruitmentCandidateSelector.HasEligibleCandidate(InnNormal, pool, acquisitions, ownership),
+                    $"보유 {owned.Count}명 단계에서 두 판정이 어긋났다.");
+            }
+        }
+
+        [Test]
+        public void HasEligibleCandidate_AllOwnedWithoutDuplicates_IsFalse()
+        {
+            RecruitmentPoolCatalog pool = LivePool();
+
+            Assert.IsTrue(RecruitmentCandidateSelector.HasEligibleCandidate(
+                InnNormal, pool, LiveAcquisitions(), RecruitmentOwnership.Of("CatKnight", "ElfArcher")),
+                "아직 못 가진 용병이 남아 있으면 소진이 아니다.");
+
+            Assert.IsFalse(RecruitmentCandidateSelector.HasEligibleCandidate(
+                InnNormal, pool, LiveAcquisitions(), RecruitmentOwnership.Of(
+                    "CatKnight", "ElfArcher", "Barbarian", "ElfGuardian", "RabbitHealer", "CatMage")),
+                "중복 모집이 막힌 후보를 전부 보유하면 뽑을 사람이 없다.");
+        }
+
+        [Test]
+        public void HasEligibleCandidate_OwnedButDuplicateAllowed_StaysTrue()
+        {
+            CharacterAcquisitionCatalog acquisitions = AcquisitionCatalog(
+                Acquisition("CatKnight"),
+                Acquisition("CatMage", allowDuplicate: true));
+
+            Assert.IsTrue(RecruitmentCandidateSelector.HasEligibleCandidate(
+                InnNormal, Pool(Entry("1", "CatKnight", 100), Entry("2", "CatMage", 40)),
+                acquisitions, RecruitmentOwnership.Of("CatKnight", "CatMage")),
+                "중복 모집이 허용된 캐릭터는 보유 중이어도 후보로 남는다 - 소진으로 보면 안 된다.");
+        }
+
+        [Test]
+        public void HasEligibleCandidate_EmptyOrUnknownRecruitment_IsFalse()
+        {
+            Assert.IsFalse(RecruitmentCandidateSelector.HasEligibleCandidate(
+                InnNormal, Pool(), Acquisitions(), RecruitmentOwnership.None));
+            Assert.IsFalse(RecruitmentCandidateSelector.HasEligibleCandidate(
+                InnNormal, null, Acquisitions(), RecruitmentOwnership.None));
+            Assert.IsFalse(RecruitmentCandidateSelector.HasEligibleCandidate(
+                string.Empty, LivePool(), LiveAcquisitions(), RecruitmentOwnership.None),
+                "모집 종류를 모르면 후보도 알 수 없다.");
+            Assert.IsFalse(RecruitmentCandidateSelector.HasEligibleCandidate(
+                "Inn_Rare", LivePool(), LiveAcquisitions(), RecruitmentOwnership.None),
+                "다른 모집의 후보를 빌려 오지 않는다.");
+        }
+
+        /// <summary>
+        /// 화면이 매 프레임 물어보는 자리이므로, 물어보는 것만으로 저장 문서도 저장 횟수도 달라지지
+        /// 않아야 한다 - 난수는 아예 건네지도 않는다.
+        /// </summary>
+        [Test]
+        public void HasEligibleCandidate_DoesNotTouchSaveData()
+        {
+            Assert.IsNotNull(ConfigureSaveMethod,
+                "SaveSystem.ConfigureForTests를 찾지 못했습니다 - 그대로 두면 시험이 실제 저장 파일을 읽고 씁니다.");
+
+            var storage = new FakeStorage();
+            ConfigureSaveMethod.Invoke(null, new object[] { storage, null, null });
+
+            try
+            {
+                SaveData document = SaveSystem.Data;
+                Assert.IsNotNull(document);
+
+                string before = JsonUtility.ToJson(document);
+                int writesBefore = storage.WriteCalls;
+
+                RecruitmentPoolCatalog pool = LivePool();
+                CharacterAcquisitionCatalog acquisitions = LiveAcquisitions();
+
+                for (int i = 0; i < 120; i++)
+                {
+                    RecruitmentCandidateSelector.HasEligibleCandidate(
+                        InnNormal, pool, acquisitions, RecruitmentOwnership.Of("CatKnight"));
+                }
+
+                Assert.AreEqual(before, JsonUtility.ToJson(document),
+                    "후보가 남았는지 묻는 것만으로 저장 문서가 달라져서는 안 된다.");
+                Assert.AreEqual(writesBefore, storage.WriteCalls, "묻기만 하는 판정은 저장을 부르지 않는다.");
+            }
+            finally
+            {
+                ConfigureSaveMethod.Invoke(null, new object[] { null, null, null });
+            }
+        }
+
         // ---- 가중치 경계 ----
 
         /// <summary>

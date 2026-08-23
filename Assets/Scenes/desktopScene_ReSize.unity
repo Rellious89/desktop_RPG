@@ -2761,6 +2761,7 @@ MonoBehaviour:
   percentText: {fileID: 2162940568666274755}
   standbyRoot: {fileID: 1151013726398096171}
   recruitmentButton: {fileID: 1151013726398096170}
+  exhaustedRoot: {fileID: 7419415643000330159}
   resultRoot: {fileID: 807322865877774319}
   portraitImage: {fileID: 1233071017}
   characterNameText: {fileID: 807322865877774317}
