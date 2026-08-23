@@ -424,7 +424,7 @@ namespace DungeonEditor.Tests
             Assert.AreEqual(objectName, value.name, propertyName);
         }
 
-        private sealed class StubLevelSource : IOwnedCharacterLevelSource
+        private sealed class StubLevelSource : IPartyCharacterLevelSource
         {
             private readonly int level;
 
@@ -433,7 +433,7 @@ namespace DungeonEditor.Tests
                 this.level = level;
             }
 
-            public int HighestOwnedCharacterLevel => level;
+            public int HighestPartyCharacterLevel => level;
         }
     }
 }

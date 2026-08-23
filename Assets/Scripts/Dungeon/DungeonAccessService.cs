@@ -4,9 +4,9 @@ namespace Dungeon
 {
     public sealed class DungeonAccessService
     {
-        private readonly IOwnedCharacterLevelSource levelSource;
+        private readonly IPartyCharacterLevelSource levelSource;
 
-        public DungeonAccessService(IOwnedCharacterLevelSource levelSource)
+        public DungeonAccessService(IPartyCharacterLevelSource levelSource)
         {
             this.levelSource = levelSource;
         }
@@ -19,10 +19,10 @@ namespace Dungeon
             if (levelSource == null)
                 return DungeonAccessResult.Deny(DungeonAccessFailureReason.MissingRosterOrProgression);
 
-            int highest = levelSource.HighestOwnedCharacterLevel;
+            int highest = levelSource.HighestPartyCharacterLevel;
 
             if (highest <= 0)
-                return DungeonAccessResult.Deny(DungeonAccessFailureReason.NoUsableOwnedCharacter,
+                return DungeonAccessResult.Deny(DungeonAccessFailureReason.NoUsablePartyCharacter,
                     dungeon.RequiredCharacterLevel, 0);
 
             int required = dungeon.RequiredCharacterLevel;

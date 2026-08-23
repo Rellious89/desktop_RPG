@@ -13,8 +13,9 @@ namespace Recovery
     {
         private readonly CharacterRoster roster;
 
-        // 새 영입도 저장 직후 즉시 회복소의 선택 목록에 반영되어야 하므로, 이 버퍼는 호출마다 현재
-        // 로스터 Entries에서 다시 채운다. RecoveryStation은 어댑터를 계속 보관해도 오래된 목록을 보지 않는다.
+        // 새 영입도 저장 직후 즉시 회복소의 선택 목록에 반영되어야 하므로, 이 버퍼는 호출마다 전체
+        // 보유 목록에서 다시 채운다. 출전 파티는 전투/교체의 경계이고, 비파티 보유 캐릭터도 회복소에는
+        // 등록할 수 있어야 한다. RecoveryStation은 어댑터를 계속 보관해도 오래된 목록을 보지 않는다.
         private readonly List<CharacterDefinition> characters = new List<CharacterDefinition>();
 
         public CharacterRosterRecoveryAdapter(CharacterRoster roster)
@@ -94,11 +95,11 @@ namespace Recovery
         private void RefreshCharacters()
         {
             characters.Clear();
-            IReadOnlyList<CharacterRoster.Entry> entries = roster.Entries;
-            for (int i = 0; i < entries.Count; i++)
+            IReadOnlyList<CharacterDefinition> owned = roster.OwnedCharacters;
+            for (int i = 0; i < owned.Count; i++)
             {
-                CharacterRoster.Entry entry = entries[i];
-                if (entry != null && entry.definition != null) characters.Add(entry.definition);
+                CharacterDefinition definition = owned[i];
+                if (definition != null) characters.Add(definition);
             }
         }
     }

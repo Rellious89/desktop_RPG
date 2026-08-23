@@ -261,6 +261,8 @@ namespace CharacterArchive
             }
 
             CharacterRoster.Instance?.RefreshPartyAfterExternalSave();
+            CharacterSwapPanel.RequestRefresh();
+            RecoveryService.NotifyRosterChangedAfterExternalSave();
             if (showSuccess && successCharacter != null) ShowToast(60, CharacterNameBinding.GetCurrent(successCharacter));
             RefreshContents();
         }

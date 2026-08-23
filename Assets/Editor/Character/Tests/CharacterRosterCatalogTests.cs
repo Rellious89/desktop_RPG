@@ -64,19 +64,20 @@ namespace CharacterEditor.Tests
             SetInstance(null);
         }
 
-        // ---- 목록은 보유한 것만, 카탈로그 차례로 ----
+        // ---- 목록은 유효한 출전 파티원만, 저장 파티 차례로 ----
 
         [Test]
-        public void UsableEntries_AreOwnedOnlyInCatalogOrder()
+        public void UsableEntries_AreOwnedOnlyInSavedPartyOrder()
         {
-            // 저장 목록의 차례는 뒤죽박죽이고 모르는 id도 섞여 있다.
+            // 보유/파티 목록의 차례는 뒤죽박죽이고 모르는 id도 섞여 있다.
             SaveData document = Inject(State("CatMage"), State("GhostHero"), State("ElfArcher"));
+            document.partyCharacterIds = new List<string> { "ElfArcher", "GhostHero", "CatMage" };
             CharacterRoster roster = Roster(Catalog(SixIds));
 
             BuildUsableEntries(roster);
 
             CollectionAssert.AreEqual(new[] { "ElfArcher", "CatMage" }, EntryIds(roster),
-                "카탈로그 차례로, 보유한 것만 남아야 한다.");
+                "저장 파티 차례로, 유효하고 보유한 것만 남아야 한다.");
             Assert.AreEqual(3, document.characters.Count, "목록을 만드는 것만으로 저장 문서가 달라지면 안 된다.");
         }
 
@@ -108,6 +109,65 @@ namespace CharacterEditor.Tests
 
             CollectionAssert.AreEqual(new[] { "CatKnight" }, EntryIds(roster),
                 "보유했어도 재생할 수 없는 프로필은 기존 규칙대로 걸러진다.");
+        }
+
+        [Test]
+        public void UsableEntries_SkipInvalidPartyIdsWithoutMutatingSavedParty()
+        {
+            SaveData document = Inject(State("CatKnight"), State("CatMage"));
+            document.partyCharacterIds = new List<string> { "GhostHero", "ElfArcher", "CatMage", "CatMage" };
+            CharacterRoster roster = Roster(Catalog(SixIds));
+            string before = string.Join("|", document.partyCharacterIds);
+
+            BuildUsableEntries(roster);
+
+            CollectionAssert.AreEqual(new[] { "CatMage" }, EntryIds(roster));
+            Assert.AreEqual(before, string.Join("|", document.partyCharacterIds),
+                "미보유/알 수 없음/중복 파티 ID는 저장을 고치지 않고 런타임 Entries에서만 제외한다.");
+        }
+
+        [Test]
+        public void RefreshOwnedCharacters_DoesNotAutoJoinNewRecruit()
+        {
+            SaveData document = Inject(State("CatKnight"));
+            CharacterRoster roster = Ready(Catalog(SixIds));
+
+            document.characters.Add(State("CatMage", level: 30));
+            roster.RefreshOwnedCharactersAfterExternalSave();
+
+            CollectionAssert.AreEqual(new[] { "CatKnight" }, EntryIds(roster));
+            CollectionAssert.AreEqual(new[] { "CatKnight" }, document.partyCharacterIds,
+                "영입은 보유 목록만 바꾸며 파티에 자동 합류하지 않는다.");
+        }
+
+        [Test]
+        public void RefreshPartyFallback_UsesFirstAvailablePartyMemberInSavedOrder()
+        {
+            SaveData document = Inject(State("CatKnight"), State("ElfArcher"), State("CatMage"));
+            document.partyCharacterIds = new List<string> { "CatMage", "ElfArcher" };
+            CharacterRoster roster = Ready(Catalog(SixIds));
+
+            CharacterDefinition fallback = (CharacterDefinition)Invoke(roster, "ResolveFirstAvailablePartyCharacter");
+
+            Assert.AreEqual("CatMage", fallback.CharacterId,
+                "현재 캐릭터가 외부 파티 변경으로 빠지면 첫 번째 사용 가능한 파티원으로 재선택한다.");
+        }
+
+        [Test]
+        public void RefreshParty_KeepsCurrentCharacterWhenItRemainsInParty()
+        {
+            SaveData document = Inject(State("CatKnight"), State("ElfArcher"));
+            document.partyCharacterIds = new List<string> { "CatKnight", "ElfArcher" };
+            CharacterRoster roster = Ready(Catalog(SixIds));
+            CharacterDefinition current = roster.Entries[0].definition;
+            SetPrivate(roster, "current", current);
+
+            document.partyCharacterIds = new List<string> { "ElfArcher", "CatKnight" };
+            roster.RefreshPartyAfterExternalSave();
+
+            Assert.AreSame(current, roster.Current,
+                "외부 파티 순서 변경 뒤에도 현재 캐릭터가 파티에 남아 있으면 유지한다.");
+            CollectionAssert.AreEqual(new[] { "ElfArcher", "CatKnight" }, EntryIds(roster));
         }
 
         // ---- 읽기와 거부된 변경은 문서를 바꾸지 않는다 ----
@@ -838,7 +898,8 @@ namespace CharacterEditor.Tests
         [Test]
         public void RecoveryAdapterExposesOnlyOwnedCharacters()
         {
-            Inject(State("ElfArcher"), State("CatMage"));
+            SaveData document = Inject(State("ElfArcher"), State("CatMage"));
+            document.partyCharacterIds = new List<string> { "ElfArcher" };
             CharacterRoster roster = Ready(Catalog(SixIds));
 
             var adapter = new CharacterRosterRecoveryAdapter(roster);
@@ -847,6 +908,8 @@ namespace CharacterEditor.Tests
             foreach (CharacterDefinition definition in adapter.RecoverableCharacters) ids.Add(definition.CharacterId);
 
             CollectionAssert.AreEqual(new[] { "ElfArcher", "CatMage" }, ids);
+            CollectionAssert.AreEqual(new[] { "ElfArcher" }, EntryIds(roster),
+                "출전 파티 경계가 회복소의 전체 보유 목록을 축소하면 안 된다.");
         }
 
         // ---- 도우미 ----
@@ -854,7 +917,11 @@ namespace CharacterEditor.Tests
         /// <summary>저장 문서를 직접 끼워 넣는다 - 저장소가 아예 불리지 않으므로 실제 파일을 읽지 않는다.</summary>
         private static SaveData Inject(params CharacterSaveState[] states)
         {
-            var document = new SaveData { characters = new List<CharacterSaveState>(states) };
+            var document = new SaveData
+            {
+                characters = new List<CharacterSaveState>(states),
+                partyCharacterIds = new List<string>(Array.ConvertAll(states, state => state != null ? state.characterId : null)),
+            };
             DataField.SetValue(null, document);
             LoadResultField.SetValue(null, SaveLoadResult.NewGame(document));
             return document;

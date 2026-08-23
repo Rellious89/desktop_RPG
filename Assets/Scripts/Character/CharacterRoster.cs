@@ -41,7 +41,7 @@ namespace Character
     /// 전용 경로인 <see cref="ApplyRecoveryStamina"/>를 쓴다.
     /// </summary>
     [DisallowMultipleComponent]
-    public class CharacterRoster : MonoBehaviour, IOwnedCharacterLevelSource
+    public class CharacterRoster : MonoBehaviour, IPartyCharacterLevelSource
     {
         /// <summary>교체가 막히는 이유. UI가 사용자에게 무엇을 보여줄지 결정하는 근거다 -
         /// "선택했는데 아무 반응 없이 실패"하는 경로를 만들지 않기 위해 항상 이유를 함께 돌려준다.</summary>
@@ -74,7 +74,7 @@ namespace Character
 
         [Header("Roster")]
         [Tooltip("이 게임의 활성 캐릭터 전체(생성 카탈로그). 이것이 연결되면 로스터는 " +
-                 "'카탈로그 순서 ∩ 저장 데이터의 보유'로 목록을 만들고 아래 Entries는 보지 않는다.")]
+                 "'저장 출전 파티 순서 ∩ 카탈로그 ∩ 보유'로 목록을 만들고 아래 Entries는 보지 않는다.")]
         [SerializeField] private CharacterCatalog catalog;
 
         [Tooltip("<b>과도기 폴백</b>. Character Catalog가 연결되지 않은 씬에서만 쓰인다 - " +
@@ -137,14 +137,29 @@ namespace Character
 
         public IReadOnlyList<Entry> Entries => usableEntries;
 
+        /// <summary>출전 여부와 무관한 전체 보유 캐릭터. 회복소처럼 보유 상태를 다루는 화면만 사용한다.</summary>
+        public IReadOnlyList<CharacterDefinition> OwnedCharacters => owned != null ? owned.OwnedCharacters : Array.Empty<CharacterDefinition>();
+
         /// <summary>
-        /// 저장 트랜잭션이 새 보유 캐릭터를 성공적으로 확정한 뒤, 카탈로그 기반 로스터의 목록만 다시
-        /// 읽는다. 현재 전투 캐릭터를 고르거나 적용하지 않으므로 영입 자체가 전투 캐릭터를 바꾸지 않는다.
+        /// 저장 트랜잭션이 새 보유 캐릭터를 성공적으로 확정한 뒤, 카탈로그 기반 로스터의 출전 파티만
+        /// 다시 읽는다. 영입은 partyCharacterIds를 바꾸지 않으므로 목록과 현재 전투 캐릭터를 바꾸지 않는다.
         /// </summary>
         public void RefreshOwnedCharactersAfterExternalSave()
         {
             if (!UsesCatalog) return;
             BuildUsableEntries();
+        }
+
+        /// <summary>파티 저장이 성공한 뒤 출전 목록을 다시 읽는다. 저장하거나 자동 합류시키지 않는다.</summary>
+        public void RefreshPartyAfterExternalSave()
+        {
+            if (!UsesCatalog) return;
+            CharacterDefinition previous = current;
+            BuildUsableEntries();
+            if (previous != null && ResolveUsable(previous) != null) return;
+            // current만 바꾸면 화면의 Runtime Actor가 이전 캐릭터를 계속 연기한다. 일반 교체와 같은
+            // 적용 경로를 써서 로스터와 화면을 원자적으로 맞춘다.
+            ApplyActiveCharacter(ResolveFirstAvailablePartyCharacter());
         }
 
         /// <summary>지금 전투 중인 캐릭터. 사용 가능한 항목이 하나도 없으면 null이다.</summary>
@@ -316,22 +331,28 @@ namespace Character
         }
 
         /// <summary>
-        /// 카탈로그 기반 목록. 순서는 <b>카탈로그(표의 display_order)</b>이고, 그 중 저장 데이터가
-        /// 보유한 것만 남긴 뒤 기존 재생 가능 검사를 그대로 통과시킨다.
+        /// 카탈로그 기반 목록. 순서는 <b>저장된 partyCharacterIds</b>이고, 그 중 카탈로그에 정의가
+        /// 있으며 지금도 보유한 것만 남긴 뒤 기존 재생 가능 검사를 그대로 통과시킨다.
         ///
         /// <b>여기서 저장 데이터에 손대지 않는다.</b> 보유하지 않은 캐릭터는 그냥 목록에 없을 뿐이고,
         /// 목록을 만드는 동안 항목이 생기거나 사라지지 않는다 - 목록을 여는 것만으로 캐릭터가 지급되면
         /// "보유"라는 말이 아무 뜻도 갖지 못한다.
         ///
-        /// 중복 id 검사가 없는 것은 카탈로그가 이미 그것을 보장하기 때문이다(같은 id는 한 번만 담긴다).
+        /// 저장 데이터의 잘못된 중복 ID도 런타임 Entries에는 한 번만 나타낸다. 이 방어는 저장 문서를
+        /// 고치지 않으며, 저장 정합성의 소유자는 PartyCompositionService다.
         /// </summary>
         private void BuildUsableEntriesFromCatalog()
         {
-            IReadOnlyList<CharacterDefinition> ownedCharacters = owned.OwnedCharacters;
+            List<string> party = SaveSystem.Data != null ? SaveSystem.Data.partyCharacterIds : null;
+            if (party == null) return;
 
-            for (int i = 0; i < ownedCharacters.Count; i++)
+            var seenIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < party.Count; i++)
             {
-                CharacterDefinition definition = ownedCharacters[i];
+                string id = party[i];
+                if (string.IsNullOrEmpty(id) || !seenIds.Add(id)) continue;
+                CharacterDefinition definition = catalog.Find(id);
+                if (definition == null || !owned.IsOwned(definition)) continue;
 
                 if (definition.MotionProfile == null)
                 {
@@ -442,7 +463,9 @@ namespace Character
             // 카탈로그가 없는 폴백 구성에는 보유라는 개념이 없다 - 상태를 만들지 않으므로 언제나 실패다.
             if (owned == null) return false;
 
-            canonical = ResolveUsable(definition);
+            string id = definition != null ? definition.CharacterId : null;
+            if (string.IsNullOrEmpty(id)) return false;
+            canonical = catalog != null ? catalog.Find(id) : null;
             if (canonical == null) return false;
 
             return owned.TryGetState(canonical.CharacterId, out state);
@@ -462,7 +485,9 @@ namespace Character
             // 상태 변경 알림이 통째로 죽는다(모든 캐릭터가 "쓸 수 없음"이 된다).
             if (owned == null) return ResolveUsable(definition);
 
-            return TryGetOwnedState(definition, out CharacterDefinition canonical, out _) ? canonical : null;
+            CharacterDefinition canonical = ResolveUsable(definition);
+            if (canonical == null) return null;
+            return owned.TryGetState(canonical.CharacterId, out _) ? canonical : null;
         }
 
         /// <summary>
@@ -530,27 +555,39 @@ namespace Character
                 if (!Recovery.RecoveryService.IsCharacterInRecovery(candidate)) return candidate;
             }
 
-            // 보유 캐릭터가 전부 회복소에 들어가 있다. 회복 중인 캐릭터를 억지로 켜지 않고 아무도
+            // 출전 파티원이 전부 회복소에 들어가 있다. 회복 중인 캐릭터를 억지로 켜지 않고 아무도
             // 투입하지 않은 상태로 시작한다 - CurrentCharacterCanAct가 false가 되어 공격도 막힌다.
-            Debug.LogWarning("[CharacterRoster] 보유한 모든 캐릭터가 회복소에 있어 전투에 투입할 캐릭터가 " +
+            Debug.LogWarning("[CharacterRoster] 출전 파티원 모두가 회복소에 있어 전투에 투입할 캐릭터가 " +
                              "없습니다 - 회복이 끝난 캐릭터를 합류시키면 다시 선택할 수 있습니다.", this);
             return null;
         }
 
-        // ---- IOwnedCharacterLevelSource ----
+        /// <summary>외부 파티 변경으로 현재 캐릭터가 빠졌을 때 파티 순서대로 다음 사용 가능 캐릭터를 찾는다.</summary>
+        private CharacterDefinition ResolveFirstAvailablePartyCharacter()
+        {
+            for (int i = 0; i < usableEntries.Count; i++)
+            {
+                CharacterDefinition candidate = usableEntries[i].definition;
+                if (candidate != null && !Recovery.RecoveryService.IsCharacterInRecovery(candidate)) return candidate;
+            }
+
+            return null;
+        }
+
+        // ---- IPartyCharacterLevelSource ----
 
         /// <inheritdoc/>
         /// <remarks>
         /// <b>usableEntries를 순회한다.</b> <see cref="BuildUsableEntries"/>가 걸러낸, 재생 가능한
-        /// 모션 프로필이 있는 보유 캐릭터만 대상이다. <see cref="OwnedCharacterCollection.OwnedCharacters"/>를
-        /// 직접 쓰면 프로필 검증에 실패한 정의가 포함되어, 화면에 투입할 수 없는 캐릭터의 레벨이
+        /// 모션 프로필이 있는 출전 파티원만 대상이다. <see cref="OwnedCharacterCollection.OwnedCharacters"/>를
+        /// 직접 쓰면 비파티 또는 프로필 검증에 실패한 정의가 포함되어, 화면에 투입할 수 없는 캐릭터의 레벨이
         /// 던전 입장 판정에 쓰인다.
         ///
         /// 항목마다 <see cref="TryGetOwnedState"/>로 <b>지금도 보유 중인지</b> 재확인한다 -
         /// usableEntries는 Awake 때 한 번 만든 목록이라, 그 뒤에 저장 문서에서 보유가 사라진
         /// 캐릭터도 남아 있기 때문이다.
         /// </remarks>
-        public int HighestOwnedCharacterLevel
+        public int HighestPartyCharacterLevel
         {
             get
             {
@@ -572,7 +609,7 @@ namespace Character
 
         // ---- 조회 ----
 
-        /// <summary>보유하고 <b>지금 쓸 수 있는</b> 캐릭터의 레벨. 그 밖에는(null, 미보유, 카탈로그에
+        /// <summary>보유한 캐릭터의 레벨. 그 밖에는(null, 미보유, 카탈로그에
         /// 없는 저장 전용 id) 0이며 저장 데이터에 항목이 생기지 않는다 - 값을 물어보는 것만으로
         /// 캐릭터가 지급되거나 감춰 둔 값이 드러나면 안 된다.</summary>
         public int GetLevel(CharacterDefinition definition)
@@ -835,7 +872,7 @@ namespace Character
         /// 더 이상 없다.
         ///
         /// <paramref name="next"/>가 null이면 <b>아무도 투입하지 않은 상태</b>가 된다(액터를 끄고
-        /// current를 null로 둔다). 보유 캐릭터가 전부 회복소에 있을 때 쓰이며, 회복 중인 캐릭터를
+        /// current를 null로 둔다). 출전 파티원이 전부 회복소에 있을 때 쓰이며, 회복 중인 캐릭터를
         /// 대신 켜지 않기 위한 정상 경로다 - 시작 시점에도 이 경로가 그대로 관측되도록 상태 변경
         /// 신호를 보낸다.
         ///

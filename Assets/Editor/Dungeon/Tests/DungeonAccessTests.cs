@@ -72,7 +72,7 @@ namespace DungeonEditor.Tests
 
             Assert.IsTrue(result.Allowed);
             Assert.AreEqual(5, result.DungeonRequiredLevel);
-            Assert.AreEqual(5, result.HighestOwnedLevel);
+            Assert.AreEqual(5, result.HighestPartyLevel);
             Assert.AreEqual(DungeonAccessFailureReason.None, result.FailureReason);
         }
 
@@ -83,7 +83,7 @@ namespace DungeonEditor.Tests
             DungeonAccessResult result = service.Evaluate(Dungeon("d1", requiredLevel: 3));
 
             Assert.IsTrue(result.Allowed);
-            Assert.AreEqual(10, result.HighestOwnedLevel);
+            Assert.AreEqual(10, result.HighestPartyLevel);
         }
 
         [Test]
@@ -95,7 +95,7 @@ namespace DungeonEditor.Tests
             Assert.IsFalse(result.Allowed);
             Assert.AreEqual(DungeonAccessFailureReason.InsufficientLevel, result.FailureReason);
             Assert.AreEqual(5, result.DungeonRequiredLevel);
-            Assert.AreEqual(2, result.HighestOwnedLevel);
+            Assert.AreEqual(2, result.HighestPartyLevel);
         }
 
         // ---- 선택된 현재 캐릭터가 낮아도 다른 보유 캐릭터가 높으면 허용 ----
@@ -113,7 +113,7 @@ namespace DungeonEditor.Tests
             DungeonAccessResult result = service.Evaluate(Dungeon("d1", requiredLevel: 5));
 
             Assert.IsTrue(result.Allowed);
-            Assert.AreEqual(10, result.HighestOwnedLevel);
+            Assert.AreEqual(10, result.HighestPartyLevel);
         }
 
         // ---- 모션 프로필 없는 보유 캐릭터 제외 ----
@@ -130,7 +130,7 @@ namespace DungeonEditor.Tests
                 @"\[CharacterRoster\].*noprofile.*Motion Profile"));
             CharacterRoster roster = ReadyRosterFromDefinitions(goodDef, noProfileDef);
 
-            Assert.AreEqual(3, roster.HighestOwnedCharacterLevel,
+            Assert.AreEqual(3, roster.HighestPartyCharacterLevel,
                 "프로필 없는 캐릭터(level 99)는 usableEntries에서 제외되어야 한다.");
         }
 
@@ -142,27 +142,28 @@ namespace DungeonEditor.Tests
             SaveData doc = Inject(State("low", level: 2), State("high", level: 10));
             CharacterRoster roster = ReadyRoster("low", "high");
 
-            Assert.AreEqual(10, roster.HighestOwnedCharacterLevel);
+            Assert.AreEqual(10, roster.HighestPartyCharacterLevel);
 
             doc.characters.RemoveAll(s => s.characterId == "high");
 
-            Assert.AreEqual(2, roster.HighestOwnedCharacterLevel,
+            Assert.AreEqual(2, roster.HighestPartyCharacterLevel,
                 "저장 상태가 제거되면 재평가에 즉시 반영되어야 한다.");
         }
 
-        // ---- 미보유 고레벨 제외 ----
+        // ---- 비파티 고레벨 제외 ----
 
         [Test]
-        public void Access_UnownedHighLevelExcluded()
+        public void Access_NonPartyHighLevelCannotBypassRequirement()
         {
-            Inject(State("low", level: 2));
+            SaveData document = Inject(State("low", level: 2), State("high", level: 99));
+            document.partyCharacterIds = new List<string> { "low" };
             CharacterRoster roster = ReadyRoster("low", "high");
 
             var service = new DungeonAccessService(roster);
             DungeonAccessResult result = service.Evaluate(Dungeon("d1", requiredLevel: 5));
 
             Assert.IsFalse(result.Allowed);
-            Assert.AreEqual(2, result.HighestOwnedLevel);
+            Assert.AreEqual(2, result.HighestPartyLevel, "보유했어도 비파티 고레벨은 입장 제한을 우회할 수 없다.");
         }
 
         // ---- 카탈로그에 없는 저장 ID 제외 ----
@@ -174,14 +175,14 @@ namespace DungeonEditor.Tests
             CharacterRoster roster = ReadyRoster("known");
 
             var service = new DungeonAccessService(roster);
-            Assert.AreEqual(2, roster.HighestOwnedCharacterLevel);
+            Assert.AreEqual(2, roster.HighestPartyCharacterLevel);
 
             DungeonAccessResult result = service.Evaluate(Dungeon("d1", requiredLevel: 50));
             Assert.IsFalse(result.Allowed);
-            Assert.AreEqual(2, result.HighestOwnedLevel);
+            Assert.AreEqual(2, result.HighestPartyLevel);
         }
 
-        // ---- 사용 가능한 보유 캐릭터 0명 → 거부 ----
+        // ---- 사용 가능한 출전 파티원 0명 → 거부 ----
 
         [Test]
         public void Access_ZeroUsable_Denied()
@@ -190,7 +191,7 @@ namespace DungeonEditor.Tests
             DungeonAccessResult result = service.Evaluate(Dungeon("d1", requiredLevel: 1));
 
             Assert.IsFalse(result.Allowed);
-            Assert.AreEqual(DungeonAccessFailureReason.NoUsableOwnedCharacter, result.FailureReason);
+            Assert.AreEqual(DungeonAccessFailureReason.NoUsablePartyCharacter, result.FailureReason);
         }
 
         // ---- 로스터/소스 없음 → 거부 ----
@@ -239,7 +240,7 @@ namespace DungeonEditor.Tests
             doc.characters[0].level = 10;
 
             Assert.IsTrue(service.Evaluate(Dungeon("d1", requiredLevel: 5)).Allowed);
-            Assert.AreEqual(10, service.Evaluate(Dungeon("d1", requiredLevel: 5)).HighestOwnedLevel);
+            Assert.AreEqual(10, service.Evaluate(Dungeon("d1", requiredLevel: 5)).HighestPartyLevel);
         }
 
         // ---- 유효하지 않은 저장 레벨 < 1은 런타임 1로 읽는다 ----
@@ -250,13 +251,13 @@ namespace DungeonEditor.Tests
             SaveData doc = Inject(State("hero", level: -5));
             CharacterRoster roster = ReadyRoster("hero");
 
-            Assert.AreEqual(1, roster.HighestOwnedCharacterLevel);
+            Assert.AreEqual(1, roster.HighestPartyCharacterLevel);
 
             var service = new DungeonAccessService(roster);
 
             DungeonAccessResult allowed = service.Evaluate(Dungeon("d1", requiredLevel: 1));
             Assert.IsTrue(allowed.Allowed);
-            Assert.AreEqual(1, allowed.HighestOwnedLevel);
+            Assert.AreEqual(1, allowed.HighestPartyLevel);
 
             DungeonAccessResult denied = service.Evaluate(Dungeon("d2", requiredLevel: 2));
             Assert.IsFalse(denied.Allowed);
@@ -274,7 +275,7 @@ namespace DungeonEditor.Tests
             DungeonAccessResult result = service.Evaluate(Dungeon("d1", requiredLevel: 1));
 
             Assert.IsTrue(result.Allowed);
-            Assert.AreEqual(int.MaxValue, result.HighestOwnedLevel);
+            Assert.AreEqual(int.MaxValue, result.HighestPartyLevel);
         }
 
         // ---- 유효하지 않은 던전 ----
@@ -436,7 +437,11 @@ namespace DungeonEditor.Tests
 
         private static SaveData Inject(params CharacterSaveState[] states)
         {
-            var doc = new SaveData { characters = new List<CharacterSaveState>(states) };
+            var doc = new SaveData
+            {
+                characters = new List<CharacterSaveState>(states),
+                partyCharacterIds = new List<string>(Array.ConvertAll(states, state => state != null ? state.characterId : null)),
+            };
             DataField.SetValue(null, doc);
             LoadResultField.SetValue(null, SaveLoadResult.NewGame(doc));
             return doc;
@@ -596,11 +601,11 @@ namespace DungeonEditor.Tests
             return string.Join("|", parts);
         }
 
-        private sealed class StubLevelSource : IOwnedCharacterLevelSource
+        private sealed class StubLevelSource : IPartyCharacterLevelSource
         {
             private readonly int level;
             public StubLevelSource(int level) { this.level = level; }
-            public int HighestOwnedCharacterLevel => level;
+            public int HighestPartyCharacterLevel => level;
         }
     }
 }

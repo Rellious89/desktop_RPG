@@ -737,11 +737,11 @@ namespace DungeonEditor.Tests
             panel.gameObject.SetActive(false);
         }
 
-        private sealed class StubLevelSource : IOwnedCharacterLevelSource
+        private sealed class StubLevelSource : IPartyCharacterLevelSource
         {
             private readonly int level;
             public StubLevelSource(int level) { this.level = level; }
-            public int HighestOwnedCharacterLevel => level;
+            public int HighestPartyCharacterLevel => level;
         }
     }
 }

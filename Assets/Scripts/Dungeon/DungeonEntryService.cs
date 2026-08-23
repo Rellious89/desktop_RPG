@@ -67,7 +67,7 @@ namespace Dungeon
             if (!access.Allowed)
             {
                 Debug.Log($"[DungeonEntryService] 던전 '{dungeon.DungeonId}' 입장 거부: {access.FailureReason} " +
-                          $"(필요 {access.DungeonRequiredLevel}, 최고 보유 {access.HighestOwnedLevel}).");
+                          $"(필요 {access.DungeonRequiredLevel}, 파티 최고 {access.HighestPartyLevel}).");
                 return false;
             }
 

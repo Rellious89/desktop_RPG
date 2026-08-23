@@ -5,7 +5,7 @@ namespace Dungeon
         None,
         MissingOrInvalidDungeon,
         MissingRosterOrProgression,
-        NoUsableOwnedCharacter,
+        NoUsablePartyCharacter,
         InsufficientLevel,
     }
 
@@ -13,29 +13,29 @@ namespace Dungeon
     {
         public bool Allowed { get; }
         public int DungeonRequiredLevel { get; }
-        public int HighestOwnedLevel { get; }
+        public int HighestPartyLevel { get; }
         public DungeonAccessFailureReason FailureReason { get; }
 
         private DungeonAccessResult(
             bool allowed,
             int dungeonRequiredLevel,
-            int highestOwnedLevel,
+            int highestPartyLevel,
             DungeonAccessFailureReason failureReason)
         {
             Allowed = allowed;
             DungeonRequiredLevel = dungeonRequiredLevel;
-            HighestOwnedLevel = highestOwnedLevel;
+            HighestPartyLevel = highestPartyLevel;
             FailureReason = failureReason;
         }
 
-        public static DungeonAccessResult Allow(int dungeonRequiredLevel, int highestOwnedLevel)
+        public static DungeonAccessResult Allow(int dungeonRequiredLevel, int highestPartyLevel)
         {
-            return new DungeonAccessResult(true, dungeonRequiredLevel, highestOwnedLevel, DungeonAccessFailureReason.None);
+            return new DungeonAccessResult(true, dungeonRequiredLevel, highestPartyLevel, DungeonAccessFailureReason.None);
         }
 
-        public static DungeonAccessResult Deny(DungeonAccessFailureReason reason, int dungeonRequiredLevel = 0, int highestOwnedLevel = 0)
+        public static DungeonAccessResult Deny(DungeonAccessFailureReason reason, int dungeonRequiredLevel = 0, int highestPartyLevel = 0)
         {
-            return new DungeonAccessResult(false, dungeonRequiredLevel, highestOwnedLevel, reason);
+            return new DungeonAccessResult(false, dungeonRequiredLevel, highestPartyLevel, reason);
         }
     }
 }
