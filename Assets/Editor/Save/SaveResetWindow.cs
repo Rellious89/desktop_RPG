@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Building;
+using Character;
 using Common;
 using Inventory;
 using UnityEditor;
@@ -24,9 +25,17 @@ namespace CommonEditor.Save
         private SaveResetTargets selection = SaveResetTargets.None;
         private Vector2 scroll;
 
-        // 정의 조회 캐시. 이름을 보여 주기 위한 것이며 초기화 판정에는 쓰지 않는다.
+        // 정의 조회 캐시. 이름/기본 보유 여부를 보여 주기 위한 것이며 초기화 판정에는 쓰지 않는다.
         private Dictionary<string, ItemDefinition> itemsById;
         private Dictionary<string, BuildingDefinition> buildingsById;
+        private Dictionary<string, CharacterDefinition> charactersById;
+
+        // 삭제하려고 체크한 캐릭터 id. Character 비트가 켜질 때 삭제 가능한 캐릭터 전체로 채우고,
+        // 개별 해제/재선택은 이 집합을 직접 고친다. 매 프레임 현재 삭제 가능 목록으로 걸러 낸다.
+        private HashSet<string> selectedCharacterIds = new HashSet<string>(StringComparer.Ordinal);
+
+        // Character 비트의 이전 상태. 꺼짐 -> 켜짐으로 바뀌는 순간에만 삭제 가능 캐릭터 전체를 고른다.
+        private bool prevCharacterSelected;
 
         private GUIStyle highlightBox;
 
@@ -50,7 +59,7 @@ namespace CommonEditor.Save
 
             EditorGUILayout.LabelField("개발용 저장 데이터 초기화", EditorStyles.boldLabel);
             EditorGUILayout.LabelField(
-                "고른 항목만 초기화합니다. 캐릭터·계정 진행·회복소 등 나머지는 절대 건드리지 않습니다.",
+                "고른 항목만 초기화합니다. Character는 체크한 캐릭터만 삭제하며, 계정 진행 등 나머지는 건드리지 않습니다.",
                 EditorStyles.wordWrappedMiniLabel);
 
             EditorGUILayout.Space();
@@ -63,11 +72,29 @@ namespace CommonEditor.Save
 
             SaveData data = SaveSystem.Data; // 최초 접근에서 실제 계정을 한 번 읽는다(읽기 전용 표시용).
 
+            // Character 비트 상태에 맞춰 체크 목록을 동기화한다(그리기 전에 한다).
+            bool characterSelected = (selection & SaveResetTargets.Character) != 0;
+            HashSet<string> deletable = GetDeletableIds(data);
+            if (characterSelected && !prevCharacterSelected)
+            {
+                // 꺼짐 -> 켜짐: 삭제 가능한 캐릭터를 모두 고른다.
+                selectedCharacterIds = new HashSet<string>(deletable, StringComparer.Ordinal);
+            }
+            else if (!characterSelected)
+            {
+                selectedCharacterIds.Clear();
+            }
+
+            // 목록이 바뀌었을 수 있으니 지금 삭제 가능한 것만 남긴다(사라진 id는 자동으로 빠진다).
+            selectedCharacterIds.IntersectWith(deletable);
+            prevCharacterSelected = characterSelected;
+
             scroll = EditorGUILayout.BeginScrollView(scroll);
 
             DrawItemSection(data, (selection & SaveResetTargets.Item) != 0);
             DrawCurrencySection(data, (selection & SaveResetTargets.Currency) != 0);
             DrawConstructionSection(data, (selection & SaveResetTargets.Construction) != 0);
+            DrawCharacterSection(data, characterSelected);
 
             EditorGUILayout.EndScrollView();
 
@@ -87,8 +114,13 @@ namespace CommonEditor.Save
                     Repaint();
                 }
 
-                bool nothingSelected = (selection & SaveResetTargets.All) == SaveResetTargets.None;
-                using (new EditorGUI.DisabledScope(nothingSelected || EditorApplication.isPlaying))
+                bool anyNonCharacter =
+                    (selection & (SaveResetTargets.Item | SaveResetTargets.Currency | SaveResetTargets.Construction)) != 0;
+                bool anyCharacterToDelete =
+                    (selection & SaveResetTargets.Character) != 0 && selectedCharacterIds.Count > 0;
+                bool canRun = anyNonCharacter || anyCharacterToDelete;
+
+                using (new EditorGUI.DisabledScope(!canRun || EditorApplication.isPlaying))
                 {
                     if (GUILayout.Button("Reset Selected", GUILayout.Height(24f)))
                     {
@@ -171,23 +203,103 @@ namespace CommonEditor.Save
             return nowUtc >= completeUtc ? "완료" : "건설 중";
         }
 
+        private void DrawCharacterSection(SaveData data, bool sectionActive)
+        {
+            using (BeginSection("Character", sectionActive))
+            {
+                List<CharacterSaveState> characters = data.characters ?? new List<CharacterSaveState>();
+                EditorGUILayout.LabelField($"보유 캐릭터 수: {characters.Count}");
+
+                if (!sectionActive)
+                {
+                    EditorGUILayout.LabelField(
+                        "상단에서 Character를 선택하면 개별 캐릭터를 고를 수 있습니다.", EditorStyles.miniLabel);
+                }
+
+                if (characters.Count == 0)
+                {
+                    EditorGUILayout.LabelField("(보유 캐릭터 없음)", EditorStyles.miniLabel);
+                    return;
+                }
+
+                foreach (CharacterSaveState character in characters)
+                {
+                    if (character == null) continue;
+                    DrawCharacterRow(character, sectionActive);
+                }
+            }
+        }
+
+        private void DrawCharacterRow(CharacterSaveState character, bool sectionActive)
+        {
+            string id = character.characterId ?? string.Empty;
+            bool hasId = !string.IsNullOrEmpty(id);
+            bool initiallyOwned = hasId && IsInitiallyOwned(id);
+            bool selectable = sectionActive && hasId && !initiallyOwned;
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                using (new EditorGUI.DisabledScope(!selectable))
+                {
+                    bool isChecked = hasId && selectedCharacterIds.Contains(id);
+                    bool newChecked = EditorGUILayout.Toggle(isChecked, GUILayout.Width(18f));
+                    if (selectable && newChecked != isChecked)
+                    {
+                        if (newChecked) selectedCharacterIds.Add(id);
+                        else selectedCharacterIds.Remove(id);
+                    }
+                }
+
+                string name = hasId ? DescribeCharacterName(id) : "(빈 characterId)";
+                string info =
+                    $"{name}  ·  Lv.{character.level}  ·  EXP {character.currentExp}  ·  행동력 {character.currentStamina}";
+                EditorGUILayout.LabelField(info);
+
+                if (initiallyOwned)
+                {
+                    EditorGUILayout.LabelField(
+                        "기본 캐릭터 · 삭제 불가", EditorStyles.miniBoldLabel, GUILayout.Width(120f));
+                }
+            }
+        }
+
         // ---- 실행 ----
 
         private void RunReset()
         {
+            SaveData data = SaveSystem.Data;
             SaveResetTargets targets = selection & SaveResetTargets.All;
-            if (targets == SaveResetTargets.None) return;
 
-            string list = DescribeTargets(targets);
+            // 캐릭터 삭제 대상과 보호 집합을 준비한다. Character 비트가 없으면 캐릭터는 건드리지 않는다.
+            List<string> toRemove = null;
+            List<string> protectedIds = null;
+            if ((targets & SaveResetTargets.Character) != 0)
+            {
+                toRemove = new List<string>(selectedCharacterIds);
+                protectedIds = GetProtectedIds(data);
+            }
+
+            bool anyNonCharacter =
+                (targets & (SaveResetTargets.Item | SaveResetTargets.Currency | SaveResetTargets.Construction)) != 0;
+            bool anyCharacterToDelete = toRemove != null && toRemove.Count > 0;
+            if (!anyNonCharacter && !anyCharacterToDelete) return;
+
+            string body = DescribeTargets(targets);
+            if (anyCharacterToDelete)
+            {
+                body += "\n\n삭제할 캐릭터:\n" + DescribeCharacterList(toRemove);
+            }
+
             bool confirmed = EditorUtility.DisplayDialog(
                 "저장 데이터 초기화",
-                $"다음 항목을 초기화합니다:\n\n{list}\n\n캐릭터·계정 진행·회복소 등 나머지는 그대로 유지됩니다.\n계속할까요?",
+                $"다음 항목을 초기화합니다:\n\n{body}\n\n선택하지 않은 캐릭터·계정 진행·회복소 등 나머지는 그대로 유지됩니다.\n계속할까요?",
                 "초기화",
                 "취소");
 
             if (!confirmed) return;
 
-            SaveResetResult result = SaveResetService.Apply(SaveSystem.Data, targets, SaveSystem.Save);
+            SaveResetResult result =
+                SaveResetService.Apply(data, targets, toRemove, protectedIds, SaveSystem.Save);
 
             RefreshDefinitions();
             Repaint();
@@ -195,10 +307,12 @@ namespace CommonEditor.Save
             switch (result.Outcome)
             {
                 case SaveResetOutcome.Success:
-                    EditorUtility.DisplayDialog(
-                        "초기화 완료",
-                        $"다음 항목을 초기화하고 저장했습니다:\n\n{DescribeTargets(result.AppliedTargets)}",
-                        "확인");
+                    string done = DescribeTargets(result.AppliedTargets);
+                    if (result.RemovedCharacterCount > 0)
+                    {
+                        done += $"\n\n삭제한 캐릭터 수: {result.RemovedCharacterCount}";
+                    }
+                    EditorUtility.DisplayDialog("초기화 완료", $"다음 항목을 초기화하고 저장했습니다:\n\n{done}", "확인");
                     break;
 
                 case SaveResetOutcome.SaveFailed:
@@ -223,7 +337,82 @@ namespace CommonEditor.Save
             {
                 lines.Add("• Construction (건축·모집 주기 기록 전체)");
             }
+            if ((targets & SaveResetTargets.Character) != 0)
+            {
+                lines.Add("• Character (선택한 캐릭터만 삭제)");
+            }
             return lines.Count == 0 ? "(없음)" : string.Join("\n", lines);
+        }
+
+        // ---- 캐릭터 조회 ----
+
+        /// <summary>지금 삭제할 수 있는 캐릭터 id(저장에 존재하고 기본 보유가 아닌 것).</summary>
+        private HashSet<string> GetDeletableIds(SaveData data)
+        {
+            var set = new HashSet<string>(StringComparer.Ordinal);
+            if (data.characters == null) return set;
+
+            foreach (CharacterSaveState character in data.characters)
+            {
+                if (character == null) continue;
+                string id = character.characterId;
+                if (string.IsNullOrEmpty(id)) continue;
+                if (IsInitiallyOwned(id)) continue;
+                set.Add(id);
+            }
+
+            return set;
+        }
+
+        /// <summary>절대 지우면 안 되는 기본 보유 캐릭터 id(저장에 존재하는 것만).</summary>
+        private List<string> GetProtectedIds(SaveData data)
+        {
+            var list = new List<string>();
+            if (data.characters == null) return list;
+
+            foreach (CharacterSaveState character in data.characters)
+            {
+                if (character == null) continue;
+                string id = character.characterId;
+                if (!string.IsNullOrEmpty(id) && IsInitiallyOwned(id)) list.Add(id);
+            }
+
+            return list;
+        }
+
+        private bool IsInitiallyOwned(string characterId)
+        {
+            if (string.IsNullOrEmpty(characterId)) return false;
+            if (charactersById != null && charactersById.TryGetValue(characterId, out CharacterDefinition def) && def != null)
+            {
+                return def.InitiallyOwned;
+            }
+
+            // 정의를 못 찾으면 기본 보유 여부를 알 수 없다 - 보호하지 않는다(개발자가 지우려는 값일 수 있다).
+            return false;
+        }
+
+        private string DescribeCharacterName(string characterId)
+        {
+            if (string.IsNullOrEmpty(characterId)) return "(빈 characterId)";
+
+            if (charactersById != null && charactersById.TryGetValue(characterId, out CharacterDefinition def) && def != null)
+            {
+                string name = ResolveLocalized(def.LocalizedName) ?? def.DisplayName;
+                if (!string.IsNullOrEmpty(name) && !string.Equals(name, characterId, StringComparison.Ordinal))
+                {
+                    return $"{name} ({characterId})";
+                }
+            }
+
+            return characterId;
+        }
+
+        private string DescribeCharacterList(IReadOnlyList<string> characterIds)
+        {
+            var lines = new List<string>(characterIds.Count);
+            foreach (string id in characterIds) lines.Add("• " + DescribeCharacterName(id));
+            return string.Join("\n", lines);
         }
 
         // ---- 이름 조회 ----
@@ -232,6 +421,7 @@ namespace CommonEditor.Save
         {
             itemsById = BuildMap<ItemDefinition>(def => def.ItemId);
             buildingsById = BuildMap<BuildingDefinition>(def => def.BuildingId);
+            charactersById = BuildMap<CharacterDefinition>(def => def.CharacterId);
         }
 
         private static Dictionary<string, T> BuildMap<T>(Func<T, string> keyOf) where T : UnityEngine.Object
