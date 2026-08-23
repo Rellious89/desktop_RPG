@@ -2768,6 +2768,24 @@ MonoBehaviour:
   newLabel: {fileID: 807322865877774315}
   confirmButton: {fileID: 807322865877774314}
   cancelButton: {fileID: 807322865877774313}
+  acquiredToastMessage:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 9338736604078083
+      m_Key: ""
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  returnedToastMessage:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 9338736604078084
+      m_Key: ""
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
 --- !u!1 &471919068
 GameObject:
   m_ObjectHideFlags: 0

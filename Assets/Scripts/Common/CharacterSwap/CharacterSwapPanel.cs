@@ -58,8 +58,7 @@ namespace Common
         public static void RequestRefresh()
         {
             if (openInstance == null) return;
-            openInstance.RefreshAllItems();
-            openInstance.UpdateSwapButton();
+            openInstance.RefreshContents();
         }
 
         protected override void OnModalOpened()

@@ -137,6 +137,16 @@ namespace Character
 
         public IReadOnlyList<Entry> Entries => usableEntries;
 
+        /// <summary>
+        /// 저장 트랜잭션이 새 보유 캐릭터를 성공적으로 확정한 뒤, 카탈로그 기반 로스터의 목록만 다시
+        /// 읽는다. 현재 전투 캐릭터를 고르거나 적용하지 않으므로 영입 자체가 전투 캐릭터를 바꾸지 않는다.
+        /// </summary>
+        public void RefreshOwnedCharactersAfterExternalSave()
+        {
+            if (!UsesCatalog) return;
+            BuildUsableEntries();
+        }
+
         /// <summary>지금 전투 중인 캐릭터. 사용 가능한 항목이 하나도 없으면 null이다.</summary>
         public CharacterDefinition Current => current;
 

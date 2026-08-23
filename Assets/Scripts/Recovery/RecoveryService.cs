@@ -79,6 +79,15 @@ namespace Recovery
             return RecoveryStation.IsCharacterIdInSavedSlot(SaveSystem.Data, definition.CharacterId);
         }
 
+        /// <summary>
+        /// 보유 캐릭터가 외부 저장 트랜잭션으로 달라졌음을 회복소 UI에 알린다. 슬롯 기록은 바꾸지 않고,
+        /// 열려 있는 선택 목록만 다시 읽게 하므로 저장이나 회복 진행을 추가로 발생시키지 않는다.
+        /// </summary>
+        public static void NotifyRosterChangedAfterExternalSave()
+        {
+            SlotsChanged?.Invoke();
+        }
+
         private void Awake()
         {
             if (Instance != null && Instance != this)

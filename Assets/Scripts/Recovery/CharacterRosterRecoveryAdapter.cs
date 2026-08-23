@@ -13,22 +13,24 @@ namespace Recovery
     {
         private readonly CharacterRoster roster;
 
-        // Entries를 매번 순회해 새 리스트를 만들지 않도록 재사용하는 버퍼. 로스터의 사용 가능 목록은
-        // 시작할 때 한 번 확정되므로 첫 접근에 한 번만 채운다.
+        // 새 영입도 저장 직후 즉시 회복소의 선택 목록에 반영되어야 하므로, 이 버퍼는 호출마다 현재
+        // 로스터 Entries에서 다시 채운다. RecoveryStation은 어댑터를 계속 보관해도 오래된 목록을 보지 않는다.
         private readonly List<CharacterDefinition> characters = new List<CharacterDefinition>();
 
         public CharacterRosterRecoveryAdapter(CharacterRoster roster)
         {
             this.roster = roster;
 
-            IReadOnlyList<CharacterRoster.Entry> entries = roster.Entries;
-            for (int i = 0; i < entries.Count; i++)
-            {
-                characters.Add(entries[i].definition);
-            }
         }
 
-        public IReadOnlyList<CharacterDefinition> RecoverableCharacters => characters;
+        public IReadOnlyList<CharacterDefinition> RecoverableCharacters
+        {
+            get
+            {
+                RefreshCharacters();
+                return characters;
+            }
+        }
 
         public CharacterDefinition CurrentCharacter => roster.Current;
 
@@ -49,6 +51,8 @@ namespace Recovery
         public CharacterDefinition FindById(string characterId)
         {
             if (string.IsNullOrEmpty(characterId)) return null;
+
+            RefreshCharacters();
 
             for (int i = 0; i < characters.Count; i++)
             {
@@ -85,6 +89,17 @@ namespace Recovery
         public void RaiseCharacterStateChanged(CharacterDefinition definition)
         {
             roster.RaiseCharacterStateChanged(definition);
+        }
+
+        private void RefreshCharacters()
+        {
+            characters.Clear();
+            IReadOnlyList<CharacterRoster.Entry> entries = roster.Entries;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                CharacterRoster.Entry entry = entries[i];
+                if (entry != null && entry.definition != null) characters.Add(entry.definition);
+            }
         }
     }
 }

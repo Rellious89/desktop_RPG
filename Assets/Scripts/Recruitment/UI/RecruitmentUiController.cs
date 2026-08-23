@@ -3,6 +3,7 @@ using Building;
 using Character;
 using Common;
 using Field;
+using Recovery;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -38,10 +39,14 @@ namespace Recruitment
         [SerializeField] private GameObject newLabel;
         [SerializeField] private Button confirmButton;
         [SerializeField] private Button cancelButton;
+        [SerializeField] private LocalizedTextReference acquiredToastMessage = new LocalizedTextReference();
+        [SerializeField] private LocalizedTextReference returnedToastMessage = new LocalizedTextReference();
 
         private RecruitmentCycleService cycle;
         private RecruitmentCandidateDrawService draw;
+        private RecruitmentCandidateResolutionService resolution;
         private bool drawing;
+        private bool resolving;
         private bool initializedThisRefresh;
         private string warnedUnreadableCause;
         private CharacterDefinition boundCharacter;
@@ -49,9 +54,9 @@ namespace Recruitment
         private void OnEnable()
         {
             if (recruitmentButton != null) recruitmentButton.onClick.AddListener(Draw);
+            if (confirmButton != null) confirmButton.onClick.AddListener(Acquire);
+            if (cancelButton != null) cancelButton.onClick.AddListener(Return);
             if (progressSlider != null) progressSlider.interactable = false;
-            if (confirmButton != null) confirmButton.interactable = false;
-            if (cancelButton != null) cancelButton.interactable = false;
             EnsureServices();
             Refresh();
         }
@@ -59,6 +64,8 @@ namespace Recruitment
         private void OnDisable()
         {
             if (recruitmentButton != null) recruitmentButton.onClick.RemoveListener(Draw);
+            if (confirmButton != null) confirmButton.onClick.RemoveListener(Acquire);
+            if (cancelButton != null) cancelButton.onClick.RemoveListener(Return);
             UnbindCharacter();
         }
 
@@ -71,6 +78,8 @@ namespace Recruitment
                 accessCatalog, typeCatalog);
             draw = new RecruitmentCandidateDrawService(() => SaveSystem.Data, SaveSystem.Save, () => DateTime.UtcNow,
                 cycle, accessCatalog, typeCatalog, poolCatalog, acquisitionCatalog, new SystemRecruitmentRandom());
+            resolution = new RecruitmentCandidateResolutionService(() => SaveSystem.Data, SaveSystem.Save,
+                () => DateTime.UtcNow, cycle, characterCatalog);
         }
 
         private void Refresh()
@@ -139,6 +148,7 @@ namespace Recruitment
             if (boundCharacter != character) BindCharacter(character);
             if (portraitImage != null) portraitImage.sprite = character.Portrait;
             if (newLabel != null) newLabel.SetActive(!Owned(id));
+            SetResultButtonsInteractable(!resolving);
             Set(progressRoot, false); Set(standbyRoot, false); Set(resultRoot, true); Set(openInnButton, false);
         }
         private void Draw()
@@ -157,6 +167,75 @@ namespace Recruitment
                 drawing = false;
                 Refresh();
             }
+        }
+        private void Acquire()
+        {
+            if (resolving || !IsTownReady()) return;
+            EnsureServices();
+            if (!HasPendingCandidate()) return;
+
+            resolving = true;
+            SetResultButtonsInteractable(false);
+            try
+            {
+                RecruitmentCandidateResolutionResult result = resolution.TryAcquire(buildingId);
+                if (!result.Success) return;
+
+                RefreshOwnedCharacterSurfaces();
+                ShowToast(acquiredToastMessage, result.Character);
+                Refresh();
+            }
+            finally
+            {
+                resolving = false;
+                if (resultRoot != null && resultRoot.activeSelf) SetResultButtonsInteractable(true);
+            }
+        }
+        private void Return()
+        {
+            if (resolving || !IsTownReady()) return;
+            EnsureServices();
+            if (!HasPendingCandidate()) return;
+
+            CharacterDefinition candidate = boundCharacter;
+            resolving = true;
+            SetResultButtonsInteractable(false);
+            try
+            {
+                RecruitmentCandidateResolutionResult result = resolution.TryReturn(buildingId);
+                if (!result.Success) return;
+
+                ShowToast(returnedToastMessage, candidate);
+                Refresh();
+            }
+            finally
+            {
+                resolving = false;
+                if (resultRoot != null && resultRoot.activeSelf) SetResultButtonsInteractable(true);
+            }
+        }
+        private bool HasPendingCandidate()
+        {
+            RecruitmentCycleStatus status = cycle.GetStatus(buildingId);
+            return status.State != null && !string.IsNullOrEmpty(status.State.pendingCharacterId);
+        }
+        private static void RefreshOwnedCharacterSurfaces()
+        {
+            CharacterRoster.Instance?.RefreshOwnedCharactersAfterExternalSave();
+            CharacterSwapPanel.RequestRefresh();
+            RecoveryService.NotifyRosterChangedAfterExternalSave();
+        }
+        private static void ShowToast(LocalizedTextReference message, CharacterDefinition character)
+        {
+            if (message == null || !message.HasReference || character == null ||
+                !character.HasLocalizedName || ToastManager.Instance == null) return;
+
+            ToastManager.Instance.Show(message.GetLocalizedString(character.LocalizedName.GetLocalizedString()));
+        }
+        private void SetResultButtonsInteractable(bool value)
+        {
+            if (confirmButton != null) confirmButton.interactable = value;
+            if (cancelButton != null) cancelButton.interactable = value;
         }
         private bool Owned(string id)
         {
