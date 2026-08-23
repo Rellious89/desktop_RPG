@@ -5,6 +5,7 @@ using Building;
 using Character;
 using Dungeon;
 using Inventory;
+using Party;
 using Recruitment;
 using Skill;
 using UnityEditor;
@@ -56,7 +57,8 @@ namespace TableDataEditor
             $"CharacterAcquisition {Snapshot?.CharacterAcquisitions.Count ?? 0} / " +
             $"RecruitmentType {Snapshot?.RecruitmentTypes.Count ?? 0} / " +
             $"RecruitmentPool {Snapshot?.RecruitmentPools.Count ?? 0} / " +
-            $"RecruitmentAccess {Snapshot?.RecruitmentAccesses.Count ?? 0} 행, " +
+            $"RecruitmentAccess {Snapshot?.RecruitmentAccesses.Count ?? 0} / " +
+            $"PartyConfig {Snapshot?.PartyConfigs.Count ?? 0} 행, " +
             $"오류 {ErrorCount}건, 경고 {WarningCount}건";
     }
 
@@ -149,6 +151,9 @@ namespace TableDataEditor
             CsvTable recruitmentAccessTable = TableDataCsvReader.Read(
                 TableDataPaths.RecruitmentAccessCsvPath, TableDataPaths.RecruitmentAccessCsvFileName,
                 TableDataColumns.RecruitmentAccess, log);
+            CsvTable partyConfigTable = TableDataCsvReader.Read(
+                TableDataPaths.PartyConfigCsvPath, TableDataPaths.PartyConfigCsvFileName,
+                TableDataColumns.PartyConfig, log);
 
             var snapshot = new TableDataSnapshot();
             bool allTablesRead = worldTable != null && currencyTable != null && itemTable != null
@@ -156,7 +161,8 @@ namespace TableDataEditor
                                  && characterTable != null && skillTable != null && characterSkillTable != null
                                  && buildingTable != null
                                  && acquisitionTable != null && recruitmentTypeTable != null
-                                 && recruitmentPoolTable != null && recruitmentAccessTable != null;
+                                 && recruitmentPoolTable != null && recruitmentAccessTable != null
+                                 && partyConfigTable != null;
 
             try
             {
@@ -178,6 +184,10 @@ namespace TableDataEditor
                 if (recruitmentTypeTable != null) ValidateRecruitmentTypes(recruitmentTypeTable, snapshot, log);
                 if (recruitmentPoolTable != null) ValidateRecruitmentPools(recruitmentPoolTable, snapshot, log);
                 if (recruitmentAccessTable != null) ValidateRecruitmentAccesses(recruitmentAccessTable, snapshot, log);
+
+                // 파티 설정은 어느 표도 가리키지 않으므로 순서에 매이지 않는다 - 맨 뒤에 이어 붙여
+                // 앞의 순서를 한 칸도 건드리지 않는다.
+                if (partyConfigTable != null) ValidatePartyConfigs(partyConfigTable, snapshot, log);
 
                 // 출력 쪽 충돌과 orphan은 표가 다 읽힌 뒤에만 의미가 있다. 절반만 읽힌 상태에서 orphan을
                 // 세면 "CSV에서 사라졌다"가 아니라 "아직 못 읽었다"를 보고하게 된다.
@@ -2028,6 +2038,64 @@ namespace TableDataEditor
             }
         }
 
+        // ---- PartyConfig ----
+
+        /// <summary>
+        /// PartyConfig.csv 한 장. 담는 것이 키와 정원과 활성 여부뿐이라 검사도 그 셋뿐이다 -
+        /// <b>없는 칸을 지어내지 않는다</b>(이 표에는 display_order도 이름 참조도 없다).
+        ///
+        /// id는 <b>표준 형식</b>(<see cref="TableDataFieldRules.IdPatternText"/>)이다 - 모집 표처럼
+        /// 대문자를 허용할 이유가 없는 새 표이고, 표준 형식으로 담을 수 있는 값(<c>default</c>)만
+        /// 쓰기 때문이다.
+        ///
+        /// <b>base_capacity가 1 미만이면 오류다.</b> 값을 하한으로 끌어올려 통과시키지 않는다 -
+        /// 보정해 넘기면 CSV에 적힌 값과 생성 에셋의 값이 달라져, 표만 보고는 실제 정원을 알 수
+        /// 없게 된다(RecruitmentPool.csv의 weight와 같은 판정이다).
+        /// </summary>
+        private static void ValidatePartyConfigs(
+            CsvTable table, TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            string file = table.FileName;
+
+            foreach (CsvRecord record in table.Records)
+            {
+                int line = record.Line;
+                var row = new PartyConfigRow { Line = line };
+
+                bool idOk = TableDataFieldRules.TryReadRequiredId(
+                    file, line, TableDataColumns.PartyConfigId,
+                    table.Get(record, TableDataColumns.PartyConfigId), log, out string id);
+                row.Id = id;
+
+                if (idOk && snapshot.PartyConfigsById.TryGetValue(id, out PartyConfigRow existing))
+                {
+                    log.Error(file, line, TableDataColumns.PartyConfigId, id,
+                        $"party_config_id가 {existing.Line}행과 중복됩니다 - 먼저 나온 행만 사용됩니다.");
+                    idOk = false;
+                }
+
+                if (TableDataFieldRules.TryReadIntAtLeast(
+                        file, line, TableDataColumns.BaseCapacity,
+                        table.Get(record, TableDataColumns.BaseCapacity),
+                        PartyConfigRules.MinimumBaseCapacity, log, out int baseCapacity))
+                {
+                    row.BaseCapacity = baseCapacity;
+                }
+
+                if (TableDataFieldRules.TryReadEnabled(
+                        file, line, TableDataColumns.Enabled, table.Get(record, TableDataColumns.Enabled), log,
+                        out bool enabled))
+                {
+                    row.Enabled = enabled;
+                }
+
+                if (!idOk) continue;
+
+                snapshot.PartyConfigs.Add(row);
+                snapshot.PartyConfigsById[row.Id] = row;
+            }
+        }
+
         /// <summary>
         /// 모집 키가 RecruitmentType.csv에 실재하는지 본다. <b>비활성 행의 참조도 검사한다</b> -
         /// 잘못된 참조를 통과시키면 다시 켜는 순간 조용히 깨지기 때문이다. 다만 "활성인데 비활성
@@ -2287,6 +2355,11 @@ namespace TableDataEditor
                 folders.Add(TableDataPaths.RecruitmentTypeOutputFolder);
                 folders.Add(TableDataPaths.RecruitmentPoolOutputFolder);
                 folders.Add(TableDataPaths.RecruitmentAccessOutputFolder);
+            }
+
+            if (TableDataRebuildScopes.IncludesPartyConfigTable(outputScope))
+            {
+                folders.Add(TableDataPaths.PartyConfigOutputFolder);
             }
 
             return folders;
@@ -2581,6 +2654,27 @@ namespace TableDataEditor
                     TableDataColumns.FilePseudoColumn, TableDataPaths.RecruitmentAccessCatalogAssetName, log);
             }
 
+            if (InScope(selected, TableDataPaths.PartyConfigOutputFolder))
+            {
+                CheckDuplicateGenerated(
+                    TableDataAssetIndex.LoadGeneratedById<PartyConfigDefinition>(
+                        TableDataPaths.PartyConfigOutputFolder, c => c.ConfigId),
+                    TableDataPaths.PartyConfigCsvFileName, TableDataColumns.PartyConfigId, log);
+
+                foreach (PartyConfigRow row in snapshot.PartyConfigs)
+                {
+                    CheckOutputPath<PartyConfigDefinition>(
+                        TableDataPaths.PartyConfigAssetPath(row.Id), row.Id, c => c.ConfigId,
+                        TableDataPaths.PartyConfigCsvFileName, row.Line,
+                        TableDataColumns.PartyConfigId, row.Id, log);
+                }
+
+                CheckOutputPath<PartyConfigCatalog>(
+                    TableDataPaths.PartyConfigCatalogAssetPath, null, null,
+                    TableDataPaths.PartyConfigCsvFileName, TableDataDiagnostic.FileLevelRow,
+                    TableDataColumns.FilePseudoColumn, TableDataPaths.PartyConfigCatalogAssetName, log);
+            }
+
             // 모집만 다시 만드는 좁은 범위에서는 이번 Rebuild가 Character 에셋을 만들지 않는다.
             // 그러면 후보/획득 참조를 어디서 가져올지가 문제가 되므로 <b>여기서 미리</b> 확인한다
             // (Building만 다시 만드는 범위가 Currency/Item을 확인하는 것과 같은 이유다).
@@ -2779,6 +2873,17 @@ namespace TableDataEditor
                         TableDataPaths.RecruitmentAccessOutputFolder, a => a.RecruitmentAccessId),
                     snapshot.RecruitmentAccessesById.Keys, TableDataPaths.RecruitmentAccessCsvFileName,
                     TableDataColumns.RecruitmentAccessId, log);
+            }
+
+            // 파티 설정도 <b>같은 규칙</b>이다 - 자기 출력 폴더 안만 보고, 지우지 않으며,
+            // 카탈로그에서만 빠진다.
+            if (InScope(selected, TableDataPaths.PartyConfigOutputFolder))
+            {
+                ReportOrphans(
+                    TableDataAssetIndex.LoadGeneratedById<PartyConfigDefinition>(
+                        TableDataPaths.PartyConfigOutputFolder, c => c.ConfigId),
+                    snapshot.PartyConfigsById.Keys, TableDataPaths.PartyConfigCsvFileName,
+                    TableDataColumns.PartyConfigId, log);
             }
         }
 

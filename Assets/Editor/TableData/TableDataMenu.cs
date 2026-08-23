@@ -83,6 +83,20 @@ namespace TableDataEditor
                 TableDataPaths.RecruitmentAccessOutputFolder);
         }
 
+        /// <summary>
+        /// PartyConfig 한 표만 다시 만든다. <b>검사는 열네 표 전부를 그대로</b> 하고, 쓰기만 이 폴더
+        /// 안으로 좁힌다 - 파티 표를 손보는 동안 다른 열세 도메인의 생성 에셋 파일이 다시 쓰이지
+        /// 않게 하기 위한 것이다. 이 표는 어느 표도 가리키지 않으므로 이을 참조가 없고, 따라서 다른
+        /// 도메인의 생성 에셋을 <b>읽지도 않는다</b>.
+        /// </summary>
+        [MenuItem(MenuRoot + "Rebuild (PartyConfig only)", priority = 105)]
+        public static void RebuildPartyConfigTable()
+        {
+            Run(TableDataRebuildScope.PartyConfigTable,
+                "Rebuild (PartyConfig)",
+                TableDataPaths.PartyConfigOutputFolder);
+        }
+
         private static void Run(TableDataRebuildScope scope, string label, string outputDescription)
         {
             TableDataRebuildResult result = TableDataRebuilder.Rebuild(scope);

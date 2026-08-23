@@ -5,6 +5,7 @@ using Character;
 using CommonEditor;
 using Dungeon;
 using Inventory;
+using Party;
 using Recruitment;
 using Skill;
 using UnityEditor;
@@ -63,6 +64,16 @@ namespace TableDataEditor
         /// 나머지 아홉 도메인의 생성 에셋은 <b>쓰지도 SetDirty하지도 않는다</b>.
         /// </summary>
         RecruitmentTables = 3,
+
+        /// <summary>
+        /// PartyConfig 한 표만. 이 표는 <b>어느 표도 가리키지 않으므로</b> 이을 참조 자체가 없고,
+        /// 따라서 "가리키는 표와 가리켜지는 표를 함께 넣는다"는 규칙을 만족시키기 위해 다른 도메인을
+        /// 끌고 올 이유도 없다 - 임의의 부분집합을 허용하지 않는 규칙을 지키면서 이 범위를 가장
+        /// 안전하게 열 수 있는 경우다.
+        ///
+        /// 나머지 열세 도메인의 생성 에셋은 <b>쓰지도 읽지도 SetDirty하지도 않는다</b>.
+        /// </summary>
+        PartyConfigTable = 4,
     }
 
     /// <summary>
@@ -78,7 +89,8 @@ namespace TableDataEditor
             return scope == TableDataRebuildScope.All
                    || scope == TableDataRebuildScope.CharacterSkillTables
                    || scope == TableDataRebuildScope.BuildingTable
-                   || scope == TableDataRebuildScope.RecruitmentTables;
+                   || scope == TableDataRebuildScope.RecruitmentTables
+                   || scope == TableDataRebuildScope.PartyConfigTable;
         }
 
         /// <summary>지원하지 않는 값이면 <b>아무것도 하기 전에</b> 던진다.</summary>
@@ -90,7 +102,8 @@ namespace TableDataEditor
                 "지원하지 않는 Rebuild 범위입니다 - " +
                 $"{nameof(TableDataRebuildScope.All)}, {nameof(TableDataRebuildScope.CharacterSkillTables)}, " +
                 $"{nameof(TableDataRebuildScope.BuildingTable)}, " +
-                $"{nameof(TableDataRebuildScope.RecruitmentTables)}만 " +
+                $"{nameof(TableDataRebuildScope.RecruitmentTables)}, " +
+                $"{nameof(TableDataRebuildScope.PartyConfigTable)}만 " +
                 "쓸 수 있습니다. 임의의 부분집합을 허용하면 범위 밖 표를 가리키던 참조가 지워집니다.");
         }
 
@@ -120,6 +133,13 @@ namespace TableDataEditor
         {
             EnsureSupported(scope, nameof(scope));
             return scope == TableDataRebuildScope.All || scope == TableDataRebuildScope.RecruitmentTables;
+        }
+
+        /// <summary>이 범위가 PartyConfig 표를 포함하는지.</summary>
+        public static bool IncludesPartyConfigTable(TableDataRebuildScope scope)
+        {
+            EnsureSupported(scope, nameof(scope));
+            return scope == TableDataRebuildScope.All || scope == TableDataRebuildScope.PartyConfigTable;
         }
     }
 
@@ -213,6 +233,12 @@ namespace TableDataEditor
         private const string ConsumeAmountField = "consumeAmount";
         private const string RecruitmentEnabledField = "enabled";
 
+        // 파티 설정 표의 칸 이름들. 정원은 <b>정수 칸</b>이어야 하고 enabled는 참/거짓이어야 한다 -
+        // 타입이 어긋나면 표의 값이 조용히 버려져 정원이 0인 설정이 만들어진다.
+        private const string PartyConfigIdField = "configId";
+        private const string BaseCapacityField = "baseCapacity";
+        private const string PartyConfigEnabledField = "enabled";
+
         // 관계가 가리키는 두 참조 칸. 문자열로 되돌아가 있으면 objectReferenceValue에 넣은 값이
         // 조용히 버려지므로, 이름뿐 아니라 타입까지 미리 확인한다(재화 칸과 같은 이유다).
         private const string RelationCharacterField = "character";
@@ -258,6 +284,7 @@ namespace TableDataEditor
             if (scope == TableDataRebuildScope.CharacterSkillTables) return RebuildCharacterTables(result, snapshot);
             if (scope == TableDataRebuildScope.BuildingTable) return RebuildBuildingTable(result, snapshot);
             if (scope == TableDataRebuildScope.RecruitmentTables) return RebuildRecruitmentTables(result, snapshot);
+            if (scope == TableDataRebuildScope.PartyConfigTable) return RebuildPartyConfigTable(result, snapshot);
 
             var worldAssets = ResolveTargets<WorldDefinition>(
                 TableDataPaths.WorldOutputFolder, w => w.WorldId,
@@ -289,6 +316,7 @@ namespace TableDataEditor
             CharacterTableTargets characterTargets = ResolveCharacterTableTargets(snapshot, result);
             BuildingTableTargets buildingTargets = ResolveBuildingTableTargets(snapshot, result);
             RecruitmentTableTargets recruitmentTargets = ResolveRecruitmentTableTargets(snapshot, result);
+            PartyConfigTableTargets partyConfigTargets = ResolvePartyConfigTableTargets(snapshot, result);
 
             AssetDatabase.StartAssetEditing();
             try
@@ -317,6 +345,9 @@ namespace TableDataEditor
 
                 // 모집 네 표가 맨 뒤다 - Character를 가리키므로 그 표가 이미 채워져 있어야 한다.
                 WriteRecruitmentTables(snapshot, recruitmentTargets, characterTargets.Characters);
+
+                // 파티 설정은 아무것도 참조하지 않으므로 순서에 매이지 않는다 - 맨 뒤에 둔다.
+                WritePartyConfigTable(snapshot, partyConfigTargets);
             }
             finally
             {
@@ -337,9 +368,120 @@ namespace TableDataEditor
             characterTargets.MarkDirty();
             buildingTargets.MarkDirty();
             recruitmentTargets.MarkDirty();
+            partyConfigTargets.MarkDirty();
 
             result.Wrote = true;
             return result;
+        }
+
+        // ---- PartyConfig ----
+
+        /// <summary>PartyConfig 한 표의 생성 대상. 다른 도메인과 <b>완전히 분리해</b> 들고 다닌다 -
+        /// 좁은 범위의 Rebuild가 다른 도메인의 사전을 아예 만들지 않게 하기 위해서다.</summary>
+        private sealed class PartyConfigTableTargets
+        {
+            public Dictionary<string, PartyConfigDefinition> Configs;
+            public PartyConfigCatalog Catalog;
+
+            public void MarkDirty()
+            {
+                Catalog.MarkDirty();
+            }
+
+            /// <summary>이번 범위가 실제로 건드린 에셋 <b>전부</b>를 한 번씩(중복도 누락도 없이).</summary>
+            public List<UnityEngine.Object> AllTargets()
+            {
+                var all = new List<UnityEngine.Object>();
+                var seen = new HashSet<int>();
+
+                void Add(UnityEngine.Object asset)
+                {
+                    if (asset == null) return;
+                    if (!seen.Add(asset.GetInstanceID())) return;
+                    all.Add(asset);
+                }
+
+                foreach (PartyConfigDefinition config in Configs.Values) Add(config);
+                Add(Catalog);
+                return all;
+            }
+        }
+
+        /// <summary>
+        /// PartyConfig 한 표만 다시 만든다. <b>다른 열세 도메인의 생성 에셋은 쓰지도 읽지도
+        /// SetDirty하지도 않는다</b> - 이 표는 어느 표도 참조하지 않으므로 이을 대상을 불러올 필요조차
+        /// 없다(Building 범위가 Currency/Item을 읽는 것과 달리, 여기서는 읽는 것도 없다).
+        ///
+        /// <b>여기서도 <see cref="AssetDatabase.SaveAssets"/>를 부르지 않는다</b> -
+        /// <see cref="RebuildBuildingTable"/>과 같은 이유다.
+        /// </summary>
+        private static TableDataRebuildResult RebuildPartyConfigTable(
+            TableDataRebuildResult result, TableDataSnapshot snapshot)
+        {
+            PartyConfigTableTargets targets = ResolvePartyConfigTableTargets(snapshot, result);
+
+            AssetDatabase.StartAssetEditing();
+            try
+            {
+                WritePartyConfigTable(snapshot, targets);
+            }
+            finally
+            {
+                AssetDatabase.StopAssetEditing();
+            }
+
+            foreach (UnityEngine.Object asset in targets.AllTargets())
+            {
+                AssetDatabase.SaveAssetIfDirty(asset);
+            }
+
+            targets.MarkDirty();
+
+            result.Wrote = true;
+            return result;
+        }
+
+        private static PartyConfigTableTargets ResolvePartyConfigTableTargets(
+            TableDataSnapshot snapshot, TableDataRebuildResult result)
+        {
+            return new PartyConfigTableTargets
+            {
+                Configs = ResolveTargets<PartyConfigDefinition>(
+                    TableDataPaths.PartyConfigOutputFolder, c => c.ConfigId,
+                    snapshot.PartyConfigs.ConvertAll(r => r.Id), TableDataPaths.PartyConfigAssetPath,
+                    TableDataPaths.PartyConfigCsvFileName, TableDataColumns.PartyConfigId, result),
+
+                Catalog = ResolveSingleton<PartyConfigCatalog>(TableDataPaths.PartyConfigCatalogAssetPath, result),
+            };
+        }
+
+        /// <summary>카탈로그는 <b>CSV 순서를 그대로</b> 쓴다 - 이 표에는 display_order 칸이 없다
+        /// (모집 세 표와 같은 이유다).</summary>
+        private static void WritePartyConfigTable(TableDataSnapshot snapshot, PartyConfigTableTargets targets)
+        {
+            foreach (PartyConfigRow row in snapshot.PartyConfigs)
+            {
+                WritePartyConfig(targets.Configs[row.Id], row);
+            }
+
+            WriteCatalog(targets.Catalog, "configs",
+                FilterForCatalog(snapshot.PartyConfigs, r => r.Enabled, r => r.Id, targets.Configs));
+        }
+
+        /// <summary>
+        /// 파티 설정 한 줄. party_config_id는 <b>CSV에 적힌 값을 한 글자도 바꾸지 않고</b> 쓴다.
+        ///
+        /// base_capacity도 <b>표에 적힌 값 그대로</b>다 - 1 미만인 값은 Validate가 이미 오류로 막았고
+        /// (자동으로 끌어올리지 않는다), 여기서 다시 보정하면 표와 에셋이 다른 말을 하게 된다.
+        /// </summary>
+        private static void WritePartyConfig(PartyConfigDefinition asset, PartyConfigRow row)
+        {
+            var serialized = new SerializedObject(asset);
+            serialized.FindProperty(PartyConfigIdField).stringValue = row.Id;
+            serialized.FindProperty(BaseCapacityField).intValue = row.BaseCapacity;
+            serialized.FindProperty(PartyConfigEnabledField).boolValue = row.Enabled;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(asset);
         }
 
         // ---- Building ----
@@ -946,6 +1088,11 @@ namespace TableDataEditor
                 EnsureFolder(TableDataPaths.OutputRoot, "RecruitmentPool");
                 EnsureFolder(TableDataPaths.OutputRoot, "RecruitmentAccess");
             }
+
+            if (TableDataRebuildScopes.IncludesPartyConfigTable(scope))
+            {
+                EnsureFolder(TableDataPaths.OutputRoot, "PartyConfig");
+            }
         }
 
         private static void EnsureFolder(string parent, string child)
@@ -1494,6 +1641,20 @@ namespace TableDataEditor
             ok &= VerifyFields<RecruitmentTypeCatalog>(log, "types");
             ok &= VerifyFields<RecruitmentPoolCatalog>(log, "entries");
             ok &= VerifyFields<RecruitmentAccessCatalog>(log, "accesses");
+
+            // 파티 설정. 정원이 문자열 칸으로 되돌아가 있으면 intValue에 넣은 값이 조용히 버려져
+            // "표에는 3인데 실제로는 0"인 파티가 만들어지므로, 이름뿐 아니라 타입까지 확인한다.
+            ok &= VerifyFields<PartyConfigDefinition>(log, PartyConfigIdField, BaseCapacityField,
+                PartyConfigEnabledField);
+            ok &= VerifyPropertyType<PartyConfigDefinition>(
+                log, BaseCapacityField, SerializedPropertyType.Integer,
+                "기본 정원은 정수 칸이어야 합니다 - 다른 타입이면 표의 값이 버려져 아무도 파티에 " +
+                "넣을 수 없게 됩니다.");
+            ok &= VerifyPropertyType<PartyConfigDefinition>(
+                log, PartyConfigEnabledField, SerializedPropertyType.Boolean,
+                "표의 enabled 값은 참/거짓 칸이어야 합니다.");
+
+            ok &= VerifyFields<PartyConfigCatalog>(log, "configs");
             return ok;
         }
 
