@@ -6,6 +6,7 @@ using Dungeon;
 using NUnit.Framework;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace CharacterEditor.Tests
 {
@@ -14,6 +15,7 @@ namespace CharacterEditor.Tests
         private GameObject root;
         private WorldDefinition world;
         private CharacterDefinition character;
+        private CharacterCatalog catalog;
 
         [TearDown]
         public void TearDown()
@@ -21,6 +23,7 @@ namespace CharacterEditor.Tests
             if (root != null) Object.DestroyImmediate(root);
             if (world != null) Object.DestroyImmediate(world);
             if (character != null) Object.DestroyImmediate(character);
+            if (catalog != null) Object.DestroyImmediate(catalog);
         }
 
         [Test]
@@ -50,6 +53,87 @@ namespace CharacterEditor.Tests
 
             Invoke(view, "UnbindWorldName");
             Assert.IsNull(GetPrivate(view, "worldName"));
+        }
+
+        [Test]
+        public void DragPreview_IsSingleTransparentNonRaycastAndCleansUp()
+        {
+            root = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas));
+            root.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
+            var source = new GameObject("source", typeof(RectTransform), typeof(Image));
+            source.transform.SetParent(root.transform, false);
+
+            InvokePreview("Begin", source, new Vector2(30f, 40f));
+            Assert.IsTrue(PreviewActive());
+            GameObject preview = GameObject.Find("CharacterArchiveDragPreview");
+            CanvasGroup group = preview.GetComponent<CanvasGroup>();
+            Assert.AreEqual(0.6f, group.alpha);
+            Assert.IsFalse(group.blocksRaycasts);
+            Assert.IsFalse(group.interactable);
+
+            InvokePreview("UpdatePosition", new Vector2(60f, 80f));
+            Assert.AreNotEqual(Vector2.zero, ((RectTransform)preview.transform).anchoredPosition);
+
+            InvokePreview("End");
+            Assert.IsFalse(PreviewActive());
+        }
+
+        [Test]
+        public void RemoveButton_IsHiddenForOneMemberAndShownForEveryOccupiedMemberAboveOne()
+        {
+            root = new GameObject("root", typeof(RectTransform));
+            var panelObject = new GameObject("panel", typeof(RectTransform), typeof(CharacterArchivePanel));
+            panelObject.transform.SetParent(root.transform, false);
+            var slotObject = new GameObject("slot_CharacterArchive_Party1", typeof(RectTransform), typeof(PartySlotView));
+            slotObject.transform.SetParent(root.transform, false);
+            AddChild(slotObject, "item_Party_enable");
+            AddChild(slotObject, "item_Party_disable");
+            GameObject remove = AddChild(slotObject, "btn_remove", typeof(Button));
+            remove.SetActive(false);
+
+            character = ScriptableObject.CreateInstance<CharacterDefinition>();
+            SetPrivate(character, "characterId", "hero");
+            catalog = ScriptableObject.CreateInstance<CharacterCatalog>();
+            var catalogSo = new UnityEditor.SerializedObject(catalog);
+            catalogSo.FindProperty("characters").arraySize = 1;
+            catalogSo.FindProperty("characters").GetArrayElementAtIndex(0).objectReferenceValue = character;
+            catalogSo.ApplyModifiedPropertiesWithoutUndo();
+            catalog.MarkDirty();
+            SetPrivate(panelObject.GetComponent<CharacterArchivePanel>(), "catalog", catalog);
+
+            PartySlotView view = slotObject.GetComponent<PartySlotView>();
+            view.Bind(panelObject.GetComponent<CharacterArchivePanel>(), 0);
+            var one = new SaveData { partyCharacterIds = new System.Collections.Generic.List<string> { "hero" } };
+            view.Refresh(one, character, 3);
+            Assert.IsFalse(remove.activeSelf);
+
+            var two = new SaveData { partyCharacterIds = new System.Collections.Generic.List<string> { "hero", "other" } };
+            view.Refresh(two, character, 3);
+            Assert.IsTrue(remove.activeSelf);
+            Assert.IsTrue(remove.GetComponent<Button>().interactable,
+                "현재/회복 상태는 클릭 경로가 막더라도 2명 이상 파티의 탈퇴 버튼을 숨기지 않는다.");
+        }
+
+        private static GameObject AddChild(GameObject parent, string name, params System.Type[] components)
+        {
+            var child = new GameObject(name, components.Length == 0 ? new[] { typeof(RectTransform) } : components);
+            child.transform.SetParent(parent.transform, false);
+            return child;
+        }
+
+        private static void InvokePreview(string methodName, params object[] arguments)
+        {
+            System.Type type = typeof(PartySlotView).Assembly.GetType("CharacterArchive.CharacterArchiveDragPreview");
+            MethodInfo method = type.GetMethod(methodName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            Assert.IsNotNull(method);
+            method.Invoke(null, arguments);
+        }
+
+        private static bool PreviewActive()
+        {
+            System.Type type = typeof(PartySlotView).Assembly.GetType("CharacterArchive.CharacterArchiveDragPreview");
+            PropertyInfo property = type.GetProperty("HasActivePreview", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            return (bool)property.GetValue(null);
         }
 
         private static void Invoke(PartySlotView view, string name)

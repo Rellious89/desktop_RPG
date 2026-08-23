@@ -62,7 +62,12 @@ namespace CharacterArchive
             if (portrait != null) { portrait.sprite = character != null ? character.Portrait : null; portrait.enabled = portrait.sprite != null; }
             nameBinding.Bind(character, value => { if (nameText != null) nameText.text = value ?? string.Empty; });
             BindWorldName(character);
-            if (removeButton != null) removeButton.interactable = IsEnabled && character != null && data != null && data.partyCharacterIds != null && data.partyCharacterIds.Count > 1;
+            bool canRemove = IsEnabled && character != null && data != null && data.partyCharacterIds != null && data.partyCharacterIds.Count > 1;
+            if (removeButton != null)
+            {
+                SetActive(removeButton.gameObject, canRemove);
+                removeButton.interactable = canRemove;
+            }
         }
 
         public void OnDrop(PointerEventData eventData)
@@ -73,17 +78,31 @@ namespace CharacterArchive
             if (source != null && source != this && source.IsDraggingPartyMember) owner?.HandlePartyDrop(source.character, this, true);
         }
 
-        public void OnBeginDrag(PointerEventData eventData) => dragging = IsEnabled && character != null;
-        public void OnDrag(PointerEventData eventData) { }
-        public void OnEndDrag(PointerEventData eventData) => dragging = false;
+        public void OnBeginDrag(PointerEventData eventData)
+        {
+            dragging = IsEnabled && character != null;
+            if (dragging && enabledRoot != null) CharacterArchiveDragPreview.Begin(enabledRoot, eventData.position);
+        }
+        public void OnDrag(PointerEventData eventData)
+        {
+            if (dragging) CharacterArchiveDragPreview.UpdatePosition(eventData.position);
+        }
+        public void OnEndDrag(PointerEventData eventData)
+        {
+            dragging = false;
+            CharacterArchiveDragPreview.End();
+        }
         private void OnDisable()
         {
             dragging = false;
+            CharacterArchiveDragPreview.End();
             nameBinding.Unbind();
             UnbindWorldName();
             SetWorldName(string.Empty);
         }
         private void Remove() => owner?.LeavePartyMember(this);
+
+        private void OnDestroy() => CharacterArchiveDragPreview.End();
 
         private void ResolveViews()
         {

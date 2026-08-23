@@ -63,9 +63,17 @@ namespace CharacterArchive
 
         public void SetSelected(bool value) => SetActive(selectMarker, value);
 
-        private void OnDisable() => Unbind();
+        private void OnDisable()
+        {
+            CharacterArchiveDragPreview.End();
+            Unbind();
+        }
 
-        private void OnDestroy() => Unbind();
+        private void OnDestroy()
+        {
+            CharacterArchiveDragPreview.End();
+            Unbind();
+        }
 
         private void Unbind()
         {
@@ -82,10 +90,18 @@ namespace CharacterArchive
             // 명부 카드는 선택 버튼을 계속 사용한다. 실제 드롭은 PartySlotView가 이 플래그와
             // Definition을 함께 확인하므로, 다른 UI의 드래그가 잘못 합류되는 일은 없다.
             IsDraggingToParty = definition != null;
+            if (IsDraggingToParty) CharacterArchiveDragPreview.Begin(gameObject, eventData.position);
         }
 
-        public void OnEndDrag(PointerEventData eventData) => IsDraggingToParty = false;
-        public void OnDrag(PointerEventData eventData) { }
+        public void OnEndDrag(PointerEventData eventData)
+        {
+            IsDraggingToParty = false;
+            CharacterArchiveDragPreview.End();
+        }
+        public void OnDrag(PointerEventData eventData)
+        {
+            if (IsDraggingToParty) CharacterArchiveDragPreview.UpdatePosition(eventData.position);
+        }
 
         private void ApplyEmpty()
         {
