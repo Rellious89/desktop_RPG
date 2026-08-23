@@ -129,6 +129,22 @@ namespace Common
         public List<BuildingConstructionSaveState> buildingConstructions =
             new List<BuildingConstructionSaveState>();
 
+        /// <summary>
+        /// 건물 등에 연결된 모집 창구별 <b>현재 방문 주기</b>. 항목의 키는
+        /// <see cref="RecruitmentCycleSaveState.recruitmentAccessId"/>이며 Ordinal 완전 일치로 찾는다.
+        ///
+        /// <b>READY 여부와 남은 시간은 저장하지 않는다.</b>
+        /// <see cref="RecruitmentCycleSaveState.readyAtUtc"/>와 현재 UTC를 비교해 매번 파생하므로 앱을
+        /// 꺼 둔 시간도 반영되고, READY가 된 뒤 조회만으로 다음 주기가 시작되지 않는다.
+        ///
+        /// 모르는 Access Id와 읽을 수 없는 시각도 그대로 보존한다. 표가 잠시 빠졌거나 저장 값이
+        /// 손상됐다는 이유로 저장 계층이 임의로 지우거나 고치면 원본을 복구할 기회가 사라지기 때문이다.
+        /// 이 목록이 없던 문서는 빈 목록으로 읽히며 뜻도 그대로라 <see cref="CurrentSaveVersion"/>은
+        /// 올리지 않았다.
+        /// </summary>
+        public List<RecruitmentCycleSaveState> recruitmentCycles =
+            new List<RecruitmentCycleSaveState>();
+
         /// <summary>저장 계층이 보장하는 최소 슬롯 수. 실제 사용 가능한 슬롯 수는 회복 밸런스 테이블의
         /// Max Slots가 정하며, 그 값이 더 크면 회복소가 목록을 더 늘린다.</summary>
         public const int DefaultRecoverySlotCount = 3;
@@ -346,6 +362,24 @@ namespace Common
         /// 더하면서 <see cref="SaveData.CurrentSaveVersion"/>을 올리지 않았다.
         /// </summary>
         public bool completionNotified;
+    }
+
+    /// <summary>
+    /// 모집 창구 하나의 현재 방문 주기. 상태 문자열이나 진행률은 두지 않고, 시작과 READY 경계 시각만
+    /// <see cref="SaveData.TimestampFormat"/>으로 기록한다. 이미 시작된 주기는 이후 테이블의 방문
+    /// 간격이 바뀌어도 이 두 값 그대로 유지된다.
+    /// </summary>
+    [Serializable]
+    public class RecruitmentCycleSaveState
+    {
+        /// <summary>RecruitmentAccessDefinition.RecruitmentAccessId와 같은 값. 항목의 유일한 키다.</summary>
+        public string recruitmentAccessId;
+
+        /// <summary>이번 주기가 시작된 시각(UTC). 최초 주기에는 건물의 완성 시각이 들어간다.</summary>
+        public string startedAtUtc;
+
+        /// <summary>용병 방문이 READY가 되는 경계 시각(UTC).</summary>
+        public string readyAtUtc;
     }
 
     /// <summary>

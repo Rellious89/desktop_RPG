@@ -238,6 +238,7 @@ namespace Common
             target.items = CopyItems(source.items);
             target.recoverySlots = CopyRecoverySlots(source.recoverySlots);
             target.buildingConstructions = CopyBuildingConstructions(source.buildingConstructions);
+            target.recruitmentCycles = CopyRecruitmentCycles(source.recruitmentCycles);
         }
 
         private static List<CharacterSaveState> CopyCharacters(List<CharacterSaveState> source)
@@ -322,6 +323,27 @@ namespace Common
                         startedAtUtc = slot.startedAtUtc,
                         completeAtUtc = slot.completeAtUtc,
                         completionNotified = slot.completionNotified,
+                    });
+            }
+
+            return copy;
+        }
+
+        private static List<RecruitmentCycleSaveState> CopyRecruitmentCycles(
+            List<RecruitmentCycleSaveState> source)
+        {
+            List<RecruitmentCycleSaveState> copy = new List<RecruitmentCycleSaveState>();
+            if (source == null) return copy;
+
+            foreach (RecruitmentCycleSaveState state in source)
+            {
+                copy.Add(state == null
+                    ? null
+                    : new RecruitmentCycleSaveState
+                    {
+                        recruitmentAccessId = state.recruitmentAccessId,
+                        startedAtUtc = state.startedAtUtc,
+                        readyAtUtc = state.readyAtUtc,
                     });
             }
 

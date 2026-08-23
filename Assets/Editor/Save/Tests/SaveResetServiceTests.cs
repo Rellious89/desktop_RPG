@@ -36,6 +36,15 @@ namespace CommonEditor.SaveTests
                 {
                     new BuildingConstructionSaveState { buildingId = "1", startedAtUtc = "s", completeAtUtc = "c" },
                 },
+                recruitmentCycles = new List<RecruitmentCycleSaveState>
+                {
+                    new RecruitmentCycleSaveState
+                    {
+                        recruitmentAccessId = "Inn_Normal_Access",
+                        startedAtUtc = "rs",
+                        readyAtUtc = "rr",
+                    },
+                },
                 characters = new List<CharacterSaveState>
                 {
                     new CharacterSaveState { characterId = "CatKnight", level = 5, currentExp = 7, currentStamina = 21 },
@@ -80,6 +89,7 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(0, data.items.Count, "아이템은 빈 목록이 됩니다.");
             Assert.AreEqual(1250, data.currency, "재화는 그대로입니다.");
             Assert.AreEqual(1, data.buildingConstructions.Count, "건축 기록은 그대로입니다.");
+            Assert.AreEqual(1, data.recruitmentCycles.Count, "모집 주기도 그대로입니다.");
             AssertNonTargetsPreserved(data);
             Assert.AreEqual(1, calls.Value);
         }
@@ -96,6 +106,7 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(0, data.currency);
             Assert.AreEqual(2, data.items.Count, "아이템은 그대로입니다.");
             Assert.AreEqual(1, data.buildingConstructions.Count, "건축 기록은 그대로입니다.");
+            Assert.AreEqual(1, data.recruitmentCycles.Count, "모집 주기도 그대로입니다.");
             AssertNonTargetsPreserved(data);
             Assert.AreEqual(1, calls.Value);
         }
@@ -110,6 +121,7 @@ namespace CommonEditor.SaveTests
 
             Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
             Assert.AreEqual(0, data.buildingConstructions.Count);
+            Assert.AreEqual(0, data.recruitmentCycles.Count, "Construction은 모집 주기도 함께 지웁니다.");
             Assert.AreEqual(2, data.items.Count, "아이템은 그대로입니다.");
             Assert.AreEqual(1250, data.currency, "재화는 그대로입니다.");
             AssertNonTargetsPreserved(data);
@@ -128,6 +140,7 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(0, data.items.Count);
             Assert.AreEqual(0, data.currency);
             Assert.AreEqual(0, data.buildingConstructions.Count);
+            Assert.AreEqual(0, data.recruitmentCycles.Count);
             AssertNonTargetsPreserved(data);
             Assert.AreEqual(1, calls.Value);
         }
@@ -146,6 +159,7 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(SaveResetTargets.Item | SaveResetTargets.Construction, result.AppliedTargets);
             Assert.AreEqual(0, data.items.Count, "Item은 초기화됩니다.");
             Assert.AreEqual(0, data.buildingConstructions.Count, "Construction은 초기화됩니다.");
+            Assert.AreEqual(0, data.recruitmentCycles.Count, "모집 주기도 Construction에 종속됩니다.");
             Assert.AreEqual(1250, data.currency, "해제한 Currency는 그대로여야 합니다.");
             AssertNonTargetsPreserved(data);
             Assert.AreEqual(1, calls.Value);
@@ -164,6 +178,7 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(2, data.items.Count);
             Assert.AreEqual(1250, data.currency);
             Assert.AreEqual(1, data.buildingConstructions.Count);
+            Assert.AreEqual(1, data.recruitmentCycles.Count);
             AssertNonTargetsPreserved(data);
         }
 
@@ -186,6 +201,7 @@ namespace CommonEditor.SaveTests
             SaveData data = MakePopulated();
             List<InventoryItemState> originalItems = data.items;
             List<BuildingConstructionSaveState> originalConstructions = data.buildingConstructions;
+            List<RecruitmentCycleSaveState> originalRecruitmentCycles = data.recruitmentCycles;
 
             SaveResetResult result =
                 SaveResetService.Apply(data, SaveResetTargets.All, Counting(out Box<int> calls, succeeds: false));
@@ -199,6 +215,8 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(1250, data.currency, "재화도 되돌립니다.");
             Assert.AreSame(originalConstructions, data.buildingConstructions, "건축 기록도 되돌립니다.");
             Assert.AreEqual(1, data.buildingConstructions.Count);
+            Assert.AreSame(originalRecruitmentCycles, data.recruitmentCycles, "모집 주기도 되돌립니다.");
+            Assert.AreEqual(1, data.recruitmentCycles.Count);
             AssertNonTargetsPreserved(data);
         }
 

@@ -219,7 +219,10 @@ namespace CommonEditor.Save
             var lines = new List<string>();
             if ((targets & SaveResetTargets.Item) != 0) lines.Add("• Item (보유 아이템 전체)");
             if ((targets & SaveResetTargets.Currency) != 0) lines.Add("• Currency (재화 0으로)");
-            if ((targets & SaveResetTargets.Construction) != 0) lines.Add("• Construction (건축 기록 전체)");
+            if ((targets & SaveResetTargets.Construction) != 0)
+            {
+                lines.Add("• Construction (건축·모집 주기 기록 전체)");
+            }
             return lines.Count == 0 ? "(없음)" : string.Join("\n", lines);
         }
 

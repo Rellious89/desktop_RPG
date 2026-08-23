@@ -88,7 +88,8 @@ namespace CommonEditor.Save
             if (data == null) throw new ArgumentNullException(nameof(data));
             if (save == null) throw new ArgumentNullException(nameof(save));
 
-            // 정의되지 않은 비트가 섞여 들어와도 지원하는 세 항목만 본다.
+            // 정의되지 않은 비트가 섞여 들어와도 지원하는 세 항목만 본다. 모집 주기는 별도 대상이
+            // 아니라 Construction의 종속 기록이므로 그 비트와 함께 움직인다.
             SaveResetTargets effective = targets & SaveResetTargets.All;
             if (effective == SaveResetTargets.None)
             {
@@ -105,10 +106,16 @@ namespace CommonEditor.Save
             int oldCurrency = resetCurrency ? data.currency : 0;
             List<BuildingConstructionSaveState> oldConstructions =
                 resetConstruction ? data.buildingConstructions : null;
+            List<RecruitmentCycleSaveState> oldRecruitmentCycles =
+                resetConstruction ? data.recruitmentCycles : null;
 
             if (resetItems) data.items = new List<InventoryItemState>();
             if (resetCurrency) data.currency = 0;
-            if (resetConstruction) data.buildingConstructions = new List<BuildingConstructionSaveState>();
+            if (resetConstruction)
+            {
+                data.buildingConstructions = new List<BuildingConstructionSaveState>();
+                data.recruitmentCycles = new List<RecruitmentCycleSaveState>();
+            }
 
             bool saved;
             try
@@ -119,13 +126,15 @@ namespace CommonEditor.Save
             {
                 // 대리자가 터져도 메모리는 원래대로 돌려놓고 예외는 그대로 올려보낸다 - 부분 초기화가
                 // 남는 것보다 호출부가 실패를 알아채는 편이 낫다.
-                Rollback(data, resetItems, oldItems, resetCurrency, oldCurrency, resetConstruction, oldConstructions);
+                Rollback(data, resetItems, oldItems, resetCurrency, oldCurrency, resetConstruction,
+                    oldConstructions, oldRecruitmentCycles);
                 throw;
             }
 
             if (!saved)
             {
-                Rollback(data, resetItems, oldItems, resetCurrency, oldCurrency, resetConstruction, oldConstructions);
+                Rollback(data, resetItems, oldItems, resetCurrency, oldCurrency, resetConstruction,
+                    oldConstructions, oldRecruitmentCycles);
                 return new SaveResetResult(SaveResetOutcome.SaveFailed, effective);
             }
 
@@ -136,11 +145,16 @@ namespace CommonEditor.Save
             SaveData data,
             bool resetItems, List<InventoryItemState> oldItems,
             bool resetCurrency, int oldCurrency,
-            bool resetConstruction, List<BuildingConstructionSaveState> oldConstructions)
+            bool resetConstruction, List<BuildingConstructionSaveState> oldConstructions,
+            List<RecruitmentCycleSaveState> oldRecruitmentCycles)
         {
             if (resetItems) data.items = oldItems;
             if (resetCurrency) data.currency = oldCurrency;
-            if (resetConstruction) data.buildingConstructions = oldConstructions;
+            if (resetConstruction)
+            {
+                data.buildingConstructions = oldConstructions;
+                data.recruitmentCycles = oldRecruitmentCycles;
+            }
         }
     }
 }

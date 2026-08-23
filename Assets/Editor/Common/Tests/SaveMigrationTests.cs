@@ -833,6 +833,15 @@ namespace CommonEditor.Tests
                         completeAtUtc = "2026-01-02T03:05:05.0000000Z",
                     },
                 },
+                recruitmentCycles = new List<RecruitmentCycleSaveState>
+                {
+                    new RecruitmentCycleSaveState
+                    {
+                        recruitmentAccessId = "Inn_Normal_Access",
+                        startedAtUtc = "2026-01-02T03:05:05.0000000Z",
+                        readyAtUtc = "2026-01-02T04:05:05.0000000Z",
+                    },
+                },
             };
         }
 
@@ -859,6 +868,10 @@ namespace CommonEditor.Tests
             Assert.AreEqual(1, data.buildingConstructions.Count, $"{because} (buildingConstructions 개수)");
             Assert.AreEqual("1", data.buildingConstructions[0].buildingId,
                 $"{because} (buildingConstructions[0])");
+
+            Assert.AreEqual(1, data.recruitmentCycles.Count, $"{because} (recruitmentCycles 개수)");
+            Assert.AreEqual("Inn_Normal_Access", data.recruitmentCycles[0].recruitmentAccessId,
+                $"{because} (recruitmentCycles[0])");
         }
 
         [Test]
@@ -947,6 +960,10 @@ namespace CommonEditor.Tests
                 "사본이 건설 기록을 빠뜨리면 안 된다.");
             Assert.AreEqual("2026-01-02T03:04:05.0000000Z", data.buildingConstructions[0].startedAtUtc);
             Assert.AreEqual("2026-01-02T03:05:05.0000000Z", data.buildingConstructions[0].completeAtUtc);
+            Assert.AreEqual("Inn_Normal_Access", data.recruitmentCycles[0].recruitmentAccessId,
+                "사본이 모집 주기 기록을 빠뜨리면 안 된다.");
+            Assert.AreEqual("2026-01-02T03:05:05.0000000Z", data.recruitmentCycles[0].startedAtUtc);
+            Assert.AreEqual("2026-01-02T04:05:05.0000000Z", data.recruitmentCycles[0].readyAtUtc);
         }
 
         [Test]
@@ -959,6 +976,7 @@ namespace CommonEditor.Tests
                 "saveVersion", "saveRevision", "lastSavedAtUtc",
                 "currentLevel", "currentExp", "totalKillCount",
                 "characters", "currency", "items", "recoverySlots", "buildingConstructions",
+                "recruitmentCycles",
             };
 
             List<string> actual = new List<string>();
@@ -1679,6 +1697,9 @@ namespace CommonEditor.Tests
             Assert.AreEqual(1, data.recoverySlots.Count);
             Assert.AreEqual("barbarian", data.recoverySlots[0].characterId);
             Assert.IsTrue(data.recoverySlots[0].completionNotified);
+            Assert.AreEqual(1, data.recruitmentCycles.Count);
+            Assert.AreEqual("Inn_Normal_Access", data.recruitmentCycles[0].recruitmentAccessId);
+            Assert.AreEqual("2026-01-02T04:05:05.0000000Z", data.recruitmentCycles[0].readyAtUtc);
 
             // FullyPopulated의 'barbarian'은 여섯과 다른 키이므로 1 + 6이다.
             Assert.AreEqual(1 + 6, data.characters.Count);
