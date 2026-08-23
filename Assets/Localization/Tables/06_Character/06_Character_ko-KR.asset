@@ -19,27 +19,27 @@ MonoBehaviour:
     m_Items: []
   m_TableData:
   - m_Id: 347070464
-    m_Localized: CatKnight
+    m_Localized: 고양이기사
     m_Metadata:
       m_Items: []
   - m_Id: 359653376
-    m_Localized: ElfArcher
+    m_Localized: 엘프궁수
     m_Metadata:
       m_Items: []
   - m_Id: 359653377
-    m_Localized: Barbarian
+    m_Localized: 바바리안
     m_Metadata:
       m_Items: []
   - m_Id: 363847680
-    m_Localized: ElfGuardian
+    m_Localized: 엘프수호자
     m_Metadata:
       m_Items: []
   - m_Id: 363847681
-    m_Localized: RabbitHealer
+    m_Localized: 토끼힐러
     m_Metadata:
       m_Items: []
   - m_Id: 363847682
-    m_Localized: CatMage
+    m_Localized: 고양이마법사
     m_Metadata:
       m_Items: []
   references:

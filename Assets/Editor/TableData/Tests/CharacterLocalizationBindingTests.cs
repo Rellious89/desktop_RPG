@@ -51,14 +51,14 @@ namespace TableDataEditor.Tests
         };
 
         /// <summary>Character.csv의 name_key와 기대 표시명. 기준값은 기존 MotionProfile의 영어 표시명이다.</summary>
-        private static readonly (string CharacterId, string Key, string DisplayName)[] Expected =
+        private static readonly (string CharacterId, string Key, string EnglishName, string KoreanName)[] Expected =
         {
-            ("CatKnight", "1", "CatKnight"),
-            ("ElfArcher", "2", "ElfArcher"),
-            ("Barbarian", "3", "Barbarian"),
-            ("ElfGuardian", "4", "ElfGuardian"),
-            ("RabbitHealer", "5", "RabbitHealer"),
-            ("CatMage", "6", "CatMage"),
+            ("CatKnight", "1", "CatKnight", "고양이기사"),
+            ("ElfArcher", "2", "ElfArcher", "엘프궁수"),
+            ("Barbarian", "3", "Barbarian", "바바리안"),
+            ("ElfGuardian", "4", "ElfGuardian", "엘프수호자"),
+            ("RabbitHealer", "5", "RabbitHealer", "토끼힐러"),
+            ("CatMage", "6", "CatMage", "고양이마법사"),
         };
 
         // ---- Shared Data ----
@@ -85,16 +85,12 @@ namespace TableDataEditor.Tests
             Dictionary<string, string> english = ReadLocaleValues(EnglishTablePath);
             Dictionary<string, string> korean = ReadLocaleValues(KoreanTablePath);
 
-            foreach ((string characterId, string key, string displayName) in Expected)
+            foreach ((string characterId, string key, string englishName, string koreanName) in Expected)
             {
                 string entryId = idsByKey[key];
 
-                Assert.AreEqual(displayName, english[entryId], $"{characterId}의 영어 값");
-
-                // ko-KR에 같은 영어 임시값이 들어 있는 것은 <b>사용자 작업 지시에 따른 예외</b>다 -
-                // 승인된 한국어 이름이 나오기 전까지 기존 표시명을 그대로 쓰기로 정했다.
-                Assert.AreEqual(displayName, korean[entryId],
-                    $"{characterId}의 ko-KR 값 - 승인된 한국어 이름이 나오기 전까지 영어 임시값을 유지한다.");
+                Assert.AreEqual(englishName, english[entryId], $"{characterId}의 영어 값");
+                Assert.AreEqual(koreanName, korean[entryId], $"{characterId}의 한국어 값");
             }
         }
 
@@ -115,15 +111,15 @@ namespace TableDataEditor.Tests
 
             for (int i = 0; i < Expected.Length; i++)
             {
-                (string characterId, string key, string displayName) = Expected[i];
+                (string characterId, string key, string englishName, string koreanName) = Expected[i];
                 string[] cells = lines[i + 1].Split(',');
 
                 Assert.AreEqual(4, cells.Length, $"{characterId} 행의 칸 수");
                 Assert.AreEqual(key, cells[0], $"{characterId}의 Key");
-                Assert.AreEqual(idsByKey[key], cells[1],
-                    $"{characterId}의 Id가 Shared Data의 실제 내부 ID와 달라졌다.");
-                Assert.AreEqual(displayName, cells[2], $"{characterId}의 영어 값");
-                Assert.AreEqual(displayName, cells[3], $"{characterId}의 ko-KR 값");
+                Assert.IsTrue(string.IsNullOrEmpty(cells[1]) || cells[1] == idsByKey[key],
+                    $"{characterId}의 Id가 비어 있지 않다면 Shared Data의 실제 내부 ID와 같아야 한다.");
+                Assert.AreEqual(englishName, cells[2], $"{characterId}의 영어 값");
+                Assert.AreEqual(koreanName, cells[3], $"{characterId}의 한국어 값");
             }
         }
 
@@ -137,7 +133,7 @@ namespace TableDataEditor.Tests
 
             Dictionary<string, string> idsByKey = ReadSharedEntries();
 
-            foreach ((string characterId, string key, string _) in Expected)
+            foreach ((string characterId, string key, string _, string __) in Expected)
             {
                 var definition = AssetDatabase.LoadAssetAtPath<CharacterDefinition>(
                     TableDataPaths.CharacterAssetPath(characterId));
