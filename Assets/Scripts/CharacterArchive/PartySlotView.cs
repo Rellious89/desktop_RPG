@@ -21,7 +21,9 @@ namespace CharacterArchive
         private Button removeButton;
         private Image portrait;
         private TMP_Text nameText;
+        private TMP_Text worldNameText;
         private readonly CharacterNameBinding nameBinding = new CharacterNameBinding();
+        private LocalizedTextReference worldName;
         private CharacterDefinition character;
         private bool dragging;
 
@@ -41,7 +43,9 @@ namespace CharacterArchive
         public void Unbind()
         {
             if (removeButton != null) removeButton.onClick.RemoveListener(Remove);
-            nameBinding.Unbind(); owner = null; character = null; dragging = false;
+            nameBinding.Unbind();
+            UnbindWorldName();
+            owner = null; character = null; dragging = false;
         }
 
         public void Refresh(SaveData data, CharacterDefinition current, int capacity)
@@ -57,6 +61,7 @@ namespace CharacterArchive
             SetActive(recoveryMarker, character != null && RecoveryStation.IsCharacterIdInSavedSlot(data, character.CharacterId));
             if (portrait != null) { portrait.sprite = character != null ? character.Portrait : null; portrait.enabled = portrait.sprite != null; }
             nameBinding.Bind(character, value => { if (nameText != null) nameText.text = value ?? string.Empty; });
+            BindWorldName(character);
             if (removeButton != null) removeButton.interactable = IsEnabled && character != null && data != null && data.partyCharacterIds != null && data.partyCharacterIds.Count > 1;
         }
 
@@ -71,7 +76,13 @@ namespace CharacterArchive
         public void OnBeginDrag(PointerEventData eventData) => dragging = IsEnabled && character != null;
         public void OnDrag(PointerEventData eventData) { }
         public void OnEndDrag(PointerEventData eventData) => dragging = false;
-        private void OnDisable() { dragging = false; nameBinding.Unbind(); }
+        private void OnDisable()
+        {
+            dragging = false;
+            nameBinding.Unbind();
+            UnbindWorldName();
+            SetWorldName(string.Empty);
+        }
         private void Remove() => owner?.LeavePartyMember(this);
 
         private void ResolveViews()
@@ -81,6 +92,40 @@ namespace CharacterArchive
             GameObject remove = FindObject("btn_remove"); removeButton = remove != null ? remove.GetComponent<Button>() : null;
             GameObject portraitObject = FindObject("sp_portrait"); portrait = portraitObject != null ? portraitObject.GetComponent<Image>() : null;
             GameObject name = FindObject("lb_CharacterName"); nameText = name != null ? name.GetComponent<TMP_Text>() : null;
+            GameObject worldName = FindObject("lb_WorldName"); worldNameText = worldName != null ? worldName.GetComponent<TMP_Text>() : null;
+        }
+
+        private void BindWorldName(CharacterDefinition definition)
+        {
+            LocalizedTextReference next = definition != null && definition.OriginWorld != null && definition.OriginWorld.HasLocalizedName
+                ? definition.OriginWorld.LocalizedName : null;
+            if (ReferenceEquals(worldName, next))
+            {
+                if (next == null) SetWorldName(string.Empty);
+                return;
+            }
+
+            UnbindWorldName();
+            if (next == null)
+            {
+                SetWorldName(string.Empty);
+                return;
+            }
+
+            worldName = next;
+            worldName.StringChanged += SetWorldName;
+            SetWorldName(worldName.GetLocalizedString());
+        }
+
+        private void UnbindWorldName()
+        {
+            if (worldName != null) worldName.StringChanged -= SetWorldName;
+            worldName = null;
+        }
+
+        private void SetWorldName(string value)
+        {
+            if (worldNameText != null) worldNameText.text = value ?? string.Empty;
         }
         private GameObject FindObject(string objectName)
         {
