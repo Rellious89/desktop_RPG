@@ -112,7 +112,7 @@ namespace Recruitment
                 characterId = pendingId,
                 level = 1,
                 currentExp = 0,
-                currentStamina = -1,
+                currentStamina = definition.MaxStamina,
             };
             string oldPending = state.pendingCharacterId;
             SaveMetadataSnapshot metadata = SaveMetadataSnapshot.Capture(data);

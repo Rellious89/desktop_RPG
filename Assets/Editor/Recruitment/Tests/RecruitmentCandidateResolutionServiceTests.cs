@@ -25,6 +25,7 @@ namespace RecruitmentEditor.Tests
         private RecruitmentAccessCatalog accesses;
         private RecruitmentTypeCatalog types;
         private CharacterCatalog characters;
+        private CharacterDefinition catMageDefinition;
 
         [SetUp]
         public void SetUp()
@@ -46,7 +47,8 @@ namespace RecruitmentEditor.Tests
             accesses = Create<RecruitmentAccessCatalog>(); Fill(accesses, "accesses", access); accesses.MarkDirty();
             types = Create<RecruitmentTypeCatalog>(); Fill(types, "types", type); types.MarkDirty();
             characters = Create<CharacterCatalog>();
-            Fill(characters, "characters", Definition("CatKnight"), Definition("CatMage"));
+            catMageDefinition = Definition("CatMage", 17);
+            Fill(characters, "characters", Definition("CatKnight"), catMageDefinition);
             characters.MarkDirty();
         }
 
@@ -74,7 +76,8 @@ namespace RecruitmentEditor.Tests
             Assert.AreEqual("CatMage", data.characters[1].characterId);
             Assert.AreEqual(1, data.characters[1].level);
             Assert.AreEqual(0, data.characters[1].currentExp);
-            Assert.AreEqual(-1, data.characters[1].currentStamina);
+            Assert.AreNotEqual(30, catMageDefinition.MaxStamina);
+            Assert.AreEqual(catMageDefinition.MaxStamina, data.characters[1].currentStamina);
             Assert.AreEqual(SaveData.CurrentSaveVersion, data.saveVersion);
         }
 
@@ -226,10 +229,11 @@ namespace RecruitmentEditor.Tests
             return state;
         }
 
-        private CharacterDefinition Definition(string id)
+        private CharacterDefinition Definition(string id, int maxStamina = 5)
         {
             CharacterDefinition definition = Create<CharacterDefinition>();
             SetString(definition, "characterId", id);
+            SetInt(definition, "maxStamina", maxStamina);
             return definition;
         }
 
