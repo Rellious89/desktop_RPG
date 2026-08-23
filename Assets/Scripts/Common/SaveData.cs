@@ -22,7 +22,7 @@ namespace Common
         /// <see cref="SaveMigrationRunner"/>에 그 한 단계를 등록한다. 필드를 새로 <i>추가</i>하기만
         /// 할 때는 올리지 않는다 - JsonUtility가 없는 필드를 기본값으로 채우므로 예전 파일이 그대로
         /// 유효하다.</summary>
-        public const int CurrentSaveVersion = 2;
+        public const int CurrentSaveVersion = 3;
 
         /// <summary>버전 필드가 아예 없던 시절의 저장 파일 번호. 파일 안에 <c>saveVersion</c> 항목이
         /// 없으면(빈 객체 <c>{}</c> 포함) 그 파일은 이 버전이다 - 없는 것 자체가 곧 표식이라
@@ -59,7 +59,7 @@ namespace Common
 
         /// <summary>
         /// 보유 캐릭터 목록. <b>v2에서 이 목록의 뜻은 하나로 고정됐다</b> - 항목 하나는 <b>동시에 두
-        /// 가지</b>를 말한다.
+        /// 가지</b>를 말한다. v3부터 실제 출전 순서는 <see cref="partyCharacterIds"/>에 따로 둔다.
         ///
         /// <list type="number">
         ///   <item>플레이어가 <b>그 characterId를 가지고 있다</b>(보유).</item>
@@ -87,6 +87,13 @@ namespace Common
         /// 쓸 수 있던 여섯 캐릭터를 보유로 확정해, 버전이 올라가면서 가진 것이 줄어드는 일이 없게 한다.
         /// </summary>
         public List<CharacterSaveState> characters = new List<CharacterSaveState>();
+
+        /// <summary>
+        /// 실제 출전 파티의 characterId를 슬롯 순서대로 적는다. 캐릭터의 성장 상태와 보유 여부는
+        /// <see cref="characters"/> 한 곳만 권위가 있으므로 여기에는 id 외의 상태를 중복하지 않는다.
+        /// 현재 활성 캐릭터나 파티 정원도 저장하지 않는다.
+        /// </summary>
+        public List<string> partyCharacterIds = new List<string>();
 
         /// <summary>보유 재화(전역 값 하나). 아이템 목록과 완전히 별개이며 아이템 슬롯에 표시하지
         /// 않는다. 경험치/레벨/행동력과도 아무 관계가 없다. 인벤토리 데이터가 없는 예전 저장 파일을

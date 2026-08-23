@@ -292,7 +292,7 @@ namespace RecruitmentEditor.Tests
             Assert.AreEqual(original.startedAtUtc, data.recruitmentCycles[0].startedAtUtc);
             Assert.AreEqual(original.readyAtUtc, data.recruitmentCycles[0].readyAtUtc);
             Assert.AreEqual(original.pendingCharacterId, data.recruitmentCycles[0].pendingCharacterId);
-            Assert.AreEqual(2, SaveData.CurrentSaveVersion);
+            Assert.AreEqual(3, SaveData.CurrentSaveVersion);
         }
 
         private RecruitmentCycleService Service(

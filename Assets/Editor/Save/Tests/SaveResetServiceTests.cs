@@ -288,6 +288,7 @@ namespace CommonEditor.SaveTests
                     new CharacterSaveState { characterId = "Barbarian", level = 9, currentExp = 3, currentStamina = 20 },
                     new CharacterSaveState { characterId = "ElfArcher", level = 3, currentExp = 1, currentStamina = 15 },
                 },
+                partyCharacterIds = new List<string> { "CatKnight", "ElfArcher", "Barbarian" },
                 recoverySlots = new List<RecoverySlotSaveState>
                 {
                     new RecoverySlotSaveState
@@ -327,6 +328,8 @@ namespace CommonEditor.SaveTests
 
             CollectionAssert.AreEqual(new[] { "CatKnight", "Barbarian" }, IdsOf(data.characters),
                 "고른 ElfArcher만 빠지고 나머지는 순서 그대로 남아야 합니다.");
+            CollectionAssert.AreEqual(new[] { "CatKnight", "Barbarian" }, data.partyCharacterIds,
+                "삭제한 캐릭터만 파티에서도 빠지고 선택하지 않은 순서는 유지돼야 합니다.");
 
             // 비대상은 그대로.
             Assert.AreEqual(500, data.currency);
@@ -422,6 +425,7 @@ namespace CommonEditor.SaveTests
         {
             SaveData data = MakeCharacterFixture();
             List<CharacterSaveState> originalCharacters = data.characters;
+            List<string> originalParty = data.partyCharacterIds;
             List<InventoryItemState> originalItems = data.items;
 
             SaveResetResult result = SaveResetService.Apply(
@@ -435,6 +439,9 @@ namespace CommonEditor.SaveTests
             // 캐릭터 목록과 다른 대상 모두 원래대로.
             Assert.AreSame(originalCharacters, data.characters, "실패하면 원래 캐릭터 목록 참조로 되돌립니다.");
             CollectionAssert.AreEqual(new[] { "CatKnight", "Barbarian", "ElfArcher" }, IdsOf(data.characters));
+            Assert.AreSame(originalParty, data.partyCharacterIds,
+                "실패하면 원래 파티 목록 참조로 되돌립니다.");
+            CollectionAssert.AreEqual(new[] { "CatKnight", "ElfArcher", "Barbarian" }, data.partyCharacterIds);
             Assert.AreSame(originalItems, data.items);
             Assert.AreEqual(500, data.currency);
             Assert.AreEqual(1, data.buildingConstructions.Count);
@@ -445,6 +452,24 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(4, data.recoverySlots[0].startStamina);
             Assert.AreEqual("es", data.recoverySlots[0].startedAtUtc);
             Assert.AreEqual("CatKnight", data.recoverySlots[2].characterId);
+        }
+
+        [Test]
+        public void 캐릭터_삭제_저장_예외도_파티를_포함해_전부_되돌린다()
+        {
+            SaveData data = MakeCharacterFixture();
+            List<CharacterSaveState> originalCharacters = data.characters;
+            List<string> originalParty = data.partyCharacterIds;
+
+            Assert.Throws<InvalidOperationException>(() => SaveResetService.Apply(
+                data, SaveResetTargets.Character,
+                new List<string> { "ElfArcher" }, null,
+                () => { throw new InvalidOperationException("write failed"); }));
+
+            Assert.AreSame(originalCharacters, data.characters);
+            Assert.AreSame(originalParty, data.partyCharacterIds);
+            CollectionAssert.AreEqual(new[] { "CatKnight", "ElfArcher", "Barbarian" }, data.partyCharacterIds);
+            Assert.AreEqual("ElfArcher", data.recoverySlots[0].characterId);
         }
 
         [Test]

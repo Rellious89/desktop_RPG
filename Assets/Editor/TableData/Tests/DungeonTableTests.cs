@@ -303,10 +303,10 @@ namespace TableDataEditor.Tests
         // ---- 저장 버전 ----
 
         [Test]
-        public void SaveVersion_RemainsExactlyTwo()
+        public void SaveVersion_RemainsExactlyThree()
         {
-            Assert.AreEqual(2, SaveData.CurrentSaveVersion,
-                "이 체크포인트는 저장 형식을 바꾸지 않는다 - CurrentSaveVersion이 2가 아니면 마이그레이션을 확인하세요.");
+            Assert.AreEqual(3, SaveData.CurrentSaveVersion,
+                "이 체크포인트는 저장 형식을 바꾸지 않는다 - v3 마이그레이션을 확인하세요.");
         }
 
         // ---- 런타임 에셋의 방어적 하한 ----

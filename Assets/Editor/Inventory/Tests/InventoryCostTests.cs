@@ -1009,11 +1009,11 @@ namespace InventoryEditor.Tests
         // ---- 9.1 저장 형식 번호는 그대로 ----
 
         [Test]
-        public void SaveVersion_RemainsTwo()
+        public void SaveVersion_IsThreeAfterPartyMigration()
         {
-            Assert.AreEqual(2, SaveData.CurrentSaveVersion,
-                "9.1은 저장 형식을 바꾸지 않습니다(마이그레이션/새 필드 없음).");
-            Assert.AreEqual(2, new SaveData().saveVersion);
+            Assert.AreEqual(3, SaveData.CurrentSaveVersion,
+                "현재 저장 형식은 v2 보유 목록에서 초기 파티를 만드는 v3입니다.");
+            Assert.AreEqual(3, new SaveData().saveVersion);
         }
 
         // ---- Helpers ----

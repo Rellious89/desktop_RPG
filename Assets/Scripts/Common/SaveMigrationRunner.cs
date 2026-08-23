@@ -138,6 +138,7 @@ namespace Common
             {
                 new UnversionedToV1Step(),
                 new V1ToV2Step(),
+                new V2ToV3Step(),
             };
         }
 
@@ -235,6 +236,7 @@ namespace Common
             target.currency = source.currency;
 
             target.characters = CopyCharacters(source.characters);
+            target.partyCharacterIds = CopyPartyCharacterIds(source.partyCharacterIds);
             target.items = CopyItems(source.items);
             target.recoverySlots = CopyRecoverySlots(source.recoverySlots);
             target.buildingConstructions = CopyBuildingConstructions(source.buildingConstructions);
@@ -281,6 +283,11 @@ namespace Common
             }
 
             return copy;
+        }
+
+        private static List<string> CopyPartyCharacterIds(List<string> source)
+        {
+            return source == null ? new List<string>() : new List<string>(source);
         }
 
         private static List<BuildingConstructionSaveState> CopyBuildingConstructions(
@@ -554,6 +561,42 @@ namespace Common
                     currentStamina = AppendedCurrentStamina,
                 });
             }
+        }
+    }
+
+    /// <summary>
+    /// v2 문서를 v3으로 올리며, 당시 모든 보유 캐릭터였던 목록에서 초기 출전 파티를 만든다.
+    /// 현재 카탈로그나 파티 설정을 읽지 않는 역사적 변환이라, 이후 표가 바뀌어도 같은 문서는 같은
+    /// 결과를 얻는다.
+    /// </summary>
+    public sealed class V2ToV3Step : ISaveMigrationStep
+    {
+        private const int LegacyInitialPartyCapacity = 3;
+
+        public int FromVersion => 2;
+
+        public int ToVersion => 3;
+
+        public void Apply(SaveData data)
+        {
+            if (data == null) throw new ArgumentNullException(nameof(data));
+
+            var party = new List<string>(LegacyInitialPartyCapacity);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            if (data.characters != null)
+            {
+                foreach (CharacterSaveState state in data.characters)
+                {
+                    if (state == null || string.IsNullOrEmpty(state.characterId)) continue;
+                    if (!seen.Add(state.characterId)) continue;
+
+                    party.Add(state.characterId);
+                    if (party.Count == LegacyInitialPartyCapacity) break;
+                }
+            }
+
+            // v2의 동명 필드는 정식 계약이 아니었으므로 신뢰하지 않는다.
+            data.partyCharacterIds = party;
         }
     }
 }

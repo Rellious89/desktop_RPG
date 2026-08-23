@@ -13,8 +13,7 @@ namespace CommonEditor.Tests
     /// (1) 이 칸이 없던 예전 파일이 그대로 열리는가, (2) 정규화가 <b>null만</b> 치우는가,
     /// (3) 변환의 작업 사본이 네 값을 전부 옮기고 원본과 끊는가.
     ///
-    /// <b>저장 형식 번호는 그대로 2다.</b> 필드를 <i>추가</i>하기만 했으므로 예전 파일이 그대로
-    /// 유효하며(JsonUtility가 없는 칸을 기본값으로 채운다), 그 사실 자체를 아래에서 확인한다.
+    /// 건설 기록 자체는 형식 번호를 올리지 않았지만, 현재 형식은 파티 의미를 추가한 v3다.
     /// </summary>
     public sealed class BuildingConstructionSaveTests
     {
@@ -25,11 +24,10 @@ namespace CommonEditor.Tests
         // ---- 예전 파일 ----
 
         [Test]
-        public void 저장_형식_번호는_2_그대로다()
+        public void 현재_저장_형식_번호는_3이다()
         {
-            Assert.AreEqual(2, SaveData.CurrentSaveVersion,
-                "건설 기록은 칸을 더하기만 했으므로 형식 번호를 올리지 않는다");
-            Assert.AreEqual(2, new SaveData().saveVersion);
+            Assert.AreEqual(3, SaveData.CurrentSaveVersion);
+            Assert.AreEqual(3, new SaveData().saveVersion);
         }
 
         [Test]
@@ -49,12 +47,13 @@ namespace CommonEditor.Tests
 
             SaveLoadResult result = SaveMigrationRunner.Default.Load(json, Deserialize);
 
-            Assert.AreEqual(SaveLoadStatus.Loaded, result.Status);
+            Assert.AreEqual(SaveLoadStatus.Migrated, result.Status);
             Assert.IsNotNull(result.Data.buildingConstructions,
                 "없는 칸이 null로 남으면 호출부가 전부 null 검사를 해야 한다");
             Assert.AreEqual(0, result.Data.buildingConstructions.Count);
             Assert.AreEqual(1234, result.Data.currency, "새 칸을 더하면서 기존 값이 흔들리면 안 된다");
             Assert.AreEqual(7, result.Data.saveRevision);
+            Assert.IsEmpty(result.Data.partyCharacterIds);
         }
 
         [Test]
@@ -264,7 +263,7 @@ namespace CommonEditor.Tests
         [Test]
         public void 완성_표식이_없던_저장_파일은_아직_안내하지_않은_것으로_읽힌다()
         {
-            // 이 칸이 없던 파일(형식 번호는 그대로 2다) - JsonUtility가 false로 채우고, 그 값이
+            // 이 칸이 없던 v2 파일 - JsonUtility가 false로 채우고, 그 값이
             // 곧 "아직 안내하지 않았다"라서 그대로 옳다.
             string json =
                 "{\"saveVersion\":2,\"buildingConstructions\":[{\"buildingId\":\"1\"," +
@@ -275,8 +274,8 @@ namespace CommonEditor.Tests
 
             Assert.AreEqual(1, data.buildingConstructions.Count);
             Assert.IsFalse(data.buildingConstructions[0].completionNotified);
-            Assert.AreEqual(SaveData.CurrentSaveVersion, data.saveVersion,
-                "칸 하나를 더했다고 저장 형식 번호를 올리지 않는다");
+            Assert.AreEqual(2, data.saveVersion,
+                "역직렬화만 한 v2 원문의 버전 값은 마이그레이션 전까지 그대로다");
         }
 
         [Test]

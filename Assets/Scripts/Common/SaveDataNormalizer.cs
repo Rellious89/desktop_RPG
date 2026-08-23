@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Common
@@ -26,6 +27,7 @@ namespace Common
             // 캐릭터와 아이템은 목록 안의 항목을 id로 찾으므로, null 항목은 아무것도 가리키지 않는
             // 쓰레기다. 지워도 나머지 항목의 상대 순서는 그대로라 아이템의 획득 순서가 흐트러지지 않는다.
             data.characters = CompactCharacters(data.characters);
+            data.partyCharacterIds = CompactPartyCharacterIds(data.partyCharacterIds, data.characters);
             data.items = CompactItems(data.items);
 
             // 건설 기록도 buildingId로 찾으므로 null 항목은 아무것도 가리키지 않는 쓰레기다. 지우는
@@ -59,6 +61,34 @@ namespace Common
             {
                 if (source[i] == null) source.RemoveAt(i);
             }
+
+            return source;
+        }
+
+        private static List<string> CompactPartyCharacterIds(
+            List<string> source, List<CharacterSaveState> characters)
+        {
+            if (source == null) return new List<string>();
+
+            var owned = new HashSet<string>(StringComparer.Ordinal);
+            if (characters != null)
+            {
+                foreach (CharacterSaveState state in characters)
+                {
+                    if (state != null && !string.IsNullOrEmpty(state.characterId)) owned.Add(state.characterId);
+                }
+            }
+
+            var normalized = new List<string>(source.Count);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string id in source)
+            {
+                if (string.IsNullOrEmpty(id) || !owned.Contains(id) || !seen.Add(id)) continue;
+                normalized.Add(id);
+            }
+
+            source.Clear();
+            source.AddRange(normalized);
 
             return source;
         }

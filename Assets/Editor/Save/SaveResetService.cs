@@ -154,6 +154,7 @@ namespace CommonEditor.Save
                 resetConstruction ? data.recruitmentCycles : null;
 
             List<CharacterSaveState> oldCharacters = null;
+            List<string> oldPartyCharacterIds = null;
             List<RecoverySlotBackup> slotBackups = null;
             int removedCount = 0;
 
@@ -184,6 +185,18 @@ namespace CommonEditor.Save
 
                 data.characters = survivors;
 
+                oldPartyCharacterIds = data.partyCharacterIds;
+                if (oldPartyCharacterIds != null)
+                {
+                    var remainingParty = new List<string>(oldPartyCharacterIds.Count);
+                    foreach (string id in oldPartyCharacterIds)
+                    {
+                        if (!removeSet.Contains(id)) remainingParty.Add(id);
+                    }
+
+                    data.partyCharacterIds = remainingParty;
+                }
+
                 // 지운 캐릭터가 회복 중이던 슬롯만 빈 상태로 바꾼다. 목록에서 빼지 않아 인덱스가 유지된다.
                 if (data.recoverySlots != null)
                 {
@@ -210,14 +223,16 @@ namespace CommonEditor.Save
                 // 대리자가 터져도 메모리는 원래대로 돌려놓고 예외는 그대로 올려보낸다 - 부분 초기화가
                 // 남는 것보다 호출부가 실패를 알아채는 편이 낫다.
                 Rollback(data, resetItems, oldItems, resetCurrency, oldCurrency, resetConstruction,
-                    oldConstructions, oldRecruitmentCycles, removeCharacters, oldCharacters, slotBackups);
+                    oldConstructions, oldRecruitmentCycles, removeCharacters, oldCharacters, oldPartyCharacterIds,
+                    slotBackups);
                 throw;
             }
 
             if (!saved)
             {
                 Rollback(data, resetItems, oldItems, resetCurrency, oldCurrency, resetConstruction,
-                    oldConstructions, oldRecruitmentCycles, removeCharacters, oldCharacters, slotBackups);
+                    oldConstructions, oldRecruitmentCycles, removeCharacters, oldCharacters, oldPartyCharacterIds,
+                    slotBackups);
                 return new SaveResetResult(SaveResetOutcome.SaveFailed, effective, 0);
             }
 
@@ -270,7 +285,7 @@ namespace CommonEditor.Save
             bool resetCurrency, int oldCurrency,
             bool resetConstruction, List<BuildingConstructionSaveState> oldConstructions,
             List<RecruitmentCycleSaveState> oldRecruitmentCycles,
-            bool removeCharacters, List<CharacterSaveState> oldCharacters,
+            bool removeCharacters, List<CharacterSaveState> oldCharacters, List<string> oldPartyCharacterIds,
             List<RecoverySlotBackup> slotBackups)
         {
             if (resetItems) data.items = oldItems;
@@ -284,6 +299,7 @@ namespace CommonEditor.Save
             if (removeCharacters)
             {
                 data.characters = oldCharacters;
+                data.partyCharacterIds = oldPartyCharacterIds;
 
                 // 빈 상태로 바꿨던 회복 슬롯을 원래 값으로 되돌린다(같은 객체, 같은 인덱스).
                 if (slotBackups != null && data.recoverySlots != null)

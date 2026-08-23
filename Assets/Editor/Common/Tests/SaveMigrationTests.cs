@@ -543,6 +543,7 @@ namespace CommonEditor.Tests
 
             Assert.IsNotNull(data);
             Assert.IsNotNull(data.characters);
+            Assert.IsNotNull(data.partyCharacterIds);
             Assert.IsNotNull(data.items);
             Assert.AreEqual(SaveData.DefaultRecoverySlotCount, data.recoverySlots.Count);
         }
@@ -550,12 +551,17 @@ namespace CommonEditor.Tests
         [Test]
         public void 정규화는_없는_목록을_빈_목록으로_만든다()
         {
-            SaveData data = new SaveData { characters = null, items = null, recoverySlots = null };
+            SaveData data = new SaveData
+            {
+                characters = null, partyCharacterIds = null, items = null, recoverySlots = null,
+            };
 
             SaveDataNormalizer.Normalize(data);
 
             Assert.IsNotNull(data.characters);
             Assert.IsEmpty(data.characters);
+            Assert.IsNotNull(data.partyCharacterIds);
+            Assert.IsEmpty(data.partyCharacterIds);
             Assert.IsNotNull(data.items);
             Assert.IsEmpty(data.items);
             Assert.AreEqual(SaveData.DefaultRecoverySlotCount, data.recoverySlots.Count);
@@ -642,6 +648,33 @@ namespace CommonEditor.Tests
             Assert.AreEqual(slots, data.recoverySlots.Count);
             Assert.IsEmpty(data.items);
             Assert.IsEmpty(data.characters);
+        }
+
+        [Test]
+        public void 정규화는_파티에서_빈값_중복과_미보유만_빼고_순서를_지킨다()
+        {
+            SaveData data = new SaveData
+            {
+                characters = new List<CharacterSaveState>
+                {
+                    new CharacterSaveState { characterId = "CatKnight" },
+                    new CharacterSaveState { characterId = "UnknownFromOldBuild" },
+                    new CharacterSaveState { characterId = "ElfArcher" },
+                },
+                partyCharacterIds = new List<string>
+                {
+                    "ElfArcher", null, "CatKnight", "ElfArcher", "Missing", "UnknownFromOldBuild", "",
+                },
+            };
+
+            SaveDataNormalizer.Normalize(data);
+            CollectionAssert.AreEqual(
+                new[] { "ElfArcher", "CatKnight", "UnknownFromOldBuild" }, data.partyCharacterIds);
+
+            SaveDataNormalizer.Normalize(data);
+            CollectionAssert.AreEqual(
+                new[] { "ElfArcher", "CatKnight", "UnknownFromOldBuild" }, data.partyCharacterIds,
+                "정규화는 여러 번 실행해도 결과가 같아야 합니다.");
         }
 
         [Test]
@@ -809,6 +842,7 @@ namespace CommonEditor.Tests
                         characterId = "barbarian", level = 4, currentExp = 5, currentStamina = 9,
                     },
                 },
+                partyCharacterIds = new List<string> { "barbarian" },
                 items = new List<InventoryItemState>
                 {
                     new InventoryItemState { itemId = "potion", count = 3 },
@@ -855,6 +889,9 @@ namespace CommonEditor.Tests
             Assert.AreEqual(240, data.currentExp, $"{because} (currentExp)");
             Assert.AreEqual(133, data.totalKillCount, $"{because} (totalKillCount)");
             Assert.AreEqual(1250, data.currency, $"{because} (currency)");
+
+            CollectionAssert.AreEqual(new[] { "barbarian" }, data.partyCharacterIds,
+                $"{because} (partyCharacterIds)");
 
             Assert.AreEqual(1, data.items.Count, $"{because} (items 개수)");
             Assert.AreEqual("potion", data.items[0].itemId, $"{because} (items[0].itemId)");
@@ -955,6 +992,8 @@ namespace CommonEditor.Tests
             Assert.AreEqual("barbarian", data.characters[0].characterId);
             Assert.AreEqual(9, data.characters[0].currentStamina);
             Assert.AreEqual(5, data.characters[0].currentExp, "사본이 경험치를 빠뜨리면 안 된다.");
+            CollectionAssert.AreEqual(new[] { "barbarian" }, data.partyCharacterIds,
+                "파티 목록도 사본 경계를 지나 보존해야 한다.");
             Assert.AreEqual("barbarian", data.recoverySlots[0].characterId);
             Assert.AreEqual(2, data.recoverySlots[0].startStamina);
             Assert.AreEqual("2026-01-02T05:04:05.0000000Z", data.recoverySlots[0].completeAtUtc);
@@ -979,7 +1018,7 @@ namespace CommonEditor.Tests
             {
                 "saveVersion", "saveRevision", "lastSavedAtUtc",
                 "currentLevel", "currentExp", "totalKillCount",
-                "characters", "currency", "items", "recoverySlots", "buildingConstructions",
+                "characters", "partyCharacterIds", "currency", "items", "recoverySlots", "buildingConstructions",
                 "recruitmentCycles",
             };
 
@@ -1013,7 +1052,7 @@ namespace CommonEditor.Tests
         }
 
         [Test]
-        public void 깊은_사본은_캐릭터의_경험치를_옮기고_원본과_끊어_둔다()
+        public void 깊은_사본은_캐릭터_경험치와_파티_목록을_옮기고_원본과_끊어_둔다()
         {
             SaveData data = new SaveData
             {
@@ -1022,9 +1061,11 @@ namespace CommonEditor.Tests
                 {
                     new CharacterSaveState { characterId = "CatKnight", level = 4, currentExp = 7, currentStamina = 9 },
                 },
+                partyCharacterIds = new List<string> { "CatKnight" },
             };
 
             CharacterSaveState original = data.characters[0];
+            List<string> originalParty = data.partyCharacterIds;
 
             SaveMigrationResult result = SaveMigrationRunner.Default.Migrate(data, SaveData.CurrentSaveVersion);
 
@@ -1035,6 +1076,8 @@ namespace CommonEditor.Tests
 
             // 사본을 거쳤으므로 호출부의 문서에는 <b>새 항목</b>이 들어와 있어야 한다.
             Assert.AreNotSame(original, data.characters[0], "목록 안의 항목까지 새로 만들어야 얕은 사본이 아니다.");
+            Assert.AreNotSame(originalParty, data.partyCharacterIds, "파티 목록도 새 목록이어야 한다.");
+            CollectionAssert.AreEqual(new[] { "CatKnight" }, data.partyCharacterIds);
         }
 
         [Test]
@@ -1372,6 +1415,64 @@ namespace CommonEditor.Tests
             return data;
         }
 
+        private static SaveData ApplyV2ToV3(SaveData data)
+        {
+            new V2ToV3Step().Apply(data);
+            return data;
+        }
+
+        [Test]
+        public void v2_v3_단계는_한_칸짜리_단계다()
+        {
+            V2ToV3Step step = new V2ToV3Step();
+
+            Assert.AreEqual(2, step.FromVersion);
+            Assert.AreEqual(3, step.ToVersion);
+        }
+
+        [Test]
+        public void v2_파티는_보유_순서에서_최대_셋만_선정하고_원본_캐릭터는_보존한다()
+        {
+            CharacterSaveState first = Character("UnknownFromOldBuild", 9, 4);
+            CharacterSaveState duplicate = Character("CatKnight", 2, 8);
+            SaveData data = new SaveData
+            {
+                saveVersion = 2,
+                characters = new List<CharacterSaveState>
+                {
+                    null,
+                    Character(string.Empty, 3, 2),
+                    first,
+                    Character("CatKnight", 5, 7),
+                    duplicate,
+                    Character("ElfArcher", 4, 6),
+                    Character("RabbitHealer", 1, 3),
+                },
+                partyCharacterIds = new List<string> { "DoNotTrustV2" },
+            };
+
+            ApplyV2ToV3(data);
+
+            CollectionAssert.AreEqual(
+                new[] { "UnknownFromOldBuild", "CatKnight", "ElfArcher" }, data.partyCharacterIds);
+            Assert.AreSame(first, data.characters[2]);
+            Assert.AreSame(duplicate, data.characters[4]);
+            Assert.IsNull(data.characters[0]);
+            Assert.AreEqual(string.Empty, data.characters[1].characterId);
+        }
+
+        [Test]
+        public void v2_파티는_보유가_없으면_빈_목록이며_잘못된_입력은_예외다()
+        {
+            SaveData data = new SaveData { saveVersion = 2, characters = null };
+
+            ApplyV2ToV3(data);
+
+            Assert.IsNotNull(data.partyCharacterIds);
+            Assert.IsEmpty(data.partyCharacterIds);
+            Assert.Throws<ArgumentNullException>(() => new V2ToV3Step().Apply(null));
+        }
+
         [Test]
         public void v1_v2_단계는_한_칸짜리_단계다()
         {
@@ -1406,7 +1507,8 @@ namespace CommonEditor.Tests
             List<int> fromVersions = new List<int>();
             foreach (ISaveMigrationStep step in steps) fromVersions.Add(step.FromVersion);
 
-            CollectionAssert.AreEquivalent(new[] { 0, 1 }, fromVersions, "0->1과 1->2가 모두 있어야 합니다.");
+            CollectionAssert.AreEquivalent(new[] { 0, 1, 2 }, fromVersions,
+                "0->1, 1->2, 2->3이 모두 있어야 합니다.");
             Assert.AreEqual(SaveData.CurrentSaveVersion, SaveMigrationRunner.Default.TargetVersion);
         }
 
@@ -1603,7 +1705,7 @@ namespace CommonEditor.Tests
 
             Assert.AreEqual(SaveLoadStatus.Migrated, result.Status);
             Assert.AreEqual(0, result.FromVersion);
-            Assert.AreEqual(2, result.ToVersion);
+            Assert.AreEqual(3, result.ToVersion);
             Assert.AreEqual(SaveData.CurrentSaveVersion, result.Data.saveVersion);
 
             // v0->v1의 결과(메타데이터를 '모름'으로)와 v1->v2의 결과(여섯 캐릭터)가 <b>둘 다</b> 보여야
@@ -1619,6 +1721,7 @@ namespace CommonEditor.Tests
 
             Assert.AreEqual("barbarian", ids[0], "예전 파일에 있던 항목이 앞자리를 지켜야 합니다.");
             Assert.AreEqual("scarecrow", ids[1]);
+            CollectionAssert.AreEqual(new[] { "barbarian", "scarecrow", "Barbarian" }, result.Data.partyCharacterIds);
         }
 
         [Test]
@@ -1633,7 +1736,7 @@ namespace CommonEditor.Tests
 
             Assert.AreEqual(SaveLoadStatus.Migrated, result.Status);
             Assert.AreEqual(1, result.FromVersion);
-            Assert.AreEqual(2, result.ToVersion);
+            Assert.AreEqual(3, result.ToVersion);
             Assert.IsTrue(result.ShouldResaveSoon, "올린 문서는 다음 명시적 저장으로 굳혀야 합니다.");
 
             // v1->v2는 메타데이터를 건드리지 않는다 - v0->v1이 함께 돌지 않았다는 증거이기도 하다.
@@ -1644,10 +1747,11 @@ namespace CommonEditor.Tests
                 new[] { "CatMage", "Barbarian", "CatKnight", "ElfArcher", "ElfGuardian", "RabbitHealer" },
                 IdsOf(result.Data.characters));
             Assert.AreEqual(8, result.Data.characters[0].level, "있던 항목의 값은 그대로입니다.");
+            CollectionAssert.AreEqual(new[] { "CatMage", "Barbarian", "CatKnight" }, result.Data.partyCharacterIds);
         }
 
         [Test]
-        public void v2_문서는_변환_없이_그대로_읽고_여섯을_다시_덧붙이지_않는다()
+        public void v2_문서는_v3으로_올리되_여섯을_다시_덧붙이지_않는다()
         {
             SaveData source = V1Document(Character("CatMage", 8, 3));
             source.saveVersion = 2;
@@ -1655,10 +1759,32 @@ namespace CommonEditor.Tests
 
             SaveLoadResult result = SaveMigrationRunner.Default.Load(json, JsonDeserializer);
 
-            Assert.AreEqual(SaveLoadStatus.Loaded, result.Status, "이미 현재 버전이면 변환하지 않습니다.");
+            Assert.AreEqual(SaveLoadStatus.Migrated, result.Status);
             Assert.AreEqual(1, result.Data.characters.Count,
                 "v2 문서에 여섯을 다시 채워 넣으면 지운 캐릭터가 되살아납니다.");
             Assert.AreEqual("CatMage", result.Data.characters[0].characterId);
+            CollectionAssert.AreEqual(new[] { "CatMage" }, result.Data.partyCharacterIds);
+        }
+
+        [Test]
+        public void v3_문서는_조회와_JSON_왕복으로_파티를_바꾸지_않는다()
+        {
+            SaveData source = new SaveData
+            {
+                saveVersion = 3,
+                characters = new List<CharacterSaveState>
+                {
+                    Character("CatKnight", 4, 9), Character("UnknownFromOldBuild", 2, 3),
+                },
+                partyCharacterIds = new List<string> { "UnknownFromOldBuild", "CatKnight" },
+            };
+
+            SaveLoadResult result = SaveMigrationRunner.Default.Load(JsonUtility.ToJson(source), JsonDeserializer);
+
+            Assert.AreEqual(SaveLoadStatus.Loaded, result.Status);
+            CollectionAssert.AreEqual(
+                new[] { "UnknownFromOldBuild", "CatKnight" }, result.Data.partyCharacterIds);
+            CollectionAssert.AreEqual(new[] { "CatKnight", "UnknownFromOldBuild" }, IdsOf(result.Data.characters));
         }
 
         [Test]
@@ -1688,7 +1814,7 @@ namespace CommonEditor.Tests
             SaveMigrationResult result = SaveMigrationRunner.Default.Migrate(data, 1);
 
             Assert.AreEqual(SaveMigrationOutcome.Migrated, result.Outcome);
-            Assert.AreEqual(2, data.saveVersion);
+            Assert.AreEqual(3, data.saveVersion);
             Assert.AreEqual(41, data.saveRevision);
             Assert.AreEqual("2026-01-02T03:04:05.0000000Z", data.lastSavedAtUtc);
             Assert.AreEqual(7, data.currentLevel);
@@ -1712,11 +1838,11 @@ namespace CommonEditor.Tests
         }
 
         [Test]
-        public void v2보다_새로운_문서는_여전히_읽지도_고치지도_않는다()
+        public void v3보다_새로운_문서는_여전히_읽지도_고치지도_않는다()
         {
             SaveData data = FullyPopulated();
 
-            SaveMigrationResult result = SaveMigrationRunner.Default.Migrate(data, 3);
+            SaveMigrationResult result = SaveMigrationRunner.Default.Migrate(data, 4);
 
             Assert.AreEqual(SaveMigrationOutcome.FutureVersion, result.Outcome);
             AssertUntouched(data, "미래 버전은 읽지도 고치지도 않습니다");

@@ -181,13 +181,16 @@ namespace CommonEditor.Tests
                 new[] { "CatMage", "Barbarian", "CatKnight", "ElfArcher", "ElfGuardian", "RabbitHealer" },
                 IdsOf(SaveSystem.Data.characters),
                 "CatMage는 여섯 중 하나이므로 나머지 다섯만 정해진 차례로 덧붙습니다.");
+            CollectionAssert.AreEqual(
+                new[] { "CatMage", "Barbarian", "CatKnight" }, SaveSystem.Data.partyCharacterIds,
+                "v3 초기 파티는 v2 최종 보유 순서에서 첫 세 명만 고릅니다.");
 
             Assert.AreEqual(0, fake.WriteCalls,
                 "켜기만 한 사용자의 파일을 바꿔 놓지 않도록, 올린 결과는 다음 명시적 Save까지 기다립니다.");
         }
 
         [Test]
-        public void 올린_뒤_명시적_Save가_v2를_쓰고_v1_원본을_백업에_남긴다()
+        public void 올린_뒤_명시적_Save가_v3를_쓰고_v1_원본을_백업에_남긴다()
         {
             LocalFileSaveStorage real = UseTemporaryDirectoryStorage();
             File.WriteAllText(real.PrimaryPath, LegacyV1Json);
@@ -199,7 +202,7 @@ namespace CommonEditor.Tests
 
             Assert.AreEqual(SaveData.CurrentSaveVersion,
                 SaveVersionProbe.Probe(File.ReadAllText(real.PrimaryPath)).Version,
-                "주 파일은 이제 v2입니다.");
+                "주 파일은 이제 v3입니다.");
             Assert.AreEqual(LegacyV1Json, File.ReadAllText(real.BackupPath),
                 "원자적 교체가 v1 원본을 백업 자리에 그대로 남겨야 합니다 - 되돌아갈 곳입니다.");
         }
@@ -416,13 +419,10 @@ namespace CommonEditor.Tests
         }
 
         [Test]
-        public void 경험치_칸을_더해도_저장_형식_번호는_2_그대로다()
+        public void v3_저장_형식_번호가_실제_파일에도_기록된다()
         {
-            // 필드를 <b>추가</b>하기만 하는 변경은 형식 번호를 올리지 않는다 - 없는 필드는 기본값으로
-            // 읽히므로 예전 파일이 그대로 유효하다. 번호가 올라가면 예전 클라이언트가 이 파일을
-            // "미래 버전"으로 보고 진행을 막으므로, 그 판단을 시험으로 못 박아 둔다.
-            Assert.AreEqual(2, SaveData.CurrentSaveVersion,
-                "체크포인트 A는 저장 형식 번호를 올리지 않습니다 - 올려야 한다면 마이그레이션 단계도 함께 필요합니다.");
+            Assert.AreEqual(3, SaveData.CurrentSaveVersion,
+                "v2의 보유 목록에서 역사적 초기 파티를 만들려면 v3 마이그레이션이 필요합니다.");
 
             LocalFileSaveStorage real = UseTemporaryDirectoryStorage();
             SaveSystem.Data.characters.Add(new CharacterSaveState
@@ -432,8 +432,8 @@ namespace CommonEditor.Tests
 
             Assert.IsTrue(SaveSystem.Save());
 
-            Assert.AreEqual(2, SaveVersionProbe.Probe(File.ReadAllText(real.PrimaryPath)).Version,
-                "실제로 쓴 파일에도 2가 적혀 있어야 합니다.");
+            Assert.AreEqual(3, SaveVersionProbe.Probe(File.ReadAllText(real.PrimaryPath)).Version,
+                "실제로 쓴 파일에도 3이 적혀 있어야 합니다.");
         }
 
         // ---- 기존 호출부와의 계약 ----
