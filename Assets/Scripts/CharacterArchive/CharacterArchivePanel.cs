@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Character;
 using Common;
 using Recovery;
+using Party;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -29,8 +30,11 @@ namespace CharacterArchive
         [SerializeField] private GameObject ownedBookmarkDisabled;
         [SerializeField] private TMP_Text ownedCountText;
         [SerializeField] private LocalizedTMPText ownedCountLocalizer;
+        [SerializeField] private PartyConfigCatalog partyConfigCatalog;
 
         private readonly List<CharacterArchiveCardView> cards = new List<CharacterArchiveCardView>();
+        private readonly List<PartySlotView> partySlots = new List<PartySlotView>();
+        private PartyCompositionService partyService;
         private bool ownedOnly;
         private CharacterDefinition selected;
         private LocalizedTextReference boundCountFormat;
@@ -46,6 +50,7 @@ namespace CharacterArchive
             ValidateReferences();
             BindButtons();
             BindCountFormat();
+            BindPartySlots();
             CharacterRoster.CurrentCharacterChanged += HandleRosterChanged;
             CharacterRoster.CharacterStateChanged += HandleRosterChanged;
             RecoveryService.SlotsChanged += HandleRecoverySlotsChanged;
@@ -59,6 +64,7 @@ namespace CharacterArchive
             RecoveryService.SlotsChanged -= HandleRecoverySlotsChanged;
             UnbindButtons();
             UnbindCountFormat();
+            UnbindPartySlots();
             if (openInstance == this) openInstance = null;
         }
 
@@ -89,6 +95,7 @@ namespace CharacterArchive
             }
             RefreshBookmarks();
             RefreshCount(owned.OwnedCount, owned.AllCharacters.Count);
+            RefreshPartySlots(data, current);
         }
 
         private bool ValidateReferences()
@@ -159,5 +166,111 @@ namespace CharacterArchive
         }
         private static bool Same(CharacterDefinition left, CharacterDefinition right) => left != null && right != null && string.Equals(left.CharacterId, right.CharacterId, StringComparison.Ordinal);
         private static void SetActive(GameObject target, bool value) { if (target != null && target.activeSelf != value) target.SetActive(value); }
+
+        private void BindPartySlots()
+        {
+            partySlots.Clear();
+            PartySlotView[] found = GetComponentsInChildren<PartySlotView>(true);
+            for (int i = 0; i < found.Length; i++) partySlots.Add(found[i]);
+
+            // UI 프리팹은 이미 만들어져 있으므로, 이전 버전의 프리팹에도 런타임에서 동작하도록
+            // 이름이 정해진 슬롯에만 컴포넌트를 붙인다. RectTransform/아트 설정은 바꾸지 않는다.
+            if (partySlots.Count == 0)
+            {
+                Transform[] transforms = GetComponentsInChildren<Transform>(true);
+                for (int i = 0; i < transforms.Length; i++)
+                {
+                    if (!transforms[i].name.StartsWith("slot_CharacterArchive_Party", StringComparison.Ordinal)) continue;
+                    partySlots.Add(transforms[i].gameObject.AddComponent<PartySlotView>());
+                }
+            }
+
+            partySlots.Sort((left, right) => left.transform.GetSiblingIndex().CompareTo(right.transform.GetSiblingIndex()));
+            for (int i = 0; i < partySlots.Count; i++) partySlots[i].Bind(this, i);
+            partyService = new PartyCompositionService(() => SaveSystem.Data, SaveSystem.Save, ResolvePartyConfigCatalog());
+        }
+
+        private void UnbindPartySlots()
+        {
+            for (int i = 0; i < partySlots.Count; i++) partySlots[i].Unbind();
+            partySlots.Clear();
+            partyService = null;
+        }
+
+        private PartyConfigCatalog ResolvePartyConfigCatalog()
+        {
+            if (partyConfigCatalog != null) return partyConfigCatalog;
+            PartyConfigCatalog[] candidates = Resources.FindObjectsOfTypeAll<PartyConfigCatalog>();
+            return candidates != null && candidates.Length > 0 ? candidates[0] : null;
+        }
+
+        private void RefreshPartySlots(SaveData data, CharacterDefinition current)
+        {
+            if (partyService == null) return;
+            PartyCapacityResult capacity = partyService.GetCapacity();
+            int count = capacity.IsAvailable ? capacity.Capacity : 0;
+            for (int i = 0; i < partySlots.Count; i++) partySlots[i].Refresh(data, current, count);
+        }
+
+        internal void HandlePartyDrop(CharacterDefinition incoming, PartySlotView target, bool fromPartySlot)
+        {
+            if (incoming == null || target == null || partyService == null || !target.IsEnabled) return;
+            SaveData data = SaveSystem.Data;
+            string incomingId = incoming.CharacterId;
+            string outgoingId = target.CharacterId;
+            CharacterDefinition current = CharacterRoster.Instance != null ? CharacterRoster.Instance.Current : null;
+
+            bool alreadyInParty = data != null && data.partyCharacterIds != null && data.partyCharacterIds.Contains(incomingId);
+            if (fromPartySlot || alreadyInParty)
+            {
+                int targetIndex = data.partyCharacterIds.Count > 0
+                    ? Mathf.Min(target.SlotIndex, data.partyCharacterIds.Count - 1) : 0;
+                ApplyPartyResult(partyService.TryMove(incomingId, targetIndex), incoming, false);
+                return;
+            }
+
+            if (string.Equals(incomingId, outgoingId, StringComparison.Ordinal)) return;
+            if (string.IsNullOrEmpty(outgoingId))
+            {
+                ApplyPartyResult(partyService.TryJoin(incomingId), incoming, true);
+                return;
+            }
+
+            if (Same(current, outgoingId)) { ShowToast(61); return; }
+            if (RecoveryStation.IsCharacterIdInSavedSlot(data, incomingId) || RecoveryStation.IsCharacterIdInSavedSlot(data, outgoingId)) { ShowToast(59); return; }
+            ApplyPartyResult(partyService.TryReplace(outgoingId, incomingId), incoming, true);
+        }
+
+        internal CharacterDefinition FindCharacter(string id) => catalog != null ? catalog.Find(id) : null;
+
+        internal void LeavePartyMember(PartySlotView slot)
+        {
+            if (slot == null || partyService == null || string.IsNullOrEmpty(slot.CharacterId)) return;
+            CharacterDefinition current = CharacterRoster.Instance != null ? CharacterRoster.Instance.Current : null;
+            if (Same(current, slot.CharacterId)) { ShowToast(61); return; }
+            if (RecoveryStation.IsCharacterIdInSavedSlot(SaveSystem.Data, slot.CharacterId)) { ShowToast(59); return; }
+            ApplyPartyResult(partyService.TryLeave(slot.CharacterId), null, false);
+        }
+
+        private void ApplyPartyResult(PartyCompositionResult result, CharacterDefinition successCharacter, bool showSuccess)
+        {
+            if (!result.Success)
+            {
+                if (result.Code == PartyCompositionCode.InRecovery) ShowToast(59);
+                return;
+            }
+
+            CharacterRoster.Instance?.RefreshPartyAfterExternalSave();
+            if (showSuccess && successCharacter != null) ShowToast(60, CharacterNameBinding.GetCurrent(successCharacter));
+            RefreshContents();
+        }
+
+        private static bool Same(CharacterDefinition character, string id) => character != null && string.Equals(character.CharacterId, id, StringComparison.Ordinal);
+        private static void ShowToast(long key, params object[] arguments)
+        {
+            if (ToastManager.Instance == null) return;
+            var message = new LocalizedTextReference("GUID:32fd067a20b754a50b20446b9c78d2ae", key.ToString());
+            ToastManager.Instance.Show(message.GetLocalizedString(arguments));
+        }
     }
 }

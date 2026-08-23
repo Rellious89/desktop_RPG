@@ -2206,6 +2206,7 @@ MonoBehaviour:
   inputBlocker: {fileID: 0}
   inputBlockerColor: {r: 0, g: 0, b: 0, a: 0}
   catalog: {fileID: 11400000, guid: 5f24823f983054d358a82014246a9fa7, type: 2}
+  partyConfigCatalog: {fileID: 11400000, guid: b5a4b1b6a358544f09c7123bd6aac7b3, type: 2}
   content: {fileID: 5231922080815455100}
   cardTemplate: {fileID: 7443924247371237418}
   detailCard: {fileID: 7832643047995069198}
