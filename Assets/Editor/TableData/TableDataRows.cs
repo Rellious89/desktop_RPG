@@ -181,6 +181,9 @@ namespace TableDataEditor
         public string Id = string.Empty;
         public LocalizedEntryRef Name;
 
+        /// <summary>태어난 월드의 ID. 활성 캐릭터는 활성 World.csv 행만 가리킨다.</summary>
+        public string OriginWorldId = string.Empty;
+
         /// <summary>이 캐릭터의 모션 데이터 원천. 활성/비활성과 무관하게 <b>필수</b>이며, 재생 가능한
         /// Base Idle이 있는 것까지 확인한 프로필만 여기까지 온다.</summary>
         public CharacterMotionProfile MotionProfile;

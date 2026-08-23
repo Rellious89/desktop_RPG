@@ -27,13 +27,13 @@ namespace TableDataEditor
         All = 0,
 
         /// <summary>
-        /// Character / Skill / CharacterSkill 세 표만. 이 셋은 앞의 다섯 표를 <b>하나도 참조하지
-        /// 않으므로</b> 따로 떼어 내도 참조가 끊길 곳이 없고, 관계 표가 가리키는 Character와 Skill은
-        /// 둘 다 이 묶음 안에 있다.
+        /// Character / Skill / CharacterSkill 세 표만. Character는 이미 만들어진 WorldDefinition을
+        /// <b>읽어서만</b> origin_world_id 참조를 잇고, 관계 표가 가리키는 Character와 Skill은 둘 다
+        /// 이 묶음 안에 있다.
         ///
-        /// 기존 다섯 도메인의 생성 에셋은 <b>읽지도 쓰지도 SetDirty하지도 않는다</b> - 이미 만들어
-        /// 놓은 World/Currency/Item/Monster/Dungeon 에셋의 파일이 이 범위의 Rebuild로 달라지는 일이
-        /// 없다는 것이 이 값의 존재 이유다.
+        /// 기존 다섯 도메인 중 World만 origin 참조를 위해 <b>읽고</b>, 어떤 도메인도 쓰거나
+        /// SetDirty하지 않는다 - 이미 만들어 놓은 World/Currency/Item/Monster/Dungeon 에셋의 파일이
+        /// 이 범위의 Rebuild로 달라지는 일이 없다는 것이 이 값의 존재 이유다.
         /// </summary>
         CharacterSkillTables = 1,
 
@@ -310,7 +310,7 @@ namespace TableDataEditor
                 WriteCatalog(dungeonCatalog, "dungeons", SortForCatalog(snapshot.Dungeons, r => r.Enabled, r => r.DisplayOrder, r => r.Id, dungeonAssets));
 
                 // Character -> Skill -> CharacterSkill. 관계 표가 앞의 둘을 가리키므로 순서가 이렇다.
-                WriteCharacterTables(snapshot, characterTargets);
+                WriteCharacterTables(snapshot, characterTargets, worldAssets);
 
                 // Building은 Currency와 Item을 가리키므로 그 둘이 이미 채워져 있어야 한다.
                 WriteBuildingTable(snapshot, buildingTargets, currencyAssets, itemAssets);
@@ -812,11 +812,11 @@ namespace TableDataEditor
         }
 
         /// <summary>
-        /// 세 표만 다시 만든다. <b>기존 다섯 도메인의 생성 에셋은 로드조차 하지 않는다</b> -
-        /// <see cref="ResolveTargets{T}"/>도 <see cref="ResolveSingleton{T}"/>도 그쪽 폴더에 대해
-        /// 불리지 않고, 검증의 출력 쪽 점검도 범위 밖 폴더를 열지 않으므로
-        /// (<see cref="TableDataValidator.GeneratedOutputFolders"/>) <c>SetDirty</c>가 걸릴 대상
-        /// 자체가 존재하지 않는다.
+        /// 세 표만 다시 만든다. World 생성 에셋은 origin 참조를 위해 읽을 뿐,
+        /// <see cref="ResolveTargets{T}"/>나 <see cref="ResolveSingleton{T}"/>로 확보하지 않고
+        /// SetDirty도 하지 않는다. 나머지 기존 도메인 폴더는 출력 점검에서도 열지 않으므로
+        /// (<see cref="TableDataValidator.GeneratedOutputFolders"/>) 범위 밖 에셋을 쓸 대상 자체가
+        /// 존재하지 않는다.
         ///
         /// <b>여기서는 <c>AssetDatabase.SaveAssets()</c>를 부르지 않는다.</b> 그것은 프로젝트에서
         /// dirty 상태인 <b>모든</b> 에셋을 디스크에 쓰는 전역 동작이라, 사람이 인스펙터에서 고쳐 두고
@@ -829,10 +829,15 @@ namespace TableDataEditor
         {
             CharacterTableTargets targets = ResolveCharacterTableTargets(snapshot, result);
 
+            // origin_world_id가 가리킬 WorldDefinition은 이번 범위에서 만들거나 고치지 않는다.
+            // Validate가 정확히 하나임을 확인했으므로, 여기서는 기존 생성 에셋을 읽기만 한다.
+            Dictionary<string, WorldDefinition> worlds = LoadGeneratedSingles<WorldDefinition>(
+                TableDataPaths.WorldOutputFolder, w => w.WorldId);
+
             AssetDatabase.StartAssetEditing();
             try
             {
-                WriteCharacterTables(snapshot, targets);
+                WriteCharacterTables(snapshot, targets, worlds);
             }
             finally
             {
@@ -880,9 +885,13 @@ namespace TableDataEditor
             };
         }
 
-        private static void WriteCharacterTables(TableDataSnapshot snapshot, CharacterTableTargets targets)
+        private static void WriteCharacterTables(
+            TableDataSnapshot snapshot, CharacterTableTargets targets, Dictionary<string, WorldDefinition> worlds)
         {
-            foreach (CharacterRow row in snapshot.Characters) WriteCharacter(targets.Characters[row.Id], row);
+            foreach (CharacterRow row in snapshot.Characters)
+            {
+                WriteCharacter(targets.Characters[row.Id], row, worlds);
+            }
             foreach (SkillRow row in snapshot.Skills) WriteSkill(targets.Skills[row.Id], row);
             foreach (CharacterSkillRow row in snapshot.CharacterSkills)
             {
@@ -1159,11 +1168,13 @@ namespace TableDataEditor
         /// 기본 체력은 <b>두 칸을 언제나 함께</b> 쓴다 - 표에서 값을 지웠는데 에셋에 예전 숫자가 남아
         /// 있으면 "정하지 않았다"가 사라진다. 지정이 없으면 플래그를 끄고 숫자 칸은 하한값으로 되돌린다.
         /// </summary>
-        private static void WriteCharacter(CharacterDefinition asset, CharacterRow row)
+        private static void WriteCharacter(
+            CharacterDefinition asset, CharacterRow row, Dictionary<string, WorldDefinition> worlds)
         {
             var serialized = new SerializedObject(asset);
             serialized.FindProperty("characterId").stringValue = row.Id;
             serialized.FindProperty("motionProfile").objectReferenceValue = row.MotionProfile;
+            serialized.FindProperty("originWorld").objectReferenceValue = Lookup(worlds, row.OriginWorldId);
             serialized.FindProperty("portrait").objectReferenceValue = row.Portrait;
             serialized.FindProperty("maxStamina").intValue = row.MaxStamina;
             serialized.FindProperty(InitiallyOwnedField).boolValue = row.InitiallyOwned;
@@ -1382,9 +1393,12 @@ namespace TableDataEditor
             // motionProfile / portrait / maxStamina)에도 값을 쓰기 때문이다. displayName은 쓰지 않지만
             // 목록에 넣어 두었다: 그 칸이 사라지면 표시 이름의 근거가 통째로 달라지므로, 임포터를 함께
             // 고쳐야 하는 변경이라는 것을 여기서 드러낸다.
-            ok &= VerifyFields<CharacterDefinition>(log, "characterId", "displayName", "motionProfile", "portrait",
+            ok &= VerifyFields<CharacterDefinition>(log, "characterId", "displayName", "originWorld", "motionProfile", "portrait",
                 "maxStamina", InitiallyOwnedField, "localizedName", HasBaseMaxHealthField, BaseMaxHealthField,
                 "displayOrder");
+            ok &= VerifyPropertyType<CharacterDefinition>(
+                log, "originWorld", SerializedPropertyType.ObjectReference,
+                "캐릭터의 origin world 칸은 WorldDefinition을 가리키는 참조여야 합니다.");
             ok &= VerifyPropertyType<CharacterDefinition>(
                 log, InitiallyOwnedField, SerializedPropertyType.Boolean,
                 "새 게임 시작 구성은 참/거짓 칸이어야 합니다 - 다른 타입이면 표의 값이 조용히 버려집니다.");

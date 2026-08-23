@@ -12,4 +12,5 @@
 
 ## 제외 범위
 
-- UI·씬·프리팹, 후보 등록·반환, 캐릭터 지급, 비용, 주기 재시작, CSV·Localization·Generated, 실제 `persistentDataPath`, 원격 푸시는 구현하지 않았다.
+- UI·씬·프리팹, 후보 등록·반환, 캐릭터 지급, 비용, CSV·Localization·Generated, 실제 `persistentDataPath`, 원격 푸시는 구현하지 않았다.
+- 후보 저장 전환은 다음 UTC 주기부터 시작한다.

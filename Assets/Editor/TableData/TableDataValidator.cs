@@ -106,10 +106,9 @@ namespace TableDataEditor
         /// 않는다 - 범위를 좁혔다고 검사가 느슨해지면 "좁게 돌렸더니 통과했다"는 상태가 생긴다.
         ///
         /// 좁아지는 것은 <see cref="CheckOutputConflicts"/>와 <see cref="CheckOrphans"/>뿐이며,
-        /// 이 둘은 <see cref="GeneratedOutputFolders"/>가 돌려주는 폴더만 로드한다. 범위 밖 도메인의
-        /// 생성 폴더에는 <see cref="TableDataAssetIndex.LoadGeneratedById{T}"/>도
-        /// <see cref="AssetDatabase.LoadAssetAtPath{T}"/>도 부르지 않는다 - 그래야 "targeted Rebuild는
-        /// 기존 다섯 도메인의 생성 에셋을 로드조차 하지 않는다"가 말이 아니라 코드가 된다.
+        /// 이 둘은 <see cref="GeneratedOutputFolders"/>가 돌려주는 폴더만 점검한다. 단,
+        /// Character-only 범위는 origin_world_id 참조를 잇기 위해 기존 World 생성 에셋을 읽어
+        /// 정확히 하나인지 확인하지만, 절대 쓰거나 dirty로 표시하지 않는다.
         /// </summary>
         public static TableDataValidationResult Validate(TableDataRebuildScope outputScope)
         {
@@ -1016,6 +1015,9 @@ namespace TableDataEditor
                 // 목록에서 무엇을 고르는지 알 수 없다.
                 row.Name = ReadLocalizedName(
                     table, record, file, line, row.Enabled, nameRequiredWhenEnabled: true, log);
+
+                row.OriginWorldId = ReadWorldReference(
+                    table, record, file, line, row.Enabled, snapshot, log, TableDataColumns.OriginWorldId);
 
                 ReadCharacterMotionProfile(table, record, file, line, assets, row, log);
                 ReadPortrait(table, record, file, line, assets, row, log);
@@ -2178,21 +2180,22 @@ namespace TableDataEditor
         /// <summary>world_id 한 칸을 읽고 참조 무결성까지 본다. 다듬지 않은 원본 값을 그대로 판정한다.</summary>
         private static string ReadWorldReference(
             CsvTable table, CsvRecord record, string file, int line,
-            bool enabled, TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+            bool enabled, TableDataSnapshot snapshot, TableDataDiagnosticLog log,
+            string column = TableDataColumns.WorldId)
         {
-            string raw = table.Get(record, TableDataColumns.WorldId);
+            string raw = table.Get(record, column);
 
             if (string.IsNullOrEmpty(raw))
             {
                 if (enabled)
                 {
-                    log.Error(file, line, TableDataColumns.WorldId, raw,
-                        "enabled=1인 행은 world_id가 필요합니다.");
+                    log.Error(file, line, column, raw,
+                        $"enabled=1인 행은 {column}가 필요합니다.");
                 }
                 else
                 {
-                    log.Warning(file, line, TableDataColumns.WorldId, raw,
-                        "world_id가 비어 있습니다 - 소속 월드 없이 생성됩니다.");
+                    log.Warning(file, line, column, raw,
+                        $"{column}가 비어 있습니다 - 소속 월드 없이 생성됩니다.");
                 }
 
                 return string.Empty;
@@ -2200,21 +2203,21 @@ namespace TableDataEditor
 
             if (!TableDataFieldRules.IsValidId(raw))
             {
-                log.Error(file, line, TableDataColumns.WorldId, raw,
-                    $"world_id 형식이 맞지 않습니다 - {TableDataFieldRules.IdPatternText} 를 만족해야 합니다.");
+                log.Error(file, line, column, raw,
+                    $"{column} 형식이 맞지 않습니다 - {TableDataFieldRules.IdPatternText} 를 만족해야 합니다.");
                 return string.Empty;
             }
 
             if (!snapshot.WorldsById.TryGetValue(raw, out WorldRow world))
             {
-                log.Error(file, line, TableDataColumns.WorldId, raw,
-                    $"{TableDataPaths.WorldCsvFileName}에 없는 world_id입니다.");
+                log.Error(file, line, column, raw,
+                    $"{TableDataPaths.WorldCsvFileName}에 없는 {column}입니다.");
                 return raw;
             }
 
             if (enabled && !world.Enabled)
             {
-                log.Error(file, line, TableDataColumns.WorldId, raw,
+                log.Error(file, line, column, raw,
                     $"enabled=0인 월드({TableDataPaths.WorldCsvFileName} {world.Line}행)를 참조합니다 - " +
                     "활성 행은 활성 월드만 가리킬 수 있습니다.");
             }
@@ -2438,6 +2441,13 @@ namespace TableDataEditor
                     TableDataPaths.CharacterCatalogAssetPath, null, null,
                     TableDataPaths.CharacterCsvFileName, TableDataDiagnostic.FileLevelRow,
                     TableDataColumns.FilePseudoColumn, TableDataPaths.CharacterCatalogAssetName, log);
+
+                // Character-only Rebuild는 World를 다시 만들지 않는다. origin_world_id 참조는 이미
+                // 만들어진 WorldDefinition을 읽어 이어야 하므로, 쓰기 전에 정확히 하나인지 확인한다.
+                if (!TableDataRebuildScopes.IncludesLegacyDomains(outputScope))
+                {
+                    CheckCharacterOriginWorldSourcesAreGenerated(snapshot, log);
+                }
             }
 
             if (InScope(selected, TableDataPaths.SkillOutputFolder))
@@ -2773,6 +2783,30 @@ namespace TableDataEditor
         }
 
         /// <summary>
+        /// Character-only 좁은 범위에서, 각 Character.csv 행의 origin_world_id가 가리키는
+        /// <see cref="WorldDefinition"/> 생성 에셋이 이미 정확히 하나 있는지 쓰기 전에 확인한다.
+        /// 이 범위는 World 표를 다시 만들지 않으므로, 없거나 중복된 대상을 참조하면 안 된다.
+        /// 읽기만 하며 World 생성 에셋을 dirty 또는 저장하지 않는다.
+        /// </summary>
+        private static void CheckCharacterOriginWorldSourcesAreGenerated(
+            TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            Dictionary<string, List<WorldDefinition>> worlds =
+                TableDataAssetIndex.LoadGeneratedById<WorldDefinition>(
+                    TableDataPaths.WorldOutputFolder, w => w.WorldId);
+
+            foreach (CharacterRow row in snapshot.Characters)
+            {
+                if (string.IsNullOrEmpty(row.OriginWorldId)) continue;
+
+                RequireSingleGenerated(
+                    worlds, row.OriginWorldId, TableDataPaths.WorldOutputFolder,
+                    nameof(WorldDefinition), row.Line, TableDataColumns.OriginWorldId, log,
+                    TableDataPaths.CharacterCsvFileName);
+            }
+        }
+
+        /// <summary>
         /// 모집만 다시 만드는 좁은 범위에서, 후보와 획득 방식이 가리키는 <b>CharacterDefinition 생성
         /// 에셋이 이미 있는지</b>를 쓰기 전에 확인한다.
         ///
@@ -2867,15 +2901,15 @@ namespace TableDataEditor
         /// 여럿이면 어느 것을 이을지 정할 수 없다 - 둘 다 오류이며 어느 쪽이든 아무것도 쓰이지 않는다.</summary>
         private static void RequireSingleGenerated<T>(
             Dictionary<string, List<T>> generated, string id, string folder, string typeName,
-            int line, string column, TableDataDiagnosticLog log) where T : ScriptableObject
+            int line, string column, TableDataDiagnosticLog log, string file = null) where T : ScriptableObject
         {
             int count = generated.TryGetValue(id, out List<T> matches) ? matches.Count : 0;
             if (count == 1) return;
 
-            log.Error(TableDataPaths.BuildingCsvFileName, line, column, id, count == 0
+            log.Error(file ?? TableDataPaths.BuildingCsvFileName, line, column, id, count == 0
                 ? $"'{folder}' 아래에 ID가 '{id}'인 {typeName} 생성 에셋이 없습니다 - " +
-                  "Building만 다시 만드는 범위는 그 에셋을 만들지 않으므로, 먼저 전체 Rebuild로 " +
-                  "그 표의 생성 에셋을 만든 뒤 다시 실행하세요."
+                  "이 좁은 Rebuild 범위는 그 에셋을 만들지 않으므로, 먼저 그 표를 포함한 Rebuild를 " +
+                  "실행한 뒤 다시 시도하세요."
                 : $"'{folder}' 아래에 ID가 '{id}'인 {typeName} 생성 에셋이 {count}개 있어 " +
                   "어느 것을 참조할지 정할 수 없습니다 - 하나만 남기세요.");
         }

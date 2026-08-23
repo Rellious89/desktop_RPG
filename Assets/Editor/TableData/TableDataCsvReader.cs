@@ -128,6 +128,9 @@ namespace TableDataEditor
         // 같다. 사람이 읽는 캐릭터 이름은 <c>$character_name</c>이라는 참조 컬럼으로 따로 둔다.
         public const string CharacterId = "character_id";
 
+        /// <summary>캐릭터가 태어난 월드의 ID. 사람이 읽는 월드명은 참조용 열이라 읽지 않는다.</summary>
+        public const string OriginWorldId = "origin_world_id";
+
         /// <summary>초상화 칸. 비어 있으면 런타임이 Base Idle 첫 프레임을 대신 쓴다(선택 항목).</summary>
         public const string PortraitKey = "portrait_key";
 
@@ -149,7 +152,7 @@ namespace TableDataEditor
 
         public static readonly string[] Character =
         {
-            CharacterId, NameCategory, NameKey, MotionProfileKey, PortraitKey, BaseMaxHealth,
+            CharacterId, NameCategory, NameKey, OriginWorldId, MotionProfileKey, PortraitKey, BaseMaxHealth,
             MaxStamina, InitiallyOwned, DisplayOrder, Enabled, Memo,
         };
 

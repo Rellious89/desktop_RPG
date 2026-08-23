@@ -59,7 +59,7 @@ namespace TableDataEditor.Tests
             CollectionAssert.AreEqual(
                 new[]
                 {
-                    "character_id", "name_category", "name_key", "motion_profile_key", "portrait_key",
+                    "character_id", "name_category", "name_key", "origin_world_id", "motion_profile_key", "portrait_key",
                     "base_max_health", "max_stamina", "initially_owned", "display_order", "enabled", "memo",
                 },
                 TableDataColumns.Character,
@@ -84,6 +84,18 @@ namespace TableDataEditor.Tests
             CollectionAssert.DoesNotContain(TableDataColumns.Character, "$character_name",
                 "$character_name은 작업자용 참조 컬럼이라 필수 컬럼이 되면 안 된다.");
             Assert.IsTrue(TableDataCsvReader.IsReferenceOnlyColumn("$character_name"));
+        }
+
+        [Test]
+        public void Schema_UsesOriginWorldIdAndNeverTheReferenceOnlyWorldName()
+        {
+            int originIndex = Array.IndexOf(TableDataColumns.Character, TableDataColumns.OriginWorldId);
+
+            Assert.Greater(originIndex, 0, "origin_world_id가 Character.csv 필수 컬럼에 없습니다.");
+            Assert.AreEqual(TableDataColumns.NameKey, TableDataColumns.Character[originIndex - 1]);
+            Assert.AreEqual(TableDataColumns.MotionProfileKey, TableDataColumns.Character[originIndex + 1]);
+            CollectionAssert.DoesNotContain(TableDataColumns.Character, "$origin_world_name");
+            Assert.IsTrue(TableDataCsvReader.IsReferenceOnlyColumn("$origin_world_name"));
         }
 
         [Test]
@@ -166,6 +178,35 @@ namespace TableDataEditor.Tests
         {
             Assert.IsTrue(TableDataFieldRules.IsValidCharacterId("ice_mage"));
             Assert.IsTrue(TableDataFieldRules.IsValidCharacterId("101"));
+        }
+
+        [Test]
+        public void OriginWorldId_ActiveCharacterReferencesAnActiveWorld()
+        {
+            TableDataSnapshot snapshot = Validate(out TableDataDiagnosticLog log,
+                Row("CatKnight", motionKey: "P", originWorldId: "1"));
+
+            Assert.AreEqual(0, CountErrors(log, TableDataColumns.OriginWorldId), Describe(log));
+            Assert.AreEqual("1", snapshot.Characters[0].OriginWorldId);
+        }
+
+        [TestCase("")]
+        [TestCase("999")]
+        public void OriginWorldId_BlankOrUnknownBlocksAnActiveCharacter(string originWorldId)
+        {
+            Validate(out TableDataDiagnosticLog log,
+                Row("CatKnight", motionKey: "P", originWorldId: originWorldId));
+
+            Assert.AreEqual(1, CountErrors(log, TableDataColumns.OriginWorldId), Describe(log));
+        }
+
+        [Test]
+        public void OriginWorldId_DisabledWorldBlocksAnActiveCharacter()
+        {
+            Validate(out TableDataDiagnosticLog log,
+                Row("CatKnight", motionKey: "P", originWorldId: "2"));
+
+            Assert.AreEqual(1, CountErrors(log, TableDataColumns.OriginWorldId), Describe(log));
         }
 
         [Test]
@@ -740,6 +781,8 @@ namespace TableDataEditor.Tests
 
             var table = new CsvTable(File, TableDataColumns.Character, records);
             var snapshot = new TableDataSnapshot();
+            AddWorld(snapshot, "1", enabled: true);
+            AddWorld(snapshot, "2", enabled: false);
             log = new TableDataDiagnosticLog();
 
             ValidateCharactersMethod.Invoke(null, new object[] { table, snapshot, assets, log });
@@ -751,6 +794,7 @@ namespace TableDataEditor.Tests
             string id,
             string category = Category,
             string key = Key,
+            string originWorldId = "1",
             string motionKey = "",
             string portraitKey = "",
             string baseMaxHealth = "",
@@ -761,9 +805,16 @@ namespace TableDataEditor.Tests
         {
             return new[]
             {
-                id, category, key, motionKey, portraitKey, baseMaxHealth, maxStamina, initiallyOwned,
+                id, category, key, originWorldId, motionKey, portraitKey, baseMaxHealth, maxStamina, initiallyOwned,
                 displayOrder, enabled, string.Empty,
             };
+        }
+
+        private static void AddWorld(TableDataSnapshot snapshot, string id, bool enabled)
+        {
+            var world = new WorldRow { Id = id, Enabled = enabled, Line = 1 };
+            snapshot.Worlds.Add(world);
+            snapshot.WorldsById[id] = world;
         }
 
         /// <summary>

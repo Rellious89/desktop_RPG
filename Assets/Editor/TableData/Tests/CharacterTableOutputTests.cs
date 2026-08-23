@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Character;
+using Dungeon;
 using NUnit.Framework;
 using Skill;
 using UnityEditor;
@@ -664,6 +665,29 @@ namespace TableDataEditor.Tests
                 Assert.IsTrue(character.HasLocalizedName, $"{character.CharacterId}의 이름 참조");
                 Assert.IsNotNull(character.MotionProfile, $"{character.CharacterId}의 모션 프로필");
                 Assert.IsTrue(CharacterMotionProfile.IsPlayable(character.MotionProfile));
+            }
+        }
+
+        [Test]
+        public void GeneratedCharacters_ReferenceTheirExactCsvOriginWorlds()
+        {
+            var expected = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["CatKnight"] = "1", ["CatMage"] = "1", ["RabbitHealer"] = "1",
+                ["ElfArcher"] = "2", ["Barbarian"] = "2", ["ElfGuardian"] = "2",
+            };
+
+            foreach (KeyValuePair<string, string> pair in expected)
+            {
+                CharacterDefinition character = AssetDatabase.LoadAssetAtPath<CharacterDefinition>(
+                    TableDataPaths.CharacterAssetPath(pair.Key));
+                WorldDefinition world = AssetDatabase.LoadAssetAtPath<WorldDefinition>(
+                    TableDataPaths.WorldAssetPath(pair.Value));
+
+                Assert.IsNotNull(character, $"생성 CharacterDefinition이 없습니다: {pair.Key}");
+                Assert.IsNotNull(world, $"생성 WorldDefinition이 없습니다: {pair.Value}");
+                Assert.AreSame(world, character.OriginWorld,
+                    $"{pair.Key}의 origin_world_id가 CSV와 다른 WorldDefinition을 가리킵니다.");
             }
         }
 

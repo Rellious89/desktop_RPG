@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   characterId: RabbitHealer
   displayName: 
+  originWorld: {fileID: 11400000, guid: 79144df9714ff41edad2ce9c6244bd91, type: 2}
   motionProfile: {fileID: 11400000, guid: 73ad72f60c266498e821b7d0e8ea4842, type: 2}
   portrait: {fileID: 0}
   maxStamina: 30

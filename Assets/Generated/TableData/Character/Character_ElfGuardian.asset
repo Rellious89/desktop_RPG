@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   characterId: ElfGuardian
   displayName: 
+  originWorld: {fileID: 11400000, guid: 629d166772e154d9eb3f9e0e564074ae, type: 2}
   motionProfile: {fileID: 11400000, guid: adabc763987eb4de1b5ec6936b293711, type: 2}
   portrait: {fileID: 0}
   maxStamina: 30

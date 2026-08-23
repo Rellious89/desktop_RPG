@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   characterId: CatMage
   displayName: 
+  originWorld: {fileID: 11400000, guid: 79144df9714ff41edad2ce9c6244bd91, type: 2}
   motionProfile: {fileID: 11400000, guid: 8adc502fe0c9542309b63d7e9bfa0944, type: 2}
   portrait: {fileID: 0}
   maxStamina: 30

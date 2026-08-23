@@ -1,4 +1,5 @@
 using Common;
+using Dungeon;
 using UnityEngine;
 
 namespace Character
@@ -37,6 +38,10 @@ namespace Character
         [SerializeField] private string displayName;
 
         [Header("References")]
+        [Tooltip("이 캐릭터가 태어난 월드. Character.csv의 origin_world_id가 가리키는 WorldDefinition 참조이며, " +
+                 "월드 이름이나 로컬라이즈 텍스트를 복사하지 않는다.")]
+        [SerializeField] private WorldDefinition originWorld;
+
         [Tooltip("이 캐릭터의 모션 데이터 원천. 캐릭터를 투입하면 런타임 액터가 이 프로필을 그대로 " +
                  "적용해 연기한다 - 비어 있거나 재생 가능한 Base Idle이 없으면 CharacterRoster가 시작 시 " +
                  "오류를 남기고 이 캐릭터를 목록에서 제외한다.")]
@@ -88,6 +93,9 @@ namespace Character
         }
 
         public CharacterMotionProfile MotionProfile => motionProfile;
+
+        /// <summary>이 캐릭터가 태어난 월드 정의. 표시 이름을 복사한 문자열이 아니라 원본 정의 참조다.</summary>
+        public WorldDefinition OriginWorld => originWorld;
 
         public int MaxStamina => Mathf.Max(1, maxStamina);
 
