@@ -11,7 +11,7 @@ namespace Building
     /// <summary>
     /// 마을의 건물 슬롯 위에 떠 있는 상호작용 UI(btn_Build_Inn / pn_ConstructionTimer / btn_Open_Inn)를
     /// <b>월드 앵커에 붙여 두는</b> 컨트롤러. 하는 일은 여섯이다 - (1) 앵커의 월드 좌표를 화면 좌표로
-    /// 옮겨 건설 버튼과 타이머의 위치를 맞추고, (2) 보여야 할 상황인지 판정해 상호작용 루트를 켜고 끄고,
+    /// 옮겨 <b>셋 모두</b>의 위치를 맞추고, (2) 보여야 할 상황인지 판정해 상호작용 루트를 켜고 끄고,
     /// (3) 버튼이 눌리면 건물 정의 하나를 팝업에 넘겨 열고, (4) <b>건설 단계에 따라 셋 중 하나만
     /// 보이게 하고</b>, (5) 짓는 중이면 남은 시간을 1초에 한 번 고쳐 쓰고, (6) 건설이 시작되거나
     /// 완성되면 안내 토스트를 <b>한 번씩</b> 띄운다.
@@ -100,8 +100,9 @@ namespace Building
                  "기준이 된다.")]
         [SerializeField] private Button buildButton;
 
-        [Tooltip("여관 입장 버튼(Interaction/btn_Open_Inn). 건설이 완성된 뒤에만 켜진다. 이번 " +
-                 "단계에서는 눌러도 하는 일이 없다 - 무엇이 열릴지는 다음 단계의 몫이다.")]
+        [Tooltip("여관 입장 버튼(Interaction/btn_Open_Inn). 건설이 완성된 뒤에만 켜지며, 켜지는 " +
+                 "자리는 건설 버튼/타이머와 같은 월드 앵커다. 이번 단계에서는 눌러도 하는 일이 " +
+                 "없다 - 무엇이 열릴지는 다음 단계의 몫이다.")]
         [SerializeField] private GameObject openInnButton;
 
         [Tooltip("건설 타이머 묶음(Interaction/pn_ConstructionTimer). 짓는 중에만 켜지며, 켜지는 " +
@@ -141,6 +142,7 @@ namespace Building
 
         private RectTransform buildButtonRect;
         private RectTransform constructionTimerRect;
+        private RectTransform openInnButtonRect;
         private Canvas interactionCanvas;
         private bool referencesValidated;
 
@@ -328,16 +330,19 @@ namespace Building
 
         private bool HasPositionableRect()
         {
-            return buildButtonRect != null || constructionTimerRect != null;
+            return buildButtonRect != null || constructionTimerRect != null || openInnButtonRect != null;
         }
 
-        /// <summary>건설 버튼과 타이머를 <b>같은 자리</b>로 옮긴다. 둘은 서로 자리를 물려받는 사이이므로
-        /// (짓기 시작하면 버튼 자리에 타이머가 뜬다) 좌표를 따로 계산하지 않는다. 지금 꺼져 있는 쪽도
-        /// 함께 옮겨 두어야 켜지는 순간 제자리에서 나타난다.</summary>
+        /// <summary>건설 버튼과 타이머와 입장 버튼을 <b>같은 자리</b>로 옮긴다. 셋은 차례로 자리를
+        /// 물려받는 사이이므로(짓기 시작하면 버튼 자리에 타이머가, 다 지으면 그 자리에 입장 버튼이
+        /// 뜬다) 좌표를 따로 계산하지 않는다. 지금 꺼져 있는 쪽도 함께 옮겨 두어야 켜지는 순간
+        /// 제자리에서 나타난다 - 옮기지 않으면 프리팹에 저장된 자리에 한 번 그려진 뒤에야 앵커를
+        /// 따라온다.</summary>
         private void ApplyAnchoredPosition(Vector2 localPoint)
         {
             if (buildButtonRect != null) buildButtonRect.anchoredPosition = localPoint;
             if (constructionTimerRect != null) constructionTimerRect.anchoredPosition = localPoint;
+            if (openInnButtonRect != null) openInnButtonRect.anchoredPosition = localPoint;
         }
 
         /// <summary>
@@ -690,6 +695,10 @@ namespace Building
             {
                 constructionTimerRect = constructionTimerRoot.transform as RectTransform;
             }
+
+            // 입장 버튼도 같은 앵커를 따라가야 하므로 사각형을 함께 잡아 둔다 - 새 참조를 요구하지
+            // 않고 이미 연결된 오브젝트에서 얻는다.
+            if (openInnButton != null) openInnButtonRect = openInnButton.transform as RectTransform;
 
             if (fieldModeManager == null)
             {

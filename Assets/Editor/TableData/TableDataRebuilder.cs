@@ -5,6 +5,7 @@ using Character;
 using CommonEditor;
 using Dungeon;
 using Inventory;
+using Recruitment;
 using Skill;
 using UnityEditor;
 using UnityEngine;
@@ -49,6 +50,19 @@ namespace TableDataEditor
         /// 않는다는 것이 이 값의 존재 이유다.
         /// </summary>
         BuildingTable = 2,
+
+        /// <summary>
+        /// 모집 네 표(CharacterAcquisition / RecruitmentType / RecruitmentPool / RecruitmentAccess)만.
+        /// 이 넷은 Character를 가리키지만 <b>그 표를 함께 다시 쓰지 않고도</b> 참조를 이을 수 있다 -
+        /// 이미 만들어져 있는 <c>CharacterDefinition</c> 생성 에셋을 <b>읽어서</b> 가리키기 때문이며,
+        /// 그 에셋이 없거나 여럿이면 <see cref="TableDataValidator"/>가 <b>쓰기 전에</b> 오류로 잡는다
+        /// (<c>CheckRecruitmentCharacterSourcesAreGenerated</c>). Building은 아예 참조하지 않는다 -
+        /// 창구는 종류와 id 문자열로만 대상을 가리키므로 이을 참조 자체가 없다.
+        ///
+        /// 네 표 사이의 참조(창구 → 모집)는 모두 이 묶음 안에 있으므로 끊길 곳이 없다.
+        /// 나머지 아홉 도메인의 생성 에셋은 <b>쓰지도 SetDirty하지도 않는다</b>.
+        /// </summary>
+        RecruitmentTables = 3,
     }
 
     /// <summary>
@@ -63,7 +77,8 @@ namespace TableDataEditor
         {
             return scope == TableDataRebuildScope.All
                    || scope == TableDataRebuildScope.CharacterSkillTables
-                   || scope == TableDataRebuildScope.BuildingTable;
+                   || scope == TableDataRebuildScope.BuildingTable
+                   || scope == TableDataRebuildScope.RecruitmentTables;
         }
 
         /// <summary>지원하지 않는 값이면 <b>아무것도 하기 전에</b> 던진다.</summary>
@@ -74,7 +89,8 @@ namespace TableDataEditor
             throw new ArgumentOutOfRangeException(parameterName, scope,
                 "지원하지 않는 Rebuild 범위입니다 - " +
                 $"{nameof(TableDataRebuildScope.All)}, {nameof(TableDataRebuildScope.CharacterSkillTables)}, " +
-                $"{nameof(TableDataRebuildScope.BuildingTable)}만 " +
+                $"{nameof(TableDataRebuildScope.BuildingTable)}, " +
+                $"{nameof(TableDataRebuildScope.RecruitmentTables)}만 " +
                 "쓸 수 있습니다. 임의의 부분집합을 허용하면 범위 밖 표를 가리키던 참조가 지워집니다.");
         }
 
@@ -97,6 +113,13 @@ namespace TableDataEditor
         {
             EnsureSupported(scope, nameof(scope));
             return scope == TableDataRebuildScope.All || scope == TableDataRebuildScope.BuildingTable;
+        }
+
+        /// <summary>이 범위가 모집 네 표를 포함하는지.</summary>
+        public static bool IncludesRecruitmentTables(TableDataRebuildScope scope)
+        {
+            EnsureSupported(scope, nameof(scope));
+            return scope == TableDataRebuildScope.All || scope == TableDataRebuildScope.RecruitmentTables;
         }
     }
 
@@ -169,6 +192,27 @@ namespace TableDataEditor
         private const string BuildingCostItemCountField = "count";
         private const string BuildingEnabledField = "enabled";
 
+        // 모집 네 표의 칸 이름들. 네 클래스가 <b>같은 이름</b>을 쓰는 칸(모집 키, 캐릭터 키, enabled)은
+        // 상수도 하나만 둔다 - 두 번 적어 두면 한쪽만 고쳐진 채로 "검사는 통과했는데 값이 비는" 상태가
+        // 생긴다. 캐릭터와 모집은 <b>id 문자열과 정의 참조를 함께</b> 쓰며(저장/조회의 키는 언제나
+        // id 쪽이다), 창구의 대상은 참조 없이 문자열 두 칸뿐이다.
+        private const string AcquisitionIdField = "acquisitionId";
+        private const string AcquisitionTypeField = "acquisitionType";
+        private const string AllowDuplicateRecruitmentField = "allowDuplicateRecruitment";
+        private const string ConditionIdField = "conditionId";
+        private const string RecruitmentCharacterIdField = "characterId";
+        private const string RecruitmentCharacterField = "character";
+        private const string RecruitmentTypeIdField = "recruitmentTypeId";
+        private const string RecruitmentTypeField = "recruitmentType";
+        private const string PoolEntryIdField = "poolEntryId";
+        private const string WeightField = "weight";
+        private const string RecruitmentAccessIdField = "recruitmentAccessId";
+        private const string SourceTypeField = "sourceType";
+        private const string SourceIdField = "sourceId";
+        private const string ArrivalIntervalSecondsField = "arrivalIntervalSeconds";
+        private const string ConsumeAmountField = "consumeAmount";
+        private const string RecruitmentEnabledField = "enabled";
+
         // 관계가 가리키는 두 참조 칸. 문자열로 되돌아가 있으면 objectReferenceValue에 넣은 값이
         // 조용히 버려지므로, 이름뿐 아니라 타입까지 미리 확인한다(재화 칸과 같은 이유다).
         private const string RelationCharacterField = "character";
@@ -213,6 +257,7 @@ namespace TableDataEditor
 
             if (scope == TableDataRebuildScope.CharacterSkillTables) return RebuildCharacterTables(result, snapshot);
             if (scope == TableDataRebuildScope.BuildingTable) return RebuildBuildingTable(result, snapshot);
+            if (scope == TableDataRebuildScope.RecruitmentTables) return RebuildRecruitmentTables(result, snapshot);
 
             var worldAssets = ResolveTargets<WorldDefinition>(
                 TableDataPaths.WorldOutputFolder, w => w.WorldId,
@@ -243,6 +288,7 @@ namespace TableDataEditor
 
             CharacterTableTargets characterTargets = ResolveCharacterTableTargets(snapshot, result);
             BuildingTableTargets buildingTargets = ResolveBuildingTableTargets(snapshot, result);
+            RecruitmentTableTargets recruitmentTargets = ResolveRecruitmentTableTargets(snapshot, result);
 
             AssetDatabase.StartAssetEditing();
             try
@@ -266,8 +312,11 @@ namespace TableDataEditor
                 // Character -> Skill -> CharacterSkill. 관계 표가 앞의 둘을 가리키므로 순서가 이렇다.
                 WriteCharacterTables(snapshot, characterTargets);
 
-                // Building은 맨 뒤다 - Currency와 Item을 가리키므로 그 둘이 이미 채워져 있어야 한다.
+                // Building은 Currency와 Item을 가리키므로 그 둘이 이미 채워져 있어야 한다.
                 WriteBuildingTable(snapshot, buildingTargets, currencyAssets, itemAssets);
+
+                // 모집 네 표가 맨 뒤다 - Character를 가리키므로 그 표가 이미 채워져 있어야 한다.
+                WriteRecruitmentTables(snapshot, recruitmentTargets, characterTargets.Characters);
             }
             finally
             {
@@ -287,6 +336,7 @@ namespace TableDataEditor
             dungeonCatalog.MarkDirty();
             characterTargets.MarkDirty();
             buildingTargets.MarkDirty();
+            recruitmentTargets.MarkDirty();
 
             result.Wrote = true;
             return result;
@@ -467,6 +517,248 @@ namespace TableDataEditor
             return singles;
         }
 
+        // ---- 모집 네 표 ----
+
+        /// <summary>모집 네 표의 생성 대상. 다른 도메인과 <b>완전히 분리해</b> 들고 다닌다 - 좁은
+        /// 범위의 Rebuild가 다른 도메인의 사전을 아예 만들지 않게 하기 위해서다.</summary>
+        private sealed class RecruitmentTableTargets
+        {
+            public Dictionary<string, CharacterAcquisitionDefinition> Acquisitions;
+            public Dictionary<string, RecruitmentTypeDefinition> Types;
+            public Dictionary<string, RecruitmentPoolEntryDefinition> PoolEntries;
+            public Dictionary<string, RecruitmentAccessDefinition> Accesses;
+
+            public CharacterAcquisitionCatalog AcquisitionCatalog;
+            public RecruitmentTypeCatalog TypeCatalog;
+            public RecruitmentPoolCatalog PoolCatalog;
+            public RecruitmentAccessCatalog AccessCatalog;
+
+            public void MarkDirty()
+            {
+                AcquisitionCatalog.MarkDirty();
+                TypeCatalog.MarkDirty();
+                PoolCatalog.MarkDirty();
+                AccessCatalog.MarkDirty();
+            }
+
+            /// <summary>이번 범위가 실제로 건드린 에셋 <b>전부</b>를 한 번씩(중복도 누락도 없이).</summary>
+            public List<UnityEngine.Object> AllTargets()
+            {
+                var all = new List<UnityEngine.Object>();
+                var seen = new HashSet<int>();
+
+                void Add(UnityEngine.Object asset)
+                {
+                    if (asset == null) return;
+                    if (!seen.Add(asset.GetInstanceID())) return;
+                    all.Add(asset);
+                }
+
+                foreach (CharacterAcquisitionDefinition entry in Acquisitions.Values) Add(entry);
+                foreach (RecruitmentTypeDefinition entry in Types.Values) Add(entry);
+                foreach (RecruitmentPoolEntryDefinition entry in PoolEntries.Values) Add(entry);
+                foreach (RecruitmentAccessDefinition entry in Accesses.Values) Add(entry);
+
+                Add(AcquisitionCatalog);
+                Add(TypeCatalog);
+                Add(PoolCatalog);
+                Add(AccessCatalog);
+                return all;
+            }
+        }
+
+        /// <summary>
+        /// 모집 네 표만 다시 만든다. <b>다른 아홉 도메인의 생성 에셋은 쓰지도 SetDirty하지도
+        /// 않는다</b> - Character만 <b>읽어서</b> 후보/획득 참조를 잇고, 그 파일은 한 바이트도
+        /// 달라지지 않는다.
+        ///
+        /// <b>여기서도 <see cref="AssetDatabase.SaveAssets"/>를 부르지 않는다</b> -
+        /// <see cref="RebuildCharacterTables"/> / <see cref="RebuildBuildingTable"/>과 같은 이유다.
+        /// </summary>
+        private static TableDataRebuildResult RebuildRecruitmentTables(
+            TableDataRebuildResult result, TableDataSnapshot snapshot)
+        {
+            RecruitmentTableTargets targets = ResolveRecruitmentTableTargets(snapshot, result);
+
+            // 후보와 획득이 가리킬 대상은 <b>이미 만들어져 있는</b> 생성 에셋에서 읽는다. 없거나
+            // 여럿이면 Validate가 이미 오류로 잡아 여기까지 오지 못한다.
+            Dictionary<string, CharacterDefinition> characters = LoadGeneratedSingles<CharacterDefinition>(
+                TableDataPaths.CharacterOutputFolder, c => c.CharacterId);
+
+            AssetDatabase.StartAssetEditing();
+            try
+            {
+                WriteRecruitmentTables(snapshot, targets, characters);
+            }
+            finally
+            {
+                AssetDatabase.StopAssetEditing();
+            }
+
+            foreach (UnityEngine.Object asset in targets.AllTargets())
+            {
+                AssetDatabase.SaveAssetIfDirty(asset);
+            }
+
+            targets.MarkDirty();
+
+            result.Wrote = true;
+            return result;
+        }
+
+        private static RecruitmentTableTargets ResolveRecruitmentTableTargets(
+            TableDataSnapshot snapshot, TableDataRebuildResult result)
+        {
+            return new RecruitmentTableTargets
+            {
+                Acquisitions = ResolveTargets<CharacterAcquisitionDefinition>(
+                    TableDataPaths.CharacterAcquisitionOutputFolder, a => a.AcquisitionId,
+                    snapshot.CharacterAcquisitions.ConvertAll(r => r.Id),
+                    TableDataPaths.CharacterAcquisitionAssetPath,
+                    TableDataPaths.CharacterAcquisitionCsvFileName, TableDataColumns.AcquisitionId, result),
+
+                Types = ResolveTargets<RecruitmentTypeDefinition>(
+                    TableDataPaths.RecruitmentTypeOutputFolder, t => t.RecruitmentTypeId,
+                    snapshot.RecruitmentTypes.ConvertAll(r => r.Id), TableDataPaths.RecruitmentTypeAssetPath,
+                    TableDataPaths.RecruitmentTypeCsvFileName, TableDataColumns.RecruitmentTypeId, result),
+
+                PoolEntries = ResolveTargets<RecruitmentPoolEntryDefinition>(
+                    TableDataPaths.RecruitmentPoolOutputFolder, e => e.PairId,
+                    snapshot.RecruitmentPools.ConvertAll(r => r.PairId), TableDataPaths.RecruitmentPoolAssetPath,
+                    TableDataPaths.RecruitmentPoolCsvFileName, TableDataColumns.PoolEntryId, result),
+
+                Accesses = ResolveTargets<RecruitmentAccessDefinition>(
+                    TableDataPaths.RecruitmentAccessOutputFolder, a => a.RecruitmentAccessId,
+                    snapshot.RecruitmentAccesses.ConvertAll(r => r.Id), TableDataPaths.RecruitmentAccessAssetPath,
+                    TableDataPaths.RecruitmentAccessCsvFileName, TableDataColumns.RecruitmentAccessId, result),
+
+                AcquisitionCatalog = ResolveSingleton<CharacterAcquisitionCatalog>(
+                    TableDataPaths.CharacterAcquisitionCatalogAssetPath, result),
+                TypeCatalog = ResolveSingleton<RecruitmentTypeCatalog>(
+                    TableDataPaths.RecruitmentTypeCatalogAssetPath, result),
+                PoolCatalog = ResolveSingleton<RecruitmentPoolCatalog>(
+                    TableDataPaths.RecruitmentPoolCatalogAssetPath, result),
+                AccessCatalog = ResolveSingleton<RecruitmentAccessCatalog>(
+                    TableDataPaths.RecruitmentAccessCatalogAssetPath, result),
+            };
+        }
+
+        /// <summary>
+        /// 네 표를 채운다. 순서는 <b>RecruitmentType → 나머지</b>다 - 창구가 모집을 가리키므로 그
+        /// 정의가 이미 메모리에 있어야 한다.
+        ///
+        /// <b>카탈로그 세 개는 CSV 순서를 그대로 쓴다.</b> 이 표들에는 display_order 칸이 없고
+        /// (<see cref="FilterForCatalog{TRow,TAsset}"/>), 특히 후보 목록은 순서가 곧 가중치 경계의
+        /// 순서라 임의로 정렬하면 같은 씨앗이 다른 결과를 낸다. 창구만 display_order가 있어 다른
+        /// 도메인과 같은 규칙으로 정렬한다.
+        /// </summary>
+        private static void WriteRecruitmentTables(
+            TableDataSnapshot snapshot, RecruitmentTableTargets targets,
+            Dictionary<string, CharacterDefinition> characters)
+        {
+            foreach (RecruitmentTypeRow row in snapshot.RecruitmentTypes)
+            {
+                WriteRecruitmentType(targets.Types[row.Id], row);
+            }
+
+            foreach (CharacterAcquisitionRow row in snapshot.CharacterAcquisitions)
+            {
+                WriteCharacterAcquisition(targets.Acquisitions[row.Id], row, characters);
+            }
+
+            foreach (RecruitmentPoolRow row in snapshot.RecruitmentPools)
+            {
+                WriteRecruitmentPoolEntry(targets.PoolEntries[row.PairId], row, characters);
+            }
+
+            foreach (RecruitmentAccessRow row in snapshot.RecruitmentAccesses)
+            {
+                WriteRecruitmentAccess(targets.Accesses[row.Id], row, targets.Types);
+            }
+
+            WriteCatalog(targets.AcquisitionCatalog, "acquisitions",
+                FilterForCatalog(snapshot.CharacterAcquisitions, r => r.Enabled, r => r.Id, targets.Acquisitions));
+            WriteCatalog(targets.TypeCatalog, "types",
+                FilterForCatalog(snapshot.RecruitmentTypes, r => r.Enabled, r => r.Id, targets.Types));
+            WriteCatalog(targets.PoolCatalog, "entries",
+                FilterForCatalog(snapshot.RecruitmentPools, r => r.Enabled, r => r.PairId, targets.PoolEntries));
+            WriteCatalog(targets.AccessCatalog, "accesses",
+                SortForCatalog(snapshot.RecruitmentAccesses, r => r.Enabled, r => r.DisplayOrder, r => r.Id,
+                    targets.Accesses));
+        }
+
+        private static void WriteRecruitmentType(RecruitmentTypeDefinition asset, RecruitmentTypeRow row)
+        {
+            var serialized = new SerializedObject(asset);
+            serialized.FindProperty(RecruitmentTypeIdField).stringValue = row.Id;
+            serialized.FindProperty(RecruitmentEnabledField).boolValue = row.Enabled;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(asset);
+        }
+
+        /// <summary>
+        /// 획득 방식 한 줄. character_id는 <b>저장 문서의 키</b>라 CSV에 적힌 값을 한 글자도 바꾸지
+        /// 않고 쓰며, 정의 참조는 <b>같은 행에서 함께</b> 쓰므로 둘이 어긋날 수 없다. 조회가 빗나가면
+        /// 참조를 비워 둔다 - 있지도 않은 대상을 가리키는 참조를 만들지 않는다(그래도 id는 남는다).
+        ///
+        /// 조건 키는 지정이 없으면 <b>비운다</b> - 예전 값이 남으면 표에서 지운 조건이 계속 걸린다.
+        /// </summary>
+        private static void WriteCharacterAcquisition(
+            CharacterAcquisitionDefinition asset, CharacterAcquisitionRow row,
+            Dictionary<string, CharacterDefinition> characters)
+        {
+            var serialized = new SerializedObject(asset);
+            serialized.FindProperty(AcquisitionIdField).stringValue = row.Id;
+            serialized.FindProperty(RecruitmentCharacterIdField).stringValue = row.CharacterId;
+            serialized.FindProperty(RecruitmentCharacterField).objectReferenceValue =
+                Lookup(characters, row.CharacterId);
+            serialized.FindProperty(AcquisitionTypeField).stringValue = row.AcquisitionType;
+            serialized.FindProperty(AllowDuplicateRecruitmentField).boolValue = row.AllowDuplicateRecruitment;
+            serialized.FindProperty(ConditionIdField).stringValue = row.ConditionId;
+            serialized.FindProperty(RecruitmentEnabledField).boolValue = row.Enabled;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(asset);
+        }
+
+        private static void WriteRecruitmentPoolEntry(
+            RecruitmentPoolEntryDefinition asset, RecruitmentPoolRow row,
+            Dictionary<string, CharacterDefinition> characters)
+        {
+            var serialized = new SerializedObject(asset);
+            serialized.FindProperty(RecruitmentTypeIdField).stringValue = row.RecruitmentTypeId;
+            serialized.FindProperty(PoolEntryIdField).stringValue = row.PoolEntryId;
+            serialized.FindProperty(RecruitmentCharacterIdField).stringValue = row.CharacterId;
+            serialized.FindProperty(RecruitmentCharacterField).objectReferenceValue =
+                Lookup(characters, row.CharacterId);
+            serialized.FindProperty(WeightField).intValue = row.Weight;
+            serialized.FindProperty(RecruitmentEnabledField).boolValue = row.Enabled;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(asset);
+        }
+
+        /// <summary>
+        /// 창구 한 줄. 대상은 <b>종류와 id 문자열</b>로만 적는다 - 건물 정의를 가리키는 참조를 만들지
+        /// 않는 것은 의도적이며, 그래야 창구를 건물이 아닌 것에 붙일 때 이 코드가 달라지지 않는다.
+        /// 모집만 id와 참조를 함께 쓴다.
+        /// </summary>
+        private static void WriteRecruitmentAccess(
+            RecruitmentAccessDefinition asset, RecruitmentAccessRow row,
+            Dictionary<string, RecruitmentTypeDefinition> types)
+        {
+            var serialized = new SerializedObject(asset);
+            serialized.FindProperty(RecruitmentAccessIdField).stringValue = row.Id;
+            serialized.FindProperty(RecruitmentTypeIdField).stringValue = row.RecruitmentTypeId;
+            serialized.FindProperty(RecruitmentTypeField).objectReferenceValue = Lookup(types, row.RecruitmentTypeId);
+            serialized.FindProperty(SourceTypeField).stringValue = row.SourceType;
+            serialized.FindProperty(SourceIdField).stringValue = row.SourceId;
+            serialized.FindProperty(ArrivalIntervalSecondsField).intValue = row.ArrivalIntervalSeconds;
+            serialized.FindProperty(ConsumeAmountField).intValue = row.ConsumeAmount;
+            serialized.FindProperty("displayOrder").intValue = row.DisplayOrder;
+            serialized.FindProperty(RecruitmentEnabledField).boolValue = row.Enabled;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(asset);
+        }
+
         // ---- Character / Skill / CharacterSkill ----
 
         /// <summary>
@@ -636,6 +928,14 @@ namespace TableDataEditor
             if (TableDataRebuildScopes.IncludesBuildingTable(scope))
             {
                 EnsureFolder(TableDataPaths.OutputRoot, "Building");
+            }
+
+            if (TableDataRebuildScopes.IncludesRecruitmentTables(scope))
+            {
+                EnsureFolder(TableDataPaths.OutputRoot, "CharacterAcquisition");
+                EnsureFolder(TableDataPaths.OutputRoot, "RecruitmentType");
+                EnsureFolder(TableDataPaths.OutputRoot, "RecruitmentPool");
+                EnsureFolder(TableDataPaths.OutputRoot, "RecruitmentAccess");
             }
         }
 
@@ -989,6 +1289,31 @@ namespace TableDataEditor
         }
 
         /// <summary>
+        /// 카탈로그에 담을 항목을 고르되 <b>정렬하지 않는다</b> - enabled=1만 남기고 CSV에 적힌 순서를
+        /// 그대로 쓴다.
+        ///
+        /// display_order 칸이 <b>없는</b> 표를 위한 것이다. 없는 칸을 지어내 정렬하면 사람이 적은
+        /// 순서가 사라지고, 특히 모집 후보 목록은 순서가 곧 가중치 경계의 순서라 임의 정렬이 "같은
+        /// 씨앗이면 같은 결과"라는 성질을 조용히 깨뜨린다.
+        /// </summary>
+        private static List<TAsset> FilterForCatalog<TRow, TAsset>(
+            List<TRow> rows,
+            Func<TRow, bool> enabledSelector,
+            Func<TRow, string> idSelector,
+            Dictionary<string, TAsset> assets) where TAsset : ScriptableObject
+        {
+            var result = new List<TAsset>();
+
+            foreach (TRow row in rows)
+            {
+                if (!enabledSelector(row)) continue;
+                if (assets.TryGetValue(idSelector(row), out TAsset asset) && asset != null) result.Add(asset);
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// 관계 카탈로그에 담을 항목을 고르고 정렬한다. <b>enabled=1만</b> 담고,
         /// display_order → character_id → skill_id 순서로 <b>세 단계</b> 오름차순이다.
         ///
@@ -1107,6 +1432,54 @@ namespace TableDataEditor
             ok &= VerifyBuildingCostItemFields(log);
 
             ok &= VerifyFields<BuildingCatalog>(log, "buildings");
+
+            // 모집 네 표. 값이 조용히 버려지면 "표에는 있는데 아무도 안 나오는" 상태가 되므로,
+            // 참/거짓과 참조 칸은 이름뿐 아니라 <b>타입까지</b> 확인한다.
+            ok &= VerifyFields<CharacterAcquisitionDefinition>(log, AcquisitionIdField,
+                RecruitmentCharacterIdField, RecruitmentCharacterField, AcquisitionTypeField,
+                AllowDuplicateRecruitmentField, ConditionIdField, RecruitmentEnabledField);
+            ok &= VerifyPropertyType<CharacterAcquisitionDefinition>(
+                log, RecruitmentCharacterField, SerializedPropertyType.ObjectReference,
+                $"획득 방식의 캐릭터 칸은 {nameof(CharacterDefinition)}을 가리키는 참조여야 합니다" +
+                "(id 문자열은 옆 칸에 따로 있습니다).");
+            ok &= VerifyPropertyType<CharacterAcquisitionDefinition>(
+                log, AllowDuplicateRecruitmentField, SerializedPropertyType.Boolean,
+                "중복 모집 허용은 참/거짓 칸이어야 합니다 - 다른 타입이면 표의 값이 조용히 버려져 " +
+                "이미 가진 캐릭터가 다시 나오거나 영영 나오지 않게 됩니다.");
+            ok &= VerifyPropertyType<CharacterAcquisitionDefinition>(
+                log, RecruitmentEnabledField, SerializedPropertyType.Boolean,
+                "표의 enabled 값은 참/거짓 칸이어야 합니다.");
+
+            ok &= VerifyFields<RecruitmentTypeDefinition>(log, RecruitmentTypeIdField, RecruitmentEnabledField);
+            ok &= VerifyPropertyType<RecruitmentTypeDefinition>(
+                log, RecruitmentEnabledField, SerializedPropertyType.Boolean,
+                "표의 enabled 값은 참/거짓 칸이어야 합니다.");
+
+            ok &= VerifyFields<RecruitmentPoolEntryDefinition>(log, RecruitmentTypeIdField, PoolEntryIdField,
+                RecruitmentCharacterIdField, RecruitmentCharacterField, WeightField, RecruitmentEnabledField);
+            ok &= VerifyPropertyType<RecruitmentPoolEntryDefinition>(
+                log, RecruitmentCharacterField, SerializedPropertyType.ObjectReference,
+                $"후보의 캐릭터 칸은 {nameof(CharacterDefinition)}을 가리키는 참조여야 합니다.");
+            ok &= VerifyPropertyType<RecruitmentPoolEntryDefinition>(
+                log, WeightField, SerializedPropertyType.Integer,
+                "가중치는 정수 칸이어야 합니다 - 다른 타입이면 표의 값이 버려져 모든 후보가 " +
+                "가중치 0으로 남고 아무도 뽑히지 않습니다.");
+
+            ok &= VerifyFields<RecruitmentAccessDefinition>(log, RecruitmentAccessIdField, RecruitmentTypeIdField,
+                RecruitmentTypeField, SourceTypeField, SourceIdField, ArrivalIntervalSecondsField,
+                ConsumeAmountField, "displayOrder", RecruitmentEnabledField);
+            ok &= VerifyPropertyType<RecruitmentAccessDefinition>(
+                log, RecruitmentTypeField, SerializedPropertyType.ObjectReference,
+                $"창구의 모집 칸은 {nameof(RecruitmentTypeDefinition)}을 가리키는 참조여야 합니다.");
+            ok &= VerifyPropertyType<RecruitmentAccessDefinition>(
+                log, SourceIdField, SerializedPropertyType.String,
+                "창구의 대상 id는 문자열이어야 합니다 - 대상은 종류와 id 두 문자열로만 가리키며 " +
+                "정의 참조로 만들지 않습니다(건물이 아닌 대상에도 붙을 수 있어야 합니다).");
+
+            ok &= VerifyFields<CharacterAcquisitionCatalog>(log, "acquisitions");
+            ok &= VerifyFields<RecruitmentTypeCatalog>(log, "types");
+            ok &= VerifyFields<RecruitmentPoolCatalog>(log, "entries");
+            ok &= VerifyFields<RecruitmentAccessCatalog>(log, "accesses");
             return ok;
         }
 

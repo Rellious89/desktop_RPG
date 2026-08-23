@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eab76c712f744424aece2fb65a385306, type: 3}
+  m_Name: RecruitmentAccess_Inn_Normal_Access
+  m_EditorClassIdentifier: 
+  recruitmentAccessId: Inn_Normal_Access
+  recruitmentTypeId: Inn_Normal
+  recruitmentType: {fileID: 11400000, guid: 4213e414b81fd4a418d3e37497186dc2, type: 2}
+  sourceType: BUILDING
+  sourceId: 1
+  arrivalIntervalSeconds: 60
+  consumeAmount: 0
+  displayOrder: 10
+  enabled: 1

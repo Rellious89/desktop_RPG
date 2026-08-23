@@ -87,6 +87,7 @@ namespace TableDataEditor.Tests
                     TableDataRebuildScope.All,
                     TableDataRebuildScope.CharacterSkillTables,
                     TableDataRebuildScope.BuildingTable,
+                    TableDataRebuildScope.RecruitmentTables,
                 },
                 Enum.GetValues(typeof(TableDataRebuildScope)),
                 "선언된 범위와 지원하는 범위가 어긋나면 안 된다.");
@@ -200,7 +201,7 @@ namespace TableDataEditor.Tests
             Assert.AreEqual("1", inn.BuildingId, "building_id는 CSV에 적힌 그대로여야 한다.");
             Assert.AreEqual(60, inn.BuildTimeSeconds);
             Assert.AreEqual("jewel", inn.CostCurrencyId);
-            Assert.AreEqual(2000, inn.CostCurrencyAmount);
+            Assert.AreEqual(2500, inn.CostCurrencyAmount);
             Assert.AreEqual(0, inn.CostItems.Count, "여관은 아이템 비용이 없다.");
             Assert.AreEqual(10, inn.DisplayOrder);
             Assert.IsTrue(inn.IsValid);

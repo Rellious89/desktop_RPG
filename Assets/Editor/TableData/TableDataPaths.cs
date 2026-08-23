@@ -24,6 +24,10 @@ namespace TableDataEditor
         public const string SkillCsvFileName = "Skill.csv";
         public const string CharacterSkillCsvFileName = "CharacterSkill.csv";
         public const string BuildingCsvFileName = "Building.csv";
+        public const string CharacterAcquisitionCsvFileName = "CharacterAcquisition.csv";
+        public const string RecruitmentTypeCsvFileName = "RecruitmentType.csv";
+        public const string RecruitmentPoolCsvFileName = "RecruitmentPool.csv";
+        public const string RecruitmentAccessCsvFileName = "RecruitmentAccess.csv";
 
         public const string WorldCsvPath = InputRoot + "/" + WorldCsvFileName;
         public const string CurrencyCsvPath = InputRoot + "/" + CurrencyCsvFileName;
@@ -34,6 +38,11 @@ namespace TableDataEditor
         public const string SkillCsvPath = InputRoot + "/" + SkillCsvFileName;
         public const string CharacterSkillCsvPath = InputRoot + "/" + CharacterSkillCsvFileName;
         public const string BuildingCsvPath = InputRoot + "/" + BuildingCsvFileName;
+
+        public const string CharacterAcquisitionCsvPath = InputRoot + "/" + CharacterAcquisitionCsvFileName;
+        public const string RecruitmentTypeCsvPath = InputRoot + "/" + RecruitmentTypeCsvFileName;
+        public const string RecruitmentPoolCsvPath = InputRoot + "/" + RecruitmentPoolCsvFileName;
+        public const string RecruitmentAccessCsvPath = InputRoot + "/" + RecruitmentAccessCsvFileName;
 
         /// <summary>
         /// <c>icon_key</c>가 가리키는 아이콘을 찾는 <b>유일한</b> 폴더. 프로젝트 전체에서 이름으로 찾지
@@ -89,6 +98,20 @@ namespace TableDataEditor
         /// </summary>
         public const string BuildingOutputFolder = OutputRoot + "/Building";
 
+        /// <summary>
+        /// 모집 네 표의 출력 폴더. <b>기존 아홉 도메인과 나란한 형제 폴더</b>들이며 서로의 안쪽을
+        /// 절대 건드리지 않는다 - 모집만 다시 만드는 좁은 범위가 다른 도메인의 생성 파일을 한
+        /// 바이트도 바꾸지 않는다는 것이 코드로 보이는 자리가 여기다.
+        ///
+        /// 네 표를 <b>한 폴더에 몰아넣지 않은</b> 것도 같은 이유다 - 도메인 하나에 폴더 하나라는
+        /// 기존 규칙을 그대로 따르면, orphan 검사와 충돌 검사가 표마다 자기 폴더만 보면 된다.
+        /// </summary>
+        public const string CharacterAcquisitionOutputFolder = OutputRoot + "/CharacterAcquisition";
+
+        public const string RecruitmentTypeOutputFolder = OutputRoot + "/RecruitmentType";
+        public const string RecruitmentPoolOutputFolder = OutputRoot + "/RecruitmentPool";
+        public const string RecruitmentAccessOutputFolder = OutputRoot + "/RecruitmentAccess";
+
         /// <summary>생성 에셋 파일 이름의 고정 접두사. 원본 ID를 그대로 뒤에 붙인다 - <b>ID 자체는
         /// 절대 바꾸지 않는다</b>. ID가 <see cref="TableDataFieldRules.IdPatternText"/>(양의 정수 또는
         /// snake_case)만 허용되므로 접두사와 합쳐도 파일 이름은 항상 안전하고, 서로 다른 ID가 같은
@@ -103,6 +126,10 @@ namespace TableDataEditor
         public const string SkillAssetPrefix = "Skill_";
         public const string CharacterSkillAssetPrefix = "CharacterSkill_";
         public const string BuildingAssetPrefix = "Building_";
+        public const string CharacterAcquisitionAssetPrefix = "CharacterAcquisition_";
+        public const string RecruitmentTypeAssetPrefix = "RecruitmentType_";
+        public const string RecruitmentPoolAssetPrefix = "RecruitmentPool_";
+        public const string RecruitmentAccessAssetPrefix = "RecruitmentAccess_";
 
         public const string WorldCatalogAssetName = "WorldCatalog";
         public const string CurrencyCatalogAssetName = "CurrencyCatalog";
@@ -113,6 +140,10 @@ namespace TableDataEditor
         public const string SkillCatalogAssetName = "SkillCatalog";
         public const string CharacterSkillCatalogAssetName = "CharacterSkillCatalog";
         public const string BuildingCatalogAssetName = "BuildingCatalog";
+        public const string CharacterAcquisitionCatalogAssetName = "CharacterAcquisitionCatalog";
+        public const string RecruitmentTypeCatalogAssetName = "RecruitmentTypeCatalog";
+        public const string RecruitmentPoolCatalogAssetName = "RecruitmentPoolCatalog";
+        public const string RecruitmentAccessCatalogAssetName = "RecruitmentAccessCatalog";
 
         public static string WorldAssetPath(string worldId)
         {
@@ -190,5 +221,46 @@ namespace TableDataEditor
 
         public static string BuildingCatalogAssetPath =>
             BuildingOutputFolder + "/" + BuildingCatalogAssetName + ".asset";
+
+        /// <summary>획득 방식 생성 에셋의 경로. <b>CSV에 적힌 acquisition_id를 한 글자도 바꾸지 않고</b>
+        /// 파일 이름에 붙인다.</summary>
+        public static string CharacterAcquisitionAssetPath(string acquisitionId)
+        {
+            return CharacterAcquisitionOutputFolder + "/" + CharacterAcquisitionAssetPrefix + acquisitionId + ".asset";
+        }
+
+        /// <summary>모집 종류 생성 에셋의 경로. recruitment_type_id는 대소문자와 밑줄만 쓰는 값이라
+        /// (<see cref="TableDataFieldRules.RecruitmentIdPatternText"/>) 파일 이름에 그대로 쓸 수 있다.</summary>
+        public static string RecruitmentTypeAssetPath(string recruitmentTypeId)
+        {
+            return RecruitmentTypeOutputFolder + "/" + RecruitmentTypeAssetPrefix + recruitmentTypeId + ".asset";
+        }
+
+        /// <summary>후보 칸 생성 에셋의 경로. 파일 이름은
+        /// <c>RecruitmentPool_&lt;recruitment_type_id&gt;__&lt;pool_entry_id&gt;</c>이며, 구분자가 밑줄
+        /// 두 개인 이유는 <see cref="Recruitment.RecruitmentPoolEntryDefinition.PairIdSeparator"/>에
+        /// 적어 두었다.</summary>
+        public static string RecruitmentPoolAssetPath(string pairId)
+        {
+            return RecruitmentPoolOutputFolder + "/" + RecruitmentPoolAssetPrefix + pairId + ".asset";
+        }
+
+        /// <summary>모집 창구 생성 에셋의 경로.</summary>
+        public static string RecruitmentAccessAssetPath(string recruitmentAccessId)
+        {
+            return RecruitmentAccessOutputFolder + "/" + RecruitmentAccessAssetPrefix + recruitmentAccessId + ".asset";
+        }
+
+        public static string CharacterAcquisitionCatalogAssetPath =>
+            CharacterAcquisitionOutputFolder + "/" + CharacterAcquisitionCatalogAssetName + ".asset";
+
+        public static string RecruitmentTypeCatalogAssetPath =>
+            RecruitmentTypeOutputFolder + "/" + RecruitmentTypeCatalogAssetName + ".asset";
+
+        public static string RecruitmentPoolCatalogAssetPath =>
+            RecruitmentPoolOutputFolder + "/" + RecruitmentPoolCatalogAssetName + ".asset";
+
+        public static string RecruitmentAccessCatalogAssetPath =>
+            RecruitmentAccessOutputFolder + "/" + RecruitmentAccessCatalogAssetName + ".asset";
     }
 }

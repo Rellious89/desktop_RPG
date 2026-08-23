@@ -4,7 +4,7 @@ using UnityEngine;
 namespace TableDataEditor
 {
     /// <summary>
-    /// 메뉴 네 개가 임포터의 유일한 진입점이다. <b>자동으로 도는 것은 없다</b> - CSV를 저장하는 순간
+    /// 메뉴 다섯 개가 임포터의 유일한 진입점이다. <b>자동으로 도는 것은 없다</b> - CSV를 저장하는 순간
     /// 에셋이 바뀌면 사람이 의도하지 않은 시점에 프로젝트가 달라지므로, 언제 반영할지는 사람이 정한다.
     ///
     /// <b>Validate는 읽기만 한다.</b> 무엇이 잘못됐는지 확인하는 동안 프로젝트가 바뀌지 않으므로
@@ -64,6 +64,23 @@ namespace TableDataEditor
             Run(TableDataRebuildScope.BuildingTable,
                 "Rebuild (Building)",
                 TableDataPaths.BuildingOutputFolder);
+        }
+
+        /// <summary>
+        /// 모집 네 표만 다시 만든다. <b>검사는 열세 표 전부를 그대로</b> 하고, 쓰기만 이 네 폴더
+        /// 안으로 좁힌다 - 모집 표를 손보는 동안 다른 아홉 도메인의 생성 에셋 파일이 다시 쓰이지
+        /// 않게 하기 위한 것이다. 후보와 획득이 가리키는 Character 생성 에셋은 <b>읽기만</b> 하며,
+        /// 그것이 아직 없으면 아무것도 쓰지 않고 오류로 멈춘다.
+        /// </summary>
+        [MenuItem(MenuRoot + "Rebuild (Recruitment only)", priority = 104)]
+        public static void RebuildRecruitmentTables()
+        {
+            Run(TableDataRebuildScope.RecruitmentTables,
+                "Rebuild (Recruitment)",
+                TableDataPaths.CharacterAcquisitionOutputFolder + ", " +
+                TableDataPaths.RecruitmentTypeOutputFolder + ", " +
+                TableDataPaths.RecruitmentPoolOutputFolder + ", " +
+                TableDataPaths.RecruitmentAccessOutputFolder);
         }
 
         private static void Run(TableDataRebuildScope scope, string label, string outputDescription)

@@ -48,6 +48,8 @@ namespace TableDataEditor.Tests
             TableDataPaths.DungeonOutputFolder, TableDataPaths.CharacterOutputFolder,
             TableDataPaths.SkillOutputFolder, TableDataPaths.CharacterSkillOutputFolder,
             TableDataPaths.BuildingOutputFolder,
+            TableDataPaths.CharacterAcquisitionOutputFolder, TableDataPaths.RecruitmentTypeOutputFolder,
+            TableDataPaths.RecruitmentPoolOutputFolder, TableDataPaths.RecruitmentAccessOutputFolder,
         };
 
         private const string TempRootName = "__TableDataTestsTemp";
@@ -154,12 +156,18 @@ namespace TableDataEditor.Tests
             // 수 있는 유일한 조건은 <b>참조가 닫히는 묶음</b>이라는 것이다 - Building이 더해진 것도
             // 그 조건을 지켰기 때문이다(가리키는 Currency/Item 생성 에셋이 없으면 Validate가 쓰기 전에
             // 오류로 막는다). 새 값을 더할 때마다 여기가 실패하므로, 그 근거를 적지 않고 늘릴 수 없다.
+            //
+            // RecruitmentTables가 더해진 근거도 같다 - 네 표가 서로를 가리키는 참조(창구 → 모집)는
+            // 모두 이 묶음 안에 있고, 밖으로 나가는 유일한 참조인 Character는 이미 만들어져 있는 생성
+            // 에셋을 읽어 잇는다(없거나 여럿이면 Validate가 쓰기 전에 오류로 막는다). 창구가 가리키는
+            // 건물은 아예 참조가 아니라 문자열 두 칸이라 지워질 참조 자체가 없다.
             CollectionAssert.AreEquivalent(
                 new[]
                 {
                     TableDataRebuildScope.All,
                     TableDataRebuildScope.CharacterSkillTables,
                     TableDataRebuildScope.BuildingTable,
+                    TableDataRebuildScope.RecruitmentTables,
                 },
                 Enum.GetValues(typeof(TableDataRebuildScope)),
                 "Rebuild 범위가 늘어나면 참조가 조용히 지워지는 경로가 생긴다.");
@@ -239,7 +247,7 @@ namespace TableDataEditor.Tests
             CollectionAssert.AreEquivalent(
                 AllOutputFolders,
                 TableDataValidator.GeneratedOutputFolders(TableDataRebuildScope.All),
-                "전체 범위는 아홉 도메인을 모두 본다(기존 동작).");
+                "전체 범위는 열세 도메인을 모두 본다(기존 동작 그대로 넓어졌다).");
         }
 
         [Test]
@@ -612,19 +620,29 @@ namespace TableDataEditor.Tests
             Assert.AreEqual(0, relations.Count, "아직 관계가 없으므로 비어 있는 것이 정상이다.");
         }
 
+        /// <summary>
+        /// 새 게임에서 처음부터 가지고 시작하는 캐릭터는 <b>고양이기사 하나뿐</b>이고, 나머지 다섯은
+        /// 모집으로 얻는다 - Character.csv의 <c>initially_owned</c>가 그렇게 적혀 있기 때문이다.
+        ///
+        /// 예전에는 여섯 모두가 true였다. 그 값이 바뀐 것은 모집이 생기면서 <b>표가 정책을 고쳤기</b>
+        /// 때문이며, 생성 에셋은 표를 따라가야 한다 - 여기서 확인하는 것은 "표에 적힌 대로 옮겨졌는가"
+        /// 하나다.
+        /// </summary>
         [Test]
-        public void GeneratedCharacters_AreAllInitiallyOwned()
+        public void GeneratedCharacters_MatchTheTablesInitiallyOwnedPolicy()
         {
-            // 표의 여섯 행이 전부 initially_owned=1이므로 생성 에셋도 전부 true여야 한다.
-            // 이 값이 false로 새면 새 게임을 시작한 사람이 캐릭터를 하나도 갖지 못한다.
-            foreach (string id in new[]
-                     { "CatKnight", "ElfArcher", "Barbarian", "ElfGuardian", "RabbitHealer", "CatMage" })
+            foreach ((string id, bool initiallyOwned) in new[]
+                     {
+                         ("CatKnight", true), ("ElfArcher", false), ("Barbarian", false),
+                         ("ElfGuardian", false), ("RabbitHealer", false), ("CatMage", false),
+                     })
             {
                 var definition = AssetDatabase.LoadAssetAtPath<CharacterDefinition>(
                     TableDataPaths.CharacterAssetPath(id));
 
                 Assert.IsNotNull(definition, $"생성 에셋이 없습니다 - Rebuild를 먼저 실행하세요: {id}");
-                Assert.IsTrue(definition.InitiallyOwned, $"{id}는 새 게임에서 처음부터 가지고 시작해야 한다.");
+                Assert.AreEqual(initiallyOwned, definition.InitiallyOwned,
+                    $"{id}의 새 게임 시작 구성이 Character.csv와 다릅니다.");
             }
         }
 
@@ -638,7 +656,8 @@ namespace TableDataEditor.Tests
 
             foreach (CharacterDefinition character in catalog.Characters)
             {
-                Assert.IsTrue(character.InitiallyOwned, $"{character.CharacterId}의 새 게임 시작 구성");
+                // initially_owned는 캐릭터마다 다르므로 여기서 값을 단정하지 않는다 - 그 판정은
+                // GeneratedCharacters_MatchTheTablesInitiallyOwnedPolicy 하나가 갖는다.
                 Assert.AreEqual(30, character.MaxStamina, $"{character.CharacterId}의 Max Stamina");
                 Assert.IsFalse(character.HasBaseMaxHealth, $"{character.CharacterId}의 기본 체력은 아직 미지정이다.");
                 Assert.AreEqual(0, character.BaseMaxHealth);

@@ -6,7 +6,7 @@ using System.IO;
 namespace TableDataEditor
 {
     /// <summary>
-    /// CSV 아홉 장의 <b>컬럼 이름</b>. CSV는 이 이름을 그대로 써야 한다 -
+    /// CSV 열세 장의 <b>컬럼 이름</b>. CSV는 이 이름을 그대로 써야 한다 -
     /// 헤더가 어긋나면 값을 추측해 읽지 않고 오류로 멈춘다.
     /// </summary>
     public static class TableDataColumns
@@ -217,6 +217,82 @@ namespace TableDataEditor
             BuildingId, NameCategory, NameKey, FunctionCategory, FunctionKey, BuildTime,
             CostCurrencyId, CostCurrencyAmount, CostItemIds, CostItemCounts,
             DisplayOrder, Enabled, Memo,
+        };
+
+        // CharacterAcquisition.csv
+        //
+        // character_id는 Character.csv의 상수를 <b>그대로</b> 쓴다 - 두 표가 같은 이름을 가리켜야
+        // 참조가 성립하므로 이름을 두 번 적어 두지 않는다. 사람이 읽는 캐릭터 이름은
+        // <c>$character_name</c>이라는 참조 컬럼으로 따로 두며 여기 넣지 않는다.
+        public const string AcquisitionId = "acquisition_id";
+
+        /// <summary>획득 방식 낱말. <c>RECRUIT_ONLY</c>처럼 <b>대문자 키</b> 형식이며, 런타임이 아는
+        /// 낱말인지는 표가 아니라 런타임이 판정한다 - 표는 형식만 지키면 된다.</summary>
+        public const string AcquisitionType = "acquisition_type";
+
+        /// <summary>이미 보유해도 다시 모집될 수 있는가. <c>enabled</c>와 같은 엄격한 0/1 칸이다.</summary>
+        public const string AllowDuplicateRecruitment = "allow_duplicate_recruitment";
+
+        /// <summary>획득에 걸린 조건의 키. <b>빈 칸이 정상</b>이며 "조건 없음"이라는 뜻이다.</summary>
+        public const string ConditionId = "condition_id";
+
+        public static readonly string[] CharacterAcquisition =
+        {
+            AcquisitionId, CharacterId, AcquisitionType, AllowDuplicateRecruitment, ConditionId,
+            Enabled, Memo,
+        };
+
+        // RecruitmentType.csv
+        //
+        // 이 표에는 display_order도 이름 참조도 없다 - 화면에 줄지어 보이는 목록이 아니라 다른 표가
+        // 가리키는 <b>키의 목록</b>이기 때문이다. 없는 칸을 지어내지 않는다.
+        public const string RecruitmentTypeId = "recruitment_type_id";
+
+        public static readonly string[] RecruitmentType =
+        {
+            RecruitmentTypeId, Enabled, Memo,
+        };
+
+        // RecruitmentPool.csv
+        //
+        // recruitment_type_id / character_id는 각각 RecruitmentType.csv / Character.csv의 상수를
+        // 그대로 쓴다. 사람이 읽는 캐릭터 이름은 <c>$character_name</c> 참조 컬럼의 몫이다.
+        public const string PoolEntryId = "pool_entry_id";
+
+        /// <summary>뽑기 가중치. <b>1 이상</b>만 뜻이 있다 - 0은 "뽑히지 않는 칸"이라 표에 적을 이유가
+        /// 없고, 조용히 통과시키면 확률 합에 들어가지 않는 유령 칸이 생긴다.</summary>
+        public const string Weight = "weight";
+
+        public static readonly string[] RecruitmentPool =
+        {
+            RecruitmentTypeId, PoolEntryId, CharacterId, Weight, Enabled, Memo,
+        };
+
+        // RecruitmentAccess.csv
+        //
+        // 창구가 붙은 대상은 <b>종류 + id 두 칸</b>으로 가리킨다 - 건물 참조 하나로 두면 건물이 아닌
+        // 곳에 창구를 붙일 수 없게 되고, 그때 표 구조를 통째로 바꿔야 한다. 사람이 읽는 대상 이름은
+        // <c>$source_name</c>이라는 참조 컬럼으로 따로 둔다.
+        public const string RecruitmentAccessId = "recruitment_access_id";
+
+        /// <summary>창구가 붙어 있는 대상의 종류 낱말(<c>BUILDING</c> 등). 획득 방식과 같은
+        /// <b>대문자 키</b> 형식이다.</summary>
+        public const string SourceType = "source_type";
+
+        /// <summary>창구가 붙어 있는 대상의 id. <c>source_type</c>이 <c>BUILDING</c>이면 Building.csv의
+        /// <c>building_id</c>이며, 그 표에 실제로 있는 활성 행이어야 한다.</summary>
+        public const string SourceId = "source_id";
+
+        /// <summary>다음 후보가 도착하기까지의 간격(초). 0 이상이며 0은 "기다림 없음"이라는 뜻이다.</summary>
+        public const string ArrivalIntervalSeconds = "arrival_interval_seconds";
+
+        /// <summary>모집 한 번에 드는 비용 수량. 0 이상이며 0은 무료라는 뜻이다.</summary>
+        public const string ConsumeAmount = "consume_amount";
+
+        public static readonly string[] RecruitmentAccess =
+        {
+            RecruitmentAccessId, RecruitmentTypeId, SourceType, SourceId, ArrivalIntervalSeconds,
+            ConsumeAmount, DisplayOrder, Enabled, Memo,
         };
 
         /// <summary>

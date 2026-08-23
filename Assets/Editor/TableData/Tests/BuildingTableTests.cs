@@ -33,7 +33,7 @@ namespace TableDataEditor.Tests
 
         private const int LiveBuildTimeSeconds = 60;
         private const string LiveCostCurrencyId = "jewel";
-        private const int LiveCostCurrencyAmount = 2000;
+        private const int LiveCostCurrencyAmount = 2500;
         private const int LiveDisplayOrder = 10;
 
         /// <summary>여관 이름은 07_Building의 숫자 키 1이다.</summary>

@@ -308,6 +308,87 @@ namespace TableDataEditor
     }
 
     /// <summary>
+    /// CharacterAcquisition.csv 한 행 - "이 캐릭터를 어떤 길로 얻는가".
+    ///
+    /// <b>캐릭터를 정의하지 않는다.</b> 이 표가 말하는 것은 획득 방식 하나이고, 캐릭터가 무엇인지는
+    /// Character.csv가 이미 말했다 - 그래서 모든 행의 character_id는 그 표에 실재해야 한다.
+    /// </summary>
+    public sealed class CharacterAcquisitionRow
+    {
+        public int Line;
+        public string Id = string.Empty;
+        public string CharacterId = string.Empty;
+
+        /// <summary>획득 방식 낱말. 대문자 낱말 형식만 여기까지 온다 - <b>런타임이 아는 낱말인지는
+        /// 보지 않는다</b>(그 판정은 런타임의 몫이다).</summary>
+        public string AcquisitionType = string.Empty;
+
+        public bool AllowDuplicateRecruitment;
+
+        /// <summary>획득 조건 키. <b>비어 있는 것이 정상</b>이며 "조건 없음"이라는 뜻이다.</summary>
+        public string ConditionId = string.Empty;
+
+        public bool Enabled;
+    }
+
+    /// <summary>RecruitmentType.csv 한 행. 담기는 것은 키와 활성 여부뿐이며 <b>일부러 얇다</b> -
+    /// 후보도 창구도 각자의 표가 말한다.</summary>
+    public sealed class RecruitmentTypeRow
+    {
+        public int Line;
+        public string Id = string.Empty;
+        public bool Enabled;
+    }
+
+    /// <summary>
+    /// RecruitmentPool.csv 한 행 - "이 모집에서 이 캐릭터가 이만큼의 가중치로 나온다".
+    ///
+    /// <b>양쪽 id는 반드시 표에 실재해야 한다.</b> RecruitmentType.csv와 Character.csv가 이 표보다
+    /// 먼저 읽히므로, 참조를 확인할 때 스냅샷은 이미 완성되어 있다.
+    /// </summary>
+    public sealed class RecruitmentPoolRow
+    {
+        public int Line;
+        public string RecruitmentTypeId = string.Empty;
+        public string PoolEntryId = string.Empty;
+        public string CharacterId = string.Empty;
+
+        /// <summary>두 id를 이은 짝 키. 중복 검사와 생성 에셋 이름에 쓴다.</summary>
+        public string PairId = string.Empty;
+
+        /// <summary>뽑기 가중치. <b>1 이상만</b> 여기까지 온다 - 0짜리 칸은 뽑히지 않으므로 표에 적을
+        /// 이유가 없고, 조용히 통과시키면 확률 합에 들어가지 않는 유령 칸이 생긴다.</summary>
+        public int Weight = 1;
+
+        public bool Enabled;
+    }
+
+    /// <summary>
+    /// RecruitmentAccess.csv 한 행 - "어디서 어떤 모집이 열리는가".
+    ///
+    /// 대상은 <b>종류 + id 두 칸</b>이며, 종류가 <c>BUILDING</c>이면 id는 Building.csv의 행을
+    /// 가리킨다. 종류가 그 밖의 낱말이면 <b>가리키는 표가 없으므로 실재 검사를 하지 않는다</b> -
+    /// 아직 코드가 모르는 대상을 표에 미리 적어 둘 수 있게 남겨 둔 자리다.
+    /// </summary>
+    public sealed class RecruitmentAccessRow
+    {
+        public int Line;
+        public string Id = string.Empty;
+        public string RecruitmentTypeId = string.Empty;
+        public string SourceType = string.Empty;
+        public string SourceId = string.Empty;
+
+        /// <summary>다음 후보가 도착하기까지의 간격(초). <b>0 이상만</b> 여기까지 온다.</summary>
+        public int ArrivalIntervalSeconds;
+
+        /// <summary>모집 한 번에 드는 수량. <b>0 이상만</b> 여기까지 온다.</summary>
+        public int ConsumeAmount;
+
+        public int DisplayOrder;
+        public bool Enabled;
+    }
+
+    /// <summary>
     /// 파싱과 검증을 마친 아홉 표. Rebuild는 이 스냅샷만 보고 에셋을 만든다 - CSV를 다시 읽지 않으므로
     /// "검증한 내용"과 "쓰는 내용"이 어긋날 수 없다.
     ///
@@ -336,6 +417,11 @@ namespace TableDataEditor
         public readonly List<CharacterSkillRow> CharacterSkills = new List<CharacterSkillRow>();
         public readonly List<BuildingRow> Buildings = new List<BuildingRow>();
 
+        public readonly List<CharacterAcquisitionRow> CharacterAcquisitions = new List<CharacterAcquisitionRow>();
+        public readonly List<RecruitmentTypeRow> RecruitmentTypes = new List<RecruitmentTypeRow>();
+        public readonly List<RecruitmentPoolRow> RecruitmentPools = new List<RecruitmentPoolRow>();
+        public readonly List<RecruitmentAccessRow> RecruitmentAccesses = new List<RecruitmentAccessRow>();
+
         public readonly Dictionary<string, WorldRow> WorldsById = new Dictionary<string, WorldRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, CurrencyRow> CurrenciesById = new Dictionary<string, CurrencyRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, ItemRow> ItemsById = new Dictionary<string, ItemRow>(StringComparer.Ordinal);
@@ -355,5 +441,24 @@ namespace TableDataEditor
 
         public readonly Dictionary<string, BuildingRow> BuildingsById =
             new Dictionary<string, BuildingRow>(StringComparer.Ordinal);
+
+        public readonly Dictionary<string, CharacterAcquisitionRow> CharacterAcquisitionsById =
+            new Dictionary<string, CharacterAcquisitionRow>(StringComparer.Ordinal);
+
+        /// <summary>획득 방식은 <b>캐릭터 하나에 하나</b>다 - 같은 캐릭터를 두 방식으로 적으면 어느
+        /// 쪽이 참인지 정할 수 없으므로, character_id로도 사전을 두어 중복을 잡는다.</summary>
+        public readonly Dictionary<string, CharacterAcquisitionRow> CharacterAcquisitionsByCharacterId =
+            new Dictionary<string, CharacterAcquisitionRow>(StringComparer.Ordinal);
+
+        public readonly Dictionary<string, RecruitmentTypeRow> RecruitmentTypesById =
+            new Dictionary<string, RecruitmentTypeRow>(StringComparer.Ordinal);
+
+        /// <summary>후보 칸은 <b>짝</b>이 키다 - 한 모집에 여러 캐릭터가, 한 캐릭터가 여러 모집에 들
+        /// 수 있으므로 어느 한쪽 id로는 행을 특정할 수 없다.</summary>
+        public readonly Dictionary<string, RecruitmentPoolRow> RecruitmentPoolsByPairId =
+            new Dictionary<string, RecruitmentPoolRow>(StringComparer.Ordinal);
+
+        public readonly Dictionary<string, RecruitmentAccessRow> RecruitmentAccessesById =
+            new Dictionary<string, RecruitmentAccessRow>(StringComparer.Ordinal);
     }
 }

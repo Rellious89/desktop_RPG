@@ -5,6 +5,7 @@ using Building;
 using Character;
 using Dungeon;
 using Inventory;
+using Recruitment;
 using Skill;
 using UnityEditor;
 using UnityEngine;
@@ -51,7 +52,12 @@ namespace TableDataEditor
             $"Character {Snapshot?.Characters.Count ?? 0} / " +
             $"Skill {Snapshot?.Skills.Count ?? 0} / " +
             $"CharacterSkill {Snapshot?.CharacterSkills.Count ?? 0} / " +
-            $"Building {Snapshot?.Buildings.Count ?? 0} 행, 오류 {ErrorCount}건, 경고 {WarningCount}건";
+            $"Building {Snapshot?.Buildings.Count ?? 0} / " +
+            $"CharacterAcquisition {Snapshot?.CharacterAcquisitions.Count ?? 0} / " +
+            $"RecruitmentType {Snapshot?.RecruitmentTypes.Count ?? 0} / " +
+            $"RecruitmentPool {Snapshot?.RecruitmentPools.Count ?? 0} / " +
+            $"RecruitmentAccess {Snapshot?.RecruitmentAccesses.Count ?? 0} 행, " +
+            $"오류 {ErrorCount}건, 경고 {WarningCount}건";
     }
 
     /// <summary>
@@ -132,12 +138,26 @@ namespace TableDataEditor
             CsvTable buildingTable = TableDataCsvReader.Read(
                 TableDataPaths.BuildingCsvPath, TableDataPaths.BuildingCsvFileName,
                 TableDataColumns.Building, log);
+            CsvTable acquisitionTable = TableDataCsvReader.Read(
+                TableDataPaths.CharacterAcquisitionCsvPath, TableDataPaths.CharacterAcquisitionCsvFileName,
+                TableDataColumns.CharacterAcquisition, log);
+            CsvTable recruitmentTypeTable = TableDataCsvReader.Read(
+                TableDataPaths.RecruitmentTypeCsvPath, TableDataPaths.RecruitmentTypeCsvFileName,
+                TableDataColumns.RecruitmentType, log);
+            CsvTable recruitmentPoolTable = TableDataCsvReader.Read(
+                TableDataPaths.RecruitmentPoolCsvPath, TableDataPaths.RecruitmentPoolCsvFileName,
+                TableDataColumns.RecruitmentPool, log);
+            CsvTable recruitmentAccessTable = TableDataCsvReader.Read(
+                TableDataPaths.RecruitmentAccessCsvPath, TableDataPaths.RecruitmentAccessCsvFileName,
+                TableDataColumns.RecruitmentAccess, log);
 
             var snapshot = new TableDataSnapshot();
             bool allTablesRead = worldTable != null && currencyTable != null && itemTable != null
                                  && monsterTable != null && dungeonTable != null
                                  && characterTable != null && skillTable != null && characterSkillTable != null
-                                 && buildingTable != null;
+                                 && buildingTable != null
+                                 && acquisitionTable != null && recruitmentTypeTable != null
+                                 && recruitmentPoolTable != null && recruitmentAccessTable != null;
 
             try
             {
@@ -152,6 +172,13 @@ namespace TableDataEditor
 
                 // Building은 Currency와 Item을 가리키므로 두 표가 모두 읽힌 뒤에 온다.
                 if (buildingTable != null) ValidateBuildings(buildingTable, snapshot, log);
+
+                // 모집 네 표는 맨 뒤다 - Character와 Building을 가리키므로 두 표가 이미 앞에 있어야
+                // 한다. 넷 사이의 순서도 같은 규칙을 따른다(RecruitmentType → Pool/Access).
+                if (acquisitionTable != null) ValidateCharacterAcquisitions(acquisitionTable, snapshot, log);
+                if (recruitmentTypeTable != null) ValidateRecruitmentTypes(recruitmentTypeTable, snapshot, log);
+                if (recruitmentPoolTable != null) ValidateRecruitmentPools(recruitmentPoolTable, snapshot, log);
+                if (recruitmentAccessTable != null) ValidateRecruitmentAccesses(recruitmentAccessTable, snapshot, log);
 
                 // 출력 쪽 충돌과 orphan은 표가 다 읽힌 뒤에만 의미가 있다. 절반만 읽힌 상태에서 orphan을
                 // 세면 "CSV에서 사라졌다"가 아니라 "아직 못 읽었다"를 보고하게 된다.
@@ -1603,6 +1630,451 @@ namespace TableDataEditor
             }
         }
 
+        // ---- CharacterAcquisition ----
+
+        /// <summary>
+        /// CharacterAcquisition.csv 한 장. 이 표는 스스로 캐릭터를 정의하지 않고 <b>Character.csv의
+        /// 행에 획득 방식을 붙이기만</b> 한다 - 그래서 모든 행의 character_id가 그 표에 실재해야 하고,
+        /// 활성 행은 활성 캐릭터만 가리킬 수 있다(CharacterSkill.csv와 같은 규칙이다).
+        ///
+        /// <b>획득 방식은 캐릭터 하나에 하나다.</b> 같은 캐릭터를 두 행에 적으면 어느 쪽이 참인지
+        /// 정할 수 없고, 카탈로그가 앞의 행만 남기므로 뒤의 행은 조용히 사라진다 - 그런 상태를
+        /// 통과시키지 않는다.
+        ///
+        /// <b>acquisition_type의 <i>뜻</i>은 여기서 보지 않는다.</b> 대문자 낱말 형식인지만 확인하며,
+        /// 런타임이 아는 낱말인지는 그 값을 읽는 쪽이 판정한다
+        /// (<see cref="RecruitmentCandidateSelector"/>는 모르는 낱말을 후보에서 뺀다) - 아직 코드가
+        /// 지원하지 않는 방식을 표에 미리 적어 둘 수 있어야 하기 때문이다.
+        /// </summary>
+        private static void ValidateCharacterAcquisitions(
+            CsvTable table, TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            string file = table.FileName;
+
+            foreach (CsvRecord record in table.Records)
+            {
+                int line = record.Line;
+                var row = new CharacterAcquisitionRow { Line = line };
+
+                bool idOk = TableDataFieldRules.TryReadRequiredId(
+                    file, line, TableDataColumns.AcquisitionId,
+                    table.Get(record, TableDataColumns.AcquisitionId), log, out string id);
+                row.Id = id;
+
+                if (idOk && snapshot.CharacterAcquisitionsById.TryGetValue(id, out CharacterAcquisitionRow existing))
+                {
+                    log.Error(file, line, TableDataColumns.AcquisitionId, id,
+                        $"acquisition_id가 {existing.Line}행과 중복됩니다 - 먼저 나온 행만 사용됩니다.");
+                    idOk = false;
+                }
+
+                bool characterOk = TableDataFieldRules.TryReadRequiredCharacterId(
+                    file, line, TableDataColumns.CharacterId,
+                    table.Get(record, TableDataColumns.CharacterId), log, out string characterId);
+                row.CharacterId = characterId;
+
+                if (TableDataFieldRules.TryReadEnabled(
+                        file, line, TableDataColumns.Enabled, table.Get(record, TableDataColumns.Enabled), log,
+                        out bool enabled))
+                {
+                    row.Enabled = enabled;
+                }
+
+                if (TableDataFieldRules.TryReadRequiredUppercaseKey(
+                        file, line, TableDataColumns.AcquisitionType,
+                        table.Get(record, TableDataColumns.AcquisitionType), log, out string acquisitionType))
+                {
+                    row.AcquisitionType = acquisitionType;
+                }
+
+                if (TableDataFieldRules.TryReadFlag(
+                        file, line, TableDataColumns.AllowDuplicateRecruitment,
+                        table.Get(record, TableDataColumns.AllowDuplicateRecruitment), log,
+                        out bool allowDuplicate))
+                {
+                    row.AllowDuplicateRecruitment = allowDuplicate;
+                }
+
+                if (TableDataFieldRules.TryReadOptionalId(
+                        file, line, TableDataColumns.ConditionId,
+                        table.Get(record, TableDataColumns.ConditionId), log, out string conditionId))
+                {
+                    row.ConditionId = conditionId;
+                }
+
+                if (characterOk)
+                {
+                    CheckCharacterReference(
+                        file, line, TableDataColumns.CharacterId, row.CharacterId, row.Enabled, snapshot, log);
+
+                    if (snapshot.CharacterAcquisitionsByCharacterId.TryGetValue(
+                            row.CharacterId, out CharacterAcquisitionRow sameCharacter))
+                    {
+                        log.Error(file, line, TableDataColumns.CharacterId, row.CharacterId,
+                            $"character_id가 {sameCharacter.Line}행과 중복됩니다 - 한 캐릭터의 획득 방식은 " +
+                            "하나여야 하며, 목록에는 먼저 나온 행만 남습니다.");
+                        characterOk = false;
+                    }
+                }
+
+                // memo는 사람이 읽는 칸이라 검증하지 않는다.
+
+                if (!idOk || !characterOk) continue;
+
+                snapshot.CharacterAcquisitions.Add(row);
+                snapshot.CharacterAcquisitionsById[row.Id] = row;
+                snapshot.CharacterAcquisitionsByCharacterId[row.CharacterId] = row;
+            }
+        }
+
+        // ---- RecruitmentType ----
+
+        /// <summary>
+        /// RecruitmentType.csv 한 장. 담는 것이 키와 활성 여부뿐이라 검사도 그 둘뿐이다 - <b>없는
+        /// 칸을 지어내지 않는다</b>(이 표에는 display_order도 이름 참조도 없다).
+        ///
+        /// id는 <see cref="TableDataFieldRules.RecruitmentIdPatternText"/>를 쓴다 - 이미
+        /// <c>Inn_Normal</c>로 저작되어 있는 값이라 표준 형식(소문자/숫자)으로는 담을 수 없고,
+        /// 표준 형식을 넓히면 기존 아홉 표의 검사가 함께 헐거워지기 때문이다.
+        /// </summary>
+        private static void ValidateRecruitmentTypes(
+            CsvTable table, TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            string file = table.FileName;
+
+            foreach (CsvRecord record in table.Records)
+            {
+                int line = record.Line;
+                var row = new RecruitmentTypeRow { Line = line };
+
+                bool idOk = TableDataFieldRules.TryReadRequiredRecruitmentId(
+                    file, line, TableDataColumns.RecruitmentTypeId,
+                    table.Get(record, TableDataColumns.RecruitmentTypeId), log, out string id);
+                row.Id = id;
+
+                if (idOk && snapshot.RecruitmentTypesById.TryGetValue(id, out RecruitmentTypeRow existing))
+                {
+                    log.Error(file, line, TableDataColumns.RecruitmentTypeId, id,
+                        $"recruitment_type_id가 {existing.Line}행과 중복됩니다 - 먼저 나온 행만 사용됩니다.");
+                    idOk = false;
+                }
+
+                if (TableDataFieldRules.TryReadEnabled(
+                        file, line, TableDataColumns.Enabled, table.Get(record, TableDataColumns.Enabled), log,
+                        out bool enabled))
+                {
+                    row.Enabled = enabled;
+                }
+
+                if (!idOk) continue;
+
+                snapshot.RecruitmentTypes.Add(row);
+                snapshot.RecruitmentTypesById[row.Id] = row;
+            }
+        }
+
+        // ---- RecruitmentPool ----
+
+        /// <summary>
+        /// RecruitmentPool.csv 한 장. 이 표도 스스로 무엇을 정의하지 않고 <b>모집과 캐릭터를 잇기만</b>
+        /// 한다 - 양쪽 id가 실재해야 하고, 활성 칸은 활성 모집과 활성 캐릭터만 가리킬 수 있다.
+        ///
+        /// <b>같은 모집 안에서 같은 캐릭터를 두 번 적을 수 없다.</b> 두 칸이 각자 가중치를 가지면
+        /// 확률이 조용히 합쳐지는데, 그 합은 표를 보고는 읽히지 않는다 - 뽑기도 뒤의 칸을 버리므로
+        /// (앞선 칸만 남긴다) 적어 둔 가중치가 그대로 사라진다.
+        ///
+        /// <b>weight는 1 이상이어야 한다.</b> 0짜리 칸은 절대 뽑히지 않으므로 표에 적을 이유가 없고,
+        /// 조용히 통과시키면 "후보에 있는데 나오지 않는" 유령 칸이 생긴다(건설 비용의 0개 칸을 오류로
+        /// 막는 것과 같은 판정이다).
+        /// </summary>
+        private static void ValidateRecruitmentPools(
+            CsvTable table, TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            string file = table.FileName;
+
+            // 같은 모집 안의 캐릭터 중복만 본다 - 서로 다른 모집에 같은 캐릭터가 드는 것은 정상이다.
+            var charactersByType = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
+
+            foreach (CsvRecord record in table.Records)
+            {
+                int line = record.Line;
+                var row = new RecruitmentPoolRow { Line = line };
+
+                bool typeOk = TableDataFieldRules.TryReadRequiredRecruitmentId(
+                    file, line, TableDataColumns.RecruitmentTypeId,
+                    table.Get(record, TableDataColumns.RecruitmentTypeId), log, out string typeId);
+                row.RecruitmentTypeId = typeId;
+
+                bool entryOk = TableDataFieldRules.TryReadRequiredId(
+                    file, line, TableDataColumns.PoolEntryId,
+                    table.Get(record, TableDataColumns.PoolEntryId), log, out string entryId);
+                row.PoolEntryId = entryId;
+
+                bool pairOk = typeOk && entryOk;
+                if (pairOk)
+                {
+                    row.PairId = RecruitmentPoolEntryDefinition.BuildPairId(typeId, entryId);
+
+                    if (snapshot.RecruitmentPoolsByPairId.TryGetValue(row.PairId, out RecruitmentPoolRow existing))
+                    {
+                        log.Error(file, line, TableDataColumns.PoolEntryId, entryId,
+                            $"'{typeId}' + '{entryId}' 짝이 {existing.Line}행과 중복됩니다 - " +
+                            "먼저 나온 행만 사용됩니다.");
+                        pairOk = false;
+                    }
+                }
+
+                bool characterOk = TableDataFieldRules.TryReadRequiredCharacterId(
+                    file, line, TableDataColumns.CharacterId,
+                    table.Get(record, TableDataColumns.CharacterId), log, out string characterId);
+                row.CharacterId = characterId;
+
+                if (TableDataFieldRules.TryReadEnabled(
+                        file, line, TableDataColumns.Enabled, table.Get(record, TableDataColumns.Enabled), log,
+                        out bool enabled))
+                {
+                    row.Enabled = enabled;
+                }
+
+                if (TableDataFieldRules.TryReadIntAtLeast(
+                        file, line, TableDataColumns.Weight, table.Get(record, TableDataColumns.Weight),
+                        1, log, out int weight))
+                {
+                    row.Weight = weight;
+                }
+
+                if (typeOk) CheckRecruitmentTypeReference(file, line, row.RecruitmentTypeId, row.Enabled, snapshot, log);
+
+                if (characterOk)
+                {
+                    CheckCharacterReference(
+                        file, line, TableDataColumns.CharacterId, row.CharacterId, row.Enabled, snapshot, log);
+
+                    if (typeOk)
+                    {
+                        if (!charactersByType.TryGetValue(typeId, out Dictionary<string, int> seen))
+                        {
+                            seen = new Dictionary<string, int>(StringComparer.Ordinal);
+                            charactersByType[typeId] = seen;
+                        }
+
+                        if (seen.TryGetValue(row.CharacterId, out int firstLine))
+                        {
+                            log.Error(file, line, TableDataColumns.CharacterId, row.CharacterId,
+                                $"'{typeId}' 모집의 {firstLine}행이 이미 같은 캐릭터를 후보로 올렸습니다 - " +
+                                "한 모집에 같은 캐릭터는 한 칸만 둘 수 있습니다(가중치를 합치려면 그 한 " +
+                                "칸의 weight를 올리세요).");
+                            pairOk = false;
+                        }
+                        else
+                        {
+                            seen[row.CharacterId] = line;
+                        }
+                    }
+                }
+
+                // memo는 사람이 읽는 칸이라 검증하지 않는다.
+
+                if (!pairOk || !characterOk) continue;
+
+                snapshot.RecruitmentPools.Add(row);
+                snapshot.RecruitmentPoolsByPairId[row.PairId] = row;
+            }
+        }
+
+        // ---- RecruitmentAccess ----
+
+        /// <summary>
+        /// RecruitmentAccess.csv 한 장. "어디서 어떤 모집이 열리는가"를 적는 표이며, 이 표에만 있는
+        /// 규칙이 둘이다.
+        ///
+        /// 첫째, <b>대상은 종류 + id 두 칸</b>이다. 종류가 <c>BUILDING</c>이면 id는 Building.csv에
+        /// 실제로 있는 행이어야 하고, 활성 창구는 활성 건물에만 붙을 수 있다. 종류가 그 밖의 낱말이면
+        /// <b>가리키는 표가 없으므로 실재 검사를 하지 않고 경고만</b> 남긴다 - 아직 코드가 모르는
+        /// 대상을 표에 미리 적어 둘 수 있어야 하기 때문이다(acquisition_type과 같은 태도다).
+        ///
+        /// 둘째, <b>한 대상에 창구가 여럿이면 경고</b>다. 오류가 아닌 이유는 그것이 표현할 수 있는
+        /// 상태이기 때문이고, 경고인 이유는 조회
+        /// (<see cref="RecruitmentAccessCatalog.FindBySource"/>)가 display_order가 앞선 하나만
+        /// 돌려주므로 나머지가 조용히 열리지 않기 때문이다.
+        /// </summary>
+        private static void ValidateRecruitmentAccesses(
+            CsvTable table, TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            string file = table.FileName;
+            var displayOrders = new Dictionary<int, int>();
+            var sources = new Dictionary<string, int>(StringComparer.Ordinal);
+
+            foreach (CsvRecord record in table.Records)
+            {
+                int line = record.Line;
+                var row = new RecruitmentAccessRow { Line = line };
+
+                bool idOk = TableDataFieldRules.TryReadRequiredRecruitmentId(
+                    file, line, TableDataColumns.RecruitmentAccessId,
+                    table.Get(record, TableDataColumns.RecruitmentAccessId), log, out string id);
+                row.Id = id;
+
+                if (idOk && snapshot.RecruitmentAccessesById.TryGetValue(id, out RecruitmentAccessRow existing))
+                {
+                    log.Error(file, line, TableDataColumns.RecruitmentAccessId, id,
+                        $"recruitment_access_id가 {existing.Line}행과 중복됩니다 - 먼저 나온 행만 사용됩니다.");
+                    idOk = false;
+                }
+
+                bool typeOk = TableDataFieldRules.TryReadRequiredRecruitmentId(
+                    file, line, TableDataColumns.RecruitmentTypeId,
+                    table.Get(record, TableDataColumns.RecruitmentTypeId), log, out string typeId);
+                row.RecruitmentTypeId = typeId;
+
+                if (TableDataFieldRules.TryReadEnabled(
+                        file, line, TableDataColumns.Enabled, table.Get(record, TableDataColumns.Enabled), log,
+                        out bool enabled))
+                {
+                    row.Enabled = enabled;
+                }
+
+                if (TableDataFieldRules.TryReadInt(
+                        file, line, TableDataColumns.DisplayOrder,
+                        table.Get(record, TableDataColumns.DisplayOrder), log, out int order))
+                {
+                    row.DisplayOrder = order;
+                    TableDataFieldRules.CheckDuplicateDisplayOrder(file, line, order, displayOrders, log);
+                }
+
+                bool sourceTypeOk = TableDataFieldRules.TryReadRequiredUppercaseKey(
+                    file, line, TableDataColumns.SourceType,
+                    table.Get(record, TableDataColumns.SourceType), log, out string sourceType);
+                row.SourceType = sourceType;
+
+                bool sourceIdOk = TableDataFieldRules.TryReadRequiredId(
+                    file, line, TableDataColumns.SourceId,
+                    table.Get(record, TableDataColumns.SourceId), log, out string sourceId);
+                row.SourceId = sourceId;
+
+                if (TableDataFieldRules.TryReadIntAtLeast(
+                        file, line, TableDataColumns.ArrivalIntervalSeconds,
+                        table.Get(record, TableDataColumns.ArrivalIntervalSeconds), 0, log, out int interval))
+                {
+                    row.ArrivalIntervalSeconds = interval;
+                }
+
+                if (TableDataFieldRules.TryReadIntAtLeast(
+                        file, line, TableDataColumns.ConsumeAmount,
+                        table.Get(record, TableDataColumns.ConsumeAmount), 0, log, out int consume))
+                {
+                    row.ConsumeAmount = consume;
+                }
+
+                if (typeOk) CheckRecruitmentTypeReference(file, line, row.RecruitmentTypeId, row.Enabled, snapshot, log);
+
+                if (sourceTypeOk && sourceIdOk)
+                {
+                    CheckRecruitmentSource(file, line, row, snapshot, log);
+
+                    string sourceKey = row.SourceType + "/" + row.SourceId;
+                    if (sources.TryGetValue(sourceKey, out int firstLine))
+                    {
+                        log.Warning(file, line, TableDataColumns.SourceId, row.SourceId,
+                            $"{firstLine}행이 이미 같은 대상('{sourceKey}')에 창구를 붙였습니다 - " +
+                            "조회는 display_order가 앞선 하나만 돌려주므로 나머지는 열리지 않습니다.");
+                    }
+                    else
+                    {
+                        sources[sourceKey] = line;
+                    }
+                }
+
+                // memo는 사람이 읽는 칸이라 검증하지 않는다.
+
+                if (!idOk) continue;
+
+                snapshot.RecruitmentAccesses.Add(row);
+                snapshot.RecruitmentAccessesById[row.Id] = row;
+            }
+        }
+
+        /// <summary>
+        /// 창구가 붙은 대상이 실재하는지 본다. 지금 <b>실재를 확인할 수 있는 종류는
+        /// <c>BUILDING</c> 하나</b>뿐이며, 그 밖의 낱말은 가리킬 표가 없으므로 경고만 남기고 넘어간다 -
+        /// 표가 코드보다 앞서가는 것을 오류로 막지 않는다.
+        /// </summary>
+        private static void CheckRecruitmentSource(
+            string file, int line, RecruitmentAccessRow row, TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            if (!string.Equals(row.SourceType, RecruitmentSourceTypes.Building, StringComparison.Ordinal))
+            {
+                log.Warning(file, line, TableDataColumns.SourceType, row.SourceType,
+                    $"런타임이 아는 대상 종류는 '{RecruitmentSourceTypes.Building}' 하나뿐이라 " +
+                    "이 창구는 어떤 조회에도 걸리지 않습니다 - 대상이 실제로 있는지도 확인하지 않습니다.");
+                return;
+            }
+
+            if (!snapshot.BuildingsById.TryGetValue(row.SourceId, out BuildingRow building))
+            {
+                log.Error(file, line, TableDataColumns.SourceId, row.SourceId,
+                    $"{TableDataPaths.BuildingCsvFileName}에 없는 building_id입니다 - " +
+                    "창구는 그 표에 실제로 있는 행에만 붙을 수 있습니다(대소문자를 구분합니다).");
+                return;
+            }
+
+            if (row.Enabled && !building.Enabled)
+            {
+                log.Error(file, line, TableDataColumns.SourceId, row.SourceId,
+                    $"enabled=0인 건물({TableDataPaths.BuildingCsvFileName} {building.Line}행)에 붙어 " +
+                    "있습니다 - 활성 창구는 활성 건물에만 붙을 수 있습니다.");
+            }
+        }
+
+        /// <summary>
+        /// 모집 키가 RecruitmentType.csv에 실재하는지 본다. <b>비활성 행의 참조도 검사한다</b> -
+        /// 잘못된 참조를 통과시키면 다시 켜는 순간 조용히 깨지기 때문이다. 다만 "활성인데 비활성
+        /// 대상을 가리킨다"는 판정은 활성 행에만 적용한다(CharacterSkill.csv와 같은 규칙이다).
+        /// </summary>
+        private static void CheckRecruitmentTypeReference(
+            string file, int line, string recruitmentTypeId, bool rowEnabled,
+            TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            if (!snapshot.RecruitmentTypesById.TryGetValue(recruitmentTypeId, out RecruitmentTypeRow type))
+            {
+                log.Error(file, line, TableDataColumns.RecruitmentTypeId, recruitmentTypeId,
+                    $"{TableDataPaths.RecruitmentTypeCsvFileName}에 없는 recruitment_type_id입니다 - " +
+                    "그 표에 실제로 있는 행만 가리킬 수 있습니다(대소문자를 구분합니다).");
+                return;
+            }
+
+            if (rowEnabled && !type.Enabled)
+            {
+                log.Error(file, line, TableDataColumns.RecruitmentTypeId, recruitmentTypeId,
+                    $"enabled=0인 모집({TableDataPaths.RecruitmentTypeCsvFileName} {type.Line}행)을 " +
+                    "가리킵니다 - 활성 행은 활성 모집만 가리킬 수 있습니다.");
+            }
+        }
+
+        /// <summary>
+        /// character_id가 Character.csv에 실재하는지 본다. 모집 쪽 두 표가 <b>같은 규칙</b>을 쓰도록
+        /// 한 자리에 모아 두었다 - 표마다 다른 판정을 적어 두면 한쪽만 고쳐질 수 있다.
+        /// </summary>
+        private static void CheckCharacterReference(
+            string file, int line, string column, string characterId, bool rowEnabled,
+            TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            if (!snapshot.CharactersById.TryGetValue(characterId, out CharacterRow character))
+            {
+                log.Error(file, line, column, characterId,
+                    $"{TableDataPaths.CharacterCsvFileName}에 없는 character_id입니다 - " +
+                    "그 표에 실제로 있는 행만 가리킬 수 있습니다(대소문자를 구분합니다).");
+                return;
+            }
+
+            if (rowEnabled && !character.Enabled)
+            {
+                log.Error(file, line, column, characterId,
+                    $"enabled=0인 캐릭터({TableDataPaths.CharacterCsvFileName} {character.Line}행)를 " +
+                    "가리킵니다 - 활성 행은 활성 캐릭터만 가리킬 수 있습니다.");
+            }
+        }
+
         // ---- 공용 칸 읽기 ----
 
         /// <summary>
@@ -1806,6 +2278,14 @@ namespace TableDataEditor
                 folders.Add(TableDataPaths.BuildingOutputFolder);
             }
 
+            if (TableDataRebuildScopes.IncludesRecruitmentTables(outputScope))
+            {
+                folders.Add(TableDataPaths.CharacterAcquisitionOutputFolder);
+                folders.Add(TableDataPaths.RecruitmentTypeOutputFolder);
+                folders.Add(TableDataPaths.RecruitmentPoolOutputFolder);
+                folders.Add(TableDataPaths.RecruitmentAccessOutputFolder);
+            }
+
             return folders;
         }
 
@@ -2007,6 +2487,99 @@ namespace TableDataEditor
                 }
             }
 
+            if (InScope(selected, TableDataPaths.CharacterAcquisitionOutputFolder))
+            {
+                CheckDuplicateGenerated(
+                    TableDataAssetIndex.LoadGeneratedById<CharacterAcquisitionDefinition>(
+                        TableDataPaths.CharacterAcquisitionOutputFolder, a => a.AcquisitionId),
+                    TableDataPaths.CharacterAcquisitionCsvFileName, TableDataColumns.AcquisitionId, log);
+
+                foreach (CharacterAcquisitionRow row in snapshot.CharacterAcquisitions)
+                {
+                    CheckOutputPath<CharacterAcquisitionDefinition>(
+                        TableDataPaths.CharacterAcquisitionAssetPath(row.Id), row.Id, a => a.AcquisitionId,
+                        TableDataPaths.CharacterAcquisitionCsvFileName, row.Line,
+                        TableDataColumns.AcquisitionId, row.Id, log);
+                }
+
+                CheckOutputPath<CharacterAcquisitionCatalog>(
+                    TableDataPaths.CharacterAcquisitionCatalogAssetPath, null, null,
+                    TableDataPaths.CharacterAcquisitionCsvFileName, TableDataDiagnostic.FileLevelRow,
+                    TableDataColumns.FilePseudoColumn, TableDataPaths.CharacterAcquisitionCatalogAssetName, log);
+            }
+
+            if (InScope(selected, TableDataPaths.RecruitmentTypeOutputFolder))
+            {
+                CheckDuplicateGenerated(
+                    TableDataAssetIndex.LoadGeneratedById<RecruitmentTypeDefinition>(
+                        TableDataPaths.RecruitmentTypeOutputFolder, t => t.RecruitmentTypeId),
+                    TableDataPaths.RecruitmentTypeCsvFileName, TableDataColumns.RecruitmentTypeId, log);
+
+                foreach (RecruitmentTypeRow row in snapshot.RecruitmentTypes)
+                {
+                    CheckOutputPath<RecruitmentTypeDefinition>(
+                        TableDataPaths.RecruitmentTypeAssetPath(row.Id), row.Id, t => t.RecruitmentTypeId,
+                        TableDataPaths.RecruitmentTypeCsvFileName, row.Line,
+                        TableDataColumns.RecruitmentTypeId, row.Id, log);
+                }
+
+                CheckOutputPath<RecruitmentTypeCatalog>(
+                    TableDataPaths.RecruitmentTypeCatalogAssetPath, null, null,
+                    TableDataPaths.RecruitmentTypeCsvFileName, TableDataDiagnostic.FileLevelRow,
+                    TableDataColumns.FilePseudoColumn, TableDataPaths.RecruitmentTypeCatalogAssetName, log);
+            }
+
+            if (InScope(selected, TableDataPaths.RecruitmentPoolOutputFolder))
+            {
+                CheckDuplicateGenerated(
+                    TableDataAssetIndex.LoadGeneratedById<RecruitmentPoolEntryDefinition>(
+                        TableDataPaths.RecruitmentPoolOutputFolder, e => e.PairId),
+                    TableDataPaths.RecruitmentPoolCsvFileName, TableDataColumns.PoolEntryId, log);
+
+                foreach (RecruitmentPoolRow row in snapshot.RecruitmentPools)
+                {
+                    CheckOutputPath<RecruitmentPoolEntryDefinition>(
+                        TableDataPaths.RecruitmentPoolAssetPath(row.PairId), row.PairId, e => e.PairId,
+                        TableDataPaths.RecruitmentPoolCsvFileName, row.Line,
+                        TableDataColumns.PoolEntryId, row.PairId, log);
+                }
+
+                CheckOutputPath<RecruitmentPoolCatalog>(
+                    TableDataPaths.RecruitmentPoolCatalogAssetPath, null, null,
+                    TableDataPaths.RecruitmentPoolCsvFileName, TableDataDiagnostic.FileLevelRow,
+                    TableDataColumns.FilePseudoColumn, TableDataPaths.RecruitmentPoolCatalogAssetName, log);
+            }
+
+            if (InScope(selected, TableDataPaths.RecruitmentAccessOutputFolder))
+            {
+                CheckDuplicateGenerated(
+                    TableDataAssetIndex.LoadGeneratedById<RecruitmentAccessDefinition>(
+                        TableDataPaths.RecruitmentAccessOutputFolder, a => a.RecruitmentAccessId),
+                    TableDataPaths.RecruitmentAccessCsvFileName, TableDataColumns.RecruitmentAccessId, log);
+
+                foreach (RecruitmentAccessRow row in snapshot.RecruitmentAccesses)
+                {
+                    CheckOutputPath<RecruitmentAccessDefinition>(
+                        TableDataPaths.RecruitmentAccessAssetPath(row.Id), row.Id, a => a.RecruitmentAccessId,
+                        TableDataPaths.RecruitmentAccessCsvFileName, row.Line,
+                        TableDataColumns.RecruitmentAccessId, row.Id, log);
+                }
+
+                CheckOutputPath<RecruitmentAccessCatalog>(
+                    TableDataPaths.RecruitmentAccessCatalogAssetPath, null, null,
+                    TableDataPaths.RecruitmentAccessCsvFileName, TableDataDiagnostic.FileLevelRow,
+                    TableDataColumns.FilePseudoColumn, TableDataPaths.RecruitmentAccessCatalogAssetName, log);
+            }
+
+            // 모집만 다시 만드는 좁은 범위에서는 이번 Rebuild가 Character 에셋을 만들지 않는다.
+            // 그러면 후보/획득 참조를 어디서 가져올지가 문제가 되므로 <b>여기서 미리</b> 확인한다
+            // (Building만 다시 만드는 범위가 Currency/Item을 확인하는 것과 같은 이유다).
+            if (InScope(selected, TableDataPaths.CharacterAcquisitionOutputFolder)
+                && !TableDataRebuildScopes.IncludesCharacterTables(outputScope))
+            {
+                CheckRecruitmentCharacterSourcesAreGenerated(snapshot, log);
+            }
+
             if (!InScope(selected, TableDataPaths.CharacterSkillOutputFolder)) return;
 
             CheckDuplicateGenerated(
@@ -2159,6 +2732,93 @@ namespace TableDataEditor
                     snapshot.BuildingsById.Keys, TableDataPaths.BuildingCsvFileName,
                     TableDataColumns.BuildingId, log);
             }
+
+            // 모집 쪽 네 도메인도 <b>같은 규칙</b>이다 - 자기 출력 폴더 안만 보고, 지우지 않으며,
+            // 카탈로그에서만 빠진다.
+            if (InScope(selected, TableDataPaths.CharacterAcquisitionOutputFolder))
+            {
+                ReportOrphans(
+                    TableDataAssetIndex.LoadGeneratedById<CharacterAcquisitionDefinition>(
+                        TableDataPaths.CharacterAcquisitionOutputFolder, a => a.AcquisitionId),
+                    snapshot.CharacterAcquisitionsById.Keys, TableDataPaths.CharacterAcquisitionCsvFileName,
+                    TableDataColumns.AcquisitionId, log);
+            }
+
+            if (InScope(selected, TableDataPaths.RecruitmentTypeOutputFolder))
+            {
+                ReportOrphans(
+                    TableDataAssetIndex.LoadGeneratedById<RecruitmentTypeDefinition>(
+                        TableDataPaths.RecruitmentTypeOutputFolder, t => t.RecruitmentTypeId),
+                    snapshot.RecruitmentTypesById.Keys, TableDataPaths.RecruitmentTypeCsvFileName,
+                    TableDataColumns.RecruitmentTypeId, log);
+            }
+
+            if (InScope(selected, TableDataPaths.RecruitmentPoolOutputFolder))
+            {
+                ReportOrphans(
+                    TableDataAssetIndex.LoadGeneratedById<RecruitmentPoolEntryDefinition>(
+                        TableDataPaths.RecruitmentPoolOutputFolder, e => e.PairId),
+                    snapshot.RecruitmentPoolsByPairId.Keys, TableDataPaths.RecruitmentPoolCsvFileName,
+                    TableDataColumns.PoolEntryId, log);
+            }
+
+            if (InScope(selected, TableDataPaths.RecruitmentAccessOutputFolder))
+            {
+                ReportOrphans(
+                    TableDataAssetIndex.LoadGeneratedById<RecruitmentAccessDefinition>(
+                        TableDataPaths.RecruitmentAccessOutputFolder, a => a.RecruitmentAccessId),
+                    snapshot.RecruitmentAccessesById.Keys, TableDataPaths.RecruitmentAccessCsvFileName,
+                    TableDataColumns.RecruitmentAccessId, log);
+            }
+        }
+
+        /// <summary>
+        /// 모집만 다시 만드는 좁은 범위에서, 후보와 획득 방식이 가리키는 <b>CharacterDefinition 생성
+        /// 에셋이 이미 있는지</b>를 쓰기 전에 확인한다.
+        ///
+        /// 이 범위는 Character 표를 다시 만들지 않으므로 참조할 대상이 이번 Rebuild의 메모리에 없다.
+        /// 그래서 Rebuild는 <b>이미 만들어져 있는 생성 에셋</b>을 읽어 참조를 잇는데, 그 에셋이 없으면
+        /// 참조가 조용히 비어 버린다 - 여기서 오류로 잡으면 아무것도 쓰이지 않으므로 그런 에셋이
+        /// 만들어질 자리가 없다(<see cref="CheckBuildingCostSourcesAreGenerated"/>와 같은 이유다).
+        ///
+        /// <b>읽기만 한다.</b> Character 생성 폴더를 로드할 뿐 <c>SetDirty</c>도 저장도 하지 않는다.
+        /// </summary>
+        private static void CheckRecruitmentCharacterSourcesAreGenerated(
+            TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            Dictionary<string, List<CharacterDefinition>> characters =
+                TableDataAssetIndex.LoadGeneratedById<CharacterDefinition>(
+                    TableDataPaths.CharacterOutputFolder, c => c.CharacterId);
+
+            foreach (CharacterAcquisitionRow row in snapshot.CharacterAcquisitions)
+            {
+                RequireSingleGeneratedCharacter(
+                    characters, row.CharacterId, TableDataPaths.CharacterAcquisitionCsvFileName, row.Line, log);
+            }
+
+            foreach (RecruitmentPoolRow row in snapshot.RecruitmentPools)
+            {
+                RequireSingleGeneratedCharacter(
+                    characters, row.CharacterId, TableDataPaths.RecruitmentPoolCsvFileName, row.Line, log);
+            }
+        }
+
+        /// <summary>그 캐릭터의 생성 에셋이 <b>정확히 하나</b> 있는지. 없으면 참조를 이을 수 없고,
+        /// 여럿이면 어느 것을 이을지 정할 수 없다 - 둘 다 오류이며 어느 쪽이든 아무것도 쓰이지 않는다.</summary>
+        private static void RequireSingleGeneratedCharacter(
+            Dictionary<string, List<CharacterDefinition>> generated, string characterId,
+            string file, int line, TableDataDiagnosticLog log)
+        {
+            int count = generated.TryGetValue(characterId, out List<CharacterDefinition> matches) ? matches.Count : 0;
+            if (count == 1) return;
+
+            log.Error(file, line, TableDataColumns.CharacterId, characterId, count == 0
+                ? $"'{TableDataPaths.CharacterOutputFolder}' 아래에 ID가 '{characterId}'인 " +
+                  $"{nameof(CharacterDefinition)} 생성 에셋이 없습니다 - 모집만 다시 만드는 범위는 그 " +
+                  "에셋을 만들지 않으므로, 먼저 Character 표를 포함한 Rebuild를 돌린 뒤 다시 실행하세요."
+                : $"'{TableDataPaths.CharacterOutputFolder}' 아래에 ID가 '{characterId}'인 " +
+                  $"{nameof(CharacterDefinition)} 생성 에셋이 {count}개 있어 어느 것을 참조할지 정할 수 " +
+                  "없습니다 - 하나만 남기세요.");
         }
 
         /// <summary>

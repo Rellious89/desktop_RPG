@@ -60,6 +60,126 @@ namespace TableDataEditor
         private static readonly HashSet<string> LegacyCharacterIdSet =
             new HashSet<string>(LegacyCharacterIds, StringComparer.Ordinal);
 
+        /// <summary>
+        /// <b>대문자 낱말</b> 형식. 소문자 키를 그대로 대문자로 뒤집은 것으로, 대문자로 시작하고
+        /// 대문자/숫자와 밑줄 구분만 쓴다(<c>RECRUIT_ONLY</c>, <c>BUILDING</c>). 값이 <b>낱말이지
+        /// 식별자가 아닌</b> 칸에 쓴다 - 획득 방식이나 대상 종류처럼, 표가 적는 것은 "이름"이고 그
+        /// 이름을 무엇으로 읽을지는 런타임이 정하는 칸들이다.
+        ///
+        /// 형식만 본다. <b>런타임이 아는 낱말인지는 여기서 보지 않는다</b> - 표가 코드보다 먼저
+        /// 앞서가는 것을 오류로 막으면, 아직 지원하지 않는 방식을 미리 적어 둘 수조차 없다.
+        /// 모르는 낱말을 어떻게 다룰지는 그 값을 읽는 런타임의 몫이다
+        /// (<see cref="Recruitment.RecruitmentCandidateSelector"/>는 후보에서 뺀다).
+        /// </summary>
+        public const string UppercaseKeyPatternText = "^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$";
+
+        private static readonly Regex UppercaseKeyPattern =
+            new Regex(UppercaseKeyPatternText, RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// <b>모집 표 전용</b> ID 형식. 표준 ID(<see cref="IdPatternText"/>)에서 <b>대문자를 허용</b>한
+        /// 것으로, 영문자로 시작하고 영문자/숫자와 밑줄 구분만 쓴다(<c>Inn_Normal</c>,
+        /// <c>Inn_Normal_Access</c>).
+        ///
+        /// 표준 형식을 <b>느슨하게 만들지 않고</b> 따로 둔 이유는
+        /// <see cref="LegacyCharacterIds"/>와 같다 - <see cref="IdPatternText"/>를 조금이라도 넓히면
+        /// 기존 아홉 표의 id 검사가 함께 헐거워진다. 모집 id에 대소문자를 허용하는 것은 이 id들이
+        /// 사람이 읽는 표기(<c>Inn_Normal</c>)로 이미 저작되어 있고, 그것을 소문자로 고치면 표와
+        /// 코드와 문서에 흩어진 값을 한꺼번에 바꿔야 하기 때문이다.
+        ///
+        /// <b>숫자만으로 이루어질 수 없다.</b> 첫 글자가 영문자여야 하므로 <c>1</c>은 모집 id가 될
+        /// 수 없다 - 모집 id와 건물 id를 눈으로 구분할 수 있게 남겨 둔 성질이다.
+        /// </summary>
+        public const string RecruitmentIdPatternText = "^[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)*$";
+
+        private static readonly Regex RecruitmentIdPattern =
+            new Regex(RecruitmentIdPatternText, RegexOptions.CultureInvariant);
+
+        /// <summary>대문자 낱말 형식을 만족하는지. 빈 값은 false다.</summary>
+        public static bool IsValidUppercaseKey(string value)
+        {
+            return !string.IsNullOrEmpty(value) && UppercaseKeyPattern.IsMatch(value);
+        }
+
+        /// <summary>모집 표의 id 형식을 만족하는지. 빈 값은 false다.</summary>
+        public static bool IsValidRecruitmentId(string value)
+        {
+            return !string.IsNullOrEmpty(value) && RecruitmentIdPattern.IsMatch(value);
+        }
+
+        /// <summary>
+        /// 모집 표의 필수 id 칸을 읽는다. 규칙은 <see cref="TryReadRequiredId"/>와 같고 허용 집합만
+        /// <see cref="IsValidRecruitmentId"/>로 넓다 - <b>값은 어떤 경우에도 고치지 않는다</b>.
+        /// </summary>
+        public static bool TryReadRequiredRecruitmentId(
+            string file, int line, string column, string raw, TableDataDiagnosticLog log, out string id)
+        {
+            id = raw ?? string.Empty;
+
+            if (id.Length == 0)
+            {
+                log.Error(file, line, column, id, "필수 ID가 비어 있습니다.");
+                return false;
+            }
+
+            if (!RecruitmentIdPattern.IsMatch(id))
+            {
+                log.Error(file, line, column, id,
+                    $"{column} 형식이 맞지 않습니다 - {RecruitmentIdPatternText} 를 정확히 만족해야 합니다" +
+                    "(영문자로 시작하고 영문자/숫자와 밑줄 구분만 쓰며, 숫자로 시작할 수 없고 " +
+                    "앞뒤 공백도 쓸 수 없습니다). 값은 자동으로 고치지 않습니다.");
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// 대문자 낱말 칸을 읽는다. <b>필수</b>이며 비어 있으면 오류다 - 이 칸이 비면 그 행이 무엇을
+        /// 뜻하는지 알 수 없다. 형식만 확인하고 <b>값은 고치지 않는다</b>(소문자를 대문자로 올려
+        /// 통과시키지 않는다).
+        /// </summary>
+        public static bool TryReadRequiredUppercaseKey(
+            string file, int line, string column, string raw, TableDataDiagnosticLog log, out string key)
+        {
+            key = raw ?? string.Empty;
+
+            if (key.Length == 0)
+            {
+                log.Error(file, line, column, key, $"{column}는 비워 둘 수 없습니다.");
+                return false;
+            }
+
+            if (IsValidUppercaseKey(key)) return true;
+
+            log.Error(file, line, column, key,
+                $"낱말 형식이 맞지 않습니다 - {UppercaseKeyPatternText} 를 정확히 만족해야 합니다" +
+                "(대문자로 시작하고 대문자/숫자와 밑줄 구분만 쓰며 앞뒤 공백은 쓸 수 없습니다). " +
+                "값은 자동으로 고치지 않습니다.");
+            key = string.Empty;
+            return false;
+        }
+
+        /// <summary>
+        /// 비어 있어도 되는 ID 칸. 비어 있으면 빈 문자열을 돌려주고 아무것도 알리지 않는다 -
+        /// "아직 조건이 없다"는 정상적인 상태다. 값이 있으면 <see cref="IdPatternText"/>를 정확히
+        /// 만족해야 하며 <b>값을 다듬지 않는다</b>.
+        /// </summary>
+        public static bool TryReadOptionalId(
+            string file, int line, string column, string raw, TableDataDiagnosticLog log, out string id)
+        {
+            id = raw ?? string.Empty;
+            if (id.Length == 0) return true;
+
+            if (IdPattern.IsMatch(id)) return true;
+
+            log.Error(file, line, column, id,
+                $"ID 형식이 맞지 않습니다 - {IdPatternText} 를 정확히 만족해야 합니다. " +
+                "값은 자동으로 고치지 않습니다.");
+            id = string.Empty;
+            return false;
+        }
+
         /// <summary>소문자 키 형식을 만족하는지. 빈 값은 false다(비어도 되는지는 호출하는 쪽이 정한다).</summary>
         public static bool IsValidLowercaseKey(string value)
         {

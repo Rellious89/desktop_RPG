@@ -649,11 +649,30 @@ namespace TableDataEditor.Tests
                 Assert.AreEqual(30, row.MaxStamina, $"{row.Id}의 max_stamina");
                 Assert.IsFalse(row.HasBaseMaxHealth, $"{row.Id}의 base_max_health는 아직 비어 있어야 한다.");
                 Assert.IsTrue(row.Enabled, $"{row.Id}는 활성이어야 한다.");
-                Assert.IsTrue(row.InitiallyOwned,
-                    $"{row.Id}는 지금까지 모두가 쓸 수 있던 캐릭터이므로 새 게임에서도 처음부터 가진다.");
                 Assert.IsTrue(row.Name.Resolved, $"{row.Id}의 이름 참조가 해석되어야 한다.");
                 Assert.IsNotNull(row.MotionProfile, $"{row.Id}의 모션 프로필이 연결되어야 한다.");
             }
+        }
+
+        /// <summary>
+        /// 새 게임에서 처음부터 가지고 시작하는 캐릭터는 <b>고양이기사 하나뿐</b>이다. 나머지 다섯은
+        /// 여관 모집으로 얻으므로 <c>initially_owned=0</c>이며, 그 값이 다시 1로 돌아가면 모집으로
+        /// 얻을 것이 하나도 남지 않는다(뽑기는 이미 보유한 캐릭터를 후보에서 뺀다).
+        /// </summary>
+        [Test]
+        public void LiveCsv_OnlyCatKnightStartsOwned()
+        {
+            TableDataSnapshot snapshot = Live().Snapshot;
+            Assert.IsNotNull(snapshot);
+
+            var owned = new List<string>();
+            foreach (CharacterRow row in snapshot.Characters)
+            {
+                if (row.InitiallyOwned) owned.Add(row.Id);
+            }
+
+            CollectionAssert.AreEqual(new[] { "CatKnight" }, owned,
+                "새 게임에서 처음부터 가지고 시작하는 캐릭터는 고양이기사 하나여야 한다.");
         }
 
         [Test]

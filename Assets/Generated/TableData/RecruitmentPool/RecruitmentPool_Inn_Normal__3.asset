@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8e3645017b7b4b0bb2fa9b4406299b43, type: 3}
+  m_Name: RecruitmentPool_Inn_Normal__3
+  m_EditorClassIdentifier: 
+  recruitmentTypeId: Inn_Normal
+  poolEntryId: 3
+  characterId: Barbarian
+  character: {fileID: 11400000, guid: 248d14fc02c4142c49d3913832fb519e, type: 2}
+  weight: 80
+  enabled: 1
