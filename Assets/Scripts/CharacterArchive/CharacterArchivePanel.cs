@@ -31,6 +31,10 @@ namespace CharacterArchive
         [SerializeField] private TMP_Text ownedCountText;
         [SerializeField] private LocalizedTMPText ownedCountLocalizer;
         [SerializeField] private PartyConfigCatalog partyConfigCatalog;
+        [Header("Party Toasts (Inspector에서만 연결)")]
+        [SerializeField] private LocalizedTextReference recoveryLeaveBlockedToast;
+        [SerializeField] private LocalizedTextReference partyJoinToast;
+        [SerializeField] private LocalizedTextReference activeCharacterBlockedToast;
 
         private readonly List<CharacterArchiveCardView> cards = new List<CharacterArchiveCardView>();
         private readonly List<PartySlotView> partySlots = new List<PartySlotView>();
@@ -236,8 +240,8 @@ namespace CharacterArchive
                 return;
             }
 
-            if (Same(current, outgoingId)) { ShowToast(61); return; }
-            if (RecoveryStation.IsCharacterIdInSavedSlot(data, incomingId) || RecoveryStation.IsCharacterIdInSavedSlot(data, outgoingId)) { ShowToast(59); return; }
+            if (Same(current, outgoingId)) { ShowToast(activeCharacterBlockedToast); return; }
+            if (RecoveryStation.IsCharacterIdInSavedSlot(data, incomingId) || RecoveryStation.IsCharacterIdInSavedSlot(data, outgoingId)) { ShowToast(recoveryLeaveBlockedToast); return; }
             ApplyPartyResult(partyService.TryReplace(outgoingId, incomingId), incoming, true);
         }
 
@@ -247,8 +251,8 @@ namespace CharacterArchive
         {
             if (slot == null || partyService == null || string.IsNullOrEmpty(slot.CharacterId)) return;
             CharacterDefinition current = CharacterRoster.Instance != null ? CharacterRoster.Instance.Current : null;
-            if (Same(current, slot.CharacterId)) { ShowToast(61); return; }
-            if (RecoveryStation.IsCharacterIdInSavedSlot(SaveSystem.Data, slot.CharacterId)) { ShowToast(59); return; }
+            if (Same(current, slot.CharacterId)) { ShowToast(activeCharacterBlockedToast); return; }
+            if (RecoveryStation.IsCharacterIdInSavedSlot(SaveSystem.Data, slot.CharacterId)) { ShowToast(recoveryLeaveBlockedToast); return; }
             ApplyPartyResult(partyService.TryLeave(slot.CharacterId), null, false);
         }
 
@@ -256,23 +260,24 @@ namespace CharacterArchive
         {
             if (!result.Success)
             {
-                if (result.Code == PartyCompositionCode.InRecovery) ShowToast(59);
+                if (result.Code == PartyCompositionCode.InRecovery) ShowToast(recoveryLeaveBlockedToast);
                 return;
             }
 
             CharacterRoster.Instance?.RefreshPartyAfterExternalSave();
             CharacterSwapPanel.RequestRefresh();
             RecoveryService.NotifyRosterChangedAfterExternalSave();
-            if (showSuccess && successCharacter != null) ShowToast(60, CharacterNameBinding.GetCurrent(successCharacter));
+            if (showSuccess && successCharacter != null) ShowToast(partyJoinToast, CharacterNameBinding.GetCurrent(successCharacter));
             RefreshContents();
         }
 
         private static bool Same(CharacterDefinition character, string id) => character != null && string.Equals(character.CharacterId, id, StringComparison.Ordinal);
-        private static void ShowToast(long key, params object[] arguments)
+        private static void ShowToast(LocalizedTextReference message, params object[] arguments)
         {
-            if (ToastManager.Instance == null) return;
-            var message = new LocalizedTextReference("GUID:32fd067a20b754a50b20446b9c78d2ae", key.ToString());
-            ToastManager.Instance.Show(message.GetLocalizedString(arguments));
+            if (ToastManager.Instance == null || message == null || !message.HasReference) return;
+            string localizedMessage = message.GetLocalizedString(arguments);
+            if (string.IsNullOrEmpty(localizedMessage) || localizedMessage.StartsWith("No translation found", StringComparison.Ordinal)) return;
+            ToastManager.Instance.Show(localizedMessage);
         }
     }
 }

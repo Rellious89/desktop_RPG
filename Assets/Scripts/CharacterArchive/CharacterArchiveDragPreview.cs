@@ -26,7 +26,13 @@ namespace CharacterArchive
             RectTransform rootRect = (RectTransform)previewRoot.transform;
             rootRect.SetParent(rootCanvas.transform, false);
             rootRect.anchorMin = rootRect.anchorMax = new Vector2(0.5f, 0.5f);
-            rootRect.pivot = new Vector2(0.5f, 0.5f);
+            rootRect.pivot = new Vector2(0f, 1f);
+
+            RectTransform sourceRect = visualSource.transform as RectTransform;
+            Vector2 sourceSize = sourceRect != null ? sourceRect.rect.size : Vector2.zero;
+            if (sourceSize.x <= 0f || sourceSize.y <= 0f)
+                sourceSize = sourceRect != null ? sourceRect.sizeDelta : Vector2.zero;
+            rootRect.sizeDelta = sourceSize;
 
             CanvasGroup group = previewRoot.GetComponent<CanvasGroup>();
             group.alpha = 0.6f;
@@ -37,7 +43,15 @@ namespace CharacterArchive
             GameObject clone = Object.Instantiate(visualSource, previewRoot.transform, false);
             DisableInteractionComponents(clone);
             RectTransform cloneRect = clone.transform as RectTransform;
-            if (cloneRect != null) cloneRect.anchoredPosition = Vector2.zero;
+            if (cloneRect != null)
+            {
+                // Stretch anchors on the original card would otherwise collapse its root Graphic
+                // into the initially zero-sized preview parent. Keep both card roots top-left aligned.
+                cloneRect.anchorMin = cloneRect.anchorMax = new Vector2(0f, 1f);
+                cloneRect.pivot = new Vector2(0f, 1f);
+                cloneRect.anchoredPosition = Vector2.zero;
+                cloneRect.sizeDelta = sourceSize;
+            }
 
             previewRoot.SetActive(true);
             UpdatePosition(screenPosition);

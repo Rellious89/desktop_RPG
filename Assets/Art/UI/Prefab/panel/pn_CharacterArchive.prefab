@@ -2221,6 +2221,30 @@ MonoBehaviour:
   ownedCountText: {fileID: 381508735678397381}
   ownedCountLocalizer: {fileID: 8029432349543417749}
   partyConfigCatalog: {fileID: 11400000, guid: b5a4b1b6a358544f09c7123bd6aac7b3, type: 2}
+  recoveryLeaveBlockedToast:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 9478137665544192
+      m_Key: ''
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+  partyJoinToast:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 9478137678127104
+      m_Key: ''
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+  activeCharacterBlockedToast:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 9478137678127105
+      m_Key: ''
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
 --- !u!1 &6919317526206799039
 GameObject:
   m_ObjectHideFlags: 0

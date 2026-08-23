@@ -5,6 +5,7 @@ using Common;
 using Dungeon;
 using NUnit.Framework;
 using TMPro;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -56,12 +57,15 @@ namespace CharacterEditor.Tests
         }
 
         [Test]
-        public void DragPreview_IsSingleTransparentNonRaycastAndCleansUp()
+        public void DragPreview_CopiesRootGraphicUsesPointerTopLeftAndCleansUp()
         {
             root = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas));
             root.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
             var source = new GameObject("source", typeof(RectTransform), typeof(Image));
             source.transform.SetParent(root.transform, false);
+            var sourceRect = (RectTransform)source.transform;
+            sourceRect.sizeDelta = new Vector2(100f, 50f);
+            source.GetComponent<Image>().color = new Color(0.2f, 0.4f, 0.6f, 0.8f);
 
             InvokePreview("Begin", source, new Vector2(30f, 40f));
             Assert.IsTrue(PreviewActive());
@@ -71,11 +75,50 @@ namespace CharacterEditor.Tests
             Assert.IsFalse(group.blocksRaycasts);
             Assert.IsFalse(group.interactable);
 
+            RectTransform previewRect = (RectTransform)preview.transform;
+            RectTransform cloneRect = (RectTransform)preview.transform.GetChild(0);
+            Image cloneBackground = cloneRect.GetComponent<Image>();
+            Assert.AreEqual(new Vector2(0f, 1f), previewRect.pivot);
+            Assert.AreEqual(new Vector2(0f, 1f), cloneRect.pivot);
+            Assert.AreEqual(sourceRect.rect.size, previewRect.rect.size);
+            Assert.AreEqual(sourceRect.rect.size, cloneRect.rect.size);
+            Assert.IsTrue(cloneBackground.enabled, "루트 배경 Graphic은 상호작용만 꺼진 복제본에 남아야 한다.");
+            Assert.AreEqual(source.GetComponent<Image>().color, cloneBackground.color);
+
             InvokePreview("UpdatePosition", new Vector2(60f, 80f));
-            Assert.AreNotEqual(Vector2.zero, ((RectTransform)preview.transform).anchoredPosition);
+            RectTransform canvasRect = (RectTransform)root.transform;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, new Vector2(60f, 80f), null, out Vector2 expected);
+            Assert.That(previewRect.anchoredPosition, Is.EqualTo(expected).Within(0.01f),
+                "프리뷰의 좌상단 피벗 위치는 입력 포인터와 같아야 한다.");
 
             InvokePreview("End");
             Assert.IsFalse(PreviewActive());
+        }
+
+        [Test]
+        public void PartyToastReferences_UseConfiguredUiEntries()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Art/UI/Prefab/panel/pn_CharacterArchive.prefab");
+            Assert.IsNotNull(prefab);
+            var serializedPanel = new SerializedObject(prefab.GetComponent<CharacterArchivePanel>());
+
+            AssertToastReference(serializedPanel, "recoveryLeaveBlockedToast", 9478137665544192L);
+            AssertToastReference(serializedPanel, "partyJoinToast", 9478137678127104L);
+            AssertToastReference(serializedPanel, "activeCharacterBlockedToast", 9478137678127105L);
+        }
+
+        [Test]
+        public void PartySlotPrefab_HasTransparentRootRaycastGraphicWithoutBlockingRemoveButton()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Art/UI/Prefab/CharacterArchive/slot_CharacterArchive_Party1.prefab");
+            Assert.IsNotNull(prefab);
+
+            Image rootRaycastGraphic = prefab.GetComponent<Image>();
+            Button removeButton = FindChild(prefab.transform, "btn_remove").GetComponent<Button>();
+            Assert.IsTrue(rootRaycastGraphic.enabled);
+            Assert.IsTrue(rootRaycastGraphic.raycastTarget);
+            Assert.AreEqual(0f, rootRaycastGraphic.color.a);
+            Assert.IsNotNull(removeButton, "자식 버튼은 루트 Graphic보다 먼저 레이캐스트되어 기존 클릭 경로를 유지한다.");
         }
 
         [Test]
@@ -119,6 +162,26 @@ namespace CharacterEditor.Tests
             var child = new GameObject(name, components.Length == 0 ? new[] { typeof(RectTransform) } : components);
             child.transform.SetParent(parent.transform, false);
             return child;
+        }
+
+        private static void AssertToastReference(SerializedObject serializedPanel, string fieldName, long expectedKeyId)
+        {
+            SerializedProperty reference = serializedPanel.FindProperty(fieldName);
+            Assert.IsNotNull(reference);
+            Assert.AreEqual("GUID:32fd067a20b754a50b20446b9c78d2ae", reference.FindPropertyRelative("m_TableReference.m_TableCollectionName").stringValue);
+            Assert.AreEqual(expectedKeyId, reference.FindPropertyRelative("m_TableEntryReference.m_KeyId").longValue);
+        }
+
+        private static Transform FindChild(Transform parent, string name)
+        {
+            foreach (Transform child in parent)
+            {
+                if (child.name == name) return child;
+                Transform nested = FindChild(child, name);
+                if (nested != null) return nested;
+            }
+
+            return null;
         }
 
         private static void InvokePreview(string methodName, params object[] arguments)
