@@ -1,7 +1,7 @@
-character_id,name_category,name_key,$character_name,motion_profile_key,portrait_key,base_max_health,max_stamina,initially_owned,display_order,enabled,memo
-CatKnight,6,1,고양이기사,CatKnight_MotionProfile,sp_character_icon,,30,1,10,1,표시 순서는 현재 로스터 순서를 그대로 옮긴 임시값 / 이름은 MotionProfile 영문 표시명을 쓴 임시값 / 기본 체력은 아직 정하지 않아 비움 / 초상화는 기존 수동 에셋이 쓰던 sp_character_icon 유지
-ElfArcher,6,2,엘프궁수,ElfArcher_MotionProfile,,,30,0,20,1,표시 순서는 현재 로스터 순서를 그대로 옮긴 임시값 / 이름은 MotionProfile 영문 표시명을 쓴 임시값 / 기본 체력은 아직 정하지 않아 비움 / 초상화를 비워 Base Idle 첫 프레임 폴백 사용
-Barbarian,6,3,바바리안,Barbarian_MotionProfile,,,30,0,30,1,표시 순서는 현재 로스터 순서를 그대로 옮긴 임시값 / 이름은 MotionProfile 영문 표시명을 쓴 임시값 / 기본 체력은 아직 정하지 않아 비움 / 초상화를 비워 Base Idle 첫 프레임 폴백 사용
-ElfGuardian,6,4,엘프수호자,ElfGuardian_MotionProfile,,,30,0,40,1,표시 순서는 현재 로스터 순서를 그대로 옮긴 임시값 / 이름은 MotionProfile 영문 표시명을 쓴 임시값 / 기본 체력은 아직 정하지 않아 비움 / 초상화를 비워 Base Idle 첫 프레임 폴백 사용
-RabbitHealer,6,5,토끼힐러,RabbitHealer_MotionProfile,,,30,0,50,1,표시 순서는 현재 로스터 순서를 그대로 옮긴 임시값 / 이름은 MotionProfile 영문 표시명을 쓴 임시값 / 기본 체력은 아직 정하지 않아 비움 / 초상화를 비워 Base Idle 첫 프레임 폴백 사용
-CatMage,6,6,고양이마법사,CatMage_MotionProfile,,,30,0,60,1,표시 순서는 현재 로스터 순서를 그대로 옮긴 임시값 / 이름은 MotionProfile 영문 표시명을 쓴 임시값 / 기본 체력은 아직 정하지 않아 비움 / 초상화를 비워 Base Idle 첫 프레임 폴백 사용
+character_id,name_category,name_key,$character_name,origin_world_id,$origin_world_name,motion_profile_key,portrait_key,base_max_health,max_stamina,initially_owned,display_order,enabled,memo
+CatKnight,6,1,고양이기사,1,애니멀랜드,CatKnight_MotionProfile,sp_character_icon,,30,1,10,1,표시 순서는 현재 로스터 순서를 그대로 옮긴 임시값 / 이름은 MotionProfile 영문 표시명을 쓴 임시값 / 기본 체력은 아직 정하지 않아 비움 / 초상화는 기존 수동 에셋이 쓰던 sp_character_icon 유지
+ElfArcher,6,2,엘프궁수,2,판타지아,ElfArcher_MotionProfile,,,30,0,20,1,표시 순서는 현재 로스터 순서를 그대로 옮긴 임시값 / 이름은 MotionProfile 영문 표시명을 쓴 임시값 / 기본 체력은 아직 정하지 않아 비움 / 초상화를 비워 Base Idle 첫 프레임 폴백 사용
+Barbarian,6,3,바바리안,2,판타지아,Barbarian_MotionProfile,,,30,0,30,1,표시 순서는 현재 로스터 순서를 그대로 옮긴 임시값 / 이름은 MotionProfile 영문 표시명을 쓴 임시값 / 기본 체력은 아직 정하지 않아 비움 / 초상화를 비워 Base Idle 첫 프레임 폴백 사용
+ElfGuardian,6,4,엘프수호자,2,판타지아,ElfGuardian_MotionProfile,,,30,0,40,1,표시 순서는 현재 로스터 순서를 그대로 옮긴 임시값 / 이름은 MotionProfile 영문 표시명을 쓴 임시값 / 기본 체력은 아직 정하지 않아 비움 / 초상화를 비워 Base Idle 첫 프레임 폴백 사용
+RabbitHealer,6,5,토끼힐러,1,애니멀랜드,RabbitHealer_MotionProfile,,,30,0,50,1,표시 순서는 현재 로스터 순서를 그대로 옮긴 임시값 / 이름은 MotionProfile 영문 표시명을 쓴 임시값 / 기본 체력은 아직 정하지 않아 비움 / 초상화를 비워 Base Idle 첫 프레임 폴백 사용
+CatMage,6,6,고양이마법사,1,애니멀랜드,CatMage_MotionProfile,,,30,0,60,1,표시 순서는 현재 로스터 순서를 그대로 옮긴 임시값 / 이름은 MotionProfile 영문 표시명을 쓴 임시값 / 기본 체력은 아직 정하지 않아 비움 / 초상화를 비워 Base Idle 첫 프레임 폴백 사용
