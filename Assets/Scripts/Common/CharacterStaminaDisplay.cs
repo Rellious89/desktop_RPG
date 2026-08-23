@@ -33,6 +33,8 @@ namespace Common
 
         [SerializeField] private string staminaFormat = "{0} / {1}";
 
+        private readonly CharacterNameBinding characterName = new CharacterNameBinding();
+
         private void OnEnable()
         {
             if (staminaBar == null) staminaBar = GetComponentInChildren<ProgressBarView>(true);
@@ -47,6 +49,7 @@ namespace Common
         {
             CharacterRoster.CurrentCharacterChanged -= HandleCurrentCharacterChanged;
             CharacterRoster.CharacterStateChanged -= HandleCharacterStateChanged;
+            characterName.Unbind();
         }
 
         /// <summary>CharacterRoster.Awake가 이 컴포넌트의 OnEnable보다 늦게 돌면 그때 발생한
@@ -75,14 +78,23 @@ namespace Common
         {
             CharacterRoster roster = CharacterRoster.Instance;
             CharacterDefinition character = roster != null ? roster.Current : null;
-            if (character == null) return;
+            if (character == null)
+            {
+                characterName.Bind(null, ApplyCharacterName);
+                return;
+            }
 
             int current = roster.GetStamina(character);
             int max = roster.GetMaxStamina(character);
 
             if (staminaBar != null) staminaBar.SetValue(current, max);
             if (staminaValueText != null) staminaValueText.text = string.Format(staminaFormat, current, max);
-            if (characterNameText != null) characterNameText.text = character.DisplayName;
+            characterName.Bind(character, ApplyCharacterName);
+        }
+
+        private void ApplyCharacterName(string value)
+        {
+            if (characterNameText != null) characterNameText.text = value;
         }
     }
 }

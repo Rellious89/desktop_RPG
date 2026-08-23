@@ -136,7 +136,7 @@ namespace Recovery
             for (int i = 0; i < pendingNotices.Count; i++)
             {
                 RecoveryCompletionNotice notice = pendingNotices[i];
-                string characterName = notice.Character != null ? notice.Character.DisplayName : string.Empty;
+                string characterName = Character.CharacterNameBinding.GetCurrent(notice.Character);
 
                 SystemNotificationItemView view = manager.Show(recoveryCompletedNotification, characterName);
                 if (view == null)

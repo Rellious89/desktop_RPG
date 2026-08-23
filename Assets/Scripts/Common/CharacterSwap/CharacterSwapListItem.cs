@@ -120,6 +120,7 @@ namespace Common
         private bool stateSubscribed;
         private bool missingStateReferenceLogged;
         private bool resolved;
+        private readonly CharacterNameBinding characterName = new CharacterNameBinding();
 
 
         /// <summary>이 항목이 표시 중인 캐릭터. 패널이 특정 캐릭터의 항목만 골라 갱신할 때 쓴다.</summary>
@@ -157,9 +158,16 @@ namespace Common
             ResolveReferences();
         }
 
+        private void OnEnable()
+        {
+            ResolveReferences();
+            if (boundCharacter != null) characterName.Bind(boundCharacter, ApplyLocalizedCharacterName);
+        }
+
         private void OnDisable()
         {
             UnsubscribeStateText();
+            characterName.Unbind();
         }
 
         /// <summary>이 항목이 어떤 캐릭터를 담당할지 정한다(클릭 콜백 포함). 값 표시는
@@ -177,7 +185,7 @@ namespace Common
                 selectButton.onClick.AddListener(HandleClicked);
             }
 
-            if (nameText != null) nameText.text = character != null ? character.DisplayName : string.Empty;
+            characterName.Bind(character, ApplyLocalizedCharacterName);
 
             if (portraitImage != null)
             {
@@ -299,6 +307,11 @@ namespace Common
         private void ApplyLocalizedStateText(string localizedText)
         {
             if (stateText != null) stateText.text = localizedText;
+        }
+
+        private void ApplyLocalizedCharacterName(string localizedText)
+        {
+            if (nameText != null) nameText.text = localizedText;
         }
 
         private LocalizedTextReference GetStateReference(DisplayState state)

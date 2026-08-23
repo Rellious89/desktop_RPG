@@ -93,6 +93,7 @@ namespace Recovery
         private CharacterDefinition lastCharacter;
         private int lastDisplayedSeconds = int.MinValue;
         private bool hasDisplayedState;
+        private readonly CharacterNameBinding characterName = new CharacterNameBinding();
 
         public int SlotIndex => slotIndex;
 
@@ -118,7 +119,13 @@ namespace Recovery
         public void Unbind()
         {
             if (joinButton != null) joinButton.onClick.RemoveListener(HandleJoinClicked);
+            characterName.Unbind();
             owner = null;
+        }
+
+        private void OnDisable()
+        {
+            characterName.Unbind();
         }
 
         /// <summary>슬롯 전체를 지금 상태로 다시 그린다. 회복소가 없으면 빈 슬롯으로 그린다 -
@@ -169,6 +176,7 @@ namespace Recovery
         {
             SetActiveSafe(emptyRoot, true);
             SetActiveSafe(characterRoot, false);
+            characterName.Bind(null, ApplyLocalizedCharacterName);
 
             lastState = RecoveryCharacterState.Available;
             lastCharacter = null;
@@ -189,10 +197,9 @@ namespace Recovery
                 // 초상화가 없으면 빈 사각형이 남지 않게 이미지를 숨긴다(교체 리스트와 같은 규칙).
                 portraitImage.enabled = portrait != null;
             }
-            if (characterChanged && nameText != null)
-            {
-                nameText.text = slot.Character != null ? slot.Character.DisplayName : string.Empty;
-            }
+            // Bind는 같은 캐릭터면 중복 구독하지 않는다. 패널을 껐다 켠 뒤에도 이름 구독이 반드시
+            // 복원되도록 캐릭터 변경 여부와 무관하게 호출한다.
+            characterName.Bind(slot.Character, ApplyLocalizedCharacterName);
 
             if (levelText != null)
             {
@@ -243,6 +250,11 @@ namespace Recovery
             lastDisplayedSeconds = seconds;
 
             timeText.text = RecoveryTimeFormat.Format(seconds);
+        }
+
+        private void ApplyLocalizedCharacterName(string value)
+        {
+            if (nameText != null) nameText.text = value;
         }
 
         private static void SetActiveSafe(GameObject target, bool active)

@@ -21,10 +21,8 @@ namespace Character
     /// <see cref="LocalizedName"/> / <see cref="BaseMaxHealth"/> / <see cref="DisplayOrder"/>는
     /// 기존 칸 <b>뒤에</b> 추가한 것이라, 이미 저장돼 있는 수동 에셋은 그대로 읽힌다(없는 칸은 Unity가
     /// 기본값으로 채운다). <b>기존 칸의 이름과 의미는 하나도 바뀌지 않았다</b> -
-    /// <see cref="DisplayName"/>이 무엇을 돌려주는지도 그대로다. 로컬라이즈 이름은 <b>아직 어떤 UI도
-    /// 읽지 않는</b> 정적 데이터이며, 표시 경로를 그쪽으로 옮기는 것은 이 단계의 범위가 아니다 -
-    /// 두 경로를 동시에 살려 두고 어느 쪽이 진짜인지 모르는 상태를 만들지 않기 위해, 연결은 한 번에
-    /// 한다.
+    /// <see cref="DisplayName"/>이 무엇을 돌려주는지도 그대로다. 화면은 <see cref="LocalizedName"/>을
+    /// 우선 사용하고, 참조가 없는 레거시 수동 에셋에 한해서만 <see cref="DisplayName"/>으로 폴백한다.
     /// </summary>
     [CreateAssetMenu(fileName = "CharacterDefinition", menuName = "Character/Character Definition")]
     public class CharacterDefinition : ScriptableObject
@@ -64,7 +62,7 @@ namespace Character
 
         [Header("Localization")]
         [Tooltip("표에서 지정한 캐릭터 이름. 카테고리 번호 + 숫자 키로 가리킨다. " +
-                 "지금은 어떤 UI도 읽지 않는 정적 데이터이며, Display Name의 동작을 바꾸지 않는다.")]
+                 "화면은 이 값을 우선 사용하며, 참조가 없는 레거시 에셋만 Display Name으로 폴백한다.")]
         [SerializeField] private LocalizedTextReference localizedName = new LocalizedTextReference();
 
         [Header("Health")]
@@ -117,7 +115,7 @@ namespace Character
         /// <summary>표에서 지정한 캐릭터 이름 참조. <b>절대 null을 돌려주지 않는다</b> - 참조가 비어
         /// 있을 수는 있어도 객체 자체는 항상 있다(<see cref="Inventory.CurrencyDefinition"/>와 같은
         /// 규칙). <b>이 값은 <see cref="DisplayName"/>에 끼어들지 않는다</b> - 표시 이름의 경로를
-        /// 바꾸는 것은 이 단계의 범위가 아니다.</summary>
+        /// 직접 바꾸지 않으며, 화면의 Locale 대응은 CharacterNameBinding이 담당한다.</summary>
         public LocalizedTextReference LocalizedName =>
             localizedName ?? (localizedName = new LocalizedTextReference());
 
