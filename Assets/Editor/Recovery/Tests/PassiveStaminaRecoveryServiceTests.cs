@@ -102,6 +102,39 @@ namespace RecoveryEditor.Tests
         }
 
         [Test]
+        public void ImmediateThenSameTimeTick_DoesNotDuplicateRecoveryOrEvents()
+        {
+            CharacterDefinition character = Add("hero", 0, null);
+            PassiveStaminaRecoveryService service = Service();
+
+            service.Tick(); // 런타임 OnEnable의 즉시 오프라인 계산과 같은 첫 기준 시각 기록.
+            now = now.AddSeconds(300);
+            service.Tick();
+            service.Tick(); // 기존 unscaled Tick이 같은 UTC 구간을 다시 주어도 중복 회복하지 않는다.
+
+            Assert.AreEqual(1, roster.GetStamina(character));
+            Assert.AreEqual(1, saves);
+            Assert.AreEqual(1, events);
+        }
+
+        [Test]
+        public void LeavingRecoveryStation_DoesNotReuseItsResidenceTime()
+        {
+            CharacterDefinition character = Add("hero", 0, now.AddHours(-1), progress: 99);
+            data.recoverySlots.Add(new RecoverySlotSaveState { characterId = "hero" });
+            PassiveStaminaRecoveryService service = Service();
+
+            service.Tick();
+            data.recoverySlots.Clear();
+            now = now.AddSeconds(299);
+            service.Tick();
+
+            Assert.AreEqual(0, roster.GetStamina(character));
+            Assert.AreEqual(0, saves);
+            Assert.AreEqual(0, events);
+        }
+
+        [Test]
         public void FullStamina_ClearsProgressSoLaterLossCannotBankTime()
         {
             CharacterDefinition character = Add("hero", 10, now.AddHours(-1), progress: 9);

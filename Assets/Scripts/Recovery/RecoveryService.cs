@@ -49,6 +49,8 @@ namespace Recovery
         public static event Action<int, CharacterDefinition> RecoveryCompleted;
 
         private RecoveryStation station;
+        private CharacterRosterRecoveryAdapter recoveryRoster;
+        private PassiveStaminaRecoveryService passiveStaminaRecovery;
         private float tickTimer;
 
         /// <summary>
@@ -127,6 +129,7 @@ namespace Recovery
             tickTimer = 0f;
 
             station.Tick();
+            passiveStaminaRecovery?.Tick();
         }
 
         private bool TryBuildStation()
@@ -162,10 +165,18 @@ namespace Recovery
                 return false;
             }
 
+            recoveryRoster = new CharacterRosterRecoveryAdapter(roster);
             station = new RecoveryStation(
                 balance,
-                new CharacterRosterRecoveryAdapter(roster),
+                recoveryRoster,
                 new InventoryRecoveryWallet(inventory, balance.CurrencyId),
+                () => SaveSystem.Data,
+                SaveSystem.Save,
+                () => DateTime.UtcNow);
+
+            passiveStaminaRecovery = new PassiveStaminaRecoveryService(
+                balance,
+                recoveryRoster,
                 () => SaveSystem.Data,
                 SaveSystem.Save,
                 () => DateTime.UtcNow);
@@ -173,9 +184,13 @@ namespace Recovery
             station.SlotsChanged += HandleSlotsChanged;
             station.StaminaStepChanged += HandleStaminaStepChanged;
             station.RecoveryCompleted += HandleRecoveryCompleted;
+            passiveStaminaRecovery.StaminaChanged += HandlePassiveStaminaChanged;
 
             // 앱을 꺼 둔 동안 흐른 시간을 켜자마자 반영한다 - 첫 Tick을 기다리지 않는다.
+            // 회복소를 먼저 처리해 슬롯 상태를 확정한 뒤 자연 회복을 실행하므로 같은 캐릭터가
+            // 두 경로에서 회복되지 않는다.
             station.Tick();
+            passiveStaminaRecovery.Tick();
             return true;
         }
 
@@ -186,7 +201,10 @@ namespace Recovery
             station.SlotsChanged -= HandleSlotsChanged;
             station.StaminaStepChanged -= HandleStaminaStepChanged;
             station.RecoveryCompleted -= HandleRecoveryCompleted;
+            if (passiveStaminaRecovery != null) passiveStaminaRecovery.StaminaChanged -= HandlePassiveStaminaChanged;
             station = null;
+            passiveStaminaRecovery = null;
+            recoveryRoster = null;
         }
 
         private void HandleSlotsChanged()
@@ -202,6 +220,15 @@ namespace Recovery
         private void HandleRecoveryCompleted(int slotIndex, CharacterDefinition character)
         {
             RecoveryCompleted?.Invoke(slotIndex, character);
+        }
+
+        private void HandlePassiveStaminaChanged(CharacterDefinition character)
+        {
+            if (recoveryRoster == null || character == null) return;
+            // 자연 회복도 회복소와 같은 CharacterStateChanged 경로를 써야 HUD, 교체 목록,
+            // 회복소 목록, 명부가 각자 별도 연결 없이 즉시 다시 그려진다.
+            recoveryRoster.RaiseCharacterStateChanged(character);
+            StaminaStepChanged?.Invoke(character, recoveryRoster.GetStamina(character), recoveryRoster.GetMaxStamina(character));
         }
     }
 }
