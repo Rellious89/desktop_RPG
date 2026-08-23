@@ -86,7 +86,7 @@ namespace CharacterArchive
             {
                 CharacterArchiveCardView card = cards[i];
                 card.gameObject.SetActive(true);
-                card.Bind(source[i], data, current, Same(selected, source[i]), SelectCard);
+                card.Bind(source[i], data, current, Same(selected, source[i]), SelectCard, owned.IsOwned(source[i]));
             }
             for (int i = source.Count; i < cards.Count; i++) cards[i].gameObject.SetActive(false);
 
@@ -95,7 +95,7 @@ namespace CharacterArchive
             if (detailCard != null)
             {
                 SetActive(detailCard.gameObject, selected != null);
-                if (selected != null) detailCard.Bind(selected, data, current, false, null);
+                if (selected != null) detailCard.Bind(selected, data, current, false, null, false);
             }
             RefreshBookmarks();
             RefreshCount(owned.OwnedCount, owned.AllCharacters.Count);
@@ -216,7 +216,7 @@ namespace CharacterArchive
             for (int i = 0; i < partySlots.Count; i++) partySlots[i].Refresh(data, current, count);
         }
 
-        internal void HandlePartyDrop(CharacterDefinition incoming, PartySlotView target, bool fromPartySlot)
+        internal void HandlePartyDrop(CharacterDefinition incoming, PartySlotView target)
         {
             if (incoming == null || target == null || partyService == null || !target.IsEnabled) return;
             SaveData data = SaveSystem.Data;
@@ -225,7 +225,7 @@ namespace CharacterArchive
             CharacterDefinition current = CharacterRoster.Instance != null ? CharacterRoster.Instance.Current : null;
 
             bool alreadyInParty = data != null && data.partyCharacterIds != null && data.partyCharacterIds.Contains(incomingId);
-            if (fromPartySlot || alreadyInParty)
+            if (alreadyInParty)
             {
                 int targetIndex = data.partyCharacterIds.Count > 0
                     ? Mathf.Min(target.SlotIndex, data.partyCharacterIds.Count - 1) : 0;

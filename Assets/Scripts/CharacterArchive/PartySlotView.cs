@@ -10,7 +10,7 @@ namespace CharacterArchive
 {
     /// <summary>기존 명부 파티 슬롯의 표시, 드롭, 탈퇴 버튼만 연결한다. 파티 저장 규칙은 Panel의 서비스 경로에만 있다.</summary>
     [DisallowMultipleComponent]
-    public sealed class PartySlotView : MonoBehaviour, IDropHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
+    public sealed class PartySlotView : MonoBehaviour, IDropHandler
     {
         private CharacterArchivePanel owner;
         private int slotIndex;
@@ -25,12 +25,10 @@ namespace CharacterArchive
         private readonly CharacterNameBinding nameBinding = new CharacterNameBinding();
         private LocalizedTextReference worldName;
         private CharacterDefinition character;
-        private bool dragging;
 
         public int SlotIndex => slotIndex;
         public string CharacterId => character != null ? character.CharacterId : null;
         public bool IsEnabled { get; private set; }
-        public bool IsDraggingPartyMember => dragging && character != null;
 
         public void Bind(CharacterArchivePanel panel, int index)
         {
@@ -45,7 +43,7 @@ namespace CharacterArchive
             if (removeButton != null) removeButton.onClick.RemoveListener(Remove);
             nameBinding.Unbind();
             UnbindWorldName();
-            owner = null; character = null; dragging = false;
+            owner = null; character = null;
         }
 
         public void Refresh(SaveData data, CharacterDefinition current, int capacity)
@@ -73,28 +71,10 @@ namespace CharacterArchive
         public void OnDrop(PointerEventData eventData)
         {
             CharacterArchiveCardView card = eventData.pointerDrag != null ? eventData.pointerDrag.GetComponentInParent<CharacterArchiveCardView>() : null;
-            if (card != null && card.IsDraggingToParty) { owner?.HandlePartyDrop(card.Definition, this, false); return; }
-            PartySlotView source = eventData.pointerDrag != null ? eventData.pointerDrag.GetComponentInParent<PartySlotView>() : null;
-            if (source != null && source != this && source.IsDraggingPartyMember) owner?.HandlePartyDrop(source.character, this, true);
-        }
-
-        public void OnBeginDrag(PointerEventData eventData)
-        {
-            dragging = IsEnabled && character != null;
-            if (dragging && enabledRoot != null) CharacterArchiveDragPreview.Begin(enabledRoot, eventData.position);
-        }
-        public void OnDrag(PointerEventData eventData)
-        {
-            if (dragging) CharacterArchiveDragPreview.UpdatePosition(eventData.position);
-        }
-        public void OnEndDrag(PointerEventData eventData)
-        {
-            dragging = false;
-            CharacterArchiveDragPreview.End();
+            if (card != null && card.IsDraggingToParty) owner?.HandlePartyDrop(card.Definition, this);
         }
         private void OnDisable()
         {
-            dragging = false;
             CharacterArchiveDragPreview.End();
             nameBinding.Unbind();
             UnbindWorldName();

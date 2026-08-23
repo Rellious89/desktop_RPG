@@ -25,14 +25,16 @@ namespace CharacterArchive
         private readonly CharacterNameBinding nameBinding = new CharacterNameBinding();
         private CharacterDefinition definition;
         private LocalizedTextReference worldName;
+        private bool allowPartyDrag;
 
         public CharacterDefinition Definition => definition;
         public bool IsDraggingToParty { get; private set; }
 
-        public void Bind(CharacterDefinition value, SaveData data, CharacterDefinition current, bool selected, Action<CharacterArchiveCardView> onSelected)
+        public void Bind(CharacterDefinition value, SaveData data, CharacterDefinition current, bool selected, Action<CharacterArchiveCardView> onSelected, bool allowPartyDrag)
         {
             Unbind();
             definition = value;
+            this.allowPartyDrag = allowPartyDrag && definition != null;
             if (definition == null)
             {
                 ApplyEmpty();
@@ -82,14 +84,15 @@ namespace CharacterArchive
             if (worldName != null) worldName.StringChanged -= SetWorldName;
             worldName = null;
             definition = null;
+            allowPartyDrag = false;
             if (selectButton != null) selectButton.onClick.RemoveAllListeners();
         }
 
         public void OnBeginDrag(PointerEventData eventData)
         {
-            // 명부 카드는 선택 버튼을 계속 사용한다. 실제 드롭은 PartySlotView가 이 플래그와
-            // Definition을 함께 확인하므로, 다른 UI의 드래그가 잘못 합류되는 일은 없다.
-            IsDraggingToParty = definition != null;
+            // 상세 카드와 미보유 카드는 조회/선택만 할 수 있다. 드롭은 PartySlotView가 이 플래그와
+            // Definition을 함께 확인하므로, 허용되지 않은 카드가 합류 경로에 들어가지 않는다.
+            IsDraggingToParty = allowPartyDrag && definition != null;
             if (IsDraggingToParty) CharacterArchiveDragPreview.Begin(gameObject, eventData.position);
         }
 

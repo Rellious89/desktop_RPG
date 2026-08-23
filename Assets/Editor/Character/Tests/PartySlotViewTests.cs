@@ -7,6 +7,7 @@ using NUnit.Framework;
 using TMPro;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace CharacterEditor.Tests
@@ -96,6 +97,78 @@ namespace CharacterEditor.Tests
         }
 
         [Test]
+        public void OwnedArchiveCard_AllowsDragAndCreatesPreview()
+        {
+            root = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas));
+            root.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
+            GameObject cardObject = AddChild(root, "ownedCard", typeof(RectTransform), typeof(Image), typeof(CharacterArchiveCardView));
+            CharacterArchiveCardView card = cardObject.GetComponent<CharacterArchiveCardView>();
+            character = CreateCharacter("hero");
+            var data = new SaveData
+            {
+                characters = new System.Collections.Generic.List<CharacterSaveState>
+                {
+                    new CharacterSaveState { characterId = "hero" }
+                }
+            };
+
+            card.Bind(character, data, null, false, null, true);
+            card.OnBeginDrag(new PointerEventData(null) { position = new Vector2(20f, 30f) });
+
+            Assert.IsTrue(card.IsDraggingToParty);
+            Assert.IsTrue(PreviewActive());
+            card.OnEndDrag(new PointerEventData(null));
+            Assert.IsFalse(PreviewActive());
+        }
+
+        [Test]
+        public void UnownedArchiveCard_RemainsSelectableButCannotStartPartyDrag()
+        {
+            root = new GameObject("root", typeof(RectTransform));
+            GameObject cardObject = AddChild(root, "unownedCard", typeof(CharacterArchiveCardView));
+            GameObject buttonObject = AddChild(cardObject, "select", typeof(Button));
+            CharacterArchiveCardView card = cardObject.GetComponent<CharacterArchiveCardView>();
+            SetPrivate(card, "selectButton", buttonObject.GetComponent<Button>());
+            character = CreateCharacter("unowned");
+            bool selected = false;
+
+            card.Bind(character, new SaveData(), null, false, _ => selected = true, false);
+            buttonObject.GetComponent<Button>().onClick.Invoke();
+            card.OnBeginDrag(new PointerEventData(null) { position = new Vector2(20f, 30f) });
+
+            Assert.IsTrue(selected, "미보유 카드는 선택과 상세 조회 경로를 유지해야 한다.");
+            Assert.IsFalse(card.IsDraggingToParty);
+            Assert.IsFalse(PreviewActive());
+        }
+
+        [Test]
+        public void DetailCardAndPartySlot_AreNotPartyDragSources()
+        {
+            root = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas));
+            root.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
+            GameObject detailObject = AddChild(root, "detailCard", typeof(RectTransform), typeof(Image), typeof(CharacterArchiveCardView));
+            CharacterArchiveCardView detailCard = detailObject.GetComponent<CharacterArchiveCardView>();
+            character = CreateCharacter("hero");
+            var ownedData = new SaveData
+            {
+                characters = new System.Collections.Generic.List<CharacterSaveState>
+                {
+                    new CharacterSaveState { characterId = "hero" }
+                }
+            };
+
+            detailCard.Bind(character, ownedData, null, false, null, false);
+            detailCard.OnBeginDrag(new PointerEventData(null) { position = new Vector2(20f, 30f) });
+
+            Assert.IsFalse(detailCard.IsDraggingToParty);
+            Assert.IsFalse(PreviewActive());
+            Assert.IsTrue(typeof(IDropHandler).IsAssignableFrom(typeof(PartySlotView)));
+            Assert.IsFalse(typeof(IBeginDragHandler).IsAssignableFrom(typeof(PartySlotView)));
+            Assert.IsFalse(typeof(IDragHandler).IsAssignableFrom(typeof(PartySlotView)));
+            Assert.IsFalse(typeof(IEndDragHandler).IsAssignableFrom(typeof(PartySlotView)));
+        }
+
+        [Test]
         public void PartyToastReferences_UseConfiguredUiEntries()
         {
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Art/UI/Prefab/panel/pn_CharacterArchive.prefab");
@@ -162,6 +235,13 @@ namespace CharacterEditor.Tests
             var child = new GameObject(name, components.Length == 0 ? new[] { typeof(RectTransform) } : components);
             child.transform.SetParent(parent.transform, false);
             return child;
+        }
+
+        private static CharacterDefinition CreateCharacter(string id)
+        {
+            var value = ScriptableObject.CreateInstance<CharacterDefinition>();
+            SetPrivate(value, "characterId", id);
+            return value;
         }
 
         private static void AssertToastReference(SerializedObject serializedPanel, string fieldName, long expectedKeyId)
