@@ -124,7 +124,7 @@ namespace PartyEditor.Tests
 
             data.recoverySlots.Clear();
             Assert.AreEqual(PartyCompositionCode.Success, Service().TryLeave("CatKnight").Code);
-            CollectionAssert.AreEqual(new[] { "Barbarian" }, data.partyCharacterIds);
+            CollectionAssert.AreEqual(new[] { string.Empty, "Barbarian" }, data.partyCharacterIds);
             Assert.AreEqual(1, saves);
         }
 
@@ -153,14 +153,24 @@ namespace PartyEditor.Tests
         }
 
         [Test]
-        public void Move_ChangesOnlyOrderAndBlocksInvalidOrSameIndex()
+        public void Move_UsesFixedSlotsAndSwapsOccupiedTargets()
         {
             data.partyCharacterIds.Add("ElfArcher");
             Assert.AreEqual(PartyCompositionCode.Success, Service().TryMove("ElfArcher", 0).Code);
-            CollectionAssert.AreEqual(new[] { "ElfArcher", "CatKnight", "Barbarian" }, data.partyCharacterIds);
+            CollectionAssert.AreEqual(new[] { "ElfArcher", "Barbarian", "CatKnight" }, data.partyCharacterIds);
             Assert.AreEqual(PartyCompositionCode.InvalidIndex, Service().TryMove("CatKnight", 3).Code);
-            Assert.AreEqual(PartyCompositionCode.NoChange, Service().TryMove("CatKnight", 1).Code);
-            Assert.AreEqual(1, saves);
+            Assert.AreEqual(PartyCompositionCode.Success, Service().TryMove("CatKnight", 1).Code);
+            Assert.AreEqual(2, saves);
+        }
+
+        [Test]
+        public void JoinAt_UsesExactEmptySlotAndLeavePreservesOtherPositions()
+        {
+            data.partyCharacterIds = new List<string> { "CatKnight", string.Empty, "Barbarian" };
+            Assert.AreEqual(PartyCompositionCode.Success, Service().TryJoinAt("ElfArcher", 1).Code);
+            CollectionAssert.AreEqual(new[] { "CatKnight", "ElfArcher", "Barbarian" }, data.partyCharacterIds);
+            Assert.AreEqual(PartyCompositionCode.Success, Service().TryLeave("CatKnight").Code);
+            CollectionAssert.AreEqual(new[] { string.Empty, "ElfArcher", "Barbarian" }, data.partyCharacterIds);
         }
 
         [Test]
@@ -176,7 +186,8 @@ namespace PartyEditor.Tests
             Assert.AreEqual(4, data.partyCharacterIds.Count);
             Assert.AreEqual(PartyCompositionCode.Success, Service().TryMove("CatMage", 0).Code);
             Assert.AreEqual(PartyCompositionCode.Success, Service().TryLeave("CatKnight").Code);
-            Assert.AreEqual(3, data.partyCharacterIds.Count);
+            Assert.AreEqual(4, data.partyCharacterIds.Count);
+            Assert.AreEqual(3, PartySlotUtility.OccupiedCount(data.partyCharacterIds));
         }
 
         [Test]

@@ -224,19 +224,17 @@ namespace CharacterArchive
             string outgoingId = target.CharacterId;
             CharacterDefinition current = CharacterRoster.Instance != null ? CharacterRoster.Instance.Current : null;
 
-            bool alreadyInParty = data != null && data.partyCharacterIds != null && data.partyCharacterIds.Contains(incomingId);
+            bool alreadyInParty = PartySlotUtility.IndexOf(data != null ? data.partyCharacterIds : null, incomingId) >= 0;
             if (alreadyInParty)
             {
-                int targetIndex = data.partyCharacterIds.Count > 0
-                    ? Mathf.Min(target.SlotIndex, data.partyCharacterIds.Count - 1) : 0;
-                ApplyPartyResult(partyService.TryMove(incomingId, targetIndex), incoming, false);
+                ApplyPartyResult(partyService.TryMove(incomingId, target.SlotIndex), incoming, false);
                 return;
             }
 
             if (string.Equals(incomingId, outgoingId, StringComparison.Ordinal)) return;
             if (string.IsNullOrEmpty(outgoingId))
             {
-                ApplyPartyResult(partyService.TryJoin(incomingId), incoming, true);
+                ApplyPartyResult(partyService.TryJoinAt(incomingId, target.SlotIndex), incoming, true);
                 return;
             }
 

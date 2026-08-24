@@ -60,7 +60,7 @@ namespace CharacterArchive
             if (portrait != null) { portrait.sprite = character != null ? character.Portrait : null; portrait.enabled = portrait.sprite != null; }
             nameBinding.Bind(character, value => { if (nameText != null) nameText.text = value ?? string.Empty; });
             BindWorldName(character);
-            bool canRemove = IsEnabled && character != null && data != null && data.partyCharacterIds != null && data.partyCharacterIds.Count > 1;
+            bool canRemove = IsEnabled && character != null && Party.PartySlotUtility.OccupiedCount(data != null ? data.partyCharacterIds : null) > 1;
             if (removeButton != null)
             {
                 SetActive(removeButton.gameObject, canRemove);

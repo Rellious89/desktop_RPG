@@ -54,7 +54,7 @@ namespace Party
     }
 
     /// <summary>
-    /// SaveData v3의 출전 파티만 바꾸는 순수 저장 트랜잭션. UI, CharacterRoster, 씬 상태에는 의존하지
+    /// SaveData v4의 고정 출전 슬롯만 바꾸는 순수 저장 트랜잭션. UI, CharacterRoster, 씬 상태에는 의존하지
     /// 않으며 회복 중 판정도 저장된 RecoverySlot만 사용한다.
     /// </summary>
     public sealed class PartyCompositionService
@@ -87,7 +87,12 @@ namespace Party
 
         public PartyCompositionResult TryJoin(string characterId)
         {
-            return TryChange(() => JoinInternal(characterId));
+            return TryChange(() => JoinInternal(characterId, -1));
+        }
+
+        public PartyCompositionResult TryJoinAt(string characterId, int targetSlotIndex)
+        {
+            return TryChange(() => JoinInternal(characterId, targetSlotIndex));
         }
 
         public PartyCompositionResult TryLeave(string characterId)
@@ -114,7 +119,7 @@ namespace Party
             finally { changing = false; }
         }
 
-        private PartyCompositionResult JoinInternal(string characterId)
+        private PartyCompositionResult JoinInternal(string characterId, int requestedSlot)
         {
             if (string.IsNullOrEmpty(characterId)) return Result(PartyCompositionCode.InvalidCharacterId);
             if (!TryGetMutable(out SaveData data, out List<string> party, out int capacity, out PartyCompositionCode failure))
@@ -123,9 +128,11 @@ namespace Party
             if (IndexOf(party, characterId) >= 0) return Result(PartyCompositionCode.AlreadyInParty, capacity, party);
             if (RecoveryStation.IsCharacterIdInSavedSlot(data, characterId))
                 return Result(PartyCompositionCode.InRecovery, capacity, party);
-            if (party.Count >= capacity) return Result(PartyCompositionCode.CapacityReached, capacity, party);
-
-            var changed = new List<string>(party) { characterId };
+            if (PartySlotUtility.OccupiedCount(party) >= capacity) return Result(PartyCompositionCode.CapacityReached, capacity, party);
+            int slot = requestedSlot >= 0 ? requestedSlot : PartySlotUtility.FirstEmpty(party, capacity);
+            if (slot < 0 || slot >= capacity) return Result(PartyCompositionCode.InvalidIndex, capacity, party);
+            if (!string.IsNullOrEmpty(PartySlotUtility.At(party, slot))) return Result(PartyCompositionCode.InvalidIndex, capacity, party);
+            var changed = new List<string>(party); PartySlotUtility.EnsureIndex(changed, slot); changed[slot] = characterId;
             return SaveChanged(data, party, changed, capacity);
         }
 
@@ -137,12 +144,11 @@ namespace Party
 
             int index = IndexOf(party, characterId);
             if (index < 0) return Result(PartyCompositionCode.NotInParty, capacity, party);
-            if (party.Count <= MinimumPartyCount) return Result(PartyCompositionCode.MinimumPartySize, capacity, party);
+            if (PartySlotUtility.OccupiedCount(party) <= MinimumPartyCount) return Result(PartyCompositionCode.MinimumPartySize, capacity, party);
             if (RecoveryStation.IsCharacterIdInSavedSlot(data, characterId))
                 return Result(PartyCompositionCode.InRecovery, capacity, party);
 
-            var changed = new List<string>(party);
-            changed.RemoveAt(index);
+            var changed = new List<string>(party); changed[index] = string.Empty;
             return SaveChanged(data, party, changed, capacity);
         }
 
@@ -179,12 +185,11 @@ namespace Party
 
             int currentIndex = IndexOf(party, characterId);
             if (currentIndex < 0) return Result(PartyCompositionCode.NotInParty, capacity, party);
-            if (targetIndex < 0 || targetIndex >= party.Count) return Result(PartyCompositionCode.InvalidIndex, capacity, party);
+            if (targetIndex < 0 || targetIndex >= capacity) return Result(PartyCompositionCode.InvalidIndex, capacity, party);
             if (targetIndex == currentIndex) return Result(PartyCompositionCode.NoChange, capacity, party);
 
-            var changed = new List<string>(party);
-            changed.RemoveAt(currentIndex);
-            changed.Insert(targetIndex, characterId);
+            var changed = new List<string>(party); PartySlotUtility.EnsureIndex(changed, targetIndex);
+            string target = changed[targetIndex]; changed[targetIndex] = characterId; changed[currentIndex] = target;
             return SaveChanged(data, party, changed, capacity);
         }
 
@@ -259,7 +264,8 @@ namespace Party
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (string id in party)
             {
-                if (string.IsNullOrEmpty(id) || !seen.Add(id) || !IsOwned(characters, id)) return false;
+                if (string.IsNullOrEmpty(id)) continue;
+                if (!seen.Add(id) || !IsOwned(characters, id)) return false;
             }
 
             return true;
@@ -276,15 +282,7 @@ namespace Party
             return false;
         }
 
-        private static int IndexOf(List<string> party, string characterId)
-        {
-            for (int i = 0; i < party.Count; i++)
-            {
-                if (string.Equals(party[i], characterId, StringComparison.Ordinal)) return i;
-            }
-
-            return -1;
-        }
+        private static int IndexOf(List<string> party, string characterId) => PartySlotUtility.IndexOf(party, characterId);
 
         private static PartyCompositionResult Result(
             PartyCompositionCode code, int capacity = 0, IReadOnlyList<string> party = null)
