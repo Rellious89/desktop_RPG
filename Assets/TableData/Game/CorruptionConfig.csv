@@ -1,0 +1,2 @@
+config_id,max_corruption,warning_threshold_percent,danger_threshold_percent,warning_stamina_cost_multiplier,danger_stamina_cost_multiplier,enabled
+default,300,50,80,2,3,1
