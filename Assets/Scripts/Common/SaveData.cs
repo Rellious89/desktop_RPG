@@ -59,7 +59,8 @@ namespace Common
 
         /// <summary>
         /// 보유 캐릭터 목록. <b>v2에서 이 목록의 뜻은 하나로 고정됐다</b> - 항목 하나는 <b>동시에 두
-        /// 가지</b>를 말한다. v3부터 실제 출전 순서는 <see cref="partyCharacterIds"/>에 따로 둔다.
+        /// 가지</b>를 말한다. v3부터 실제 출전 순서는 <see cref="partyCharacterIds"/>에 따로 두며,
+        /// v4부터는 그 목록이 빈 값을 보존하는 고정 슬롯 목록이다.
         ///
         /// <list type="number">
         ///   <item>플레이어가 <b>그 characterId를 가지고 있다</b>(보유).</item>
