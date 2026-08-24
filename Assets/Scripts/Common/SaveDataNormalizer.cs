@@ -29,7 +29,8 @@ namespace Common
             data.characters = CompactCharacters(data.characters);
             foreach (CharacterSaveState state in data.characters)
             {
-                if (state.currentCorruption < 0) state.currentCorruption = 0;
+                if (double.IsNaN(state.currentCorruption) || double.IsInfinity(state.currentCorruption)
+                    || state.currentCorruption < 0d) state.currentCorruption = 0d;
             }
             data.partyCharacterIds = CompactPartyCharacterIds(data.partyCharacterIds, data.characters);
             data.items = CompactItems(data.items);

@@ -1064,7 +1064,7 @@ namespace CommonEditor.Tests
                     new CharacterSaveState
                     {
                         characterId = "CatKnight", level = 4, currentExp = 7, currentStamina = 9,
-                        passiveStaminaLastCalculatedUtc = "2026-08-24T00:00:00.0000000Z", passiveStaminaProgress = 1234, currentCorruption = 77,
+                        passiveStaminaLastCalculatedUtc = "2026-08-24T00:00:00.0000000Z", passiveStaminaProgress = 1234, currentCorruption = 77.25d,
                     },
                 },
                 partyCharacterIds = new List<string> { "CatKnight" },
@@ -1081,12 +1081,29 @@ namespace CommonEditor.Tests
             Assert.AreEqual(9, data.characters[0].currentStamina);
             Assert.AreEqual("2026-08-24T00:00:00.0000000Z", data.characters[0].passiveStaminaLastCalculatedUtc);
             Assert.AreEqual(1234, data.characters[0].passiveStaminaProgress);
-            Assert.AreEqual(77, data.characters[0].currentCorruption);
+            Assert.AreEqual(77.25d, data.characters[0].currentCorruption, 0.0000001d);
 
             // 사본을 거쳤으므로 호출부의 문서에는 <b>새 항목</b>이 들어와 있어야 한다.
             Assert.AreNotSame(original, data.characters[0], "목록 안의 항목까지 새로 만들어야 얕은 사본이 아니다.");
             Assert.AreNotSame(originalParty, data.partyCharacterIds, "파티 목록도 새 목록이어야 한다.");
             CollectionAssert.AreEqual(new[] { "CatKnight" }, data.partyCharacterIds);
+        }
+
+        [Test]
+        public void 오염도_정규화는_유한한_소수값만_보존한다()
+        {
+            SaveData data = new SaveData { characters = new List<CharacterSaveState>
+            {
+                new CharacterSaveState { characterId = "A", currentCorruption = 300.75d },
+                new CharacterSaveState { characterId = "B", currentCorruption = -1d },
+                new CharacterSaveState { characterId = "C", currentCorruption = double.NaN },
+                new CharacterSaveState { characterId = "D", currentCorruption = double.PositiveInfinity },
+            }};
+            SaveDataNormalizer.Normalize(data);
+            Assert.AreEqual(300.75d, data.characters[0].currentCorruption, 0.0000001d);
+            Assert.AreEqual(0d, data.characters[1].currentCorruption);
+            Assert.AreEqual(0d, data.characters[2].currentCorruption);
+            Assert.AreEqual(0d, data.characters[3].currentCorruption);
         }
 
         [Test]

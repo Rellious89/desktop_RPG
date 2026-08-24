@@ -446,7 +446,7 @@ namespace Common
         /// RecoveryBalance.SecondsPerStamina와 UTC ticks를 공통 분모로 쓴다.</summary>
         public long passiveStaminaProgress;
 
-        /// <summary>현재 오염도 원시값. 저장 계층은 음수만 0으로 보정하며 상한/최저값은 런타임 규칙의 몫이다.</summary>
-        public int currentCorruption;
+        /// <summary>현재 오염도 원시값. 파티 분배를 보존하도록 소수값을 저장하며, 저장 계층은 0 이상의 유한값만 허용한다.</summary>
+        public double currentCorruption = 0d;
     }
 }
