@@ -22,7 +22,7 @@ namespace Common
         /// <see cref="SaveMigrationRunner"/>에 그 한 단계를 등록한다. 필드를 새로 <i>추가</i>하기만
         /// 할 때는 올리지 않는다 - JsonUtility가 없는 필드를 기본값으로 채우므로 예전 파일이 그대로
         /// 유효하다.</summary>
-        public const int CurrentSaveVersion = 5;
+        public const int CurrentSaveVersion = 6;
 
         /// <summary>버전 필드가 아예 없던 시절의 저장 파일 번호. 파일 안에 <c>saveVersion</c> 항목이
         /// 없으면(빈 객체 <c>{}</c> 포함) 그 파일은 이 버전이다 - 없는 것 자체가 곧 표식이라
@@ -154,9 +154,47 @@ namespace Common
         public List<RecruitmentCycleSaveState> recruitmentCycles =
             new List<RecruitmentCycleSaveState>();
 
+        /// <summary>
+        /// 오염도 정화 슬롯. 목록 인덱스가 슬롯 번호이며 빈 슬롯도 보존한다. 현재 오염도는
+        /// <see cref="CharacterSaveState.currentCorruption"/>이 계속 소유하고, 슬롯에는 정화 방식과
+        /// 대상 캐릭터, 마지막 계산 시각 및 다음 정화 단계로 넘길 잔여 시간만 기록한다.
+        /// </summary>
+        public List<PurificationSlotSaveState> purificationSlots = new List<PurificationSlotSaveState>();
+
         /// <summary>저장 계층이 보장하는 최소 슬롯 수. 실제 사용 가능한 슬롯 수는 회복 밸런스 테이블의
         /// Max Slots가 정하며, 그 값이 더 크면 회복소가 목록을 더 늘린다.</summary>
         public const int DefaultRecoverySlotCount = 3;
+
+        /// <summary>저장 계층이 보장하는 최소 정화 슬롯 수. 실제 확장은 정화 설정이 정한다.</summary>
+        public const int DefaultPurificationSlotCount = 1;
+
+        /// <summary>
+        /// 정화 슬롯을 null 없는 <paramref name="minimumCount"/>개 이상으로 맞춘다. 이미 존재하는
+        /// 슬롯은 자르거나 압축하지 않아 저장된 슬롯 번호와 진행 상태를 보존한다.
+        /// </summary>
+        public static void EnsurePurificationSlots(SaveData data, int minimumCount = DefaultPurificationSlotCount)
+        {
+            if (data == null) return;
+            if (minimumCount < DefaultPurificationSlotCount) minimumCount = DefaultPurificationSlotCount;
+
+            if (data.purificationSlots == null)
+            {
+                data.purificationSlots = new List<PurificationSlotSaveState>();
+            }
+
+            for (int i = 0; i < data.purificationSlots.Count; i++)
+            {
+                if (data.purificationSlots[i] == null)
+                {
+                    data.purificationSlots[i] = new PurificationSlotSaveState();
+                }
+            }
+
+            while (data.purificationSlots.Count < minimumCount)
+            {
+                data.purificationSlots.Add(new PurificationSlotSaveState());
+            }
+        }
 
         /// <summary>
         /// 슬롯 목록을 항상 "null 없는 <paramref name="minimumCount"/>개 이상"으로 맞춘다. 저장 파일에
@@ -448,5 +486,31 @@ namespace Common
 
         /// <summary>현재 오염도 원시값. 파티 분배를 보존하도록 소수값을 저장하며, 저장 계층은 0 이상의 유한값만 허용한다.</summary>
         public double currentCorruption = 0d;
+    }
+
+    [Serializable]
+    public class PurificationSlotSaveState
+    {
+        /// <summary>PurificationConfigDefinition.PurificationTypeId. 빈 값이면 방식이 정해지지 않았다.</summary>
+        public string purificationTypeId;
+
+        /// <summary>기도 중인 CharacterDefinition.CharacterId. 빈 값이면 빈 슬롯이다.</summary>
+        public string characterId;
+
+        /// <summary>마지막 정화 계산 시각. <see cref="SaveData.TimestampFormat"/>을 사용한다.</summary>
+        public string lastCalculatedAtUtc;
+
+        /// <summary>아직 한 정화 주기를 채우지 못한 잔여 시간(<see cref="TimeSpan.Ticks"/> 단위).</summary>
+        public long progressTicks;
+
+        public bool HasCharacter => !string.IsNullOrEmpty(characterId);
+
+        public void Clear()
+        {
+            purificationTypeId = null;
+            characterId = null;
+            lastCalculatedAtUtc = null;
+            progressTicks = 0;
+        }
     }
 }

@@ -141,6 +141,7 @@ namespace Common
                 new V2ToV3Step(),
                 new V3ToV4Step(),
                 new V4ToV5Step(),
+                new V5ToV6Step(),
             };
         }
 
@@ -241,6 +242,7 @@ namespace Common
             target.partyCharacterIds = CopyPartyCharacterIds(source.partyCharacterIds);
             target.items = CopyItems(source.items);
             target.recoverySlots = CopyRecoverySlots(source.recoverySlots);
+            target.purificationSlots = CopyPurificationSlots(source.purificationSlots);
             target.buildingConstructions = CopyBuildingConstructions(source.buildingConstructions);
             target.recruitmentCycles = CopyRecruitmentCycles(source.recruitmentCycles);
         }
@@ -335,6 +337,27 @@ namespace Common
                         startedAtUtc = slot.startedAtUtc,
                         completeAtUtc = slot.completeAtUtc,
                         completionNotified = slot.completionNotified,
+                    });
+            }
+
+            return copy;
+        }
+
+        private static List<PurificationSlotSaveState> CopyPurificationSlots(List<PurificationSlotSaveState> source)
+        {
+            var copy = new List<PurificationSlotSaveState>();
+            if (source == null) return copy;
+
+            foreach (PurificationSlotSaveState slot in source)
+            {
+                copy.Add(slot == null
+                    ? null
+                    : new PurificationSlotSaveState
+                    {
+                        purificationTypeId = slot.purificationTypeId,
+                        characterId = slot.characterId,
+                        lastCalculatedAtUtc = slot.lastCalculatedAtUtc,
+                        progressTicks = slot.progressTicks,
                     });
             }
 
@@ -630,6 +653,22 @@ namespace Common
             {
                 if (state != null) state.currentCorruption = 0;
             }
+        }
+    }
+
+    /// <summary>v5 문서에 정화 슬롯의 첫 정식 계약인 빈 슬롯 하나를 만든다.</summary>
+    public sealed class V5ToV6Step : ISaveMigrationStep
+    {
+        public int FromVersion => 5;
+        public int ToVersion => 6;
+
+        public void Apply(SaveData data)
+        {
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            data.purificationSlots = new List<PurificationSlotSaveState>
+            {
+                new PurificationSlotSaveState(),
+            };
         }
     }
 }

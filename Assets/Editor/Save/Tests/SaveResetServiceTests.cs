@@ -53,6 +53,14 @@ namespace CommonEditor.SaveTests
                 {
                     new RecoverySlotSaveState { characterId = "Barbarian", startStamina = 2 },
                 },
+                purificationSlots = new List<PurificationSlotSaveState>
+                {
+                    new PurificationSlotSaveState
+                    {
+                        purificationTypeId = "church_prayer", characterId = "CatKnight",
+                        lastCalculatedAtUtc = "ps", progressTicks = 123,
+                    },
+                },
             };
         }
 
@@ -90,6 +98,7 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(1250, data.currency, "재화는 그대로입니다.");
             Assert.AreEqual(1, data.buildingConstructions.Count, "건축 기록은 그대로입니다.");
             Assert.AreEqual(1, data.recruitmentCycles.Count, "모집 주기도 그대로입니다.");
+            Assert.AreEqual("CatKnight", data.purificationSlots[0].characterId, "기도 슬롯도 그대로입니다.");
             AssertNonTargetsPreserved(data);
             Assert.AreEqual(1, calls.Value);
         }
@@ -107,6 +116,7 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(2, data.items.Count, "아이템은 그대로입니다.");
             Assert.AreEqual(1, data.buildingConstructions.Count, "건축 기록은 그대로입니다.");
             Assert.AreEqual(1, data.recruitmentCycles.Count, "모집 주기도 그대로입니다.");
+            Assert.AreEqual("CatKnight", data.purificationSlots[0].characterId, "기도 슬롯도 그대로입니다.");
             AssertNonTargetsPreserved(data);
             Assert.AreEqual(1, calls.Value);
         }
@@ -122,6 +132,9 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
             Assert.AreEqual(0, data.buildingConstructions.Count);
             Assert.AreEqual(0, data.recruitmentCycles.Count, "Construction은 모집 주기도 함께 지웁니다.");
+            Assert.AreEqual(1, data.purificationSlots.Count);
+            Assert.IsFalse(data.purificationSlots[0].HasCharacter,
+                "Construction은 존재하지 않는 교회에 기도 기록이 남지 않도록 정화 슬롯도 비웁니다.");
             Assert.AreEqual(2, data.items.Count, "아이템은 그대로입니다.");
             Assert.AreEqual(1250, data.currency, "재화는 그대로입니다.");
             AssertNonTargetsPreserved(data);
@@ -141,6 +154,8 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(0, data.currency);
             Assert.AreEqual(0, data.buildingConstructions.Count);
             Assert.AreEqual(0, data.recruitmentCycles.Count);
+            Assert.AreEqual(1, data.purificationSlots.Count);
+            Assert.IsFalse(data.purificationSlots[0].HasCharacter);
             AssertNonTargetsPreserved(data);
             Assert.AreEqual(1, calls.Value);
         }
@@ -160,6 +175,8 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(0, data.items.Count, "Item은 초기화됩니다.");
             Assert.AreEqual(0, data.buildingConstructions.Count, "Construction은 초기화됩니다.");
             Assert.AreEqual(0, data.recruitmentCycles.Count, "모집 주기도 Construction에 종속됩니다.");
+            Assert.AreEqual(1, data.purificationSlots.Count);
+            Assert.IsFalse(data.purificationSlots[0].HasCharacter);
             Assert.AreEqual(1250, data.currency, "해제한 Currency는 그대로여야 합니다.");
             AssertNonTargetsPreserved(data);
             Assert.AreEqual(1, calls.Value);
@@ -179,6 +196,7 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(1250, data.currency);
             Assert.AreEqual(1, data.buildingConstructions.Count);
             Assert.AreEqual(1, data.recruitmentCycles.Count);
+            Assert.AreEqual("CatKnight", data.purificationSlots[0].characterId);
             AssertNonTargetsPreserved(data);
         }
 
@@ -202,6 +220,7 @@ namespace CommonEditor.SaveTests
             List<InventoryItemState> originalItems = data.items;
             List<BuildingConstructionSaveState> originalConstructions = data.buildingConstructions;
             List<RecruitmentCycleSaveState> originalRecruitmentCycles = data.recruitmentCycles;
+            List<PurificationSlotSaveState> originalPurificationSlots = data.purificationSlots;
 
             SaveResetResult result =
                 SaveResetService.Apply(data, SaveResetTargets.All, Counting(out Box<int> calls, succeeds: false));
@@ -217,6 +236,8 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(1, data.buildingConstructions.Count);
             Assert.AreSame(originalRecruitmentCycles, data.recruitmentCycles, "모집 주기도 되돌립니다.");
             Assert.AreEqual(1, data.recruitmentCycles.Count);
+            Assert.AreSame(originalPurificationSlots, data.purificationSlots, "기도 슬롯도 원래 목록으로 되돌립니다.");
+            Assert.AreEqual("CatKnight", data.purificationSlots[0].characterId);
             AssertNonTargetsPreserved(data);
         }
 
@@ -301,6 +322,20 @@ namespace CommonEditor.SaveTests
                         characterId = "CatKnight", startStamina = 6, startedAtUtc = "cs", completeAtUtc = "cc",
                     },
                 },
+                purificationSlots = new List<PurificationSlotSaveState>
+                {
+                    new PurificationSlotSaveState
+                    {
+                        purificationTypeId = "church_prayer", characterId = "ElfArcher",
+                        lastCalculatedAtUtc = "eps", progressTicks = 11,
+                    },
+                    new PurificationSlotSaveState(),
+                    new PurificationSlotSaveState
+                    {
+                        purificationTypeId = "church_prayer", characterId = "CatKnight",
+                        lastCalculatedAtUtc = "cps", progressTicks = 22,
+                    },
+                },
             };
         }
 
@@ -383,6 +418,27 @@ namespace CommonEditor.SaveTests
         }
 
         [Test]
+        public void 삭제한_캐릭터의_기도_슬롯만_비우고_다른_슬롯의_인덱스와_값은_보존한다()
+        {
+            SaveData data = MakeCharacterFixture();
+
+            SaveResetService.Apply(
+                data, SaveResetTargets.Character,
+                new List<string> { "ElfArcher" }, null, Counting(out Box<int> _));
+
+            Assert.AreEqual(3, data.purificationSlots.Count);
+            Assert.IsFalse(data.purificationSlots[0].HasCharacter);
+            Assert.IsTrue(string.IsNullOrEmpty(data.purificationSlots[0].purificationTypeId));
+            Assert.IsTrue(string.IsNullOrEmpty(data.purificationSlots[0].lastCalculatedAtUtc));
+            Assert.AreEqual(0, data.purificationSlots[0].progressTicks);
+            Assert.IsFalse(data.purificationSlots[1].HasCharacter);
+            Assert.AreEqual("CatKnight", data.purificationSlots[2].characterId);
+            Assert.AreEqual("church_prayer", data.purificationSlots[2].purificationTypeId);
+            Assert.AreEqual("cps", data.purificationSlots[2].lastCalculatedAtUtc);
+            Assert.AreEqual(22, data.purificationSlots[2].progressTicks);
+        }
+
+        [Test]
         public void Character만_초기화하면_아이템_재화_건축_모집은_그대로다()
         {
             SaveData data = MakeCharacterFixture();
@@ -395,6 +451,9 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(500, data.currency, "재화는 그대로입니다.");
             Assert.AreEqual(1, data.buildingConstructions.Count, "건축 기록은 그대로입니다.");
             Assert.AreEqual(1, data.recruitmentCycles.Count, "모집 주기는 그대로입니다.");
+            Assert.AreEqual(3, data.purificationSlots.Count, "기도 슬롯 목록은 그대로입니다.");
+            Assert.IsFalse(data.purificationSlots[0].HasCharacter, "삭제한 캐릭터의 기도 슬롯만 비웁니다.");
+            Assert.AreEqual("CatKnight", data.purificationSlots[2].characterId);
         }
 
         [Test]
@@ -417,6 +476,8 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(0, data.currency);
             Assert.AreEqual(0, data.buildingConstructions.Count);
             Assert.AreEqual(0, data.recruitmentCycles.Count);
+            Assert.AreEqual(1, data.purificationSlots.Count);
+            Assert.IsFalse(data.purificationSlots[0].HasCharacter);
             CollectionAssert.AreEqual(new[] { "CatKnight", "Barbarian" }, IdsOf(data.characters));
         }
 
@@ -427,6 +488,7 @@ namespace CommonEditor.SaveTests
             List<CharacterSaveState> originalCharacters = data.characters;
             List<string> originalParty = data.partyCharacterIds;
             List<InventoryItemState> originalItems = data.items;
+            List<PurificationSlotSaveState> originalPurificationSlots = data.purificationSlots;
 
             SaveResetResult result = SaveResetService.Apply(
                 data, SaveResetTargets.All,
@@ -446,6 +508,9 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(500, data.currency);
             Assert.AreEqual(1, data.buildingConstructions.Count);
             Assert.AreEqual(1, data.recruitmentCycles.Count);
+            Assert.AreSame(originalPurificationSlots, data.purificationSlots);
+            Assert.AreEqual("ElfArcher", data.purificationSlots[0].characterId);
+            Assert.AreEqual("CatKnight", data.purificationSlots[2].characterId);
 
             // 비웠던 회복 슬롯도 원래 값으로 복구(같은 인덱스).
             Assert.AreEqual("ElfArcher", data.recoverySlots[0].characterId, "롤백하면 슬롯 값이 되살아나야 합니다.");
@@ -470,6 +535,8 @@ namespace CommonEditor.SaveTests
             Assert.AreSame(originalParty, data.partyCharacterIds);
             CollectionAssert.AreEqual(new[] { "CatKnight", "ElfArcher", "Barbarian" }, data.partyCharacterIds);
             Assert.AreEqual("ElfArcher", data.recoverySlots[0].characterId);
+            Assert.AreEqual("ElfArcher", data.purificationSlots[0].characterId);
+            Assert.AreEqual("eps", data.purificationSlots[0].lastCalculatedAtUtc);
         }
 
         [Test]

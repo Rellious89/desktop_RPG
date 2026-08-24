@@ -546,6 +546,7 @@ namespace CommonEditor.Tests
             Assert.IsNotNull(data.partyCharacterIds);
             Assert.IsNotNull(data.items);
             Assert.AreEqual(SaveData.DefaultRecoverySlotCount, data.recoverySlots.Count);
+            Assert.AreEqual(SaveData.DefaultPurificationSlotCount, data.purificationSlots.Count);
         }
 
         [Test]
@@ -554,6 +555,7 @@ namespace CommonEditor.Tests
             SaveData data = new SaveData
             {
                 characters = null, partyCharacterIds = null, items = null, recoverySlots = null,
+                purificationSlots = null,
             };
 
             SaveDataNormalizer.Normalize(data);
@@ -565,6 +567,7 @@ namespace CommonEditor.Tests
             Assert.IsNotNull(data.items);
             Assert.IsEmpty(data.items);
             Assert.AreEqual(SaveData.DefaultRecoverySlotCount, data.recoverySlots.Count);
+            Assert.AreEqual(SaveData.DefaultPurificationSlotCount, data.purificationSlots.Count);
         }
 
         [Test]
@@ -633,6 +636,48 @@ namespace CommonEditor.Tests
             SaveDataNormalizer.Normalize(many);
             Assert.AreEqual(6, many.recoverySlots.Count,
                 "슬롯 수를 나중에 줄여도 회복 중이던 저장 값을 지우면 안 됩니다.");
+        }
+
+        [Test]
+        public void 정규화는_정화_슬롯의_번호와_첫_캐릭터를_보존하고_잘못된_값만_비운다()
+        {
+            SaveData data = new SaveData
+            {
+                purificationSlots = new List<PurificationSlotSaveState>
+                {
+                    null,
+                    new PurificationSlotSaveState
+                    {
+                        purificationTypeId = "church_prayer", characterId = "CatMage",
+                        lastCalculatedAtUtc = "not-a-time", progressTicks = -10,
+                    },
+                    new PurificationSlotSaveState
+                    {
+                        purificationTypeId = "unknown_type", characterId = "CatMage",
+                        lastCalculatedAtUtc = "raw-time", progressTicks = 99,
+                    },
+                    new PurificationSlotSaveState
+                    {
+                        purificationTypeId = "leftover", characterId = null,
+                        lastCalculatedAtUtc = "leftover-time", progressTicks = 77,
+                    },
+                },
+            };
+
+            SaveDataNormalizer.Normalize(data);
+
+            Assert.AreEqual(4, data.purificationSlots.Count, "추가 슬롯과 인덱스를 보존해야 합니다.");
+            Assert.IsFalse(data.purificationSlots[0].HasCharacter);
+            Assert.AreEqual("CatMage", data.purificationSlots[1].characterId);
+            Assert.AreEqual("church_prayer", data.purificationSlots[1].purificationTypeId);
+            Assert.AreEqual("not-a-time", data.purificationSlots[1].lastCalculatedAtUtc,
+                "저장 계층은 읽을 수 없는 시각 원문을 지우지 않습니다.");
+            Assert.AreEqual(0, data.purificationSlots[1].progressTicks);
+            Assert.IsFalse(data.purificationSlots[2].HasCharacter, "뒤의 중복 캐릭터 슬롯은 비웁니다.");
+            Assert.IsFalse(data.purificationSlots[3].HasCharacter);
+            Assert.IsTrue(string.IsNullOrEmpty(data.purificationSlots[3].purificationTypeId));
+            Assert.IsTrue(string.IsNullOrEmpty(data.purificationSlots[3].lastCalculatedAtUtc));
+            Assert.AreEqual(0, data.purificationSlots[3].progressTicks);
         }
 
         [Test]
@@ -879,6 +924,16 @@ namespace CommonEditor.Tests
                         pendingCharacterId = "CatMage",
                     },
                 },
+                purificationSlots = new List<PurificationSlotSaveState>
+                {
+                    new PurificationSlotSaveState
+                    {
+                        purificationTypeId = "church_prayer",
+                        characterId = "barbarian",
+                        lastCalculatedAtUtc = "2026-01-02T03:06:05.0000000Z",
+                        progressTicks = 1234567,
+                    },
+                },
             };
         }
 
@@ -914,6 +969,16 @@ namespace CommonEditor.Tests
                 $"{because} (recruitmentCycles[0])");
             Assert.AreEqual("CatMage", data.recruitmentCycles[0].pendingCharacterId,
                 $"{because} (recruitmentCycles[0].pendingCharacterId)");
+
+            Assert.AreEqual(1, data.purificationSlots.Count, $"{because} (purificationSlots 개수)");
+            Assert.AreEqual("church_prayer", data.purificationSlots[0].purificationTypeId,
+                $"{because} (purificationSlots[0].purificationTypeId)");
+            Assert.AreEqual("barbarian", data.purificationSlots[0].characterId,
+                $"{because} (purificationSlots[0].characterId)");
+            Assert.AreEqual("2026-01-02T03:06:05.0000000Z", data.purificationSlots[0].lastCalculatedAtUtc,
+                $"{because} (purificationSlots[0].lastCalculatedAtUtc)");
+            Assert.AreEqual(1234567, data.purificationSlots[0].progressTicks,
+                $"{because} (purificationSlots[0].progressTicks)");
         }
 
         [Test]
@@ -1021,7 +1086,7 @@ namespace CommonEditor.Tests
                 "saveVersion", "saveRevision", "lastSavedAtUtc",
                 "currentLevel", "currentExp", "totalKillCount",
                 "characters", "partyCharacterIds", "currency", "items", "recoverySlots", "buildingConstructions",
-                "recruitmentCycles",
+                "recruitmentCycles", "purificationSlots",
             };
 
             List<string> actual = new List<string>();
@@ -1054,6 +1119,25 @@ namespace CommonEditor.Tests
         }
 
         [Test]
+        public void 정화_슬롯에_필드를_추가하면_깊은_사본도_함께_고쳐야_한다()
+        {
+            string[] expected =
+            {
+                "purificationTypeId", "characterId", "lastCalculatedAtUtc", "progressTicks",
+            };
+
+            var actual = new List<string>();
+            foreach (System.Reflection.FieldInfo field in typeof(PurificationSlotSaveState).GetFields(
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            {
+                actual.Add(field.Name);
+            }
+
+            CollectionAssert.AreEquivalent(expected, actual,
+                "PurificationSlotSaveState 필드가 바뀌면 CopyPurificationSlots도 함께 고쳐야 합니다.");
+        }
+
+        [Test]
         public void 깊은_사본은_캐릭터_경험치와_파티_목록을_옮기고_원본과_끊어_둔다()
         {
             SaveData data = new SaveData
@@ -1068,10 +1152,22 @@ namespace CommonEditor.Tests
                     },
                 },
                 partyCharacterIds = new List<string> { "CatKnight" },
+                purificationSlots = new List<PurificationSlotSaveState>
+                {
+                    new PurificationSlotSaveState
+                    {
+                        purificationTypeId = "church_prayer",
+                        characterId = "CatKnight",
+                        lastCalculatedAtUtc = "2026-08-24T01:00:00.0000000Z",
+                        progressTicks = 4321,
+                    },
+                },
             };
 
             CharacterSaveState original = data.characters[0];
             List<string> originalParty = data.partyCharacterIds;
+            List<PurificationSlotSaveState> originalPurificationSlots = data.purificationSlots;
+            PurificationSlotSaveState originalPurificationSlot = data.purificationSlots[0];
 
             SaveMigrationResult result = SaveMigrationRunner.Default.Migrate(data, SaveData.CurrentSaveVersion);
 
@@ -1082,10 +1178,18 @@ namespace CommonEditor.Tests
             Assert.AreEqual("2026-08-24T00:00:00.0000000Z", data.characters[0].passiveStaminaLastCalculatedUtc);
             Assert.AreEqual(1234, data.characters[0].passiveStaminaProgress);
             Assert.AreEqual(77.25d, data.characters[0].currentCorruption, 0.0000001d);
+            Assert.AreEqual("church_prayer", data.purificationSlots[0].purificationTypeId);
+            Assert.AreEqual("CatKnight", data.purificationSlots[0].characterId);
+            Assert.AreEqual("2026-08-24T01:00:00.0000000Z", data.purificationSlots[0].lastCalculatedAtUtc);
+            Assert.AreEqual(4321, data.purificationSlots[0].progressTicks);
 
             // 사본을 거쳤으므로 호출부의 문서에는 <b>새 항목</b>이 들어와 있어야 한다.
             Assert.AreNotSame(original, data.characters[0], "목록 안의 항목까지 새로 만들어야 얕은 사본이 아니다.");
             Assert.AreNotSame(originalParty, data.partyCharacterIds, "파티 목록도 새 목록이어야 한다.");
+            Assert.AreNotSame(originalPurificationSlots, data.purificationSlots,
+                "정화 슬롯 목록도 새 목록이어야 한다.");
+            Assert.AreNotSame(originalPurificationSlot, data.purificationSlots[0],
+                "정화 슬롯 항목도 새 객체여야 한다.");
             CollectionAssert.AreEqual(new[] { "CatKnight" }, data.partyCharacterIds);
         }
 
@@ -1533,8 +1637,8 @@ namespace CommonEditor.Tests
             List<int> fromVersions = new List<int>();
             foreach (ISaveMigrationStep step in steps) fromVersions.Add(step.FromVersion);
 
-            CollectionAssert.AreEquivalent(new[] { 0, 1, 2, 3, 4 }, fromVersions,
-                "0->1부터 4->5까지 모든 단계가 있어야 합니다.");
+            CollectionAssert.AreEquivalent(new[] { 0, 1, 2, 3, 4, 5 }, fromVersions,
+                "0->1부터 5->6까지 모든 단계가 있어야 합니다.");
             Assert.AreEqual(SaveData.CurrentSaveVersion, SaveMigrationRunner.Default.TargetVersion);
         }
 
@@ -1731,7 +1835,7 @@ namespace CommonEditor.Tests
 
             Assert.AreEqual(SaveLoadStatus.Migrated, result.Status);
             Assert.AreEqual(0, result.FromVersion);
-            Assert.AreEqual(5, result.ToVersion);
+            Assert.AreEqual(SaveData.CurrentSaveVersion, result.ToVersion);
             Assert.AreEqual(SaveData.CurrentSaveVersion, result.Data.saveVersion);
 
             // v0->v1의 결과(메타데이터를 '모름'으로)와 v1->v2의 결과(여섯 캐릭터)가 <b>둘 다</b> 보여야
@@ -1762,7 +1866,7 @@ namespace CommonEditor.Tests
 
             Assert.AreEqual(SaveLoadStatus.Migrated, result.Status);
             Assert.AreEqual(1, result.FromVersion);
-            Assert.AreEqual(5, result.ToVersion);
+            Assert.AreEqual(SaveData.CurrentSaveVersion, result.ToVersion);
             Assert.IsTrue(result.ShouldResaveSoon, "올린 문서는 다음 명시적 저장으로 굳혀야 합니다.");
 
             // v1->v2는 메타데이터를 건드리지 않는다 - v0->v1이 함께 돌지 않았다는 증거이기도 하다.
@@ -1809,7 +1913,7 @@ namespace CommonEditor.Tests
 
             Assert.AreEqual(SaveLoadStatus.Migrated, result.Status);
             Assert.AreEqual(3, result.FromVersion);
-            Assert.AreEqual(5, result.ToVersion);
+            Assert.AreEqual(SaveData.CurrentSaveVersion, result.ToVersion);
             CollectionAssert.AreEqual(
                 new[] { "UnknownFromOldBuild", "CatKnight" }, result.Data.partyCharacterIds);
             CollectionAssert.AreEqual(new[] { "CatKnight", "UnknownFromOldBuild" }, IdsOf(result.Data.characters));
@@ -1842,7 +1946,7 @@ namespace CommonEditor.Tests
             SaveMigrationResult result = SaveMigrationRunner.Default.Migrate(data, 1);
 
             Assert.AreEqual(SaveMigrationOutcome.Migrated, result.Outcome);
-            Assert.AreEqual(5, data.saveVersion);
+            Assert.AreEqual(SaveData.CurrentSaveVersion, data.saveVersion);
             Assert.AreEqual(41, data.saveRevision);
             Assert.AreEqual("2026-01-02T03:04:05.0000000Z", data.lastSavedAtUtc);
             Assert.AreEqual(7, data.currentLevel);
@@ -1858,6 +1962,9 @@ namespace CommonEditor.Tests
             Assert.AreEqual(1, data.recruitmentCycles.Count);
             Assert.AreEqual("Inn_Normal_Access", data.recruitmentCycles[0].recruitmentAccessId);
             Assert.AreEqual("2026-01-02T04:05:05.0000000Z", data.recruitmentCycles[0].readyAtUtc);
+            Assert.AreEqual(1, data.purificationSlots.Count,
+                "v5->v6은 이전의 비정식 정화 슬롯 대신 빈 기본 슬롯 하나를 만듭니다.");
+            Assert.IsFalse(data.purificationSlots[0].HasCharacter);
 
             // FullyPopulated의 'barbarian'은 여섯과 다른 키이므로 1 + 6이다.
             Assert.AreEqual(1 + 6, data.characters.Count);
@@ -1866,11 +1973,42 @@ namespace CommonEditor.Tests
         }
 
         [Test]
-        public void v5보다_새로운_문서는_여전히_읽지도_고치지도_않는다()
+        public void v5_문서는_기존_진행을_보존하며_빈_정화_슬롯_하나로_v6이_된다()
+        {
+            SaveData data = FullyPopulated();
+            data.saveVersion = 5;
+            data.characters[0].currentCorruption = 77.25d;
+
+            SaveMigrationResult result = SaveMigrationRunner.Default.Migrate(data, 5);
+
+            Assert.AreEqual(SaveMigrationOutcome.Migrated, result.Outcome);
+            Assert.AreEqual(6, result.ReachedVersion);
+            Assert.AreEqual(SaveData.CurrentSaveVersion, data.saveVersion);
+            Assert.AreEqual(77.25d, data.characters[0].currentCorruption, 0.0000001d);
+            CollectionAssert.AreEqual(new[] { "barbarian" }, data.partyCharacterIds);
+            Assert.AreEqual("barbarian", data.recoverySlots[0].characterId);
+            Assert.AreEqual("1", data.buildingConstructions[0].buildingId);
+            Assert.AreEqual("Inn_Normal_Access", data.recruitmentCycles[0].recruitmentAccessId);
+            Assert.AreEqual("potion", data.items[0].itemId);
+            Assert.AreEqual(1250, data.currency);
+            Assert.AreEqual(1, data.purificationSlots.Count);
+            Assert.IsFalse(data.purificationSlots[0].HasCharacter,
+                "v5에 우연히 있던 비정식 정화 슬롯은 v6의 빈 기본 슬롯으로 교체합니다.");
+        }
+
+        [Test]
+        public void v5에서_v6으로_올리는_단계는_null_문서를_거부한다()
+        {
+            Assert.Throws<ArgumentNullException>(() => new V5ToV6Step().Apply(null));
+        }
+
+        [Test]
+        public void v6보다_새로운_문서는_여전히_읽지도_고치지도_않는다()
         {
             SaveData data = FullyPopulated();
 
-            SaveMigrationResult result = SaveMigrationRunner.Default.Migrate(data, 6);
+            SaveMigrationResult result = SaveMigrationRunner.Default.Migrate(
+                data, SaveData.CurrentSaveVersion + 1);
 
             Assert.AreEqual(SaveMigrationOutcome.FutureVersion, result.Outcome);
             AssertUntouched(data, "미래 버전은 읽지도 고치지도 않습니다");

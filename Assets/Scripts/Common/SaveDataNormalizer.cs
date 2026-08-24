@@ -49,6 +49,19 @@ namespace Common
             // 뒤 슬롯들이 앞으로 밀려 남의 진행이 다른 슬롯으로 옮겨간다. 그래서 지우지 않고 빈 슬롯으로
             // 갈아 끼우며, 그 처리와 최소 개수 채우기는 SaveData가 이미 갖고 있는 규칙을 그대로 쓴다.
             SaveData.EnsureRecoverySlots(data);
+            SaveData.EnsurePurificationSlots(data);
+            var seenPurificationCharacters = new HashSet<string>(StringComparer.Ordinal);
+            foreach (PurificationSlotSaveState slot in data.purificationSlots)
+            {
+                if (string.IsNullOrEmpty(slot.characterId))
+                {
+                    slot.Clear();
+                    continue;
+                }
+
+                if (slot.progressTicks < 0) slot.progressTicks = 0;
+                if (!seenPurificationCharacters.Add(slot.characterId)) slot.Clear();
+            }
 
             // 저장 일련번호는 커지기만 하는 값이다. 음수는 우리가 쓸 수 없는 값이므로 "모름"인 0으로 되돌린다.
             // 시각 문자열은 손대지 않는다 - 읽을 수 없는 값이라도 지우는 것보다 남겨 두는 쪽이 낫고,

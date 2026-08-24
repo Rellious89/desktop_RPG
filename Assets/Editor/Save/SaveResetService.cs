@@ -152,10 +152,13 @@ namespace CommonEditor.Save
                 resetConstruction ? data.buildingConstructions : null;
             List<RecruitmentCycleSaveState> oldRecruitmentCycles =
                 resetConstruction ? data.recruitmentCycles : null;
+            List<PurificationSlotSaveState> oldPurificationSlots =
+                resetConstruction ? data.purificationSlots : null;
 
             List<CharacterSaveState> oldCharacters = null;
             List<string> oldPartyCharacterIds = null;
             List<RecoverySlotBackup> slotBackups = null;
+            List<PurificationSlotBackup> purificationBackups = null;
             int removedCount = 0;
 
             if (resetItems) data.items = new List<InventoryItemState>();
@@ -164,6 +167,7 @@ namespace CommonEditor.Save
             {
                 data.buildingConstructions = new List<BuildingConstructionSaveState>();
                 data.recruitmentCycles = new List<RecruitmentCycleSaveState>();
+                data.purificationSlots = new List<PurificationSlotSaveState> { new PurificationSlotSaveState() };
             }
 
             if (removeCharacters)
@@ -181,6 +185,19 @@ namespace CommonEditor.Save
                     }
 
                     survivors.Add(state);
+                }
+                if (data.purificationSlots != null)
+                {
+                    purificationBackups = new List<PurificationSlotBackup>();
+                    for (int i = 0; i < data.purificationSlots.Count; i++)
+                    {
+                        PurificationSlotSaveState slot = data.purificationSlots[i];
+                        if (slot != null && removeSet.Contains(slot.characterId))
+                        {
+                            purificationBackups.Add(PurificationSlotBackup.Capture(i, slot));
+                            slot.Clear();
+                        }
+                    }
                 }
 
                 data.characters = survivors;
@@ -221,16 +238,16 @@ namespace CommonEditor.Save
                 // 대리자가 터져도 메모리는 원래대로 돌려놓고 예외는 그대로 올려보낸다 - 부분 초기화가
                 // 남는 것보다 호출부가 실패를 알아채는 편이 낫다.
                 Rollback(data, resetItems, oldItems, resetCurrency, oldCurrency, resetConstruction,
-                    oldConstructions, oldRecruitmentCycles, removeCharacters, oldCharacters, oldPartyCharacterIds,
-                    slotBackups);
+                    oldConstructions, oldRecruitmentCycles, oldPurificationSlots, removeCharacters, oldCharacters,
+                    oldPartyCharacterIds, slotBackups, purificationBackups);
                 throw;
             }
 
             if (!saved)
             {
                 Rollback(data, resetItems, oldItems, resetCurrency, oldCurrency, resetConstruction,
-                    oldConstructions, oldRecruitmentCycles, removeCharacters, oldCharacters, oldPartyCharacterIds,
-                    slotBackups);
+                    oldConstructions, oldRecruitmentCycles, oldPurificationSlots, removeCharacters, oldCharacters,
+                    oldPartyCharacterIds, slotBackups, purificationBackups);
                 return new SaveResetResult(SaveResetOutcome.SaveFailed, effective, 0);
             }
 
@@ -283,8 +300,9 @@ namespace CommonEditor.Save
             bool resetCurrency, int oldCurrency,
             bool resetConstruction, List<BuildingConstructionSaveState> oldConstructions,
             List<RecruitmentCycleSaveState> oldRecruitmentCycles,
+            List<PurificationSlotSaveState> oldPurificationSlots,
             bool removeCharacters, List<CharacterSaveState> oldCharacters, List<string> oldPartyCharacterIds,
-            List<RecoverySlotBackup> slotBackups)
+            List<RecoverySlotBackup> slotBackups, List<PurificationSlotBackup> purificationBackups)
         {
             if (resetItems) data.items = oldItems;
             if (resetCurrency) data.currency = oldCurrency;
@@ -292,6 +310,7 @@ namespace CommonEditor.Save
             {
                 data.buildingConstructions = oldConstructions;
                 data.recruitmentCycles = oldRecruitmentCycles;
+                data.purificationSlots = oldPurificationSlots;
             }
 
             if (removeCharacters)
@@ -307,6 +326,16 @@ namespace CommonEditor.Save
                         if (backup.Index >= 0 && backup.Index < data.recoverySlots.Count)
                         {
                             backup.RestoreTo(data.recoverySlots[backup.Index]);
+                        }
+                    }
+                }
+                if (purificationBackups != null && data.purificationSlots != null)
+                {
+                    foreach (PurificationSlotBackup backup in purificationBackups)
+                    {
+                        if (backup.Index >= 0 && backup.Index < data.purificationSlots.Count)
+                        {
+                            backup.RestoreTo(data.purificationSlots[backup.Index]);
                         }
                     }
                 }
@@ -346,6 +375,38 @@ namespace CommonEditor.Save
                 slot.startedAtUtc = startedAtUtc;
                 slot.completeAtUtc = completeAtUtc;
                 slot.completionNotified = completionNotified;
+            }
+        }
+
+        private readonly struct PurificationSlotBackup
+        {
+            public int Index { get; }
+            private readonly string purificationTypeId;
+            private readonly string characterId;
+            private readonly string lastCalculatedAtUtc;
+            private readonly long progressTicks;
+
+            private PurificationSlotBackup(int index, PurificationSlotSaveState slot)
+            {
+                Index = index;
+                purificationTypeId = slot.purificationTypeId;
+                characterId = slot.characterId;
+                lastCalculatedAtUtc = slot.lastCalculatedAtUtc;
+                progressTicks = slot.progressTicks;
+            }
+
+            public static PurificationSlotBackup Capture(int index, PurificationSlotSaveState slot)
+            {
+                return new PurificationSlotBackup(index, slot);
+            }
+
+            public void RestoreTo(PurificationSlotSaveState slot)
+            {
+                if (slot == null) return;
+                slot.purificationTypeId = purificationTypeId;
+                slot.characterId = characterId;
+                slot.lastCalculatedAtUtc = lastCalculatedAtUtc;
+                slot.progressTicks = progressTicks;
             }
         }
     }
