@@ -27,6 +27,10 @@ namespace Common
             // 캐릭터와 아이템은 목록 안의 항목을 id로 찾으므로, null 항목은 아무것도 가리키지 않는
             // 쓰레기다. 지워도 나머지 항목의 상대 순서는 그대로라 아이템의 획득 순서가 흐트러지지 않는다.
             data.characters = CompactCharacters(data.characters);
+            foreach (CharacterSaveState state in data.characters)
+            {
+                if (state.currentCorruption < 0) state.currentCorruption = 0;
+            }
             data.partyCharacterIds = CompactPartyCharacterIds(data.partyCharacterIds, data.characters);
             data.items = CompactItems(data.items);
 

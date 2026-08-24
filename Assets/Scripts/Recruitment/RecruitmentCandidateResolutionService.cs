@@ -113,6 +113,7 @@ namespace Recruitment
                 level = 1,
                 currentExp = 0,
                 currentStamina = definition.MaxStamina,
+                currentCorruption = definition.BaseCorruption,
             };
             string oldPending = state.pendingCharacterId;
             SaveMetadataSnapshot metadata = SaveMetadataSnapshot.Capture(data);

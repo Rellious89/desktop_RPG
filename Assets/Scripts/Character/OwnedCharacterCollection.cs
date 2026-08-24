@@ -193,6 +193,7 @@ namespace Character
                     characterId = id,
                     level = 1,
                     currentStamina = -1,
+                    currentCorruption = definition.BaseCorruption,
                 });
 
                 added++;

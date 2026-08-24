@@ -140,6 +140,7 @@ namespace Common
                 new V1ToV2Step(),
                 new V2ToV3Step(),
                 new V3ToV4Step(),
+                new V4ToV5Step(),
             };
         }
 
@@ -263,6 +264,7 @@ namespace Common
                         currentStamina = item.currentStamina,
                         passiveStaminaLastCalculatedUtc = item.passiveStaminaLastCalculatedUtc,
                         passiveStaminaProgress = item.passiveStaminaProgress,
+                        currentCorruption = item.currentCorruption,
                     });
             }
 
@@ -612,6 +614,22 @@ namespace Common
             if (data == null) throw new ArgumentNullException(nameof(data));
             // v3는 압축 목록이므로 기존 순서가 그대로 슬롯 0부터의 배치다. 카탈로그/정원은 읽지 않는다.
             if (data.partyCharacterIds == null) data.partyCharacterIds = new List<string>();
+        }
+    }
+
+    public sealed class V4ToV5Step : ISaveMigrationStep
+    {
+        public int FromVersion => 4;
+        public int ToVersion => 5;
+
+        public void Apply(SaveData data)
+        {
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            if (data.characters == null) return;
+            foreach (CharacterSaveState state in data.characters)
+            {
+                if (state != null) state.currentCorruption = 0;
+            }
         }
     }
 }

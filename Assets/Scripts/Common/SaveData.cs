@@ -22,7 +22,7 @@ namespace Common
         /// <see cref="SaveMigrationRunner"/>에 그 한 단계를 등록한다. 필드를 새로 <i>추가</i>하기만
         /// 할 때는 올리지 않는다 - JsonUtility가 없는 필드를 기본값으로 채우므로 예전 파일이 그대로
         /// 유효하다.</summary>
-        public const int CurrentSaveVersion = 4;
+        public const int CurrentSaveVersion = 5;
 
         /// <summary>버전 필드가 아예 없던 시절의 저장 파일 번호. 파일 안에 <c>saveVersion</c> 항목이
         /// 없으면(빈 객체 <c>{}</c> 포함) 그 파일은 이 버전이다 - 없는 것 자체가 곧 표식이라
@@ -445,5 +445,8 @@ namespace Common
         /// <summary>자연 회복 1칸에 아직 못 미친 정수 진행 분자. 부동소수점 누적 오차를 피하기 위해
         /// RecoveryBalance.SecondsPerStamina와 UTC ticks를 공통 분모로 쓴다.</summary>
         public long passiveStaminaProgress;
+
+        /// <summary>현재 오염도 원시값. 저장 계층은 음수만 0으로 보정하며 상한/최저값은 런타임 규칙의 몫이다.</summary>
+        public int currentCorruption;
     }
 }
