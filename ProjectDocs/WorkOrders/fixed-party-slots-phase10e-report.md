@@ -10,4 +10,11 @@
 
 수정 범위는 SaveData/마이그레이션/정규화/Reset, PartyCompositionService·PartySlotUtility, CharacterArchive 드롭/버튼 판정, CharacterRoster 계약 주석 및 집중 테스트다. 씬·프리팹은 변경하지 않았고 SaveData는 v4다. 원격 푸시와 실제 `persistentDataPath` 접근은 하지 않았다.
 
+## 최종 집중 검증
+
+- 보정 커밋: `85cf73e6` — v4 고정 슬롯 계약에 맞게 마이그레이션·Reset 기대값을 보정했다.
+- 격리 복제 프로젝트의 EditMode 집중 실행: **169/169 통과**. `SaveMigrationTests`, `SaveResetServiceTests`, `PartyCompositionServiceTests`, `PartySlotViewTests`, `DungeonAccessTests`, `PassiveStaminaRecoveryServiceTests`와 고정 슬롯 런타임 영향만 확인하는 CharacterRoster 메서드 4건을 실행했다.
+- Unity C# 컴파일 오류: **0**. 실제 프로젝트는 이미 열린 Unity 인스턴스 잠금으로 별도 batch 컴파일을 열 수 없었으며, 같은 소스의 격리 복제본에서 컴파일했다.
+- `git diff --check`: 통과. SaveData v4 유지, 씬·프리팹 변경 없음, 실제 `persistentDataPath` 접근 및 원격 푸시 없음.
+
 수동 확인: 좌측 탈퇴 뒤 우측 위치 유지, 빈 중간 슬롯 정확한 합류, 점유 슬롯 교체, 명부 카드 이동/교환, 한 명 남은 파티의 탈퇴 차단, 재실행 후 슬롯 보존, 교체/던전 진입을 확인한다.
