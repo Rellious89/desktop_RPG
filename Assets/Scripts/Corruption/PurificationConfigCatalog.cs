@@ -20,6 +20,20 @@ namespace Corruption
                 if (string.Equals(config.PurificationTypeId, purificationTypeId, StringComparison.Ordinal)) return config;
             return null;
         }
+
+        /// <summary>활성/유효 여부와 관계없이 원본 설정을 찾는다. 런타임 서비스가 "설정 없음"과
+        /// "설정 값 오류"를 구분해 호출자에게 전달할 때만 사용하며, 일반 조회는 <see cref="Find"/>를 쓴다.</summary>
+        public PurificationConfigDefinition FindConfigured(string purificationTypeId)
+        {
+            if (string.IsNullOrWhiteSpace(purificationTypeId) || configs == null) return null;
+            for (int i = 0; i < configs.Count; i++)
+            {
+                PurificationConfigDefinition config = configs[i];
+                if (config != null && string.Equals(config.PurificationTypeId, purificationTypeId, StringComparison.Ordinal))
+                    return config;
+            }
+            return null;
+        }
         public void MarkDirty() => built = false;
         private void OnEnable() => built = false;
         private void EnsureBuilt()

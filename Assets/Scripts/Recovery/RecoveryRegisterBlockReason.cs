@@ -28,6 +28,9 @@ namespace Recovery
         /// <summary>이미 회복 중이거나 회복이 끝나 합류를 기다리는 캐릭터다.</summary>
         AlreadyInRecovery,
 
+        /// <summary>교회 정화 슬롯에 있어 회복소와 동시에 이용할 수 없다.</summary>
+        InPurification,
+
         /// <summary>행동력이 이미 최대치라 회복할 것이 없다.</summary>
         StaminaFull,
 

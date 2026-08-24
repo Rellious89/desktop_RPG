@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Common;
+using Corruption;
 using Recovery;
 
 namespace Party
@@ -18,6 +19,7 @@ namespace Party
         CapacityReached,
         MinimumPartySize,
         InRecovery,
+        InPurification,
         InvalidIndex,
         NoChange,
         SaveFailed,
@@ -128,6 +130,8 @@ namespace Party
             if (IndexOf(party, characterId) >= 0) return Result(PartyCompositionCode.AlreadyInParty, capacity, party);
             if (RecoveryStation.IsCharacterIdInSavedSlot(data, characterId))
                 return Result(PartyCompositionCode.InRecovery, capacity, party);
+            if (PurificationService.IsCharacterIdInSavedSlot(data, characterId))
+                return Result(PartyCompositionCode.InPurification, capacity, party);
             if (PartySlotUtility.OccupiedCount(party) >= capacity) return Result(PartyCompositionCode.CapacityReached, capacity, party);
             int slot = requestedSlot >= 0 ? requestedSlot : PartySlotUtility.FirstEmpty(party, capacity);
             if (slot < 0 || slot >= capacity) return Result(PartyCompositionCode.InvalidIndex, capacity, party);
@@ -170,6 +174,11 @@ namespace Party
                 RecoveryStation.IsCharacterIdInSavedSlot(data, incomingCharacterId))
             {
                 return Result(PartyCompositionCode.InRecovery, capacity, party);
+            }
+            if (PurificationService.IsCharacterIdInSavedSlot(data, outgoingCharacterId) ||
+                PurificationService.IsCharacterIdInSavedSlot(data, incomingCharacterId))
+            {
+                return Result(PartyCompositionCode.InPurification, capacity, party);
             }
 
             var changed = new List<string>(party);

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using Character;
 using Common;
+using Corruption;
 using UnityEngine;
 
 namespace Recovery
@@ -238,6 +239,8 @@ namespace Recovery
             if (!balance.IsValid) return RecoveryRegisterBlockReason.InvalidBalance;
             if (definition == null || !roster.Contains(definition)) return RecoveryRegisterBlockReason.NotInRoster;
             if (IndexOfRecoverySlot(definition) >= 0) return RecoveryRegisterBlockReason.AlreadyInRecovery;
+            if (PurificationService.IsCharacterIdInSavedSlot(dataProvider(), roster.GetCharacterId(definition)))
+                return RecoveryRegisterBlockReason.InPurification;
             if (roster.CurrentCharacter == definition) return RecoveryRegisterBlockReason.Active;
             if (IndexOfPendingSlot(definition) >= 0) return RecoveryRegisterBlockReason.AlreadyPending;
             if (GetMissingStamina(definition) <= 0) return RecoveryRegisterBlockReason.StaminaFull;
@@ -501,6 +504,8 @@ namespace Recovery
         {
             if (definition == null || !roster.Contains(definition)) return RecoveryRegisterBlockReason.NotInRoster;
             if (IndexOfRecoverySlot(definition) >= 0) return RecoveryRegisterBlockReason.AlreadyInRecovery;
+            if (PurificationService.IsCharacterIdInSavedSlot(dataProvider(), roster.GetCharacterId(definition)))
+                return RecoveryRegisterBlockReason.InPurification;
             if (roster.CurrentCharacter == definition) return RecoveryRegisterBlockReason.Active;
             if (GetMissingStamina(definition) <= 0) return RecoveryRegisterBlockReason.StaminaFull;
             return RecoveryRegisterBlockReason.None;
