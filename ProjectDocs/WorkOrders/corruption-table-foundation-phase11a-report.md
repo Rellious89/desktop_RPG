@@ -1,7 +1,7 @@
 # 11A 오염도 테이블 런타임 기반
 
 - 구현 기준: `2d26169e`
-- 구현 커밋: 아래 후속 커밋
+- 구현 커밋: `7eb12014` (`Add corruption table runtime foundation`)
 - SaveData: v4 유지(변경·마이그레이션 없음)
 
 ## 반영 내용
