@@ -1,0 +1,2 @@
+purification_type_id,required_building_id,$required_building_name,purification_interval_seconds,$purification_interval_seconds,purification_value_per_interval,base_slot_count,enabled,memo
+church_prayer,2,교회,60,00:01:00,1,1,1,
