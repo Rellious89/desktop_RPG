@@ -2,7 +2,7 @@
 
 ## 결과
 
-- 구현 커밋: 아래 후속 커밋
+- 구현 커밋: `8527c796` (`Add character corruption save migration v5`)
 - SaveData: v5
 - v4→v5: null 항목과 알 수 없는 ID를 보존하고, 각 실제 캐릭터의 `currentCorruption`을 0으로 초기화한다.
 - 신규 지급: 새 게임 기본 보유 및 모집 획득에서 `CharacterDefinition.BaseCorruption`을 사용한다.
