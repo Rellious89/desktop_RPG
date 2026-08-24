@@ -68,6 +68,10 @@ namespace Dungeon
         [Min(1)]
         [SerializeField] private int requiredCharacterLevel = 1;
 
+        [Header("Corruption")]
+        [Min(1)] [SerializeField] private int corruptionIntervalSeconds = 1;
+        [Min(1)] [SerializeField] private int corruptionGainPerInterval = 1;
+
         [Header("Ordering")]
         [Tooltip("던전을 정렬할 때 쓰는 순서 값. 작을수록 앞이다 - 이 값 자체가 목록을 만들지는 않으며, " +
                  "목록의 순서는 DungeonCatalog의 작성 순서가 결정한다.")]
@@ -106,6 +110,8 @@ namespace Dungeon
 
         /// <summary>표에 적힌 필요 캐릭터 레벨(1 이상).</summary>
         public int RequiredCharacterLevel => Mathf.Max(1, requiredCharacterLevel);
+        public int CorruptionIntervalSeconds => Mathf.Max(1, corruptionIntervalSeconds);
+        public int CorruptionGainPerInterval => Mathf.Max(1, corruptionGainPerInterval);
 
         /// <summary>정렬용 순서 값. 작을수록 앞이며, 지정하지 않으면 0이다.</summary>
         public int DisplayOrder => displayOrder;

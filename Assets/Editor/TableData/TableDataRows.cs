@@ -163,6 +163,8 @@ namespace TableDataEditor
 
         /// <summary>표에 적힌 필요 캐릭터 레벨. 1 이상만 여기까지 오며 <b>상한은 없다</b>.</summary>
         public int RequiredCharacterLevel = 1;
+        public int CorruptionIntervalSeconds = 1;
+        public int CorruptionGainPerInterval = 1;
 
         public int DisplayOrder;
         public bool Enabled;
@@ -198,6 +200,7 @@ namespace TableDataEditor
         public int BaseMaxHealth;
 
         public int MaxStamina = 1;
+        public int BaseCorruption;
 
         /// <summary>새 게임을 시작할 때 이 캐릭터를 처음부터 가지고 시작하는가.
         /// <b>지금 보유했는지가 아니다</b> - 그것은 저장 문서의 몫이다.</summary>
@@ -409,6 +412,13 @@ namespace TableDataEditor
         public bool Enabled;
     }
 
+    public sealed class CorruptionConfigRow
+    {
+        public int Line; public string Id = string.Empty; public int MaxCorruption;
+        public int WarningThresholdPercent; public int DangerThresholdPercent;
+        public int WarningStaminaCostMultiplier; public int DangerStaminaCostMultiplier; public bool Enabled;
+    }
+
     /// <summary>
     /// 파싱과 검증을 마친 아홉 표. Rebuild는 이 스냅샷만 보고 에셋을 만든다 - CSV를 다시 읽지 않으므로
     /// "검증한 내용"과 "쓰는 내용"이 어긋날 수 없다.
@@ -446,6 +456,7 @@ namespace TableDataEditor
         /// <summary>파티 설정. 다른 표를 하나도 가리키지 않으므로 <b>맨 뒤에</b> 이어 붙여도 앞의
         /// 순서를 한 칸도 건드리지 않는다.</summary>
         public readonly List<PartyConfigRow> PartyConfigs = new List<PartyConfigRow>();
+        public readonly List<CorruptionConfigRow> CorruptionConfigs = new List<CorruptionConfigRow>();
 
         public readonly Dictionary<string, WorldRow> WorldsById = new Dictionary<string, WorldRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, CurrencyRow> CurrenciesById = new Dictionary<string, CurrencyRow>(StringComparer.Ordinal);
@@ -488,5 +499,7 @@ namespace TableDataEditor
 
         public readonly Dictionary<string, PartyConfigRow> PartyConfigsById =
             new Dictionary<string, PartyConfigRow>(StringComparer.Ordinal);
+        public readonly Dictionary<string, CorruptionConfigRow> CorruptionConfigsById =
+            new Dictionary<string, CorruptionConfigRow>(StringComparer.Ordinal);
     }
 }

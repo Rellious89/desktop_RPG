@@ -52,6 +52,7 @@ namespace TableDataEditor.Tests
             TableDataPaths.CharacterAcquisitionOutputFolder, TableDataPaths.RecruitmentTypeOutputFolder,
             TableDataPaths.RecruitmentPoolOutputFolder, TableDataPaths.RecruitmentAccessOutputFolder,
             TableDataPaths.PartyConfigOutputFolder,
+            TableDataPaths.CorruptionConfigOutputFolder,
         };
 
         private const string TempRootName = "__TableDataTestsTemp";
@@ -174,6 +175,7 @@ namespace TableDataEditor.Tests
                     TableDataRebuildScope.BuildingTable,
                     TableDataRebuildScope.RecruitmentTables,
                     TableDataRebuildScope.PartyConfigTable,
+                    TableDataRebuildScope.CorruptionConfigTable,
                 },
                 Enum.GetValues(typeof(TableDataRebuildScope)),
                 "Rebuild 범위가 늘어나면 참조가 조용히 지워지는 경로가 생긴다.");

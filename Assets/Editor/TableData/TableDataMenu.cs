@@ -97,6 +97,13 @@ namespace TableDataEditor
                 TableDataPaths.PartyConfigOutputFolder);
         }
 
+        [MenuItem(MenuRoot + "Rebuild (CorruptionConfig only)", priority = 106)]
+        public static void RebuildCorruptionConfigTable()
+        {
+            Run(TableDataRebuildScope.CorruptionConfigTable,
+                "Rebuild (CorruptionConfig)", TableDataPaths.CorruptionConfigOutputFolder);
+        }
+
         private static void Run(TableDataRebuildScope scope, string label, string outputDescription)
         {
             TableDataRebuildResult result = TableDataRebuilder.Rebuild(scope);

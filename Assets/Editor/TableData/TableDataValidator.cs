@@ -59,6 +59,7 @@ namespace TableDataEditor
             $"RecruitmentPool {Snapshot?.RecruitmentPools.Count ?? 0} / " +
             $"RecruitmentAccess {Snapshot?.RecruitmentAccesses.Count ?? 0} / " +
             $"PartyConfig {Snapshot?.PartyConfigs.Count ?? 0} 행, " +
+            $"CorruptionConfig {Snapshot?.CorruptionConfigs.Count ?? 0} 행, " +
             $"오류 {ErrorCount}건, 경고 {WarningCount}건";
     }
 
@@ -154,6 +155,9 @@ namespace TableDataEditor
             CsvTable partyConfigTable = TableDataCsvReader.Read(
                 TableDataPaths.PartyConfigCsvPath, TableDataPaths.PartyConfigCsvFileName,
                 TableDataColumns.PartyConfig, log);
+            CsvTable corruptionConfigTable = TableDataCsvReader.Read(
+                TableDataPaths.CorruptionConfigCsvPath, TableDataPaths.CorruptionConfigCsvFileName,
+                TableDataColumns.CorruptionConfig, log);
 
             var snapshot = new TableDataSnapshot();
             bool allTablesRead = worldTable != null && currencyTable != null && itemTable != null
@@ -163,6 +167,7 @@ namespace TableDataEditor
                                  && acquisitionTable != null && recruitmentTypeTable != null
                                  && recruitmentPoolTable != null && recruitmentAccessTable != null
                                  && partyConfigTable != null;
+            allTablesRead = allTablesRead && corruptionConfigTable != null;
 
             try
             {
@@ -170,6 +175,7 @@ namespace TableDataEditor
                 if (currencyTable != null) ValidateCurrencies(currencyTable, snapshot, assets, log);
                 if (itemTable != null) ValidateItems(itemTable, snapshot, assets, log);
                 if (monsterTable != null) ValidateMonsters(monsterTable, snapshot, assets, log);
+                if (corruptionConfigTable != null) ValidateCorruptionConfigs(corruptionConfigTable, snapshot, log);
                 if (dungeonTable != null) ValidateDungeons(dungeonTable, snapshot, assets, log);
                 if (characterTable != null) ValidateCharacters(characterTable, snapshot, assets, log);
                 if (skillTable != null) ValidateSkills(skillTable, snapshot, assets, log);
@@ -825,6 +831,35 @@ namespace TableDataEditor
             row.PreviewSprite = sprite;
         }
 
+        // ---- CorruptionConfig ----
+
+        private static void ValidateCorruptionConfigs(CsvTable table, TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            foreach (CsvRecord record in table.Records)
+            {
+                int line = record.Line;
+                var row = new CorruptionConfigRow { Line = line };
+                bool idOk = TableDataFieldRules.TryReadRequiredId(table.FileName, line, TableDataColumns.ConfigId, table.Get(record, TableDataColumns.ConfigId), log, out string id);
+                row.Id = id;
+                if (idOk && snapshot.CorruptionConfigsById.TryGetValue(id, out CorruptionConfigRow prior))
+                { log.Error(table.FileName, line, TableDataColumns.ConfigId, id, $"config_id가 {prior.Line}행과 중복됩니다."); idOk = false; }
+                TableDataFieldRules.TryReadEnabled(table.FileName, line, TableDataColumns.Enabled, table.Get(record, TableDataColumns.Enabled), log, out row.Enabled);
+                TableDataFieldRules.TryReadIntAtLeast(table.FileName, line, TableDataColumns.MaxCorruption, table.Get(record, TableDataColumns.MaxCorruption), 1, log, out row.MaxCorruption);
+                TableDataFieldRules.TryReadIntAtLeast(table.FileName, line, TableDataColumns.WarningThresholdPercent, table.Get(record, TableDataColumns.WarningThresholdPercent), 1, log, out row.WarningThresholdPercent);
+                TableDataFieldRules.TryReadIntAtLeast(table.FileName, line, TableDataColumns.DangerThresholdPercent, table.Get(record, TableDataColumns.DangerThresholdPercent), 1, log, out row.DangerThresholdPercent);
+                TableDataFieldRules.TryReadIntAtLeast(table.FileName, line, TableDataColumns.WarningStaminaCostMultiplier, table.Get(record, TableDataColumns.WarningStaminaCostMultiplier), 1, log, out row.WarningStaminaCostMultiplier);
+                TableDataFieldRules.TryReadIntAtLeast(table.FileName, line, TableDataColumns.DangerStaminaCostMultiplier, table.Get(record, TableDataColumns.DangerStaminaCostMultiplier), 1, log, out row.DangerStaminaCostMultiplier);
+                if (row.WarningThresholdPercent >= 100 || row.DangerThresholdPercent > 100 || row.DangerThresholdPercent <= row.WarningThresholdPercent)
+                    log.Error(table.FileName, line, TableDataColumns.DangerThresholdPercent, row.DangerThresholdPercent.ToString(), "위험 기준은 주의 기준보다 크고 100 이하여야 합니다.");
+                if (row.DangerStaminaCostMultiplier < row.WarningStaminaCostMultiplier)
+                    log.Error(table.FileName, line, TableDataColumns.DangerStaminaCostMultiplier, row.DangerStaminaCostMultiplier.ToString(), "위험 배율은 주의 배율 이상이어야 합니다.");
+                if (!idOk) continue;
+                snapshot.CorruptionConfigs.Add(row); snapshot.CorruptionConfigsById[row.Id] = row;
+            }
+            int defaults = 0; foreach (CorruptionConfigRow row in snapshot.CorruptionConfigs) if (row.Enabled && row.Id == "default") defaults++;
+            if (defaults != 1) log.Error(table.FileName, TableDataDiagnostic.FileLevelRow, TableDataColumns.ConfigId, "default", "활성 default 설정이 정확히 하나여야 합니다.");
+        }
+
         // ---- Dungeon ----
 
         private static void ValidateDungeons(
@@ -883,11 +918,10 @@ namespace TableDataEditor
                 ReadMonsterList(table, record, file, line, snapshot, row, log);
                 ReadRewardList(table, record, file, line, snapshot, row, log);
 
-                if (TableDataFieldRules.TryReadIntAtLeast(
-                        file, line, TableDataColumns.RequiredCharacterLevel,
-                        table.Get(record, TableDataColumns.RequiredCharacterLevel), 1, log, out int reqLevel))
+                if (row.Enabled)
                 {
-                    row.RequiredCharacterLevel = reqLevel;
+                    if (TableDataFieldRules.TryReadIntAtLeast(file, line, TableDataColumns.CorruptionIntervalSeconds, table.Get(record, TableDataColumns.CorruptionIntervalSeconds), 1, log, out int interval)) row.CorruptionIntervalSeconds = interval;
+                    if (TableDataFieldRules.TryReadIntAtLeast(file, line, TableDataColumns.CorruptionGainPerInterval, table.Get(record, TableDataColumns.CorruptionGainPerInterval), 1, log, out int gain)) row.CorruptionGainPerInterval = gain;
                 }
 
                 if (!idOk) continue;
@@ -1045,6 +1079,14 @@ namespace TableDataEditor
                         1, log, out int stamina))
                 {
                     row.MaxStamina = stamina;
+                }
+                bool hasDefaultConfig = snapshot.CorruptionConfigsById.TryGetValue("default", out CorruptionConfigRow config)
+                                        && config.Enabled;
+                if (TableDataFieldRules.TryReadIntAtLeast(file, line, TableDataColumns.BaseCorruption, table.Get(record, TableDataColumns.BaseCorruption), 0, log, out int corruption))
+                {
+                    row.BaseCorruption = corruption;
+                    if (hasDefaultConfig && corruption > config.MaxCorruption)
+                        log.Error(file, line, TableDataColumns.BaseCorruption, corruption.ToString(), "base_corruption은 default max_corruption 이하여야 합니다.");
                 }
 
                 // 새 게임 시작 구성은 <b>모든 행이 반드시 밝혀야 하는 값</b>이다 - 비워 두면 "정하지
@@ -2361,6 +2403,10 @@ namespace TableDataEditor
             {
                 folders.Add(TableDataPaths.PartyConfigOutputFolder);
             }
+            if (TableDataRebuildScopes.IncludesCorruptionConfigTable(outputScope))
+            {
+                folders.Add(TableDataPaths.CorruptionConfigOutputFolder);
+            }
 
             return folders;
         }
@@ -2675,6 +2721,24 @@ namespace TableDataEditor
                     TableDataColumns.FilePseudoColumn, TableDataPaths.PartyConfigCatalogAssetName, log);
             }
 
+            if (InScope(selected, TableDataPaths.CorruptionConfigOutputFolder))
+            {
+                CheckDuplicateGenerated(
+                    TableDataAssetIndex.LoadGeneratedById<Corruption.CorruptionConfigDefinition>(
+                        TableDataPaths.CorruptionConfigOutputFolder, c => c.ConfigId),
+                    TableDataPaths.CorruptionConfigCsvFileName, TableDataColumns.ConfigId, log);
+                foreach (CorruptionConfigRow row in snapshot.CorruptionConfigs)
+                {
+                    CheckOutputPath<Corruption.CorruptionConfigDefinition>(
+                        TableDataPaths.CorruptionConfigAssetPath(row.Id), row.Id, c => c.ConfigId,
+                        TableDataPaths.CorruptionConfigCsvFileName, row.Line, TableDataColumns.ConfigId, row.Id, log);
+                }
+                CheckOutputPath<Corruption.CorruptionConfigCatalog>(
+                    TableDataPaths.CorruptionConfigCatalogAssetPath, null, null,
+                    TableDataPaths.CorruptionConfigCsvFileName, TableDataDiagnostic.FileLevelRow,
+                    TableDataColumns.FilePseudoColumn, TableDataPaths.CorruptionConfigCatalogAssetName, log);
+            }
+
             // 모집만 다시 만드는 좁은 범위에서는 이번 Rebuild가 Character 에셋을 만들지 않는다.
             // 그러면 후보/획득 참조를 어디서 가져올지가 문제가 되므로 <b>여기서 미리</b> 확인한다
             // (Building만 다시 만드는 범위가 Currency/Item을 확인하는 것과 같은 이유다).
@@ -2884,6 +2948,15 @@ namespace TableDataEditor
                         TableDataPaths.PartyConfigOutputFolder, c => c.ConfigId),
                     snapshot.PartyConfigsById.Keys, TableDataPaths.PartyConfigCsvFileName,
                     TableDataColumns.PartyConfigId, log);
+            }
+
+            if (InScope(selected, TableDataPaths.CorruptionConfigOutputFolder))
+            {
+                ReportOrphans(
+                    TableDataAssetIndex.LoadGeneratedById<Corruption.CorruptionConfigDefinition>(
+                        TableDataPaths.CorruptionConfigOutputFolder, c => c.ConfigId),
+                    snapshot.CorruptionConfigsById.Keys, TableDataPaths.CorruptionConfigCsvFileName,
+                    TableDataColumns.ConfigId, log);
             }
         }
 

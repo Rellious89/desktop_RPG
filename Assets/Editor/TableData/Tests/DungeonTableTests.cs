@@ -42,122 +42,122 @@ namespace TableDataEditor.Tests
                 new[]
                 {
                     "dungeon_id", "name_category", "name_key", "world_id",
-                    "representative_sprite_key", "monster_ids", "reward_item_ids",
-                    "required_character_level", "display_order", "enabled", "memo",
+                    "representative_sprite_key", "monster_ids", "corruption_interval_seconds",
+                    "corruption_gain_per_interval", "reward_item_ids", "display_order", "enabled", "memo",
                 },
                 TableDataColumns.Dungeon,
                 "Dungeon.csv의 필수 컬럼과 순서가 약속과 달라졌습니다.");
         }
 
         [Test]
-        public void Schema_PlacesRequiredCharacterLevelBetweenRewardItemIdsAndDisplayOrder()
+        public void Schema_PlacesCorruptionColumnsBeforeRewardItemIds()
         {
-            int index = Array.IndexOf(TableDataColumns.Dungeon, "required_character_level");
+            int index = Array.IndexOf(TableDataColumns.Dungeon, "corruption_interval_seconds");
 
-            Assert.Greater(index, 0, "required_character_level이 필수 컬럼에 없습니다.");
-            Assert.AreEqual("reward_item_ids", TableDataColumns.Dungeon[index - 1]);
-            Assert.AreEqual("display_order", TableDataColumns.Dungeon[index + 1]);
+            Assert.Greater(index, 0, "corruption_interval_seconds가 필수 컬럼에 없습니다.");
+            Assert.AreEqual("monster_ids", TableDataColumns.Dungeon[index - 1]);
+            Assert.AreEqual("corruption_gain_per_interval", TableDataColumns.Dungeon[index + 1]);
         }
 
         [Test]
-        public void Schema_SharesRequiredCharacterLevelNameWithCharacterSkillTable()
+        public void Schema_DoesNotRetainRemovedRequiredCharacterLevelColumn()
         {
-            CollectionAssert.Contains(TableDataColumns.Dungeon, TableDataColumns.RequiredCharacterLevel);
-            CollectionAssert.Contains(TableDataColumns.CharacterSkill, TableDataColumns.RequiredCharacterLevel);
+            CollectionAssert.DoesNotContain(TableDataColumns.Dungeon, TableDataColumns.RequiredCharacterLevel);
         }
 
         // ---- 헤더 검증 ----
 
         [Test]
-        public void Header_MissingRequiredCharacterLevel_FailsWithRequiredColumnDiagnostic()
+        public void Header_MissingCorruptionInterval_FailsWithRequiredColumnDiagnostic()
         {
             string[] headerWithout = TableDataColumns.Dungeon
-                .Where(c => c != "required_character_level")
+                .Where(c => c != TableDataColumns.CorruptionIntervalSeconds)
                 .ToArray();
 
             var log = new TableDataDiagnosticLog();
             bool ok = (bool)ValidateHeaderMethod.Invoke(null,
                 new object[] { File, headerWithout, TableDataColumns.Dungeon, log });
 
-            Assert.IsFalse(ok, "required_character_level이 빠진 헤더는 실패해야 한다.");
+            Assert.IsFalse(ok, "corruption_interval_seconds가 빠진 헤더는 실패해야 한다.");
             Assert.AreEqual(1, log.ErrorCount, Describe(log));
 
             TableDataDiagnostic diag = log.Entries[0];
             Assert.AreEqual(TableDataDiagnostic.HeaderRow, diag.Row);
-            Assert.AreEqual("required_character_level", diag.Column);
+            Assert.AreEqual(TableDataColumns.CorruptionIntervalSeconds, diag.Column);
             StringAssert.Contains("필수 컬럼이 없습니다", diag.Message);
         }
 
-        // ---- 필요 레벨 검증 ----
+        // ---- 오염도 주기/증가량 검증 ----
 
         [Test]
-        public void RequiredLevel_ValidRow_EntersSnapshotWithItsValue()
+        public void CorruptionValues_ValidRow_EnterSnapshot()
         {
             TableDataSnapshot snapshot = SnapshotWithWorld("1");
             TableDataDiagnosticLog log = Validate(snapshot,
-                Row("1", level: "5", worldId: "1", displayOrder: "10"));
+                Row("1", interval: "5", gain: "2", worldId: "1", displayOrder: "10"));
 
             Assert.AreEqual(0, log.ErrorCount, Describe(log));
             Assert.AreEqual(1, snapshot.Dungeons.Count);
-            Assert.AreEqual(5, snapshot.Dungeons[0].RequiredCharacterLevel);
+            Assert.AreEqual(5, snapshot.Dungeons[0].CorruptionIntervalSeconds);
+            Assert.AreEqual(2, snapshot.Dungeons[0].CorruptionGainPerInterval);
         }
 
         [Test]
-        public void RequiredLevel_MustBeAtLeastOne()
+        public void CorruptionInterval_MustBeAtLeastOne()
         {
             TableDataSnapshot snapshot = SnapshotWithWorld("1");
             TableDataDiagnosticLog log = Validate(snapshot,
-                Row("1", level: "0", worldId: "1"));
+                Row("1", interval: "0", worldId: "1"));
 
-            Assert.AreEqual(1, CountErrors(log, TableDataColumns.RequiredCharacterLevel), Describe(log));
+            Assert.AreEqual(1, CountErrors(log, TableDataColumns.CorruptionIntervalSeconds), Describe(log));
         }
 
         [Test]
-        public void RequiredLevel_Blank_IsAnError()
+        public void CorruptionGain_Blank_IsAnError()
         {
             TableDataSnapshot snapshot = SnapshotWithWorld("1");
             TableDataDiagnosticLog log = Validate(snapshot,
-                Row("1", level: "", worldId: "1"));
+                Row("1", gain: "", worldId: "1"));
 
-            Assert.AreEqual(1, CountErrors(log, TableDataColumns.RequiredCharacterLevel), Describe(log));
+            Assert.AreEqual(1, CountErrors(log, TableDataColumns.CorruptionGainPerInterval), Describe(log));
         }
 
         [Test]
-        public void RequiredLevel_Negative_IsAnError()
+        public void CorruptionGain_Negative_IsAnError()
         {
             TableDataSnapshot snapshot = SnapshotWithWorld("1");
             TableDataDiagnosticLog log = Validate(snapshot,
-                Row("1", level: "-1", worldId: "1"));
+                Row("1", gain: "-1", worldId: "1"));
 
-            Assert.AreEqual(1, CountErrors(log, TableDataColumns.RequiredCharacterLevel), Describe(log));
+            Assert.AreEqual(1, CountErrors(log, TableDataColumns.CorruptionGainPerInterval), Describe(log));
         }
 
         [Test]
-        public void RequiredLevel_NonInteger_IsAnError()
+        public void CorruptionInterval_NonInteger_IsAnError()
         {
             TableDataSnapshot snapshot = SnapshotWithWorld("1");
             TableDataDiagnosticLog log = Validate(snapshot,
-                Row("1", level: "abc", worldId: "1"));
+                Row("1", interval: "abc", worldId: "1"));
 
-            Assert.AreEqual(1, CountErrors(log, TableDataColumns.RequiredCharacterLevel), Describe(log));
+            Assert.AreEqual(1, CountErrors(log, TableDataColumns.CorruptionIntervalSeconds), Describe(log));
         }
 
         [Test]
-        public void RequiredLevel_HasNoUpperBound()
+        public void CorruptionInterval_HasNoUpperBound()
         {
             TableDataSnapshot snapshot = SnapshotWithWorld("1");
             TableDataDiagnosticLog log = Validate(snapshot,
-                Row("1", level: "2147483647", worldId: "1", displayOrder: "10"));
+                Row("1", interval: "2147483647", worldId: "1", displayOrder: "10"));
 
             Assert.AreEqual(0, log.ErrorCount,
                 "int.MaxValue는 유효한 값이다 - 상한을 두지 않는다: " + Describe(log));
-            Assert.AreEqual(2147483647, snapshot.Dungeons[0].RequiredCharacterLevel);
+            Assert.AreEqual(2147483647, snapshot.Dungeons[0].CorruptionIntervalSeconds);
         }
 
         // ---- 생성 에셋의 필요 레벨 ----
 
         [Test]
-        public void GeneratedDefinitions_HaveRequiredCharacterLevelMatchingCsv()
+        public void GeneratedDefinitions_HaveCorruptionValuesMatchingCsv()
         {
             TableDataSnapshot snapshot = Live().Snapshot;
             Assert.IsNotNull(snapshot, "여덟 표가 모두 읽혀야 스냅샷이 만들어진다: " + Live().Summary);
@@ -168,28 +168,27 @@ namespace TableDataEditor.Tests
                 string path = TableDataPaths.DungeonAssetPath(row.Id);
                 var definition = AssetDatabase.LoadAssetAtPath<DungeonDefinition>(path);
                 Assert.IsNotNull(definition, $"생성 에셋 '{path}'가 없습니다.");
-                Assert.AreEqual(row.RequiredCharacterLevel, definition.RequiredCharacterLevel,
-                    $"던전 '{row.Id}'의 RequiredCharacterLevel이 CSV와 다릅니다.");
+                Assert.AreEqual(row.CorruptionIntervalSeconds, definition.CorruptionIntervalSeconds);
+                Assert.AreEqual(row.CorruptionGainPerInterval, definition.CorruptionGainPerInterval);
 
                 var so = new SerializedObject(definition);
-                int raw = so.FindProperty("requiredCharacterLevel").intValue;
-                Assert.AreEqual(row.RequiredCharacterLevel, raw,
-                    $"던전 '{row.Id}'의 직렬화된 requiredCharacterLevel 원시 값이 CSV와 다릅니다.");
+                Assert.AreEqual(row.CorruptionIntervalSeconds, so.FindProperty("corruptionIntervalSeconds").intValue);
+                Assert.AreEqual(row.CorruptionGainPerInterval, so.FindProperty("corruptionGainPerInterval").intValue);
             }
         }
 
         // ---- 프로덕션 데이터 ----
 
         [Test]
-        public void LiveCsv_AllActiveProductionRows_HaveRequiredCharacterLevelExactlyOne()
+        public void LiveCsv_AllActiveProductionRows_HavePositiveCorruptionValues()
         {
             TableDataSnapshot snapshot = Live().Snapshot;
             Assert.IsNotNull(snapshot, Live().Summary);
 
             foreach (DungeonRow row in snapshot.Dungeons)
             {
-                Assert.AreEqual(1, row.RequiredCharacterLevel,
-                    $"던전 '{row.Id}'(CSV {row.Line}행)의 required_character_level이 1이 아닙니다.");
+                Assert.GreaterOrEqual(row.CorruptionIntervalSeconds, 1);
+                Assert.GreaterOrEqual(row.CorruptionGainPerInterval, 1);
             }
         }
 
@@ -220,14 +219,7 @@ namespace TableDataEditor.Tests
         /// 망자의 도시 셋은 그 앞에 50000이 하나 더 붙는다 - 표를 손볼 때 어느 던전의 보상이 조용히
         /// 달라지는 것을 막기 위해 값 자체를 여기에 적어 둔다.
         /// </summary>
-        private static readonly string[] EarlyWorldRewardItemIds = { "50002", "50003", "50004" };
-
-        private static readonly string[] DeadCityRewardItemIds = { "50000", "50002", "50003", "50004" };
-
-        private static string[] ExpectedRewardItemIds(string dungeonId)
-        {
-            return int.Parse(dungeonId) <= 6 ? EarlyWorldRewardItemIds : DeadCityRewardItemIds;
-        }
+        private static readonly string[] ExpectedRewardItemIds = new string[0];
 
         [Test]
         public void LiveCsv_AllNineRowsHaveTheAgreedRewardItemIds()
@@ -238,7 +230,7 @@ namespace TableDataEditor.Tests
 
             foreach (DungeonRow row in snapshot.Dungeons)
             {
-                CollectionAssert.AreEqual(ExpectedRewardItemIds(row.Id), row.RewardItemIds,
+                CollectionAssert.AreEqual(ExpectedRewardItemIds, row.RewardItemIds,
                     $"던전 '{row.Id}'(CSV {row.Line}행)의 reward_item_ids가 약속한 값과 다릅니다.");
             }
         }
@@ -256,7 +248,7 @@ namespace TableDataEditor.Tests
                 var definition = AssetDatabase.LoadAssetAtPath<DungeonDefinition>(path);
                 Assert.IsNotNull(definition, $"생성 에셋 '{path}'가 없습니다.");
 
-                string[] expected = ExpectedRewardItemIds(row.Id);
+                string[] expected = ExpectedRewardItemIds;
                 Assert.AreEqual(expected.Length, definition.RewardItems.Count,
                     $"던전 '{row.Id}'의 대표 보상 개수가 CSV와 다릅니다.");
 
@@ -303,10 +295,10 @@ namespace TableDataEditor.Tests
         // ---- 저장 버전 ----
 
         [Test]
-        public void SaveVersion_RemainsExactlyThree()
+        public void SaveVersion_RemainsExactlyFour()
         {
-            Assert.AreEqual(3, SaveData.CurrentSaveVersion,
-                "이 체크포인트는 저장 형식을 바꾸지 않는다 - v3 마이그레이션을 확인하세요.");
+            Assert.AreEqual(4, SaveData.CurrentSaveVersion,
+                "이 단계는 저장 형식을 바꾸지 않는다 - v4를 유지해야 합니다.");
         }
 
         // ---- 런타임 에셋의 방어적 하한 ----
@@ -318,11 +310,12 @@ namespace TableDataEditor.Tests
             try
             {
                 var serialized = new SerializedObject(probe);
-                serialized.FindProperty("requiredCharacterLevel").intValue = 0;
+                serialized.FindProperty("corruptionIntervalSeconds").intValue = 0;
+                serialized.FindProperty("corruptionGainPerInterval").intValue = 0;
                 serialized.ApplyModifiedPropertiesWithoutUndo();
 
-                Assert.GreaterOrEqual(probe.RequiredCharacterLevel, 1,
-                    "DungeonDefinition.RequiredCharacterLevel은 0이 들어와도 1 이상을 돌려줘야 한다.");
+                Assert.GreaterOrEqual(probe.CorruptionIntervalSeconds, 1);
+                Assert.GreaterOrEqual(probe.CorruptionGainPerInterval, 1);
             }
             finally
             {
@@ -372,8 +365,9 @@ namespace TableDataEditor.Tests
             string worldId = "",
             string spriteKey = "",
             string monsterIds = "",
+            string interval = "1",
+            string gain = "1",
             string rewardItemIds = "",
-            string level = "1",
             string displayOrder = "10",
             string enabled = "1",
             string memo = "")
@@ -381,7 +375,7 @@ namespace TableDataEditor.Tests
             return new[]
             {
                 dungeonId, nameCategory, nameKey, worldId, spriteKey, monsterIds,
-                rewardItemIds, level, displayOrder, enabled, memo,
+                interval, gain, rewardItemIds, displayOrder, enabled, memo,
             };
         }
 

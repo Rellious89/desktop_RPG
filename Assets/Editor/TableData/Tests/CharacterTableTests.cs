@@ -60,7 +60,7 @@ namespace TableDataEditor.Tests
                 new[]
                 {
                     "character_id", "name_category", "name_key", "origin_world_id", "motion_profile_key", "portrait_key",
-                    "base_max_health", "max_stamina", "initially_owned", "display_order", "enabled", "memo",
+                    "base_corruption", "base_max_health", "max_stamina", "initially_owned", "display_order", "enabled", "memo",
                 },
                 TableDataColumns.Character,
                 "Character.csv의 필수 컬럼과 순서가 약속과 달라졌습니다.");
@@ -797,6 +797,7 @@ namespace TableDataEditor.Tests
             string originWorldId = "1",
             string motionKey = "",
             string portraitKey = "",
+            string baseCorruption = "0",
             string baseMaxHealth = "",
             string maxStamina = "30",
             string initiallyOwned = "1",
@@ -805,7 +806,7 @@ namespace TableDataEditor.Tests
         {
             return new[]
             {
-                id, category, key, originWorldId, motionKey, portraitKey, baseMaxHealth, maxStamina, initiallyOwned,
+                id, category, key, originWorldId, motionKey, portraitKey, baseCorruption, baseMaxHealth, maxStamina, initiallyOwned,
                 displayOrder, enabled, string.Empty,
             };
         }

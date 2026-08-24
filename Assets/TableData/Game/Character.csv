@@ -4,4 +4,4 @@ ElfArcher,6,2,엘프궁수,2,판타지아,ElfArcher_MotionProfile,,0,,30,0,20,1,
 Barbarian,6,3,바바리안,2,판타지아,Barbarian_MotionProfile,,0,,30,0,30,1,표시 순서는 현재 로스터 순서를 그대로 옮긴 임시값 / 이름은 MotionProfile 영문 표시명을 쓴 임시값 / 기본 체력은 아직 정하지 않아 비움 / 초상화를 비워 Base Idle 첫 프레임 폴백 사용
 ElfGuardian,6,4,엘프수호자,2,판타지아,ElfGuardian_MotionProfile,,0,,30,0,40,1,표시 순서는 현재 로스터 순서를 그대로 옮긴 임시값 / 이름은 MotionProfile 영문 표시명을 쓴 임시값 / 기본 체력은 아직 정하지 않아 비움 / 초상화를 비워 Base Idle 첫 프레임 폴백 사용
 RabbitHealer,6,5,토끼힐러,1,애니멀랜드,RabbitHealer_MotionProfile,,0,,30,0,50,1,표시 순서는 현재 로스터 순서를 그대로 옮긴 임시값 / 이름은 MotionProfile 영문 표시명을 쓴 임시값 / 기본 체력은 아직 정하지 않아 비움 / 초상화를 비워 Base Idle 첫 프레임 폴백 사용
-CatMage,6,6,고양이마법사,1,애니멀랜드,CatMage_MotionProfile,,10,,30,0,60,1,표시 순서는 현재 로스터 순서를 그대로 옮긴 임시값 / 이름은 MotionProfile 영문 표시명을 쓴 임시값 / 기본 체력은 아직 정하지 않아 비움 / 초상화를 비워 Base Idle 첫 프레임 폴백 사용
+CatMage,6,6,고양이마법사,1,애니멀랜드,CatMage_MotionProfile,,0,,30,0,60,1,표시 순서는 현재 로스터 순서를 그대로 옮긴 임시값 / 이름은 MotionProfile 영문 표시명을 쓴 임시값 / 기본 체력은 아직 정하지 않아 비움 / 초상화를 비워 Base Idle 첫 프레임 폴백 사용

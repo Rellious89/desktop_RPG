@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Building;
 using Character;
+using Corruption;
 using CommonEditor;
 using Dungeon;
 using Inventory;
@@ -74,6 +75,7 @@ namespace TableDataEditor
         /// 나머지 열세 도메인의 생성 에셋은 <b>쓰지도 읽지도 SetDirty하지도 않는다</b>.
         /// </summary>
         PartyConfigTable = 4,
+        CorruptionConfigTable = 5,
     }
 
     /// <summary>
@@ -90,7 +92,8 @@ namespace TableDataEditor
                    || scope == TableDataRebuildScope.CharacterSkillTables
                    || scope == TableDataRebuildScope.BuildingTable
                    || scope == TableDataRebuildScope.RecruitmentTables
-                   || scope == TableDataRebuildScope.PartyConfigTable;
+                   || scope == TableDataRebuildScope.PartyConfigTable
+                   || scope == TableDataRebuildScope.CorruptionConfigTable;
         }
 
         /// <summary>지원하지 않는 값이면 <b>아무것도 하기 전에</b> 던진다.</summary>
@@ -103,7 +106,8 @@ namespace TableDataEditor
                 $"{nameof(TableDataRebuildScope.All)}, {nameof(TableDataRebuildScope.CharacterSkillTables)}, " +
                 $"{nameof(TableDataRebuildScope.BuildingTable)}, " +
                 $"{nameof(TableDataRebuildScope.RecruitmentTables)}, " +
-                $"{nameof(TableDataRebuildScope.PartyConfigTable)}만 " +
+                $"{nameof(TableDataRebuildScope.PartyConfigTable)}, " +
+                $"{nameof(TableDataRebuildScope.CorruptionConfigTable)}만 " +
                 "쓸 수 있습니다. 임의의 부분집합을 허용하면 범위 밖 표를 가리키던 참조가 지워집니다.");
         }
 
@@ -140,6 +144,12 @@ namespace TableDataEditor
         {
             EnsureSupported(scope, nameof(scope));
             return scope == TableDataRebuildScope.All || scope == TableDataRebuildScope.PartyConfigTable;
+        }
+
+        public static bool IncludesCorruptionConfigTable(TableDataRebuildScope scope)
+        {
+            EnsureSupported(scope, nameof(scope));
+            return scope == TableDataRebuildScope.All || scope == TableDataRebuildScope.CorruptionConfigTable;
         }
     }
 
@@ -238,6 +248,9 @@ namespace TableDataEditor
         private const string PartyConfigIdField = "configId";
         private const string BaseCapacityField = "baseCapacity";
         private const string PartyConfigEnabledField = "enabled";
+        private const string BaseCorruptionField = "baseCorruption";
+        private const string CorruptionIntervalSecondsField = "corruptionIntervalSeconds";
+        private const string CorruptionGainPerIntervalField = "corruptionGainPerInterval";
 
         // 관계가 가리키는 두 참조 칸. 문자열로 되돌아가 있으면 objectReferenceValue에 넣은 값이
         // 조용히 버려지므로, 이름뿐 아니라 타입까지 미리 확인한다(재화 칸과 같은 이유다).
@@ -281,6 +294,8 @@ namespace TableDataEditor
 
             EnsureFolders(scope);
 
+            if (scope == TableDataRebuildScope.CorruptionConfigTable) return RebuildCorruptionConfigTable(result, snapshot);
+
             if (scope == TableDataRebuildScope.CharacterSkillTables) return RebuildCharacterTables(result, snapshot);
             if (scope == TableDataRebuildScope.BuildingTable) return RebuildBuildingTable(result, snapshot);
             if (scope == TableDataRebuildScope.RecruitmentTables) return RebuildRecruitmentTables(result, snapshot);
@@ -317,6 +332,11 @@ namespace TableDataEditor
             BuildingTableTargets buildingTargets = ResolveBuildingTableTargets(snapshot, result);
             RecruitmentTableTargets recruitmentTargets = ResolveRecruitmentTableTargets(snapshot, result);
             PartyConfigTableTargets partyConfigTargets = ResolvePartyConfigTableTargets(snapshot, result);
+            var corruptionAssets = ResolveTargets<CorruptionConfigDefinition>(
+                TableDataPaths.CorruptionConfigOutputFolder, c => c.ConfigId,
+                snapshot.CorruptionConfigs.ConvertAll(r => r.Id), TableDataPaths.CorruptionConfigAssetPath,
+                TableDataPaths.CorruptionConfigCsvFileName, TableDataColumns.ConfigId, result);
+            var corruptionCatalog = ResolveSingleton<CorruptionConfigCatalog>(TableDataPaths.CorruptionConfigCatalogAssetPath, result);
 
             AssetDatabase.StartAssetEditing();
             try
@@ -348,6 +368,8 @@ namespace TableDataEditor
 
                 // 파티 설정은 아무것도 참조하지 않으므로 순서에 매이지 않는다 - 맨 뒤에 둔다.
                 WritePartyConfigTable(snapshot, partyConfigTargets);
+                foreach (CorruptionConfigRow row in snapshot.CorruptionConfigs) WriteCorruptionConfig(corruptionAssets[row.Id], row);
+                WriteCatalog(corruptionCatalog, "configs", FilterForCatalog(snapshot.CorruptionConfigs, r => r.Enabled, r => r.Id, corruptionAssets));
             }
             finally
             {
@@ -369,9 +391,36 @@ namespace TableDataEditor
             buildingTargets.MarkDirty();
             recruitmentTargets.MarkDirty();
             partyConfigTargets.MarkDirty();
+            corruptionCatalog.MarkDirty();
 
             result.Wrote = true;
             return result;
+        }
+
+        private static void WriteCorruptionConfig(CorruptionConfigDefinition asset, CorruptionConfigRow row)
+        {
+            var serialized = new SerializedObject(asset);
+            serialized.FindProperty("configId").stringValue = row.Id;
+            serialized.FindProperty("maxCorruption").intValue = row.MaxCorruption;
+            serialized.FindProperty("warningThresholdPercent").intValue = row.WarningThresholdPercent;
+            serialized.FindProperty("dangerThresholdPercent").intValue = row.DangerThresholdPercent;
+            serialized.FindProperty("warningStaminaCostMultiplier").intValue = row.WarningStaminaCostMultiplier;
+            serialized.FindProperty("dangerStaminaCostMultiplier").intValue = row.DangerStaminaCostMultiplier;
+            serialized.FindProperty("enabled").boolValue = row.Enabled;
+            serialized.ApplyModifiedPropertiesWithoutUndo(); EditorUtility.SetDirty(asset);
+        }
+
+        private static TableDataRebuildResult RebuildCorruptionConfigTable(TableDataRebuildResult result, TableDataSnapshot snapshot)
+        {
+            var assets = ResolveTargets<CorruptionConfigDefinition>(TableDataPaths.CorruptionConfigOutputFolder, c => c.ConfigId,
+                snapshot.CorruptionConfigs.ConvertAll(r => r.Id), TableDataPaths.CorruptionConfigAssetPath,
+                TableDataPaths.CorruptionConfigCsvFileName, TableDataColumns.ConfigId, result);
+            var catalog = ResolveSingleton<CorruptionConfigCatalog>(TableDataPaths.CorruptionConfigCatalogAssetPath, result);
+            AssetDatabase.StartAssetEditing();
+            try { foreach (CorruptionConfigRow row in snapshot.CorruptionConfigs) WriteCorruptionConfig(assets[row.Id], row); WriteCatalog(catalog, "configs", FilterForCatalog(snapshot.CorruptionConfigs, r => r.Enabled, r => r.Id, assets)); }
+            finally { AssetDatabase.StopAssetEditing(); }
+            foreach (var asset in assets.Values) AssetDatabase.SaveAssetIfDirty(asset);
+            AssetDatabase.SaveAssetIfDirty(catalog); catalog.MarkDirty(); result.Wrote = true; return result;
         }
 
         // ---- PartyConfig ----
@@ -1093,6 +1142,7 @@ namespace TableDataEditor
             {
                 EnsureFolder(TableDataPaths.OutputRoot, "PartyConfig");
             }
+            if (TableDataRebuildScopes.IncludesCorruptionConfigTable(scope)) EnsureFolder(TableDataPaths.OutputRoot, "CorruptionConfig");
         }
 
         private static void EnsureFolder(string parent, string child)
@@ -1298,6 +1348,8 @@ namespace TableDataEditor
             }
 
             serialized.FindProperty("requiredCharacterLevel").intValue = row.RequiredCharacterLevel;
+            serialized.FindProperty(CorruptionIntervalSecondsField).intValue = row.CorruptionIntervalSeconds;
+            serialized.FindProperty(CorruptionGainPerIntervalField).intValue = row.CorruptionGainPerInterval;
 
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(asset);
@@ -1324,6 +1376,7 @@ namespace TableDataEditor
             serialized.FindProperty("originWorld").objectReferenceValue = Lookup(worlds, row.OriginWorldId);
             serialized.FindProperty("portrait").objectReferenceValue = row.Portrait;
             serialized.FindProperty("maxStamina").intValue = row.MaxStamina;
+            serialized.FindProperty(BaseCorruptionField).intValue = row.BaseCorruption;
             serialized.FindProperty(InitiallyOwnedField).boolValue = row.InitiallyOwned;
             serialized.FindProperty(HasBaseMaxHealthField).boolValue = row.HasBaseMaxHealth;
             serialized.FindProperty(BaseMaxHealthField).intValue = row.HasBaseMaxHealth ? row.BaseMaxHealth : 1;
@@ -1529,7 +1582,8 @@ namespace TableDataEditor
             ok &= VerifyMonsterCurrencyIsAReference(log);
             ok &= VerifyDropEntryFields(log);
             ok &= VerifyFields<DungeonDefinition>(log, "dungeonId", "dungeonName", "world", "representativeSprite",
-                "monsters", "rewardItems", "requiredCharacterLevel", "displayOrder");
+                "monsters", "rewardItems", "requiredCharacterLevel", CorruptionIntervalSecondsField,
+                CorruptionGainPerIntervalField, "displayOrder");
             ok &= VerifyFields<WorldCatalog>(log, "worlds");
             ok &= VerifyFields<CurrencyCatalog>(log, "currencies");
             ok &= VerifyFields<ItemCatalog>(log, "items");
@@ -1541,8 +1595,11 @@ namespace TableDataEditor
             // 목록에 넣어 두었다: 그 칸이 사라지면 표시 이름의 근거가 통째로 달라지므로, 임포터를 함께
             // 고쳐야 하는 변경이라는 것을 여기서 드러낸다.
             ok &= VerifyFields<CharacterDefinition>(log, "characterId", "displayName", "originWorld", "motionProfile", "portrait",
-                "maxStamina", InitiallyOwnedField, "localizedName", HasBaseMaxHealthField, BaseMaxHealthField,
+                "maxStamina", BaseCorruptionField, InitiallyOwnedField, "localizedName", HasBaseMaxHealthField, BaseMaxHealthField,
                 "displayOrder");
+            ok &= VerifyFields<CorruptionConfigDefinition>(log, "configId", "maxCorruption", "warningThresholdPercent",
+                "dangerThresholdPercent", "warningStaminaCostMultiplier", "dangerStaminaCostMultiplier", "enabled");
+            ok &= VerifyFields<CorruptionConfigCatalog>(log, "configs");
             ok &= VerifyPropertyType<CharacterDefinition>(
                 log, "originWorld", SerializedPropertyType.ObjectReference,
                 "캐릭터의 origin world 칸은 WorldDefinition을 가리키는 참조여야 합니다.");

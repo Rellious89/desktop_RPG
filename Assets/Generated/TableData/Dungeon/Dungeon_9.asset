@@ -27,12 +27,10 @@ MonoBehaviour:
   monsters:
   - {fileID: 11400000, guid: 750a5bed3166f44abb02d9f8c7920c9a, type: 2}
   - {fileID: 11400000, guid: 8daf2b2fd616f49e9ac1505f2a26a95e, type: 2}
-  rewardItems:
-  - {fileID: 11400000, guid: 0abf78287f21a4ecfb20566c2b8b02ac, type: 2}
-  - {fileID: 11400000, guid: 7f57e18d4d07d440590e07db76470d0d, type: 2}
-  - {fileID: 11400000, guid: 77309d45b7b2343be8d600751716d1ae, type: 2}
-  - {fileID: 11400000, guid: c8030cc5dbcc24f638d72ed351c46977, type: 2}
+  rewardItems: []
   requiredCharacterLevel: 1
+  corruptionIntervalSeconds: 60
+  corruptionGainPerInterval: 3
   displayOrder: 90
   references:
     version: 2

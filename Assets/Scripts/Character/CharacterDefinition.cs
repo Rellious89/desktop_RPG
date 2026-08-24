@@ -54,6 +54,9 @@ namespace Character
         [Min(1)]
         [SerializeField] private int maxStamina = 5;
 
+        [Header("Corruption")]
+        [Min(0)] [SerializeField] private int baseCorruption;
+
         [Header("New Game")]
         [Tooltip("새 게임을 시작할 때 이 캐릭터를 처음부터 가지고 시작하는가. " +
                  "이미 진행 중인 저장 데이터에는 소급 적용되지 않는다 - 보유 여부는 저장 데이터가 " +
@@ -96,6 +99,7 @@ namespace Character
         public WorldDefinition OriginWorld => originWorld;
 
         public int MaxStamina => Mathf.Max(1, maxStamina);
+        public int BaseCorruption => Mathf.Max(0, baseCorruption);
 
         /// <summary>전용 초상화가 없으면 Base Idle의 첫 프레임을 돌려준다 - 초상화 아트가 준비되기
         /// 전에도 리스트에서 캐릭터를 구분할 수 있게 하기 위한 폴백이며, 둘 다 없으면 null이다

@@ -114,11 +114,13 @@ namespace TableDataEditor
         public const string RepresentativeSpriteKey = "representative_sprite_key";
         public const string MonsterIds = "monster_ids";
         public const string RewardItemIds = "reward_item_ids";
+        public const string CorruptionIntervalSeconds = "corruption_interval_seconds";
+        public const string CorruptionGainPerInterval = "corruption_gain_per_interval";
 
         public static readonly string[] Dungeon =
         {
             DungeonId, NameCategory, NameKey, WorldId, RepresentativeSpriteKey, MonsterIds,
-            RewardItemIds, RequiredCharacterLevel, DisplayOrder, Enabled, Memo,
+            CorruptionIntervalSeconds, CorruptionGainPerInterval, RewardItemIds, DisplayOrder, Enabled, Memo,
         };
 
         // Character.csv
@@ -139,6 +141,7 @@ namespace TableDataEditor
         public const string BaseMaxHealth = "base_max_health";
 
         public const string MaxStamina = "max_stamina";
+        public const string BaseCorruption = "base_corruption";
 
         /// <summary>
         /// <b>새 게임을 시작할 때</b> 이 캐릭터를 처음부터 가지고 시작하는가. <c>enabled</c>와 같은
@@ -152,9 +155,17 @@ namespace TableDataEditor
 
         public static readonly string[] Character =
         {
-            CharacterId, NameCategory, NameKey, OriginWorldId, MotionProfileKey, PortraitKey, BaseMaxHealth,
-            MaxStamina, InitiallyOwned, DisplayOrder, Enabled, Memo,
+            CharacterId, NameCategory, NameKey, OriginWorldId, MotionProfileKey, PortraitKey, BaseCorruption,
+            BaseMaxHealth, MaxStamina, InitiallyOwned, DisplayOrder, Enabled, Memo,
         };
+
+        public const string ConfigId = "config_id";
+        public const string MaxCorruption = "max_corruption";
+        public const string WarningThresholdPercent = "warning_threshold_percent";
+        public const string DangerThresholdPercent = "danger_threshold_percent";
+        public const string WarningStaminaCostMultiplier = "warning_stamina_cost_multiplier";
+        public const string DangerStaminaCostMultiplier = "danger_stamina_cost_multiplier";
+        public static readonly string[] CorruptionConfig = { ConfigId, MaxCorruption, WarningThresholdPercent, DangerThresholdPercent, WarningStaminaCostMultiplier, DangerStaminaCostMultiplier, Enabled };
 
         // Skill.csv
         public const string SkillId = "skill_id";
