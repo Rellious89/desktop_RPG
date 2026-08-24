@@ -79,17 +79,12 @@ namespace Common
                 }
             }
 
-            var normalized = new List<string>(source.Count);
             var seen = new HashSet<string>(StringComparer.Ordinal);
-            foreach (string id in source)
+            for (int i = 0; i < source.Count; i++)
             {
-                if (string.IsNullOrEmpty(id) || !owned.Contains(id) || !seen.Add(id)) continue;
-                normalized.Add(id);
+                string id = source[i];
+                if (string.IsNullOrEmpty(id) || !owned.Contains(id) || !seen.Add(id)) source[i] = string.Empty;
             }
-
-            source.Clear();
-            source.AddRange(normalized);
-
             return source;
         }
 

@@ -22,7 +22,7 @@ namespace Common
         /// <see cref="SaveMigrationRunner"/>에 그 한 단계를 등록한다. 필드를 새로 <i>추가</i>하기만
         /// 할 때는 올리지 않는다 - JsonUtility가 없는 필드를 기본값으로 채우므로 예전 파일이 그대로
         /// 유효하다.</summary>
-        public const int CurrentSaveVersion = 3;
+        public const int CurrentSaveVersion = 4;
 
         /// <summary>버전 필드가 아예 없던 시절의 저장 파일 번호. 파일 안에 <c>saveVersion</c> 항목이
         /// 없으면(빈 객체 <c>{}</c> 포함) 그 파일은 이 버전이다 - 없는 것 자체가 곧 표식이라
@@ -89,7 +89,8 @@ namespace Common
         public List<CharacterSaveState> characters = new List<CharacterSaveState>();
 
         /// <summary>
-        /// 실제 출전 파티의 characterId를 슬롯 순서대로 적는다. 캐릭터의 성장 상태와 보유 여부는
+        /// 실제 출전 파티의 고정 슬롯 characterId를 슬롯 순서대로 적는다. 빈 슬롯은 string.Empty이며
+        /// 내부 빈 칸을 제거하거나 앞으로 당기지 않는다. 캐릭터의 성장 상태와 보유 여부는
         /// <see cref="characters"/> 한 곳만 권위가 있으므로 여기에는 id 외의 상태를 중복하지 않는다.
         /// 현재 활성 캐릭터나 파티 정원도 저장하지 않는다.
         /// </summary>

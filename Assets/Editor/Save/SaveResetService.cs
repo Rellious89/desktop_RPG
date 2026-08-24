@@ -188,11 +188,9 @@ namespace CommonEditor.Save
                 oldPartyCharacterIds = data.partyCharacterIds;
                 if (oldPartyCharacterIds != null)
                 {
-                    var remainingParty = new List<string>(oldPartyCharacterIds.Count);
-                    foreach (string id in oldPartyCharacterIds)
-                    {
-                        if (!removeSet.Contains(id)) remainingParty.Add(id);
-                    }
+                    var remainingParty = new List<string>(oldPartyCharacterIds);
+                    for (int i = 0; i < remainingParty.Count; i++)
+                        if (removeSet.Contains(remainingParty[i])) remainingParty[i] = string.Empty;
 
                     data.partyCharacterIds = remainingParty;
                 }

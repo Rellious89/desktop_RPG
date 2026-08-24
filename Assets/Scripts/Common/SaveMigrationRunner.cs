@@ -139,6 +139,7 @@ namespace Common
                 new UnversionedToV1Step(),
                 new V1ToV2Step(),
                 new V2ToV3Step(),
+                new V3ToV4Step(),
             };
         }
 
@@ -599,6 +600,18 @@ namespace Common
 
             // v2의 동명 필드는 정식 계약이 아니었으므로 신뢰하지 않는다.
             data.partyCharacterIds = party;
+        }
+    }
+
+    public sealed class V3ToV4Step : ISaveMigrationStep
+    {
+        public int FromVersion => 3;
+        public int ToVersion => 4;
+        public void Apply(SaveData data)
+        {
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            // v3는 압축 목록이므로 기존 순서가 그대로 슬롯 0부터의 배치다. 카탈로그/정원은 읽지 않는다.
+            if (data.partyCharacterIds == null) data.partyCharacterIds = new List<string>();
         }
     }
 }
