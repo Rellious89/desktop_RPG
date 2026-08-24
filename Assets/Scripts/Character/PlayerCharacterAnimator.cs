@@ -884,7 +884,16 @@ namespace Character
             flashOnCue.Flash();
             // 이동은 "실제 타격"에만 반응한다 - 키 입력이나 충전 진행으로는 절대 발동하지 않는다.
             if (attackMovement != null && attackMovement.isActiveAndEnabled) attackMovement.PlayAttackMove();
-            HitPoint?.Invoke(new AttackHitCue(basicAttackPower, activeMotion.HitSound, activeMotion.HitEffectPrefab, activeMotion.HitEffectOffset, activeMotion.HitEffectScale, activeMotion.OverrideHitEffectJitter, activeMotion.HitEffectJitter)); // 이 호출이 처치를 유발하면 Target.HasAttackableTarget이 여기서 이미 false로 바뀌어 있을 수 있다.
+            // HitPoint 구독자는 처치에 따라 캐릭터 교체/비활성화나 공격 취소를 일으킬 수 있다. 이벤트
+            // 전 모션을 보존해 두고, 그 재진입 경계에서 이번 Strike가 이미 정리됐다면 뒤의 Recovery나
+            // 예약 입력 처리를 다시 열지 않는다.
+            IAttackMotion motionBeforeHit = activeMotion;
+            HitPoint?.Invoke(new AttackHitCue(basicAttackPower, motionBeforeHit.HitSound, motionBeforeHit.HitEffectPrefab, motionBeforeHit.HitEffectOffset, motionBeforeHit.HitEffectScale, motionBeforeHit.OverrideHitEffectJitter, motionBeforeHit.HitEffectJitter));
+
+            if (!isActiveAndEnabled || attackPhase == AttackPhase.None || activeMotion == null || activeMotion != motionBeforeHit)
+            {
+                return;
+            }
 
             if (activeMotion.UseAccumulatedInput)
             {
