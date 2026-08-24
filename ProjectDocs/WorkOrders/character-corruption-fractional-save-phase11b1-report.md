@@ -1,6 +1,6 @@
 # 11B-1 캐릭터 오염도 소수 저장
 
-- 구현 커밋: 아래 후속 커밋
+- 구현 커밋: `df2da2c7` (`Store character corruption as fractional value`)
 - `CharacterSaveState.currentCorruption`을 `double`(기본 `0d`)로 변경했고 SaveData v5는 유지했다.
 - 정규화는 음수·NaN·양/음 무한대를 `0d`로 바르며, 유한 소수 및 Config 최대치를 넘는 원시값은 보존한다.
 - 새 게임과 모집 획득은 기존 `BaseCorruption`을 double 값으로 저장한다.
