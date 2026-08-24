@@ -70,6 +70,43 @@ namespace DungeonEditor.Tests
             Assert.AreEqual("forest_01", ledger.ActiveDungeonId);
         }
 
+        [Test]
+        public void Participants_CopiesOccupiedFixedSlots_AndPreservesTheirOrder()
+        {
+            DungeonDefinition dungeon = MakeDungeon("forest_01");
+            var partySlots = new[] { "A", string.Empty, "B", null, "C" };
+
+            Assert.AreEqual(SessionStartResult.Started, ledger.TryStartSession(dungeon, partySlots));
+            partySlots[0] = "changed-after-entry";
+
+            Assert.IsTrue(ledger.TryCompleteSession(out DungeonSessionSnapshot snapshot));
+            CollectionAssert.AreEqual(new[] { "A", "B", "C" }, snapshot.ParticipantCharacterIds);
+        }
+
+        [Test]
+        public void Participants_DuplicateIds_AreExcludedWithOrdinalComparison()
+        {
+            DungeonDefinition dungeon = MakeDungeon("forest_01");
+            Assert.AreEqual(SessionStartResult.Started,
+                ledger.TryStartSession(dungeon, new[] { "A", "A", "a", "B", "B" }));
+
+            ledger.TryCompleteSession(out DungeonSessionSnapshot snapshot);
+
+            CollectionAssert.AreEqual(new[] { "A", "a", "B" }, snapshot.ParticipantCharacterIds);
+        }
+
+        [Test]
+        public void Participants_DuplicateStart_DoesNotOverwriteActiveSnapshot()
+        {
+            DungeonDefinition dungeon = MakeDungeon("forest_01");
+            Assert.AreEqual(SessionStartResult.Started, ledger.TryStartSession(dungeon, new[] { "A", "B" }));
+            Assert.AreEqual(SessionStartResult.DuplicateIgnored, ledger.TryStartSession(dungeon, new[] { "C" }));
+
+            ledger.TryCompleteSession(out DungeonSessionSnapshot snapshot);
+
+            CollectionAssert.AreEqual(new[] { "A", "B" }, snapshot.ParticipantCharacterIds);
+        }
+
         // ======== Sequence ========
 
         [Test]

@@ -31,6 +31,7 @@ namespace Dungeon
     public sealed class DungeonSessionSnapshot
     {
         private readonly ReadOnlyCollection<DungeonSessionItemReward> earnedItems;
+        private readonly ReadOnlyCollection<string> participantCharacterIds;
 
         internal DungeonSessionSnapshot(
             DungeonDefinition dungeon,
@@ -39,7 +40,7 @@ namespace Dungeon
             long earnedCurrency,
             long defeatedMonsterCount,
             double elapsedSeconds,
-            DungeonSessionItemReward[] items)
+            DungeonSessionItemReward[] items, string[] participants = null)
         {
             DungeonDefinition = dungeon;
             DungeonId = dungeonId ?? string.Empty;
@@ -48,6 +49,7 @@ namespace Dungeon
             DefeatedMonsterCount = defeatedMonsterCount;
             ElapsedSeconds = NormalizeElapsedSeconds(elapsedSeconds);
             earnedItems = Array.AsReadOnly(items ?? Array.Empty<DungeonSessionItemReward>());
+            participantCharacterIds = Array.AsReadOnly(participants ?? Array.Empty<string>());
         }
 
         public DungeonDefinition DungeonDefinition { get; }
@@ -57,6 +59,7 @@ namespace Dungeon
         public long DefeatedMonsterCount { get; }
         public double ElapsedSeconds { get; }
         public ReadOnlyCollection<DungeonSessionItemReward> EarnedItems => earnedItems;
+        public ReadOnlyCollection<string> ParticipantCharacterIds => participantCharacterIds;
         public bool IsEmpty => EarnedCurrency == 0L && DefeatedMonsterCount == 0L && earnedItems.Count == 0;
 
         private static double NormalizeElapsedSeconds(double value)
@@ -110,6 +113,7 @@ namespace Dungeon
         private readonly Queue<DungeonSessionSnapshot> completed = new Queue<DungeonSessionSnapshot>();
         private long lastSequence;
         private long activeSequence;
+        private string[] activeParticipants = Array.Empty<string>();
 
         public bool HasActiveSession => activeDungeon != null;
 
@@ -125,6 +129,9 @@ namespace Dungeon
         /// 새 세션을 시작한다. 유효한 <see cref="DungeonDefinition"/>이 필요하다.
         /// </summary>
         public SessionStartResult TryStartSession(DungeonDefinition dungeon)
+            => TryStartSession(dungeon, null);
+
+        public SessionStartResult TryStartSession(DungeonDefinition dungeon, IEnumerable<string> participantCharacterIds)
         {
             if (dungeon == null || !dungeon.IsValid)
                 return SessionStartResult.InvalidDungeon;
@@ -149,6 +156,7 @@ namespace Dungeon
             activeKills = 0L;
             activeItems.Clear();
             activeItemIndex.Clear();
+            activeParticipants = CopyParticipants(participantCharacterIds);
 
             return SessionStartResult.Started;
         }
@@ -181,7 +189,7 @@ namespace Dungeon
 
             snapshot = new DungeonSessionSnapshot(
                 activeDungeon, activeDungeonId, activeSequence,
-                activeCurrency, activeKills, elapsedSeconds, items);
+                activeCurrency, activeKills, elapsedSeconds, items, activeParticipants);
 
             completed.Enqueue(snapshot);
             ClearActive();
@@ -197,6 +205,14 @@ namespace Dungeon
             if (activeDungeon == null) return false;
             ClearActive();
             return true;
+        }
+
+        private static string[] CopyParticipants(IEnumerable<string> source)
+        {
+            if (source == null) return Array.Empty<string>();
+            var result = new List<string>(); var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string id in source) if (!string.IsNullOrEmpty(id) && seen.Add(id)) result.Add(id);
+            return result.ToArray();
         }
 
         // ---- 기록 ----
@@ -289,6 +305,7 @@ namespace Dungeon
             activeKills = 0L;
             activeItems.Clear();
             activeItemIndex.Clear();
+            activeParticipants = Array.Empty<string>();
         }
 
         private readonly struct ItemAccumulator
