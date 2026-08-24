@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using Character;
 using Common;
+using Corruption;
 using NUnit.Framework;
 using Recovery;
 using UnityEditor;
@@ -244,6 +245,73 @@ namespace CharacterEditor.Tests
             Assert.AreEqual(0, roster.GetStamina(catKnight));
             Assert.AreEqual(1, storage.WriteCalls);
             CollectionAssert.AreEqual(new[] { "CatKnight", string.Empty, "ElfArcher" }, document.partyCharacterIds);
+        }
+
+        [Test]
+        public void Defeat_CorruptionMultiplierSpendsOnceAndStillAutoSwitchesAtZero()
+        {
+            SaveData document = Inject(
+                State("CatKnight", stamina: 3),
+                State("ElfArcher", stamina: 5));
+            document.characters[0].currentCorruption = 240d;
+            document.partyCharacterIds = new List<string> { "CatKnight", "ElfArcher" };
+
+            MemoryStorage storage = UseMemoryStorage();
+            CharacterRoster roster = Ready(Catalog("CatKnight", "ElfArcher"));
+            SetPrivate(roster, "current", roster.Entries[0].definition);
+            SetPrivate(roster, "runtimeActor", RuntimeActor());
+            SetPrivate(roster, "corruptionConfigCatalog", CorruptionCatalog());
+
+            int stateChanges = 0;
+            Action<CharacterDefinition> handler = _ => stateChanges++;
+            CharacterRoster.CharacterStateChanged += handler;
+            try
+            {
+                LogAssert.ignoreFailingMessages = true;
+                InvokeWithString(roster, "HandleAnyTargetDefeated", "corruption-target");
+                LogAssert.ignoreFailingMessages = false;
+
+                Assert.AreEqual(0, roster.GetStamina(Definition("CatKnight")));
+                Assert.AreEqual("ElfArcher", roster.Current.CharacterId,
+                    "3배 비용으로 0이 된 뒤에도 기존 자동 교체 경로를 사용해야 한다.");
+                Assert.AreEqual(1, storage.WriteCalls, "처치 차감은 배율과 관계없이 한 번만 저장한다.");
+                Assert.AreEqual(1, stateChanges, "소진 캐릭터의 상태 변경은 한 번만 알려야 한다.");
+
+                InvokeWithString(roster, "HandleAnyTargetDefeated", "corruption-target");
+                Assert.AreEqual(1, storage.WriteCalls, "중복 처치 이벤트는 추가 차감을 만들지 않는다.");
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = false;
+                CharacterRoster.CharacterStateChanged -= handler;
+            }
+        }
+
+        [Test]
+        public void Scene_CharacterRosterHasGeneratedCorruptionConfig()
+        {
+            UnityEngine.SceneManagement.Scene scene =
+                UnityEditor.SceneManagement.EditorSceneManager.OpenScene(
+                    "Assets/Scenes/desktopScene_ReSize.unity",
+                    UnityEditor.SceneManagement.OpenSceneMode.Additive);
+            try
+            {
+                CharacterRoster[] sceneRosters = Array.FindAll(
+                    UnityEngine.Object.FindObjectsOfType<CharacterRoster>(),
+                    roster => roster.gameObject.scene == scene);
+                Assert.AreEqual(1, sceneRosters.Length,
+                    "대상 씬에는 CharacterRoster가 정확히 하나여야 한다.");
+
+                var config = (CorruptionConfigCatalog)GetPrivate(
+                    sceneRosters[0], "corruptionConfigCatalog");
+                Assert.IsNotNull(config, "CharacterRoster에 CorruptionConfigCatalog가 연결되어야 한다.");
+                Assert.IsNotNull(config.Find("default"),
+                    "연결된 Catalog는 유효한 default 설정을 제공해야 한다.");
+            }
+            finally
+            {
+                UnityEditor.SceneManagement.EditorSceneManager.CloseScene(scene, true);
+            }
         }
 
         // ---- 읽기와 거부된 변경은 문서를 바꾸지 않는다 ----
@@ -1201,6 +1269,31 @@ namespace CharacterEditor.Tests
             var definitions = new CharacterDefinition[ids.Length];
             for (int i = 0; i < ids.Length; i++) definitions[i] = Definition(ids[i]);
             return Catalog(definitions);
+        }
+
+        private CorruptionConfigCatalog CorruptionCatalog()
+        {
+            var definition = ScriptableObject.CreateInstance<CorruptionConfigDefinition>();
+            created.Add(definition);
+            var serializedDefinition = new SerializedObject(definition);
+            serializedDefinition.FindProperty("configId").stringValue = "default";
+            serializedDefinition.FindProperty("maxCorruption").intValue = 300;
+            serializedDefinition.FindProperty("warningThresholdPercent").intValue = 50;
+            serializedDefinition.FindProperty("dangerThresholdPercent").intValue = 80;
+            serializedDefinition.FindProperty("warningStaminaCostMultiplier").intValue = 2;
+            serializedDefinition.FindProperty("dangerStaminaCostMultiplier").intValue = 3;
+            serializedDefinition.FindProperty("enabled").boolValue = true;
+            serializedDefinition.ApplyModifiedPropertiesWithoutUndo();
+
+            var catalog = ScriptableObject.CreateInstance<CorruptionConfigCatalog>();
+            created.Add(catalog);
+            var serializedCatalog = new SerializedObject(catalog);
+            SerializedProperty configs = serializedCatalog.FindProperty("configs");
+            configs.arraySize = 1;
+            configs.GetArrayElementAtIndex(0).objectReferenceValue = definition;
+            serializedCatalog.ApplyModifiedPropertiesWithoutUndo();
+            catalog.MarkDirty();
+            return catalog;
         }
 
         private CharacterRuntimeActor RuntimeActor()

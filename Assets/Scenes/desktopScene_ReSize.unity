@@ -11016,6 +11016,7 @@ MonoBehaviour:
   runtimeActor: {fileID: 1959120555}
   defaultCharacter: {fileID: 11400000, guid: 342e077c6a6894f169a84d989ea37a84, type: 2}
   staminaCostPerDefeat: 1
+  corruptionConfigCatalog: {fileID: 11400000, guid: 1b0f04d23c4bf4f278118382ebe826e0, type: 2}
   overrideStaminaOnStart: 1
   debugStartStamina: 30
 --- !u!1001 &1901465460

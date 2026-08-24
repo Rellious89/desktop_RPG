@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Common;
+using Corruption;
 using Party;
 using UnityEngine;
 
@@ -23,10 +24,9 @@ namespace Character
     ///   - SaveData.characters: 캐릭터가 지금 어떤 상태인지(레벨/현재 행동력)
     /// 목록의 근거는 정의 에셋 하나뿐이다 - 씬에 캐릭터 오브젝트가 있는지는 더 이상 보지 않는다.
     ///
-    /// <b>행동력 소비 규칙: 몬스터 처치 1회당 1.</b> 근거는 <see cref="Target.AnyTargetDefeated"/>
-    /// (처치가 확정된 순간 정확히 한 번 발생하는 기존 이벤트) 하나뿐이다 - 키 입력, 공격 시작,
-    /// 타격 판정, 데미지 적용, 애니메이션 종료로는 절대 줄지 않는다. 공격 템포가 빠른 캐릭터와 느린
-    /// 캐릭터가 같은 몬스터 하나를 잡는 데 같은 비용을 쓰게 하기 위한 초기 규칙이다.
+    /// <b>행동력 소비 규칙: 몬스터 처치 1회당 기본 비용에 오염도 구간 배율을 곱한다.</b> 근거는
+    /// <see cref="Target.AnyTargetDefeated"/> (처치가 확정된 순간 정확히 한 번 발생하는 기존 이벤트)
+    /// 하나뿐이다 - 키 입력, 공격 시작, 타격 판정, 데미지 적용, 애니메이션 종료로는 절대 줄지 않는다.
     ///
     /// 행동력이 처치 비용으로 1 이상에서 정확히 0이 되면, 저장된 v4 고정 파티 슬롯 순서로 다음
     /// 행동 가능한 파티원을 한 번만 찾아 교체한다. 직접 행동력 변경·회복·로드 경로는 이 판정을
@@ -99,6 +99,9 @@ namespace Character
         [Min(0)]
         [SerializeField] private int staminaCostPerDefeat = 1;
 
+        [Tooltip("행동력 비용 오염도 구간을 읽는 생성 Config Catalog. 비어 있거나 default 설정이 없으면 기존 1배 비용을 쓴다.")]
+        [SerializeField] private CorruptionConfigCatalog corruptionConfigCatalog;
+
         [Header("Debug (개발용 - 정식 UI에 노출하지 않는다)")]
         [Tooltip("켜면 시작할 때 모든 캐릭터의 현재 행동력을 아래 값으로 덮어쓰고 저장한다. " +
                  "반복 테스트용이며, 켜 둔 채로 두면 실제 저장 데이터가 매 실행 덮어써진다.")]
@@ -122,6 +125,7 @@ namespace Character
         private readonly List<Entry> usableEntries = new List<Entry>();
 
         private CharacterDefinition current;
+        private bool missingCorruptionConfigLogged;
 
         /// <summary>카탈로그와 저장 문서를 겹쳐 보는 자리. 카탈로그가 없으면 null이며, 그때 로스터는
         /// 과도기 폴백(직렬화된 Entries)으로 동작한다.</summary>
@@ -309,7 +313,8 @@ namespace Character
 
             CharacterDefinition defeatedCharacter = current;
             int staminaBefore = GetStamina(defeatedCharacter);
-            SpendStamina(defeatedCharacter, staminaCostPerDefeat);
+            int staminaCost = GetStaminaCostPerDefeat(defeatedCharacter);
+            SpendStamina(defeatedCharacter, staminaCost);
 
             // 처치 행동력 소비에서만 정확히 1회 평가한다. SetStamina가 이벤트를 발행하는 동안 다른
             // 구독자가 current를 바꾼 경우에도, 이 처치로 소진된 원래 캐릭터만 근거로 삼는다.
@@ -317,6 +322,37 @@ namespace Character
             {
                 TryAutoSwitchAfterDefeat(defeatedCharacter);
             }
+        }
+
+        private int GetStaminaCostPerDefeat(CharacterDefinition definition)
+        {
+            CorruptionConfigDefinition config = corruptionConfigCatalog != null
+                ? corruptionConfigCatalog.Find("default")
+                : null;
+            if (config == null)
+            {
+                LogMissingCorruptionConfigOnce();
+                return staminaCostPerDefeat;
+            }
+
+            if (!TryGetOwnedState(definition, out CharacterDefinition canonical, out CharacterSaveState state))
+                return staminaCostPerDefeat;
+
+            return CorruptionStaminaCostPolicy.Calculate(
+                state.currentCorruption,
+                canonical.BaseCorruption,
+                config,
+                staminaCostPerDefeat);
+        }
+
+        private void LogMissingCorruptionConfigOnce()
+        {
+            if (missingCorruptionConfigLogged) return;
+            missingCorruptionConfigLogged = true;
+            if (!Application.isPlaying) return;
+            Debug.LogWarning(
+                "[CharacterRoster] CorruptionConfigCatalog의 default 설정이 없어 기존 1배 행동력 비용을 사용합니다.",
+                this);
         }
 
         /// <summary>
