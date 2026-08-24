@@ -170,6 +170,82 @@ namespace CharacterEditor.Tests
             CollectionAssert.AreEqual(new[] { "ElfArcher", "CatKnight" }, EntryIds(roster));
         }
 
+        // ---- 처치 행동력 소진 자동 교체는 v4 고정 슬롯 순서를 쓴다 ----
+
+        [Test]
+        public void AutoSwitchSlotOrder_UsesFixedSlotsAndWrapsWithoutCompression()
+        {
+            CollectionAssert.AreEqual(new[] { 1, 2, 0 }, AutoSwitchSlots(3, 0));
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, AutoSwitchSlots(3, 2));
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, AutoSwitchSlots(3, -1),
+                "현재 캐릭터가 저장 슬롯에 없으면 첫 슬롯부터 찾는다.");
+        }
+
+        [Test]
+        public void DefeatAtZero_AutoSwitchesToNextUsableFixedSlotWithoutExtraSave()
+        {
+            SaveData document = Inject(State("CatKnight", stamina: 1), State("ElfArcher", stamina: 5), State("CatMage", stamina: 7));
+            document.partyCharacterIds = new List<string> { "CatKnight", string.Empty, "ElfArcher", "CatMage" };
+            document.recoverySlots = new List<RecoverySlotSaveState>
+            {
+                new RecoverySlotSaveState { characterId = "ElfArcher" },
+            };
+
+            MemoryStorage storage = UseMemoryStorage();
+            CharacterRoster roster = Ready(Catalog("CatKnight", "ElfArcher", "CatMage"));
+            SetPrivate(roster, "current", roster.Entries[0].definition);
+            SetPrivate(roster, "runtimeActor", RuntimeActor());
+
+            var changed = new List<CharacterDefinition>();
+            Action<CharacterDefinition> handler = changed.Add;
+            CharacterRoster.CurrentCharacterChanged += handler;
+            try
+            {
+                // 최소 모션 프로필은 전환에 필요한 Idle만 가진다. 액터가 공격 풀 누락 진단을 내더라도
+                // 이 시험의 대상(슬롯 순서/저장/현재 캐릭터)이 아니므로 로그 스코프에서만 분리한다.
+                LogAssert.ignoreFailingMessages = true;
+                InvokeWithString(roster, "HandleAnyTargetDefeated", "target-1");
+                LogAssert.ignoreFailingMessages = false;
+
+                Assert.AreEqual(0, roster.GetStamina(Definition("CatKnight")));
+                Assert.AreEqual("CatMage", roster.Current.CharacterId,
+                    "빈 슬롯과 회복소 후보를 건너뛰고 다음 고정 슬롯으로 전환해야 한다.");
+                CollectionAssert.AreEqual(new[] { "CatKnight", string.Empty, "ElfArcher", "CatMage" }, document.partyCharacterIds,
+                    "자동 교체는 파티 저장이나 슬롯 위치를 바꾸지 않는다.");
+                Assert.AreEqual(1, storage.WriteCalls, "행동력 차감만 저장하고 교체로 추가 저장하지 않는다.");
+                Assert.AreEqual(1, changed.Count);
+
+                InvokeWithString(roster, "HandleAnyTargetDefeated", "target-1");
+                Assert.AreEqual("CatMage", roster.Current.CharacterId);
+                Assert.AreEqual(1, storage.WriteCalls, "중복 처치 이벤트는 다시 차감하거나 교체하지 않는다.");
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = false;
+                CharacterRoster.CurrentCharacterChanged -= handler;
+            }
+        }
+
+        [Test]
+        public void DefeatAtZero_LeavesCurrentWhenNoOtherPartyMemberCanAct()
+        {
+            SaveData document = Inject(State("CatKnight", stamina: 1), State("ElfArcher", stamina: 0));
+            document.partyCharacterIds = new List<string> { "CatKnight", string.Empty, "ElfArcher" };
+
+            MemoryStorage storage = UseMemoryStorage();
+            CharacterRoster roster = Ready(Catalog("CatKnight", "ElfArcher"));
+            CharacterDefinition catKnight = roster.Entries[0].definition;
+            SetPrivate(roster, "current", catKnight);
+            SetPrivate(roster, "runtimeActor", RuntimeActor());
+
+            InvokeWithString(roster, "HandleAnyTargetDefeated", "target-2");
+
+            Assert.AreSame(catKnight, roster.Current, "1인 파티 또는 전원 행동력 0이면 현재 캐릭터를 유지한다.");
+            Assert.AreEqual(0, roster.GetStamina(catKnight));
+            Assert.AreEqual(1, storage.WriteCalls);
+            CollectionAssert.AreEqual(new[] { "CatKnight", string.Empty, "ElfArcher" }, document.partyCharacterIds);
+        }
+
         // ---- 읽기와 거부된 변경은 문서를 바꾸지 않는다 ----
 
         [Test]
@@ -1080,6 +1156,25 @@ namespace CharacterEditor.Tests
             return method.Invoke(roster, null);
         }
 
+        private static void InvokeWithString(CharacterRoster roster, string name, string value)
+        {
+            MethodInfo method = typeof(CharacterRoster).GetMethod(
+                name, BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(method, $"CharacterRoster.{name}을 찾지 못했습니다.");
+            method.Invoke(roster, new object[] { value });
+        }
+
+        private static List<int> AutoSwitchSlots(int count, int exhaustedSlot)
+        {
+            MethodInfo method = typeof(CharacterRoster).GetMethod(
+                "EnumerateAutoSwitchSlots", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.IsNotNull(method, "CharacterRoster.EnumerateAutoSwitchSlots을 찾지 못했습니다.");
+
+            var slots = new List<int>();
+            foreach (int slot in (System.Collections.IEnumerable)method.Invoke(null, new object[] { count, exhaustedSlot })) slots.Add(slot);
+            return slots;
+        }
+
         private static void SetPrivate(CharacterRoster roster, string field, object value)
         {
             FieldInfo info = typeof(CharacterRoster).GetField(field, BindingFlags.NonPublic | BindingFlags.Instance);
@@ -1106,6 +1201,20 @@ namespace CharacterEditor.Tests
             var definitions = new CharacterDefinition[ids.Length];
             for (int i = 0; i < ids.Length; i++) definitions[i] = Definition(ids[i]);
             return Catalog(definitions);
+        }
+
+        private CharacterRuntimeActor RuntimeActor()
+        {
+            var host = new GameObject("AutoSwitchRuntimeActor");
+            created.Add(host);
+            host.SetActive(false);
+            host.AddComponent<SpriteRenderer>();
+            host.AddComponent<FlashOnCue>();
+            host.AddComponent<HitEffectSpawner>();
+            host.AddComponent<ActorOutlineController>();
+            host.AddComponent<PlayerCharacterAnimator>();
+            host.AddComponent<AttackMovement>();
+            return host.AddComponent<CharacterRuntimeActor>();
         }
 
         private CharacterCatalog Catalog(params CharacterDefinition[] definitions)

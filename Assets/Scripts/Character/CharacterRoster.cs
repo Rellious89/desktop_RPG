@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Common;
+using Party;
 using UnityEngine;
 
 namespace Character
@@ -27,9 +28,9 @@ namespace Character
     /// 타격 판정, 데미지 적용, 애니메이션 종료로는 절대 줄지 않는다. 공격 템포가 빠른 캐릭터와 느린
     /// 캐릭터가 같은 몬스터 하나를 잡는 데 같은 비용을 쓰게 하기 위한 초기 규칙이다.
     ///
-    /// 행동력이 0이면 <see cref="CurrentCharacterCanAct"/>가 false가 되고, PlayerCharacterAnimator가
-    /// 그 값을 보고 <b>새 공격 세션을 시작하지 않는다</b>(이미 재생 중인 공격은 끊지 않는다).
-    /// 자동 교체는 하지 않는다 - 캐릭터는 Idle 상태로 대기하고, 교체는 사용자가 패널에서 한다.
+    /// 행동력이 처치 비용으로 1 이상에서 정확히 0이 되면, 저장된 v4 고정 파티 슬롯 순서로 다음
+    /// 행동 가능한 파티원을 한 번만 찾아 교체한다. 직접 행동력 변경·회복·로드 경로는 이 판정을
+    /// 거치지 않으므로 자동 교체를 만들지 않는다.
     ///
     /// <b>행동력 회복은 회복소(Recovery.RecoveryService)가 소유한다.</b> 예전에 있던 "전체 충전"
     /// 테스트 경로는 제거했다 - 회복은 재화를 내고 시간을 기다리는 정식 규칙 하나뿐이며, 그 경로를
@@ -306,7 +307,70 @@ namespace Character
             if (current == null || staminaCostPerDefeat <= 0) return;
             if (!defeatFilter.Accept(targetId, this)) return;
 
-            SpendStamina(current, staminaCostPerDefeat);
+            CharacterDefinition defeatedCharacter = current;
+            int staminaBefore = GetStamina(defeatedCharacter);
+            SpendStamina(defeatedCharacter, staminaCostPerDefeat);
+
+            // 처치 행동력 소비에서만 정확히 1회 평가한다. SetStamina가 이벤트를 발행하는 동안 다른
+            // 구독자가 current를 바꾼 경우에도, 이 처치로 소진된 원래 캐릭터만 근거로 삼는다.
+            if (staminaBefore > 0 && GetStamina(defeatedCharacter) == 0)
+            {
+                TryAutoSwitchAfterDefeat(defeatedCharacter);
+            }
+        }
+
+        /// <summary>
+        /// 처치로 소진된 캐릭터 뒤의 v4 고정 슬롯부터 한 바퀴만 돌며 기존 수동 교체 경로를 시도한다.
+        /// 교체는 저장을 하지 않으므로 처치 행동력 차감의 기존 한 번 저장 외에 추가 쓰기를 만들지 않는다.
+        /// </summary>
+        private void TryAutoSwitchAfterDefeat(CharacterDefinition exhausted)
+        {
+            if (exhausted == null || current != exhausted) return;
+
+            List<string> party = SaveSystem.Data != null ? SaveSystem.Data.partyCharacterIds : null;
+            if (party == null || party.Count == 0) return;
+
+            int exhaustedSlot = PartySlotUtility.IndexOf(party, exhausted.CharacterId);
+            foreach (int slot in EnumerateAutoSwitchSlots(party.Count, exhaustedSlot))
+            {
+                string candidateId = PartySlotUtility.At(party, slot);
+                if (string.IsNullOrEmpty(candidateId) || string.Equals(candidateId, exhausted.CharacterId, StringComparison.Ordinal)) continue;
+
+                CharacterDefinition candidate = ResolveOwnedUsableById(candidateId);
+                if (candidate == null || GetStamina(candidate) <= 0 || Recovery.RecoveryService.IsCharacterInRecovery(candidate)) continue;
+
+                // TrySwitchTo가 Runtime Actor 적용까지 포함한 수동 교체의 최종 판정이다. 적용 실패 시
+                // 다음 슬롯을 계속 확인하되, 어느 누구도 적용되지 않으면 소진 캐릭터를 그대로 유지한다.
+                if (TrySwitchTo(candidate, out _)) return;
+            }
+        }
+
+        /// <summary>
+        /// 고정 슬롯 순환 순서. 현재 슬롯을 찾지 못한 예외 상태는 첫 슬롯부터 탐색한다.
+        /// 이 순서는 런타임 Entries의 압축된 인덱스와 무관하게 SaveData의 슬롯 인덱스만 사용한다.
+        /// </summary>
+        private static IEnumerable<int> EnumerateAutoSwitchSlots(int slotCount, int exhaustedSlot)
+        {
+            if (slotCount <= 0) yield break;
+
+            int start = exhaustedSlot >= 0 && exhaustedSlot < slotCount ? (exhaustedSlot + 1) % slotCount : 0;
+            for (int offset = 0; offset < slotCount; offset++) yield return (start + offset) % slotCount;
+        }
+
+        /// <summary>고정 슬롯 순환에서 쓰는 저장 id 해석. Entries 순서를 쓰지 않아 빈 슬롯을 압축하지 않는다.</summary>
+        private CharacterDefinition ResolveOwnedUsableById(string characterId)
+        {
+            if (string.IsNullOrEmpty(characterId)) return null;
+            for (int i = 0; i < usableEntries.Count; i++)
+            {
+                CharacterDefinition definition = usableEntries[i].definition;
+                if (definition != null && string.Equals(definition.CharacterId, characterId, StringComparison.Ordinal))
+                {
+                    return ResolveOwnedUsable(definition);
+                }
+            }
+
+            return null;
         }
 
         /// <summary>실제로 투입할 수 있는 항목만 남긴다. 판정 근거는 정의 에셋뿐이다 - 씬에 그 캐릭터의
