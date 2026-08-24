@@ -2887,6 +2887,8 @@ MonoBehaviour:
   fieldModeManager: {fileID: 468841861}
   encounterQueue: {fileID: 324107453}
   inventoryManager: {fileID: 1047247884}
+  characterCatalog: {fileID: 11400000, guid: 5f24823f983054d358a82014246a9fa7, type: 2}
+  corruptionConfigCatalog: {fileID: 11400000, guid: 1b0f04d23c4bf4f278118382ebe826e0, type: 2}
 --- !u!114 &468841866
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -252,7 +252,7 @@ namespace CommonEditor.Save
 
                 string name = hasId ? DescribeCharacterName(id) : "(빈 characterId)";
                 string info =
-                    $"{name}  ·  Lv.{character.level}  ·  EXP {character.currentExp}  ·  행동력 {character.currentStamina}";
+                $"{name}  ·  Lv.{character.level}  ·  EXP {character.currentExp}  ·  행동력 {character.currentStamina}  ·  오염도 {character.currentCorruption:0.###} / 300";
                 EditorGUILayout.LabelField(info);
 
                 if (initiallyOwned)

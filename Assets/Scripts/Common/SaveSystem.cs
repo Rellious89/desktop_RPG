@@ -108,6 +108,16 @@ namespace Common
         }
 
         /// <summary>
+        /// 이미 메모리에 준비된 저장 문서만 돌려준다. 이 메서드는 파일을 읽거나 새 문서를 만들지 않는다.
+        /// 던전 세션처럼 저장을 시작할 권한이 없는 관찰자는 이 경계로 현재 상태를 스냅샷해야 한다.
+        /// </summary>
+        public static bool TryGetLoadedData(out SaveData loadedData)
+        {
+            loadedData = data;
+            return loadedData != null;
+        }
+
+        /// <summary>
         /// 현재 <see cref="Data"/>를 파일에 기록하고 성공 여부를 돌려준다. 실패해도 예외를 밖으로
         /// 던지지 않으며, 쓰기가 실패한 경우 기존 저장 파일은 그대로 남는다(부분 기록으로 망가뜨리지
         /// 않는다).

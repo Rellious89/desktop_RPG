@@ -5,6 +5,8 @@ using Dungeon;
 using Enemy;
 using Field;
 using Inventory;
+using Character;
+using Corruption;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -49,6 +51,16 @@ namespace DungeonEditor.Tests
         private static readonly FieldInfo ImField =
             typeof(DungeonSessionTracker).GetField(
                 "inventoryManager",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+
+        private static readonly FieldInfo CharacterCatalogField =
+            typeof(DungeonSessionTracker).GetField(
+                "characterCatalog",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+
+        private static readonly FieldInfo CorruptionConfigCatalogField =
+            typeof(DungeonSessionTracker).GetField(
+                "corruptionConfigCatalog",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
         private static readonly FieldInfo RealtimeProviderField =
@@ -1047,10 +1059,18 @@ namespace DungeonEditor.Tests
                 var sceneFmm = (FieldModeManager)FmmField.GetValue(sceneTracker);
                 var sceneQueue = (MonsterEncounterQueue)QueueField.GetValue(sceneTracker);
                 var sceneIm = (InventoryManager)ImField.GetValue(sceneTracker);
+                var sceneCharacterCatalog = (CharacterCatalog)CharacterCatalogField.GetValue(sceneTracker);
+                var sceneCorruptionConfigCatalog =
+                    (CorruptionConfigCatalog)CorruptionConfigCatalogField.GetValue(sceneTracker);
 
                 Assert.IsNotNull(sceneFmm, "fieldModeManager 참조가 연결되어야 한다");
                 Assert.IsNotNull(sceneQueue, "encounterQueue 참조가 연결되어야 한다");
                 Assert.IsNotNull(sceneIm, "inventoryManager 참조가 연결되어야 한다");
+                Assert.IsNotNull(sceneCharacterCatalog, "characterCatalog 참조가 연결되어야 한다");
+                Assert.IsNotNull(sceneCorruptionConfigCatalog,
+                    "corruptionConfigCatalog 참조가 연결되어야 한다");
+                Assert.IsNotNull(sceneCorruptionConfigCatalog.Find("default"),
+                    "corruptionConfigCatalog에 default 정의가 있어야 한다");
 
                 Assert.AreSame(sceneTracker.gameObject, sceneFmm.gameObject,
                     "fieldModeManager는 트래커와 같은 GameObject에 있어야 한다");
