@@ -328,8 +328,8 @@ namespace CommonEditor.SaveTests
 
             CollectionAssert.AreEqual(new[] { "CatKnight", "Barbarian" }, IdsOf(data.characters),
                 "고른 ElfArcher만 빠지고 나머지는 순서 그대로 남아야 합니다.");
-            CollectionAssert.AreEqual(new[] { "CatKnight", "Barbarian" }, data.partyCharacterIds,
-                "삭제한 캐릭터만 파티에서도 빠지고 선택하지 않은 순서는 유지돼야 합니다.");
+            CollectionAssert.AreEqual(new[] { "CatKnight", string.Empty, "Barbarian" }, data.partyCharacterIds,
+                "삭제한 캐릭터의 슬롯만 비우고 선택하지 않은 슬롯 위치는 유지돼야 합니다.");
 
             // 비대상은 그대로.
             Assert.AreEqual(500, data.currency);
