@@ -30,6 +30,7 @@ namespace TableDataEditor
         public const string RecruitmentAccessCsvFileName = "RecruitmentAccess.csv";
         public const string PartyConfigCsvFileName = "PartyConfig.csv";
         public const string CorruptionConfigCsvFileName = "CorruptionConfig.csv";
+        public const string PurificationConfigCsvFileName = "PurificationConfig.csv";
 
         public const string WorldCsvPath = InputRoot + "/" + WorldCsvFileName;
         public const string CurrencyCsvPath = InputRoot + "/" + CurrencyCsvFileName;
@@ -48,6 +49,7 @@ namespace TableDataEditor
 
         public const string PartyConfigCsvPath = InputRoot + "/" + PartyConfigCsvFileName;
         public const string CorruptionConfigCsvPath = InputRoot + "/" + CorruptionConfigCsvFileName;
+        public const string PurificationConfigCsvPath = InputRoot + "/" + PurificationConfigCsvFileName;
 
         /// <summary>
         /// <c>icon_key</c>가 가리키는 아이콘을 찾는 <b>유일한</b> 폴더. 프로젝트 전체에서 이름으로 찾지
@@ -124,6 +126,7 @@ namespace TableDataEditor
         /// </summary>
         public const string PartyConfigOutputFolder = OutputRoot + "/PartyConfig";
         public const string CorruptionConfigOutputFolder = OutputRoot + "/CorruptionConfig";
+        public const string PurificationConfigOutputFolder = OutputRoot + "/PurificationConfig";
 
         /// <summary>생성 에셋 파일 이름의 고정 접두사. 원본 ID를 그대로 뒤에 붙인다 - <b>ID 자체는
         /// 절대 바꾸지 않는다</b>. ID가 <see cref="TableDataFieldRules.IdPatternText"/>(양의 정수 또는
@@ -145,6 +148,7 @@ namespace TableDataEditor
         public const string RecruitmentAccessAssetPrefix = "RecruitmentAccess_";
         public const string PartyConfigAssetPrefix = "PartyConfig_";
         public const string CorruptionConfigAssetPrefix = "CorruptionConfig_";
+        public const string PurificationConfigAssetPrefix = "PurificationConfig_";
 
         public const string WorldCatalogAssetName = "WorldCatalog";
         public const string CurrencyCatalogAssetName = "CurrencyCatalog";
@@ -161,6 +165,7 @@ namespace TableDataEditor
         public const string RecruitmentAccessCatalogAssetName = "RecruitmentAccessCatalog";
         public const string PartyConfigCatalogAssetName = "PartyConfigCatalog";
         public const string CorruptionConfigCatalogAssetName = "CorruptionConfigCatalog";
+        public const string PurificationConfigCatalogAssetName = "PurificationConfigCatalog";
 
         public static string WorldAssetPath(string worldId)
         {
@@ -290,11 +295,15 @@ namespace TableDataEditor
 
         public static string CorruptionConfigAssetPath(string configId) =>
             CorruptionConfigOutputFolder + "/" + CorruptionConfigAssetPrefix + configId + ".asset";
+        public static string PurificationConfigAssetPath(string purificationTypeId) =>
+            PurificationConfigOutputFolder + "/" + PurificationConfigAssetPrefix + purificationTypeId + ".asset";
 
         public static string PartyConfigCatalogAssetPath =>
             PartyConfigOutputFolder + "/" + PartyConfigCatalogAssetName + ".asset";
 
         public static string CorruptionConfigCatalogAssetPath =>
             CorruptionConfigOutputFolder + "/" + CorruptionConfigCatalogAssetName + ".asset";
+        public static string PurificationConfigCatalogAssetPath =>
+            PurificationConfigOutputFolder + "/" + PurificationConfigCatalogAssetName + ".asset";
     }
 }

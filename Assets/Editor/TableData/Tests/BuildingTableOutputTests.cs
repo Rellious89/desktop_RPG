@@ -88,7 +88,7 @@ namespace TableDataEditor.Tests
                     TableDataRebuildScope.CharacterSkillTables,
                     TableDataRebuildScope.BuildingTable,
                     TableDataRebuildScope.RecruitmentTables,
-                    TableDataRebuildScope.PartyConfigTable,
+                    TableDataRebuildScope.PartyConfigTable, TableDataRebuildScope.CorruptionConfigTable, TableDataRebuildScope.PurificationConfigTable,
                 },
                 Enum.GetValues(typeof(TableDataRebuildScope)),
                 "선언된 범위와 지원하는 범위가 어긋나면 안 된다.");
@@ -161,7 +161,7 @@ namespace TableDataEditor.Tests
             Assert.Greater(snapshot.Monsters.Count, 0);
             Assert.Greater(snapshot.Dungeons.Count, 0);
             Assert.Greater(snapshot.Characters.Count, 0);
-            Assert.AreEqual(1, snapshot.Buildings.Count);
+            Assert.AreEqual(2, snapshot.Buildings.Count);
         }
 
         [Test]
@@ -202,7 +202,7 @@ namespace TableDataEditor.Tests
             Assert.AreEqual("1", inn.BuildingId, "building_id는 CSV에 적힌 그대로여야 한다.");
             Assert.AreEqual(60, inn.BuildTimeSeconds);
             Assert.AreEqual("jewel", inn.CostCurrencyId);
-            Assert.AreEqual(2500, inn.CostCurrencyAmount);
+            Assert.AreEqual(2000, inn.CostCurrencyAmount);
             Assert.AreEqual(0, inn.CostItems.Count, "여관은 아이템 비용이 없다.");
             Assert.AreEqual(10, inn.DisplayOrder);
             Assert.IsTrue(inn.IsValid);
@@ -255,7 +255,7 @@ namespace TableDataEditor.Tests
             var catalog = AssetDatabase.LoadAssetAtPath<BuildingCatalog>(TableDataPaths.BuildingCatalogAssetPath);
             Assert.IsNotNull(catalog, $"'{TableDataPaths.BuildingCatalogAssetPath}'를 읽지 못했습니다.");
 
-            Assert.AreEqual(1, catalog.Count, "지금 활성 건물은 여관 하나뿐이다.");
+            Assert.AreEqual(2, catalog.Count);
             Assert.AreSame(LoadInn(), catalog.Buildings[0]);
             Assert.AreSame(LoadInn(), catalog.Find("1"));
             Assert.IsNull(catalog.Find("Inn"), "조회는 적힌 그대로 비교한다 - 표시 이름으로는 찾지 못한다.");
@@ -272,7 +272,7 @@ namespace TableDataEditor.Tests
             }
 
             CollectionAssert.AreEquivalent(
-                new[] { BuildingAssetPath, TableDataPaths.BuildingCatalogAssetPath },
+                new[] { BuildingAssetPath, TableDataPaths.BuildingAssetPath("2"), TableDataPaths.BuildingCatalogAssetPath },
                 found,
                 "생성 폴더에 목록에 없는 에셋이 있습니다:\n" + string.Join("\n", found));
         }

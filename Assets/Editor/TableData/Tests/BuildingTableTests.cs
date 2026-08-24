@@ -33,7 +33,7 @@ namespace TableDataEditor.Tests
 
         private const int LiveBuildTimeSeconds = 60;
         private const string LiveCostCurrencyId = "jewel";
-        private const int LiveCostCurrencyAmount = 2500;
+        private const int LiveCostCurrencyAmount = 2000;
         private const int LiveDisplayOrder = 10;
 
         /// <summary>여관 이름은 07_Building의 숫자 키 1이다.</summary>
@@ -414,9 +414,9 @@ namespace TableDataEditor.Tests
             TableDataSnapshot snapshot = Live().Snapshot;
             Assert.IsNotNull(snapshot, "아홉 표가 모두 읽혀야 스냅샷이 만들어진다: " + Live().Summary);
 
-            Assert.AreEqual(1, snapshot.Buildings.Count, "지금 Building.csv에는 여관 한 행만 있다.");
+            Assert.AreEqual(2, snapshot.Buildings.Count, "Building.csv에는 여관과 교회가 있다.");
 
-            BuildingRow row = snapshot.Buildings[0];
+            BuildingRow row = snapshot.Buildings.Find(b => b.Id == LiveBuildingId);
             Assert.AreEqual(LiveBuildingId, row.Id);
             Assert.AreEqual(LiveBuildTimeSeconds, row.BuildTimeSeconds);
             Assert.AreEqual(LiveCostCurrencyId, row.CostCurrencyId);
@@ -669,8 +669,7 @@ namespace TableDataEditor.Tests
         {
             // 건설 기록이 생긴 뒤에도 형식 번호는 그대로다 - 칸을 <b>추가</b>하기만 했으므로
             // 예전 파일이 그대로 유효하다(없는 칸은 기본값으로 읽힌다).
-            Assert.AreEqual(3, SaveData.CurrentSaveVersion,
-                "Building 표와 별개로 현재 저장 형식은 초기 파티를 추가한 v3입니다.");
+            Assert.AreEqual(5, SaveData.CurrentSaveVersion);
         }
 
         // ---- 도우미 ----

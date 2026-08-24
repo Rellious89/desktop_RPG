@@ -158,6 +158,9 @@ namespace TableDataEditor
             CsvTable corruptionConfigTable = TableDataCsvReader.Read(
                 TableDataPaths.CorruptionConfigCsvPath, TableDataPaths.CorruptionConfigCsvFileName,
                 TableDataColumns.CorruptionConfig, log);
+            CsvTable purificationConfigTable = TableDataCsvReader.Read(
+                TableDataPaths.PurificationConfigCsvPath, TableDataPaths.PurificationConfigCsvFileName,
+                TableDataColumns.PurificationConfig, log);
 
             var snapshot = new TableDataSnapshot();
             bool allTablesRead = worldTable != null && currencyTable != null && itemTable != null
@@ -168,6 +171,7 @@ namespace TableDataEditor
                                  && recruitmentPoolTable != null && recruitmentAccessTable != null
                                  && partyConfigTable != null;
             allTablesRead = allTablesRead && corruptionConfigTable != null;
+            allTablesRead = allTablesRead && purificationConfigTable != null;
 
             try
             {
@@ -183,6 +187,7 @@ namespace TableDataEditor
 
                 // Building은 Currency와 Item을 가리키므로 두 표가 모두 읽힌 뒤에 온다.
                 if (buildingTable != null) ValidateBuildings(buildingTable, snapshot, log);
+                if (purificationConfigTable != null) ValidatePurificationConfigs(purificationConfigTable, snapshot, log);
 
                 // 모집 네 표는 맨 뒤다 - Character와 Building을 가리키므로 두 표가 이미 앞에 있어야
                 // 한다. 넷 사이의 순서도 같은 규칙을 따른다(RecruitmentType → Pool/Access).
@@ -861,6 +866,31 @@ namespace TableDataEditor
         }
 
         // ---- Dungeon ----
+
+        private static void ValidatePurificationConfigs(CsvTable table, TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            foreach (CsvRecord record in table.Records)
+            {
+                int line = record.Line;
+                var row = new PurificationConfigRow { Line = line };
+                bool idOk = TableDataFieldRules.TryReadRequiredId(table.FileName, line,
+                    TableDataColumns.PurificationTypeId, table.Get(record, TableDataColumns.PurificationTypeId), log, out string id);
+                row.Id = id;
+                if (idOk && snapshot.PurificationConfigsById.TryGetValue(id, out PurificationConfigRow prior))
+                { log.Error(table.FileName, line, TableDataColumns.PurificationTypeId, id, $"purification_type_id가 {prior.Line}행과 중복됩니다."); idOk = false; }
+                bool buildingOk = TableDataFieldRules.TryReadRequiredId(table.FileName, line,
+                    TableDataColumns.RequiredBuildingId, table.Get(record, TableDataColumns.RequiredBuildingId), log, out string buildingId);
+                row.RequiredBuildingId = buildingId;
+                if (buildingOk && !snapshot.BuildingsById.ContainsKey(buildingId))
+                    log.Error(table.FileName, line, TableDataColumns.RequiredBuildingId, buildingId, "Building.csv에 없는 building_id입니다.");
+                TableDataFieldRules.TryReadIntAtLeast(table.FileName, line, TableDataColumns.PurificationIntervalSeconds, table.Get(record, TableDataColumns.PurificationIntervalSeconds), 1, log, out row.IntervalSeconds);
+                TableDataFieldRules.TryReadIntAtLeast(table.FileName, line, TableDataColumns.PurificationValuePerInterval, table.Get(record, TableDataColumns.PurificationValuePerInterval), 1, log, out row.ValuePerInterval);
+                TableDataFieldRules.TryReadIntAtLeast(table.FileName, line, TableDataColumns.BaseSlotCount, table.Get(record, TableDataColumns.BaseSlotCount), 1, log, out row.BaseSlotCount);
+                TableDataFieldRules.TryReadEnabled(table.FileName, line, TableDataColumns.Enabled, table.Get(record, TableDataColumns.Enabled), log, out row.Enabled);
+                if (!idOk) continue;
+                snapshot.PurificationConfigs.Add(row); snapshot.PurificationConfigsById[row.Id] = row;
+            }
+        }
 
         private static void ValidateDungeons(
             CsvTable table, TableDataSnapshot snapshot, TableDataAssetIndex assets, TableDataDiagnosticLog log)
@@ -2406,6 +2436,10 @@ namespace TableDataEditor
             if (TableDataRebuildScopes.IncludesCorruptionConfigTable(outputScope))
             {
                 folders.Add(TableDataPaths.CorruptionConfigOutputFolder);
+            }
+            if (TableDataRebuildScopes.IncludesPurificationConfigTable(outputScope))
+            {
+                folders.Add(TableDataPaths.PurificationConfigOutputFolder);
             }
 
             return folders;

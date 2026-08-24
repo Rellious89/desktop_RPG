@@ -104,6 +104,13 @@ namespace TableDataEditor
                 "Rebuild (CorruptionConfig)", TableDataPaths.CorruptionConfigOutputFolder);
         }
 
+        [MenuItem(MenuRoot + "Rebuild (PurificationConfig only)", priority = 107)]
+        public static void RebuildPurificationConfigTable()
+        {
+            Run(TableDataRebuildScope.PurificationConfigTable,
+                "Rebuild (PurificationConfig)", TableDataPaths.PurificationConfigOutputFolder);
+        }
+
         private static void Run(TableDataRebuildScope scope, string label, string outputDescription)
         {
             TableDataRebuildResult result = TableDataRebuilder.Rebuild(scope);

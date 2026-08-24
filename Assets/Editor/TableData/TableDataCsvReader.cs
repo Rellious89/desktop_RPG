@@ -166,6 +166,12 @@ namespace TableDataEditor
         public const string WarningStaminaCostMultiplier = "warning_stamina_cost_multiplier";
         public const string DangerStaminaCostMultiplier = "danger_stamina_cost_multiplier";
         public static readonly string[] CorruptionConfig = { ConfigId, MaxCorruption, WarningThresholdPercent, DangerThresholdPercent, WarningStaminaCostMultiplier, DangerStaminaCostMultiplier, Enabled };
+        public const string PurificationTypeId = "purification_type_id";
+        public const string RequiredBuildingId = "required_building_id";
+        public const string PurificationIntervalSeconds = "purification_interval_seconds";
+        public const string PurificationValuePerInterval = "purification_value_per_interval";
+        public const string BaseSlotCount = "base_slot_count";
+        public static readonly string[] PurificationConfig = { PurificationTypeId, RequiredBuildingId, PurificationIntervalSeconds, PurificationValuePerInterval, BaseSlotCount, Enabled, Memo };
 
         // Skill.csv
         public const string SkillId = "skill_id";

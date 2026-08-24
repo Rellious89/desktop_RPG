@@ -76,6 +76,7 @@ namespace TableDataEditor
         /// </summary>
         PartyConfigTable = 4,
         CorruptionConfigTable = 5,
+        PurificationConfigTable = 6,
     }
 
     /// <summary>
@@ -93,7 +94,8 @@ namespace TableDataEditor
                    || scope == TableDataRebuildScope.BuildingTable
                    || scope == TableDataRebuildScope.RecruitmentTables
                    || scope == TableDataRebuildScope.PartyConfigTable
-                   || scope == TableDataRebuildScope.CorruptionConfigTable;
+                   || scope == TableDataRebuildScope.CorruptionConfigTable
+                   || scope == TableDataRebuildScope.PurificationConfigTable;
         }
 
         /// <summary>지원하지 않는 값이면 <b>아무것도 하기 전에</b> 던진다.</summary>
@@ -150,6 +152,12 @@ namespace TableDataEditor
         {
             EnsureSupported(scope, nameof(scope));
             return scope == TableDataRebuildScope.All || scope == TableDataRebuildScope.CorruptionConfigTable;
+        }
+
+        public static bool IncludesPurificationConfigTable(TableDataRebuildScope scope)
+        {
+            EnsureSupported(scope, nameof(scope));
+            return scope == TableDataRebuildScope.All || scope == TableDataRebuildScope.PurificationConfigTable;
         }
     }
 
@@ -295,6 +303,7 @@ namespace TableDataEditor
             EnsureFolders(scope);
 
             if (scope == TableDataRebuildScope.CorruptionConfigTable) return RebuildCorruptionConfigTable(result, snapshot);
+            if (scope == TableDataRebuildScope.PurificationConfigTable) return RebuildPurificationConfigTable(result, snapshot);
 
             if (scope == TableDataRebuildScope.CharacterSkillTables) return RebuildCharacterTables(result, snapshot);
             if (scope == TableDataRebuildScope.BuildingTable) return RebuildBuildingTable(result, snapshot);
@@ -337,6 +346,10 @@ namespace TableDataEditor
                 snapshot.CorruptionConfigs.ConvertAll(r => r.Id), TableDataPaths.CorruptionConfigAssetPath,
                 TableDataPaths.CorruptionConfigCsvFileName, TableDataColumns.ConfigId, result);
             var corruptionCatalog = ResolveSingleton<CorruptionConfigCatalog>(TableDataPaths.CorruptionConfigCatalogAssetPath, result);
+            var purificationAssets = ResolveTargets<PurificationConfigDefinition>(TableDataPaths.PurificationConfigOutputFolder, c => c.PurificationTypeId,
+                snapshot.PurificationConfigs.ConvertAll(r => r.Id), TableDataPaths.PurificationConfigAssetPath,
+                TableDataPaths.PurificationConfigCsvFileName, TableDataColumns.PurificationTypeId, result);
+            var purificationCatalog = ResolveSingleton<PurificationConfigCatalog>(TableDataPaths.PurificationConfigCatalogAssetPath, result);
 
             AssetDatabase.StartAssetEditing();
             try
@@ -370,6 +383,8 @@ namespace TableDataEditor
                 WritePartyConfigTable(snapshot, partyConfigTargets);
                 foreach (CorruptionConfigRow row in snapshot.CorruptionConfigs) WriteCorruptionConfig(corruptionAssets[row.Id], row);
                 WriteCatalog(corruptionCatalog, "configs", FilterForCatalog(snapshot.CorruptionConfigs, r => r.Enabled, r => r.Id, corruptionAssets));
+                foreach (PurificationConfigRow row in snapshot.PurificationConfigs) WritePurificationConfig(purificationAssets[row.Id], row);
+                WriteCatalog(purificationCatalog, "configs", FilterForCatalog(snapshot.PurificationConfigs, r => r.Enabled, r => r.Id, purificationAssets));
             }
             finally
             {
@@ -392,6 +407,7 @@ namespace TableDataEditor
             recruitmentTargets.MarkDirty();
             partyConfigTargets.MarkDirty();
             corruptionCatalog.MarkDirty();
+            purificationCatalog.MarkDirty();
 
             result.Wrote = true;
             return result;
@@ -418,6 +434,31 @@ namespace TableDataEditor
             var catalog = ResolveSingleton<CorruptionConfigCatalog>(TableDataPaths.CorruptionConfigCatalogAssetPath, result);
             AssetDatabase.StartAssetEditing();
             try { foreach (CorruptionConfigRow row in snapshot.CorruptionConfigs) WriteCorruptionConfig(assets[row.Id], row); WriteCatalog(catalog, "configs", FilterForCatalog(snapshot.CorruptionConfigs, r => r.Enabled, r => r.Id, assets)); }
+            finally { AssetDatabase.StopAssetEditing(); }
+            foreach (var asset in assets.Values) AssetDatabase.SaveAssetIfDirty(asset);
+            AssetDatabase.SaveAssetIfDirty(catalog); catalog.MarkDirty(); result.Wrote = true; return result;
+        }
+
+        private static void WritePurificationConfig(PurificationConfigDefinition asset, PurificationConfigRow row)
+        {
+            var serialized = new SerializedObject(asset);
+            serialized.FindProperty("purificationTypeId").stringValue = row.Id;
+            serialized.FindProperty("requiredBuildingId").stringValue = row.RequiredBuildingId;
+            serialized.FindProperty("purificationIntervalSeconds").intValue = row.IntervalSeconds;
+            serialized.FindProperty("purificationValuePerInterval").intValue = row.ValuePerInterval;
+            serialized.FindProperty("baseSlotCount").intValue = row.BaseSlotCount;
+            serialized.FindProperty("enabled").boolValue = row.Enabled;
+            serialized.ApplyModifiedPropertiesWithoutUndo(); EditorUtility.SetDirty(asset);
+        }
+
+        private static TableDataRebuildResult RebuildPurificationConfigTable(TableDataRebuildResult result, TableDataSnapshot snapshot)
+        {
+            var assets = ResolveTargets<PurificationConfigDefinition>(TableDataPaths.PurificationConfigOutputFolder, c => c.PurificationTypeId,
+                snapshot.PurificationConfigs.ConvertAll(r => r.Id), TableDataPaths.PurificationConfigAssetPath,
+                TableDataPaths.PurificationConfigCsvFileName, TableDataColumns.PurificationTypeId, result);
+            var catalog = ResolveSingleton<PurificationConfigCatalog>(TableDataPaths.PurificationConfigCatalogAssetPath, result);
+            AssetDatabase.StartAssetEditing();
+            try { foreach (PurificationConfigRow row in snapshot.PurificationConfigs) WritePurificationConfig(assets[row.Id], row); WriteCatalog(catalog, "configs", FilterForCatalog(snapshot.PurificationConfigs, r => r.Enabled, r => r.Id, assets)); }
             finally { AssetDatabase.StopAssetEditing(); }
             foreach (var asset in assets.Values) AssetDatabase.SaveAssetIfDirty(asset);
             AssetDatabase.SaveAssetIfDirty(catalog); catalog.MarkDirty(); result.Wrote = true; return result;
@@ -1143,6 +1184,7 @@ namespace TableDataEditor
                 EnsureFolder(TableDataPaths.OutputRoot, "PartyConfig");
             }
             if (TableDataRebuildScopes.IncludesCorruptionConfigTable(scope)) EnsureFolder(TableDataPaths.OutputRoot, "CorruptionConfig");
+            if (TableDataRebuildScopes.IncludesPurificationConfigTable(scope)) EnsureFolder(TableDataPaths.OutputRoot, "PurificationConfig");
         }
 
         private static void EnsureFolder(string parent, string child)
@@ -1600,6 +1642,8 @@ namespace TableDataEditor
             ok &= VerifyFields<CorruptionConfigDefinition>(log, "configId", "maxCorruption", "warningThresholdPercent",
                 "dangerThresholdPercent", "warningStaminaCostMultiplier", "dangerStaminaCostMultiplier", "enabled");
             ok &= VerifyFields<CorruptionConfigCatalog>(log, "configs");
+            ok &= VerifyFields<PurificationConfigDefinition>(log, "purificationTypeId", "requiredBuildingId", "purificationIntervalSeconds", "purificationValuePerInterval", "baseSlotCount", "enabled");
+            ok &= VerifyFields<PurificationConfigCatalog>(log, "configs");
             ok &= VerifyPropertyType<CharacterDefinition>(
                 log, "originWorld", SerializedPropertyType.ObjectReference,
                 "캐릭터의 origin world 칸은 WorldDefinition을 가리키는 참조여야 합니다.");

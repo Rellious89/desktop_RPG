@@ -418,6 +418,11 @@ namespace TableDataEditor
         public int WarningThresholdPercent; public int DangerThresholdPercent;
         public int WarningStaminaCostMultiplier; public int DangerStaminaCostMultiplier; public bool Enabled;
     }
+    public sealed class PurificationConfigRow
+    {
+        public int Line; public string Id = string.Empty; public string RequiredBuildingId = string.Empty;
+        public int IntervalSeconds; public int ValuePerInterval; public int BaseSlotCount; public bool Enabled;
+    }
 
     /// <summary>
     /// 파싱과 검증을 마친 아홉 표. Rebuild는 이 스냅샷만 보고 에셋을 만든다 - CSV를 다시 읽지 않으므로
@@ -457,6 +462,7 @@ namespace TableDataEditor
         /// 순서를 한 칸도 건드리지 않는다.</summary>
         public readonly List<PartyConfigRow> PartyConfigs = new List<PartyConfigRow>();
         public readonly List<CorruptionConfigRow> CorruptionConfigs = new List<CorruptionConfigRow>();
+        public readonly List<PurificationConfigRow> PurificationConfigs = new List<PurificationConfigRow>();
 
         public readonly Dictionary<string, WorldRow> WorldsById = new Dictionary<string, WorldRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, CurrencyRow> CurrenciesById = new Dictionary<string, CurrencyRow>(StringComparer.Ordinal);
@@ -501,5 +507,7 @@ namespace TableDataEditor
             new Dictionary<string, PartyConfigRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, CorruptionConfigRow> CorruptionConfigsById =
             new Dictionary<string, CorruptionConfigRow>(StringComparer.Ordinal);
+        public readonly Dictionary<string, PurificationConfigRow> PurificationConfigsById =
+            new Dictionary<string, PurificationConfigRow>(StringComparer.Ordinal);
     }
 }
