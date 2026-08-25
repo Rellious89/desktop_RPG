@@ -71,7 +71,7 @@ namespace Corruption
             if (service.IsSettlementDue())
             {
                 PurificationResult result = service.Tick();
-                if (result.Success)
+                if (result.Success && result.SettledCount > 0)
                 {
                     CharacterArchivePanel.RequestRefresh(); CharacterSwapPanel.RequestRefresh();
                     Recovery.RecoveryService.NotifyRosterChangedAfterExternalSave();
@@ -87,6 +87,7 @@ namespace Corruption
             if (!result.Success)
             {
                 if (result.Code == PurificationResultCode.MinimumPartySize) ShowToast("66", definition);
+                else if (result.Code == PurificationResultCode.NoPurificationNeeded) ShowToast("67", definition);
                 return;
             }
             CharacterRoster.Instance?.RefreshPartyAfterExternalSave();

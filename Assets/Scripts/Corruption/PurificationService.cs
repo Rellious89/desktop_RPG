@@ -11,7 +11,7 @@ namespace Corruption
     {
         Success, NoSaveData, ConfigurationMissing, ConfigurationInvalid, RequiredBuildingUnavailable,
         InvalidCharacter, NotOwned, InvalidSlot, SlotOccupied, AlreadyInPurification, InRecovery,
-        MinimumPartySize, NothingToStop, CapacityReached, SaveFailed, Reentrant,
+        MinimumPartySize, NothingToStop, CapacityReached, NoPurificationNeeded, SaveFailed, Reentrant,
     }
 
     public readonly struct PurificationResult
@@ -123,7 +123,13 @@ namespace Corruption
                 CharacterDefinition definition = characterCatalog != null ? characterCatalog.Find(slot.characterId) : null;
                 if (config == null || state == null || definition == null) continue;
                 if (!SaveData.TryParseTimestamp(slot.lastCalculatedAtUtc, out DateTime last) || last > now) return true;
-                if (state.currentCorruption <= definition.BaseCorruption) return true;
+                // 이미 하한에 있고 잔여 진행도 정상 정리됐으면 이후에는 저장할 일이 없다.
+                if (state.currentCorruption <= definition.BaseCorruption)
+                {
+                    long cleanedInterval = (long)config.PurificationIntervalSeconds * TimeSpan.TicksPerSecond;
+                    if (slot.progressTicks == 0 && SaveData.TryParseTimestamp(slot.lastCalculatedAtUtc, out _)) continue;
+                    return true;
+                }
                 long interval = (long)config.PurificationIntervalSeconds * TimeSpan.TicksPerSecond;
                 long progress = slot.progressTicks >= 0 && slot.progressTicks < interval ? slot.progressTicks : 0;
                 long elapsed = now.Ticks - last.Ticks;
@@ -174,8 +180,11 @@ namespace Corruption
             if (!IsBuildingCompleted(config.RequiredBuildingId)) return Result(PurificationResultCode.RequiredBuildingUnavailable, slotIndex);
             if (string.IsNullOrEmpty(characterId) || characterCatalog == null || characterCatalog.Find(characterId) == null)
                 return Result(PurificationResultCode.InvalidCharacter, slotIndex);
+            CharacterDefinition definition = characterCatalog.Find(characterId);
             CharacterSaveState state = FindOwned(data.characters, characterId);
             if (state == null) return Result(PurificationResultCode.NotOwned, slotIndex);
+            if (!IsFinite(state.currentCorruption) || state.currentCorruption <= definition.BaseCorruption)
+                return Result(PurificationResultCode.NoPurificationNeeded, slotIndex, null, characterId);
             if (RecoveryStation.IsCharacterIdInSavedSlot(data, characterId)) return Result(PurificationResultCode.InRecovery, slotIndex);
             if (IsCharacterIdInSavedSlot(data, characterId)) return Result(PurificationResultCode.AlreadyInPurification, slotIndex, null, characterId);
 
