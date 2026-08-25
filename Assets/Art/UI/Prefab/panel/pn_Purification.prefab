@@ -1160,10 +1160,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b719e0a7cb0d4f489208dffcbe399db3, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  characterCatalog: {fileID: 0}
-  purificationCatalog: {fileID: 0}
+  characterCatalog: {fileID: 11400000, guid: 5f24823f983054d358a82014246a9fa7, type: 2}
+  purificationCatalog: {fileID: 11400000, guid: afd173c29c0f64786879c5d61da16e11, type: 2}
   slotTemplate: {fileID: 122356830102366415, guid: 996c88ac44feb47ec8b6d970129cd6b8, type: 3}
-  list: {fileID: 0}
+  list: {fileID: 4678408006594043540}
   purificationTypeId: church_prayer
 --- !u!114 &3157206148200646189
 MonoBehaviour:
