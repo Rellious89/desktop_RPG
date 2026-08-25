@@ -3294,6 +3294,53 @@ MonoBehaviour:
   references:
     version: 2
     RefIds: []
+--- !u!114 &468841869
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 468841860}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6f2fa8ab7ea5445d95fa687c30e9b6f0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  fieldModeManager: {fileID: 468841861}
+  transitionSequencer: {fileID: 119946296}
+  stageCamera: {fileID: 2046182837}
+  uiAnchor: {fileID: 96665347}
+  interactionRoot: {fileID: 639766286}
+  interactionParent: {fileID: 597025922}
+  buildButton: {fileID: 1109028176}
+  openInnButton: {fileID: 938732506}
+  constructionTimerRoot: {fileID: 383920116}
+  constructionTimerText: {fileID: 1455773843}
+  constructionTimerAnimator: {fileID: 1787916260}
+  buildingPopup: {fileID: 6072216787366258619}
+  building: {fileID: 11400000, guid: 1bd00f01ce23747939091d0011d08285, type: 2}
+  inventoryManager: {fileID: 1047247884}
+  constructionStartedMessage:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 8970130103984129
+      m_Key: 
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  constructionCompletedMessage:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 8970130103984130
+      m_Key: 
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  references:
+    version: 2
+    RefIds: []
 --- !u!1 &471919068
 GameObject:
   m_ObjectHideFlags: 0
@@ -6583,7 +6630,7 @@ MonoBehaviour:
     m_PressedTrigger: Pressed
     m_SelectedTrigger: Selected
     m_DisabledTrigger: Disabled
-  m_Interactable: 0
+  m_Interactable: 1
   m_TargetGraphic: {fileID: 938732510}
   m_OnClick:
     m_PersistentCalls:
@@ -8538,7 +8585,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d9c06ac5905244d7a2c7219986aa2ad6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  panel: {fileID: 1170337707}
+  panel: {fileID: 7599717200964692829}
 --- !u!114 &1140199827
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8699,6 +8746,20 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1140199824}
   m_CullTransparentMesh: 1
+--- !u!114 &1140199834
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1140199824}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a5036cb8c0b4baf8e512cfd204998f1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  buildingId: 2
+  targetButton: {fileID: 1140199831}
 --- !u!1 &1150935526
 GameObject:
   m_ObjectHideFlags: 0
@@ -13833,6 +13894,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 800551649}
     m_Modifications:
+    - target: {fileID: 901000002, guid: 6ac066483a60d462bac34816f78fc6ce, type: 3}
+      propertyPath: slotTemplate
+      value: 
+      objectReference: {fileID: 901000001, guid: 996c88ac44feb47ec8b6d970129cd6b8, type: 3}
     - target: {fileID: 709224391690657468, guid: 6ac066483a60d462bac34816f78fc6ce, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -16630,6 +16695,17 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 709224391690657468, guid: 6ac066483a60d462bac34816f78fc6ce, type: 3}
   m_PrefabInstance: {fileID: 840273138412528200}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &7599717200964692829 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 901000002, guid: 6ac066483a60d462bac34816f78fc6ce, type: 3}
+  m_PrefabInstance: {fileID: 840273138412528200}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b719e0a7cb0d4f489208dffcbe399db3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!224 &7846166418911978283 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 8180441484297232630, guid: cd664ac1dd1924e679e6fba20020a007, type: 3}
@@ -16801,67 +16877,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e919f886e2908490da73e1855bbc0501, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &468841869
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 468841860}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6f2fa8ab7ea5445d95fa687c30e9b6f0, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  fieldModeManager: {fileID: 468841861}
-  transitionSequencer: {fileID: 119946296}
-  stageCamera: {fileID: 2046182837}
-  uiAnchor: {fileID: 96665347}
-  interactionRoot: {fileID: 639766286}
-  interactionParent: {fileID: 597025922}
-  buildButton: {fileID: 1109028176}
-  openInnButton: {fileID: 938732506}
-  constructionTimerRoot: {fileID: 383920116}
-  constructionTimerText: {fileID: 1455773843}
-  constructionTimerAnimator: {fileID: 1787916260}
-  buildingPopup: {fileID: 6072216787366258619}
-  building: {fileID: 11400000, guid: 1bd00f01ce23747939091d0011d08285, type: 2}
-  inventoryManager: {fileID: 1047247884}
-  constructionStartedMessage:
-    m_TableReference:
-      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
-    m_TableEntryReference:
-      m_KeyId: 8970130103984129
-      m_Key:
-    m_FallbackState: 0
-    m_WaitForCompletion: 0
-    m_LocalVariables: []
-  constructionCompletedMessage:
-    m_TableReference:
-      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
-    m_TableEntryReference:
-      m_KeyId: 8970130103984130
-      m_Key:
-    m_FallbackState: 0
-    m_WaitForCompletion: 0
-    m_LocalVariables: []
-  references:
-    version: 2
-    RefIds: []
---- !u!114 &1140199834
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1140199824}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8a5036cb8c0b4baf8e512cfd204998f1, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  buildingId: 2
-  targetButton: {fileID: 1140199831}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
