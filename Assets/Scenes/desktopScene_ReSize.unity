@@ -13896,10 +13896,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 800551649}
     m_Modifications:
-    - target: {fileID: 901000002, guid: 6ac066483a60d462bac34816f78fc6ce, type: 3}
-      propertyPath: slotTemplate
-      value: 
-      objectReference: {fileID: 901000001, guid: 996c88ac44feb47ec8b6d970129cd6b8, type: 3}
     - target: {fileID: 709224391690657468, guid: 6ac066483a60d462bac34816f78fc6ce, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
