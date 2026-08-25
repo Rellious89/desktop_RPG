@@ -3121,7 +3121,6 @@ MonoBehaviour:
   townFieldRoot: {fileID: 1168728918}
   dungeonFieldRoot: {fileID: 2074681}
   recoveryStationPanel: {fileID: 8395936239265254763}
-  recoveryStationButton: {fileID: 180827937}
 --- !u!114 &468841864
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3135,9 +3134,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   fieldModeManager: {fileID: 468841861}
-  dungeonButton: {fileID: 1249835704}
   returnTownButton: {fileID: 1893651802}
-  returnTownButtonRoot: {fileID: 1893651797}
   safeAreaObject: {fileID: 49654710}
   dangerousAreaObject: {fileID: 74377262}
   transitionRoot: {fileID: 1067788612}
@@ -10575,6 +10572,7 @@ GameObject:
   - component: {fileID: 1441563545}
   - component: {fileID: 1441563547}
   - component: {fileID: 1441563546}
+  - component: {fileID: 1441563548}
   m_Layer: 5
   m_Name: MainMenu
   m_TagString: Untagged
@@ -10639,6 +10637,55 @@ MonoBehaviour:
   autoCollapseDelay: 5
   collapseOnFieldMove: 1
   fieldModeManager: {fileID: 0}
+--- !u!114 &1441563548
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1441563544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9edb2437c5064208b1ae672413b4eeae, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  fieldModeManager: {fileID: 468841861}
+  buttons:
+  - label: 용병 교체
+    buttonRoot: {fileID: 824223291}
+    showInTown: 1
+    showInDungeon: 1
+    panelToCloseWhenHidden: {fileID: 0}
+  - label: 인벤토리
+    buttonRoot: {fileID: 600576599}
+    showInTown: 1
+    showInDungeon: 1
+    panelToCloseWhenHidden: {fileID: 0}
+  - label: 회복소
+    buttonRoot: {fileID: 180827937}
+    showInTown: 1
+    showInDungeon: 0
+    panelToCloseWhenHidden: {fileID: 8395936239265254763}
+  - label: 던전
+    buttonRoot: {fileID: 1249835704}
+    showInTown: 1
+    showInDungeon: 0
+    panelToCloseWhenHidden: {fileID: 5543210792707666732}
+  - label: 마을 복귀
+    buttonRoot: {fileID: 1893651797}
+    showInTown: 0
+    showInDungeon: 1
+    panelToCloseWhenHidden: {fileID: 0}
+  - label: 용병 명부
+    buttonRoot: {fileID: 328858084}
+    showInTown: 1
+    showInDungeon: 0
+    panelToCloseWhenHidden: {fileID: 1170337707}
+  - label: 기도
+    buttonRoot: {fileID: 1140199824}
+    showInTown: 1
+    showInDungeon: 0
+    panelToCloseWhenHidden: {fileID: 7599717200964692829}
 --- !u!4 &1452980433 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4371201966070470695, guid: 8cc938fe21b426a4daedf2f6c7e34c80, type: 3}

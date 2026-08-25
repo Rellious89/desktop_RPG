@@ -9,8 +9,9 @@ namespace Field
 {
     /// <summary>
     /// <see cref="FieldModeManager"/>가 "지금 어디인가"를 바꾸면, 그 말대로 <b>화면의 UI만</b> 그 모습으로
-    /// 만드는 구독자. 전투/몬스터/회복소/필드 루트는 <see cref="FieldModeRuntimeController"/>의 몫이고
-    /// 여기서는 <b>버튼 두 개, 상태 표시 두 개, 진입 연출 하나</b>만 다룬다 - 두 컨트롤러가 같은 이벤트를
+    /// 만드는 구독자. 전투/몬스터/회복소/필드 루트는 <see cref="FieldModeRuntimeController"/>의 몫이고,
+    /// 하단 메뉴 버튼의 표시 여부는 <see cref="FieldModeMenuButtonVisibilityController"/>의 몫이며,
+    /// 여기서는 <b>상태 표시 두 개와 진입 연출 하나</b>만 다룬다 - 세 컨트롤러가 같은 이벤트를
     /// 각자 구독하므로 서로를 참조하지 않고, 한쪽을 떼어내도 다른 쪽이 그대로 돈다.
     ///
     /// <b>모드 판정은 하나도 하지 않는다.</b> 마을인지 던전인지는 매니저만 알고, 이 컴포넌트는
@@ -24,10 +25,10 @@ namespace Field
     /// 드러나야 한다. 참조가 빠져도 전투에는 영향이 없으므로(UI만 담당한다) 빠진 부분만 포기하고 나머지는
     /// 계속 동작한다.
     ///
-    /// <b>버튼을 감추는 것은 언제나 바깥 오브젝트다.</b> btn_* 은 <see cref="DesktopWindow.WindowInputRegion"/>을
-    /// 든 바깥 오브젝트가 안쪽 실제 버튼을 감싸는 구조다 - 안쪽만 끄면 그림은 사라져도 그 사각형이 계속
-    /// 네이티브 마우스 입력을 잡아 바탕화면 클릭 관통을 막는다. 그래서 표시/숨김은 바깥 오브젝트에,
-    /// 클릭 리스너는 안쪽 Button에 건다(같은 오브젝트라면 두 칸에 같은 것을 넣어도 된다).
+    /// <b>메뉴 버튼의 표시 여부는 더 이상 여기서 정하지 않는다.</b> 어느 버튼이 마을/던전에서 보일지는
+    /// <see cref="FieldModeMenuButtonVisibilityController"/>의 Inspector 목록이 혼자 소유한다 - 같은 대상을
+    /// 두 컴포넌트가 껐다 켜면 어느 쪽이 마지막이었는지에 따라 결과가 달라지기 때문이다. 이 컴포넌트가
+    /// 마을 복귀 버튼에 대해 하는 일은 <b>클릭 리스너를 안쪽 Button에 거는 것뿐</b>이다.
     ///
     /// <b>진입 연출의 수명주기는 여기가 소유한다.</b> <see cref="UITweenTransition"/>은 스스로 퇴장하거나
     /// 대상을 끄지 않으므로, 켜기 -> Enter -> 유지 -> Exit -> 끄기를 이 컴포넌트가 코루틴 하나로 관리한다.
@@ -50,19 +51,10 @@ namespace Field
         [SerializeField] private FieldModeManager fieldModeManager;
 
         [Header("Buttons")]
-        [Tooltip("던전 입장 버튼(btn_ReturnTown과 짝이 되는 바깥 오브젝트). 마을에서 보이고 던전에서 숨는다 - " +
-                 "표시/숨김만 제어하며 기존 ModalPanelOpener와 OnClick 설정은 건드리지 않는다. " +
-                 "WindowInputRegion이 붙은 바깥 오브젝트를 연결한다.")]
-        [SerializeField] private GameObject dungeonButton;
-
         [Tooltip("마을 복귀 버튼의 Button. 클릭 리스너를 코드에서 걸어 FieldModeManager.TryReturnToTown()만 " +
-                 "호출한다 - 실제로 눌리는 안쪽 Button을 연결한다.")]
+                 "호출한다 - 실제로 눌리는 안쪽 Button을 연결한다. 이 버튼이 어느 필드에서 보일지는 " +
+                 "FieldModeMenuButtonVisibilityController가 정하므로 여기서는 표시를 건드리지 않는다.")]
         [SerializeField] private Button returnTownButton;
-
-        [Tooltip("마을 복귀 버튼에서 <b>켜고 끌</b> 오브젝트(WindowInputRegion이 붙은 바깥 오브젝트). " +
-                 "비워두면 위 Button의 GameObject를 쓴다 - 다만 안쪽만 끄면 그 사각형이 계속 네이티브 마우스 " +
-                 "입력을 잡으므로, 감싸는 오브젝트가 따로 있으면 그쪽을 연결한다.")]
-        [SerializeField] private GameObject returnTownButtonRoot;
 
         [Header("Field Status Indicator")]
         [Tooltip("안전 지대 표시(lb_SafeArea) 오브젝트. 마을에서만 켠다 - 문구 로컬라이징은 이 오브젝트에 " +
@@ -219,11 +211,6 @@ namespace Field
                 Debug.LogError($"[FieldModeUIController] '{name}': Field Mode Manager가 연결되지 않았습니다 - " +
                                "모드 전환을 따라갈 수 없어 UI가 마을 상태에서 멈춥니다.", this);
             }
-            if (dungeonButton == null)
-            {
-                Debug.LogWarning($"[FieldModeUIController] '{name}': Dungeon Button이 연결되지 않아 던전에서 " +
-                                 "입장 버튼을 숨기지 못합니다 - Inspector에서 btn_Dungeon을 연결하세요.", this);
-            }
             if (returnTownButton == null)
             {
                 Debug.LogWarning($"[FieldModeUIController] '{name}': Return Town Button이 연결되지 않아 마을 복귀 " +
@@ -279,24 +266,18 @@ namespace Field
             PlayFieldTransition(mode, dungeon);
         }
 
-        /// <summary>버튼과 상태 표시를 모드에 맞춘다. 연출과 달리 <b>상태를 그대로 반영하기만 하므로</b>
-        /// 몇 번을 다시 불러도 결과가 같다.</summary>
+        /// <summary>상태 표시를 모드에 맞춘다. 연출과 달리 <b>상태를 그대로 반영하기만 하므로</b>
+        /// 몇 번을 다시 불러도 결과가 같다.
+        ///
+        /// <b>메뉴 버튼은 여기서 건드리지 않는다.</b> 어느 버튼이 어느 필드에서 보일지는
+        /// <see cref="FieldModeMenuButtonVisibilityController"/>의 Inspector 목록이 혼자 정한다 - 같은
+        /// 대상을 두 곳에서 껐다 켜면 어느 쪽이 마지막이었는지에 따라 결과가 달라지기 때문이다.</summary>
         private void SyncStaticUI(FieldMode mode)
         {
             bool inTown = mode == FieldMode.Town;
 
-            SetActiveIfNeeded(dungeonButton, inTown);
-            SetActiveIfNeeded(ResolveReturnTownRoot(), !inTown);
             SetActiveIfNeeded(safeAreaObject, inTown);
             SetActiveIfNeeded(dangerousAreaObject, !inTown);
-        }
-
-        /// <summary>마을 복귀 버튼에서 실제로 켜고 끌 오브젝트. 감싸는 오브젝트를 연결했으면 그쪽을,
-        /// 비워뒀으면 Button의 GameObject를 쓴다.</summary>
-        private GameObject ResolveReturnTownRoot()
-        {
-            if (returnTownButtonRoot != null) return returnTownButtonRoot;
-            return returnTownButton != null ? returnTownButton.gameObject : null;
         }
 
         /// <summary>

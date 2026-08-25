@@ -27,13 +27,13 @@ namespace Field
     ///   2. 몬스터 대기열을 접는다 - Current/Standby가 이벤트 없이 정리되고 화면에서 사라진다.
     ///   3. <b>대기열이 안전하게 접힌 뒤에</b> 화면을 바꾼다: Dungeon 끄기 -> Common 켜기 -> Town 켜기.
     ///   4. 콤보를 끊는다(타임아웃으로 끊긴 것과 같은 경로).
-    ///   5. 회복소 입구 버튼을 보이게 한다.
     ///
     /// <b>던전 적용 순서</b>(성공이 확인되기 전에는 절대 열지 않는다):
     ///   1. 전투/입력은 계속 꺼둔 채로 시작한다.
     ///   2. 남아 있던 이전 전투를 먼저 접는다.
     ///   3. 화면을 바꾼다: Common 켜기 -> Town 끄기 -> Dungeon 켜기.
-    ///   4. 열려 있는 회복소 패널을 닫고 입구 버튼을 숨긴다.
+    ///   4. 열려 있는 회복소 패널을 닫는다(입구 버튼의 표시 여부는 이 컴포넌트의 몫이 아니다 -
+    ///      메뉴 버튼은 FieldModeMenuButtonVisibilityController가 혼자 소유한다).
     ///   5. 던전 루트가 <b>실제로</b> 살아났는지 activeInHierarchy로 확인한다 - 꺼진 부모 밑이라 켜지지
     ///      않았다면 오류를 남기고 전투를 닫은 채, 대기열도 접힌 채로 끝낸다.
     ///   6. 그 확인을 통과한 뒤에야 선택한 던전의 몬스터로 대기열을 연다.
@@ -88,10 +88,6 @@ namespace Field
         [Header("Recovery Station (선택)")]
         [Tooltip("회복소 패널(pn_RecoveryStation). 던전에 들어갈 때 열려 있으면 닫는다 - 비워두면 닫지 않는다.")]
         [SerializeField] private RecoveryStationPanel recoveryStationPanel;
-
-        [Tooltip("회복소 입구 버튼(btn_RecoveryStation) 오브젝트. 마을에서 보이고 던전에서 숨는다 - " +
-                 "이름으로 찾지 않으므로 반드시 직접 연결한다. 비워두면 버튼을 숨기지 못한다는 경고만 남는다.")]
-        [SerializeField] private GameObject recoveryStationButton;
 
         /// <summary>가장 마지막으로 <b>적용을 끝낸</b> 모드. 아직 한 번도 적용하지 않았어도 마을이다
         /// (매니저의 시작값과 같다).</summary>
@@ -258,11 +254,6 @@ namespace Field
             LogIfSameRoot(commonFieldRoot, "Common Field Root", dungeonFieldRoot, "Dungeon Field Root");
             LogIfSameRoot(townFieldRoot, "Town Field Root", dungeonFieldRoot, "Dungeon Field Root");
 
-            if (recoveryStationButton == null)
-            {
-                Debug.LogWarning($"[FieldModeRuntimeController] '{name}': 회복소 입구 버튼이 연결되지 않아 " +
-                                 "던전에서 버튼을 숨기지 못합니다 - Inspector에서 btn_RecoveryStation을 연결하세요.", this);
-            }
             if (recoveryStationPanel == null)
             {
                 Debug.LogWarning($"[FieldModeRuntimeController] '{name}': 회복소 패널이 연결되지 않아 던전 입장 " +
@@ -310,7 +301,7 @@ namespace Field
         }
 
         /// <summary>마을. 공격이 성립할 수 있는 것부터 닫고, 몬스터가 안전하게 정리된 <b>뒤에</b> 화면을
-        /// 마을 구성으로 바꾼 다음, 마지막에 회복소를 열어준다.
+        /// 마을 구성으로 바꾼다.
         /// <b>어떤 처치/보상/행동력 이벤트도 만들지 않는다</b> - 몬스터 정리는 전부 이벤트 없는 경로다.</summary>
         private void ApplyTown()
         {
@@ -334,9 +325,6 @@ namespace Field
 
             // 4. 타격 흐름이 끊겼으므로 콤보도 함께 끊는다(타임아웃과 같은 경로라 표시도 평소와 같다).
             ComboManager.ResetCombo();
-
-            // 5. 마을에서는 회복소를 쓸 수 있어야 한다(패널은 사용자가 직접 연다 - 여기서 열지 않는다).
-            SetRecoveryButtonVisible(true);
 
             AppliedMode = FieldMode.Town;
             AppliedDungeon = null;
@@ -367,7 +355,7 @@ namespace Field
             SetRootActive(townFieldRoot, false);
             SetRootActive(dungeonFieldRoot, true);
 
-            // 4. 던전에서는 회복소를 쓸 수 없다. 열려 있으면 닫고 입구 버튼을 숨긴다.
+            // 4. 던전에서는 회복소를 쓸 수 없다. 열려 있으면 닫는다(입구 버튼은 메뉴 표시 컨트롤러가 숨긴다).
             CloseRecoveryStation();
 
             // 5. <b>루트가 진짜로 켜졌는지</b> activeSelf가 아니라 activeInHierarchy로 확인한다 - 꺼진
@@ -451,24 +439,18 @@ namespace Field
             if (playerAnimator != null) playerAnimator.SetCombatEnabled(value);
         }
 
-        /// <summary>열려 있는 회복소 패널을 닫고 입구 버튼을 숨긴다 - 이미 닫혀 있으면 다시 닫지 않는다
-        /// (기존 공개 API인 <see cref="ModalPanel.Close"/>만 쓰고 패널 내부 규칙은 건드리지 않는다).</summary>
+        /// <summary>열려 있는 회복소 패널을 닫는다 - 이미 닫혀 있으면 다시 닫지 않는다(기존 공개 API인
+        /// <see cref="ModalPanel.Close"/>만 쓰고 패널 내부 규칙은 건드리지 않는다).
+        ///
+        /// <b>입구 버튼은 여기서 건드리지 않는다.</b> 버튼의 표시 여부는
+        /// <see cref="Common.FieldModeMenuButtonVisibilityController"/>의 Inspector 목록이 혼자 소유한다 -
+        /// 이 처리는 "던전에 들어갈 때 마을 패널이 화면에 남지 않게 한다"는 안전장치로만 남겨둔다.</summary>
         private void CloseRecoveryStation()
         {
             if (recoveryStationPanel != null && recoveryStationPanel.gameObject.activeSelf)
             {
                 recoveryStationPanel.Close();
             }
-
-            SetRecoveryButtonVisible(false);
-        }
-
-        private void SetRecoveryButtonVisible(bool visible)
-        {
-            if (recoveryStationButton == null) return;
-            if (recoveryStationButton.activeSelf == visible) return;
-
-            recoveryStationButton.SetActive(visible);
         }
 
         /// <summary>마을로 돌아가기를 요청한다 - 판정과 이벤트 발행은 전부
