@@ -3066,6 +3066,7 @@ GameObject:
   - component: {fileID: 468841866}
   - component: {fileID: 468841867}
   - component: {fileID: 468841868}
+  - component: {fileID: 468841869}
   m_Layer: 0
   m_Name: FieldSystem
   m_TagString: Untagged
@@ -3551,7 +3552,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 597025922}
-  - component: {fileID: 901000003}
   m_Layer: 5
   m_Name: Interaction_Church
   m_TagString: Untagged
@@ -5953,20 +5953,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 870500495}
   m_CullTransparentMesh: 1
---- !u!114 &901000003
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 597025921}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 50f08989a5004557bff884d9973cb1a5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  panel: {fileID: 0}
-  buildingId: 2
 --- !u!1 &905645345
 GameObject:
   m_ObjectHideFlags: 0
@@ -6597,7 +6583,7 @@ MonoBehaviour:
     m_PressedTrigger: Pressed
     m_SelectedTrigger: Selected
     m_DisabledTrigger: Disabled
-  m_Interactable: 1
+  m_Interactable: 0
   m_TargetGraphic: {fileID: 938732510}
   m_OnClick:
     m_PersistentCalls:
@@ -8373,7 +8359,7 @@ GameObject:
   - component: {fileID: 1109028176}
   - component: {fileID: 1109028175}
   m_Layer: 5
-  m_Name: btn_Build
+  m_Name: btn_Build_Church
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -8511,6 +8497,7 @@ GameObject:
   - component: {fileID: 1140199828}
   - component: {fileID: 1140199827}
   - component: {fileID: 1140199826}
+  - component: {fileID: 1140199834}
   m_Layer: 5
   m_Name: btn_Purification
   m_TagString: Untagged
@@ -16814,6 +16801,67 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e919f886e2908490da73e1855bbc0501, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &468841869
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 468841860}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6f2fa8ab7ea5445d95fa687c30e9b6f0, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  fieldModeManager: {fileID: 468841861}
+  transitionSequencer: {fileID: 119946296}
+  stageCamera: {fileID: 2046182837}
+  uiAnchor: {fileID: 96665347}
+  interactionRoot: {fileID: 639766286}
+  interactionParent: {fileID: 597025922}
+  buildButton: {fileID: 1109028176}
+  openInnButton: {fileID: 938732506}
+  constructionTimerRoot: {fileID: 383920116}
+  constructionTimerText: {fileID: 1455773843}
+  constructionTimerAnimator: {fileID: 1787916260}
+  buildingPopup: {fileID: 6072216787366258619}
+  building: {fileID: 11400000, guid: 1bd00f01ce23747939091d0011d08285, type: 2}
+  inventoryManager: {fileID: 1047247884}
+  constructionStartedMessage:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 8970130103984129
+      m_Key:
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  constructionCompletedMessage:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 8970130103984130
+      m_Key:
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  references:
+    version: 2
+    RefIds: []
+--- !u!114 &1140199834
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1140199824}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a5036cb8c0b4baf8e512cfd204998f1, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  buildingId: 2
+  targetButton: {fileID: 1140199831}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

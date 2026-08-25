@@ -21,6 +21,17 @@ namespace Corruption
         private PurificationService service;
         private float refreshElapsed;
 
+        protected override void OnEnable()
+        {
+            // 하단 버튼 게이트를 우회해 직접 Open()을 호출해도 미완공 교회에서는 패널을 열지 않는다.
+            if (!IsBuildingComplete("2"))
+            {
+                gameObject.SetActive(false);
+                return;
+            }
+            base.OnEnable();
+        }
+
         protected override void OnModalOpened()
         {
             ResolveReferences();
