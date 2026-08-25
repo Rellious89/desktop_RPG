@@ -19,6 +19,7 @@ namespace Corruption
         [SerializeField] private string purificationTypeId = "church_prayer";
         private readonly List<PurificationSlotView> slots = new List<PurificationSlotView>();
         private PurificationService service;
+        private float refreshElapsed;
 
         protected override void OnModalOpened()
         {
@@ -38,24 +39,59 @@ namespace Corruption
                 CharacterDefinition definition = slot != null && slot.HasCharacter && characterCatalog != null ? characterCatalog.Find(slot.characterId) : null;
                 CharacterSaveState state = FindState(data, slot != null ? slot.characterId : null);
                 service.TryGetRemainingTime(i, out TimeSpan remaining);
-                slots[i].Refresh(definition, state != null ? state.currentCorruption : 0d, remaining);
+                slots[i].Refresh(definition, state != null ? state.currentCorruption : 0d,
+                    definition != null ? definition.BaseCorruption : 0d, remaining);
             }
+        }
+
+        protected override void OnModalClosed()
+        {
+            refreshElapsed = 0f;
+            for (int i = 0; i < slots.Count; i++) slots[i].ResetProgressVisuals();
+        }
+
+        private void Update()
+        {
+            if (service == null || !gameObject.activeInHierarchy) return;
+            refreshElapsed += Time.unscaledDeltaTime;
+            if (refreshElapsed < 0.2f) return;
+            refreshElapsed = 0f;
+            // 정산 경계에서만 최대 한 번 저장한다. 나머지 표시는 읽기 전용 계산이다.
+            if (service.IsSettlementDue())
+            {
+                PurificationResult result = service.Tick();
+                if (result.Success)
+                {
+                    CharacterArchivePanel.RequestRefresh(); CharacterSwapPanel.RequestRefresh();
+                    Recovery.RecoveryService.NotifyRosterChangedAfterExternalSave();
+                }
+            }
+            RefreshContents();
         }
 
         public void Register(int slotIndex, CharacterDefinition definition)
         {
             if (service == null || definition == null) return;
             PurificationResult result = service.TryRegister(purificationTypeId, definition.CharacterId, slotIndex);
-            if (!result.Success) return;
+            if (!result.Success)
+            {
+                if (result.Code == PurificationResultCode.MinimumPartySize) ShowToast("66", definition);
+                return;
+            }
             CharacterRoster.Instance?.RefreshPartyAfterExternalSave();
             CharacterArchivePanel.RequestRefresh(); CharacterSwapPanel.RequestRefresh(); Recovery.RecoveryService.NotifyRosterChangedAfterExternalSave();
+            if (!string.IsNullOrEmpty(result.PreviousCharacterId)) ShowToast("64", characterCatalog != null ? characterCatalog.Find(result.PreviousCharacterId) : null);
+            ShowToast("63", definition);
             RefreshContents();
         }
 
         public void Stop(int slotIndex)
         {
-            if (service == null || !service.TryStop(slotIndex).Success) return;
+            if (service == null) return;
+            PurificationResult result = service.TryStop(slotIndex);
+            if (!result.Success) return;
             CharacterArchivePanel.RequestRefresh(); CharacterSwapPanel.RequestRefresh(); Recovery.RecoveryService.NotifyRosterChangedAfterExternalSave();
+            ShowToast("64", characterCatalog != null ? characterCatalog.Find(result.CharacterId) : null);
             RefreshContents();
         }
 
@@ -102,5 +138,12 @@ namespace Corruption
             return false;
         }
         private static CharacterSaveState FindState(SaveData data, string id) { if (data == null || data.characters == null) return null; for (int i = 0; i < data.characters.Count; i++) if (data.characters[i] != null && data.characters[i].characterId == id) return data.characters[i]; return null; }
+        private static void ShowToast(string key, CharacterDefinition definition)
+        {
+            if (ToastManager.Instance == null) return;
+            var text = new LocalizedTextReference { TableReference = "01_UI", TableEntryReference = key };
+            string localized = text.GetLocalizedString(definition != null ? CharacterNameBinding.GetCurrent(definition) : string.Empty);
+            if (!string.IsNullOrEmpty(localized) && !localized.StartsWith("No translation found", StringComparison.Ordinal)) ToastManager.Instance.Show(localized);
+        }
     }
 }
