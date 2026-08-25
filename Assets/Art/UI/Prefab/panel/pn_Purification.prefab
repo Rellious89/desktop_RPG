@@ -57,8 +57,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
@@ -1119,6 +1119,7 @@ GameObject:
   - component: {fileID: 709224391690657468}
   - component: {fileID: 3157206148200646189}
   - component: {fileID: 1589885604314096264}
+  - component: {fileID: 901000002}
   m_Layer: 5
   m_Name: pn_Purification
   m_TagString: Untagged
@@ -1147,6 +1148,23 @@ RectTransform:
   m_AnchoredPosition: {x: 342, y: -159}
   m_SizeDelta: {x: 300, y: 215}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &901000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7627918990978595077}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b719e0a7cb0d4f489208dffcbe399db3, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  characterCatalog: {fileID: 0}
+  purificationCatalog: {fileID: 0}
+  slotTemplate: {fileID: 122356830102366415, guid: 996c88ac44feb47ec8b6d970129cd6b8, type: 3}
+  list: {fileID: 0}
+  purificationTypeId: church_prayer
 --- !u!114 &3157206148200646189
 MonoBehaviour:
   m_ObjectHideFlags: 0
