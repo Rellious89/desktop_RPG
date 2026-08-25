@@ -17,7 +17,7 @@ namespace Corruption
         [SerializeField] private int slotIndex;
         private PurificationPanel panel;
         private GameObject enabledItem, disabledItem;
-        private Image portrait;
+        [SerializeField] private Image portrait;
         private TMP_Text nameText, percentText, timerText;
         private Button stopButton;
         private readonly List<CellImage> currentCells = new List<CellImage>(CellCount);
@@ -38,7 +38,7 @@ namespace Corruption
         private void Awake()
         {
             enabledItem = Find("item_Party_enable"); disabledItem = Find("item_Party_disable");
-            portrait = FindComponent<Image>("portrait"); nameText = FindComponent<TMP_Text>("lb_CharacterName");
+            nameText = FindComponent<TMP_Text>("lb_CharacterName");
             percentText = FindComponent<TMP_Text>("lb_percent"); timerText = FindComponent<TMP_Text>("lb_RemainingTime");
             stopButton = FindComponent<Button>("btn_archive");
             BuildCells();
@@ -63,6 +63,7 @@ namespace Corruption
             SetActive(enabledItem, occupied); SetActive(disabledItem, !occupied);
             if (!occupied)
             {
+                if (portrait != null) portrait.sprite = null;
                 if (percentText != null) percentText.text = string.Empty;
                 if (timerText != null) timerText.text = string.Empty;
                 ResetProgressVisuals();

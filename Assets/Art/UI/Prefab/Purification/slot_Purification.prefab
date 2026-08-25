@@ -257,6 +257,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   slotIndex: 0
+  portrait: {fileID: 8463384006490957965}
 --- !u!1 &146561666822537580
 GameObject:
   m_ObjectHideFlags: 0

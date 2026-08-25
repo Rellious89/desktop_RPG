@@ -200,7 +200,8 @@ namespace CommonEditor.Save
                 return "완성 시각 알 수 없음";
             }
 
-            return nowUtc >= completeUtc ? "완료" : "건설 중";
+            if (nowUtc < completeUtc) return "건설 중";
+            return record.completionNotified ? "완료" : "완료 확인 대기";
         }
 
         private void DrawCharacterSection(SaveData data, bool sectionActive)
@@ -463,6 +464,8 @@ namespace CommonEditor.Save
         private string DescribeBuilding(string buildingId)
         {
             if (string.IsNullOrEmpty(buildingId)) return "(빈 buildingId)";
+            if (buildingId == "1") return "여관 (1)";
+            if (buildingId == "2") return "교회 (2)";
 
             if (buildingsById != null && buildingsById.TryGetValue(buildingId, out BuildingDefinition def) && def != null)
             {
