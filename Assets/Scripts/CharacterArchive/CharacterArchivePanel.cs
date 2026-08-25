@@ -42,13 +42,27 @@ namespace CharacterArchive
         private readonly List<PartySlotView> partySlots = new List<PartySlotView>();
         private PartyCompositionService partyService;
         private bool ownedOnly;
+        private bool rightPanelOpen;
+        private bool pendingRefresh;
         private CharacterDefinition selected;
         private LocalizedTextReference boundCountFormat;
         private static CharacterArchivePanel openInstance;
 
         public static void RequestRefresh()
         {
-            if (openInstance != null) openInstance.RefreshContents();
+            if (openInstance != null) openInstance.RequestDeferredRefresh();
+        }
+
+        private void Update()
+        {
+            if (!pendingRefresh || CharacterArchiveDragPreview.HasActivePreview) return;
+            pendingRefresh = false;
+            RefreshContents();
+        }
+        private void RequestDeferredRefresh()
+        {
+            if (CharacterArchiveDragPreview.HasActivePreview) { pendingRefresh = true; return; }
+            RefreshContents();
         }
 
         protected override void OnModalOpened()
@@ -80,7 +94,7 @@ namespace CharacterArchive
             SaveData data = SaveSystem.Data;
             var owned = new OwnedCharacterCollection(catalog, data);
             IReadOnlyList<CharacterDefinition> source = ownedOnly ? owned.OwnedCharacters : owned.AllCharacters;
-            if (selected != null && !Contains(source, selected.CharacterId)) selected = null;
+            if (selected != null && !Contains(source, selected.CharacterId)) { selected = null; rightPanelOpen = false; }
 
             EnsureCardCount(source.Count);
             CharacterDefinition current = CharacterRoster.Instance != null ? CharacterRoster.Instance.Current : null;
@@ -92,11 +106,11 @@ namespace CharacterArchive
             }
             for (int i = source.Count; i < cards.Count; i++) cards[i].gameObject.SetActive(false);
 
-            SetActive(rightPanel, selected != null);
-            SetActive(expandRightButton != null ? expandRightButton.gameObject : null, selected != null && (rightPanel == null || !rightPanel.activeSelf));
+            SetActive(rightPanel, selected != null && rightPanelOpen);
+            SetActive(expandRightButton != null ? expandRightButton.gameObject : null, selected != null && !rightPanelOpen);
             if (detailCard != null)
             {
-                SetActive(detailCard.gameObject, selected != null);
+                SetActive(detailCard.gameObject, selected != null && rightPanelOpen);
                 if (selected != null) detailCard.Bind(selected, data, current, false, null, false);
             }
             RefreshBookmarks();
@@ -138,9 +152,9 @@ namespace CharacterArchive
         private static void Remove(Button button, UnityEngine.Events.UnityAction action) { if (button != null) button.onClick.RemoveListener(action); }
         private void ShowAll() { if (!ownedOnly) return; ownedOnly = false; RefreshContents(); }
         private void ShowOwned() { if (ownedOnly) return; ownedOnly = true; RefreshContents(); }
-        private void CloseRight() { SetActive(rightPanel, false); SetActive(expandRightButton != null ? expandRightButton.gameObject : null, selected != null); }
-        private void OpenRight() { if (selected == null) return; SetActive(rightPanel, true); SetActive(expandRightButton != null ? expandRightButton.gameObject : null, false); }
-        private void SelectCard(CharacterArchiveCardView card) { selected = card != null ? card.Definition : null; OpenRight(); RefreshContents(); }
+        private void CloseRight() { rightPanelOpen = false; RefreshContents(); }
+        private void OpenRight() { if (selected == null) return; rightPanelOpen = true; RefreshContents(); }
+        private void SelectCard(CharacterArchiveCardView card) { selected = card != null ? card.Definition : null; rightPanelOpen = selected != null; RefreshContents(); }
         private void HandleRosterChanged(CharacterDefinition _) => RefreshContents();
         private void HandleRecoverySlotsChanged() => RefreshContents();
 
