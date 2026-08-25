@@ -298,6 +298,11 @@ MonoBehaviour:
       \uD544\uC694\uD569\uB2C8\uB2E4."
     m_Metadata:
       m_Items: []
+  - m_Id: 10163047174758400
+    m_Localized: "{0} \uC6A9\uBCD1\uC740 \uAE30\uB3C4\uAC00 \uD544\uC694\uD558\uC9C0
+      \uC54A\uC2B5\uB2C8\uB2E4."
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
