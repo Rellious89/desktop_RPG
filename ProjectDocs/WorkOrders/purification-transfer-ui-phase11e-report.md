@@ -14,9 +14,9 @@
 ## 검증
 
 - `git diff --check` 통과.
-- 서비스 집중 테스트는 점유 슬롯 교체와 파티 이동 단언을 추가했다.
-- Unity 배치 컴파일 및 집중 EditMode 실행은 완료하지 못했다. 사용자 Unity Editor 프로세스가 이 프로젝트를 열고 있어 같은 프로젝트의 배치 실행이 잠금 오류로 거부됐으며, 해당 프로세스를 종료하거나 잠금을 해제하지 않았다.
-- 현재 열려 있는 Unity의 AssetImportWorker 로그에는 이번 정화 C# 파일의 `error CS` 항목이 없었으나, 이는 배치 검증을 대체하지 않는다.
+- Unity EditMode `CorruptionEditor.Tests.PurificationServiceTests`: 10/10 통과. 점유 슬롯 교체, 파티 이동, 저장 실패·예외 복구를 포함한다.
+- Unity 배치 실행에서 C# 컴파일 오류 0. 사용자 Unity Editor를 종료한 뒤에 실행했으며, 이 프로젝트의 다른 프로세스를 종료하거나 변경하지 않았다.
+- `pn_Purification` 및 `slot_Purification` 프리팹은 배치 프로젝트 로드 중 정상 import됐다.
 
 ## 보존 및 제한
 
