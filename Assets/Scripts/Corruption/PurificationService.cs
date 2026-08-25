@@ -77,7 +77,60 @@ namespace Corruption
         {
             return Change(() => MoveToPartyInternal(characterId, targetSlotIndex, partyCapacity));
         }
+
+        /// <summary>회복소의 저장 트랜잭션 안에서 기도 슬롯을 정산·비우기 위한 준비 단계다.
+        /// 저장은 호출자가 한 번만 수행하며, 실패하면 반환된 사본으로 원상복구한다.</summary>
+        public bool TryPrepareRecoveryTransfer(IReadOnlyList<string> characterIds, out RecoveryTransferSnapshot snapshot)
+        {
+            snapshot = null;
+            SaveData data = dataProvider();
+            if (data == null || characterIds == null || characterIds.Count == 0) return data != null;
+            List<PurificationSlotSaveState> changedSlots = CloneSlots(data.purificationSlots);
+            var changes = new List<CorruptionChange>();
+            DateTime now = UtcNow();
+            for (int i = 0; i < characterIds.Count; i++)
+            {
+                int index = IndexOfSavedSlot(data, characterIds[i]);
+                if (index < 0) continue;
+                PurificationSlotSaveState slot = data.purificationSlots[index];
+                PurificationConfigDefinition config = ResolveConfig(slot.purificationTypeId, out _);
+                CharacterSaveState state = FindOwned(data.characters, slot.characterId);
+                CharacterDefinition definition = characterCatalog != null ? characterCatalog.Find(slot.characterId) : null;
+                if (config == null || state == null || definition == null) return false;
+                TrackOriginal(changes, state, state.currentCorruption);
+                Settle(changedSlots[index], state, definition, config, now);
+                changedSlots[index].Clear();
+            }
+            if (changes.Count == 0) return true;
+            snapshot = new RecoveryTransferSnapshot(data.purificationSlots, changes);
+            data.purificationSlots = changedSlots;
+            return true;
+        }
         public PurificationResult Tick() => Change(TickInternal);
+
+        /// <summary>UI 폴링용 경계 판정. 저장이나 상태 변경은 하지 않으며, true일 때만 Tick을 호출한다.</summary>
+        public bool IsSettlementDue()
+        {
+            SaveData data = dataProvider();
+            if (data == null || data.purificationSlots == null) return false;
+            DateTime now = UtcNow();
+            for (int i = 0; i < data.purificationSlots.Count; i++)
+            {
+                PurificationSlotSaveState slot = data.purificationSlots[i];
+                if (slot == null || !slot.HasCharacter) continue;
+                PurificationConfigDefinition config = ResolveConfig(slot.purificationTypeId, out _);
+                CharacterSaveState state = FindOwned(data.characters, slot.characterId);
+                CharacterDefinition definition = characterCatalog != null ? characterCatalog.Find(slot.characterId) : null;
+                if (config == null || state == null || definition == null) continue;
+                if (!SaveData.TryParseTimestamp(slot.lastCalculatedAtUtc, out DateTime last) || last > now) return true;
+                if (state.currentCorruption <= definition.BaseCorruption) return true;
+                long interval = (long)config.PurificationIntervalSeconds * TimeSpan.TicksPerSecond;
+                long progress = slot.progressTicks >= 0 && slot.progressTicks < interval ? slot.progressTicks : 0;
+                long elapsed = now.Ticks - last.Ticks;
+                if (elapsed >= interval - progress) return true;
+            }
+            return false;
+        }
 
         /// <summary>화면 전용 남은 시간 조회. 저장 슬롯을 고치거나 저장하지 않으므로 매 프레임 호출해도 된다.</summary>
         public bool TryGetRemainingTime(int slotIndex, out TimeSpan remaining)
@@ -393,7 +446,20 @@ namespace Corruption
                                                  string characterId = null, int settled = 0) =>
             new PurificationResult(code, slot, previousCharacterId, characterId, settled);
 
-        private readonly struct CorruptionChange { public readonly CharacterSaveState State; public readonly double Old; public CorruptionChange(CharacterSaveState state, double old) { State = state; Old = old; } }
+        public readonly struct CorruptionChange { public readonly CharacterSaveState State; public readonly double Old; public CorruptionChange(CharacterSaveState state, double old) { State = state; Old = old; } }
+        public sealed class RecoveryTransferSnapshot
+        {
+            private readonly List<PurificationSlotSaveState> originalSlots;
+            private readonly List<CorruptionChange> changes;
+            internal RecoveryTransferSnapshot(List<PurificationSlotSaveState> originalSlots, List<CorruptionChange> changes)
+            { this.originalSlots = originalSlots; this.changes = changes; }
+            public void Rollback(SaveData data)
+            {
+                if (data == null) return;
+                data.purificationSlots = originalSlots;
+                for (int i = 0; i < changes.Count; i++) changes[i].State.currentCorruption = changes[i].Old;
+            }
+        }
         private readonly struct SlotSnapshot
         {
             private readonly string type, character, last; private readonly long progress;

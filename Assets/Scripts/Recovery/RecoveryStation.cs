@@ -39,6 +39,7 @@ namespace Recovery
         private readonly Func<bool> saveAction;
         private readonly Func<DateTime> utcNowProvider;
         private readonly RecoveryBalance balance;
+        private readonly PurificationService purificationService;
 
         // 시작 전 대기(PendingRecovery). 인덱스가 곧 슬롯 번호이며 저장하지 않는다.
         private readonly CharacterDefinition[] pendingBySlot;
@@ -88,7 +89,8 @@ namespace Recovery
                                IRecoveryWallet wallet,
                                Func<SaveData> dataProvider,
                                Func<bool> saveAction,
-                               Func<DateTime> utcNowProvider)
+                               Func<DateTime> utcNowProvider,
+                               PurificationService purificationService = null)
         {
             this.balance = balance;
             this.roster = roster ?? throw new ArgumentNullException(nameof(roster));
@@ -96,6 +98,7 @@ namespace Recovery
             this.dataProvider = dataProvider ?? throw new ArgumentNullException(nameof(dataProvider));
             this.saveAction = saveAction ?? throw new ArgumentNullException(nameof(saveAction));
             this.utcNowProvider = utcNowProvider ?? throw new ArgumentNullException(nameof(utcNowProvider));
+            this.purificationService = purificationService;
 
             SlotCount = balance.MaxSlots > 0 ? balance.MaxSlots : SaveData.DefaultRecoverySlotCount;
             pendingBySlot = new CharacterDefinition[SlotCount];
@@ -444,6 +447,17 @@ namespace Recovery
                 return RecoveryStartResult.Failure(RecoveryStartResultCode.InsufficientFunds, totalCost, walletBalance);
             }
 
+            // 기도 중 대기는 여기서만 실제 회복으로 옮긴다. Pending만으로는 이 호출에 오지 않으므로
+            // 취소해도 기도 상태가 그대로 남는다.
+            var purificationIds = new List<string>();
+            for (int i = 0; i < startSlotBuffer.Count; i++) purificationIds.Add(roster.GetCharacterId(pendingBySlot[startSlotBuffer[i]]));
+            PurificationService.RecoveryTransferSnapshot purificationSnapshot = null;
+            if (purificationService != null && !purificationService.TryPrepareRecoveryTransfer(purificationIds, out purificationSnapshot))
+            {
+                wallet.RefundWithoutSave(totalCost);
+                return RecoveryStartResult.Failure(RecoveryStartResultCode.InvalidCharacterState, totalCost, walletBalance);
+            }
+
             // h. 전원 같은 시작 시각. 완료 시각만 부족 행동력에 따라 각자 다르다.
             DateTime startedAtUtc = utcNowProvider().ToUniversalTime();
             string startedAtText = FormatUtc(startedAtUtc);
@@ -467,13 +481,19 @@ namespace Recovery
             }
 
             // i. 저장 한 번. 실패하면 여기까지의 메모리 변경을 전부 되돌린다.
-            if (!saveAction())
+            SaveMetadataSnapshot metadata = SaveMetadataSnapshot.Capture(dataProvider());
+            bool saved;
+            try { saved = saveAction(); }
+            catch { saved = false; }
+            if (!saved)
             {
                 for (int i = 0; i < startSlotBuffer.Count; i++)
                 {
                     slots[startSlotBuffer[i]].Clear();
                 }
                 wallet.RefundWithoutSave(totalCost);
+                purificationSnapshot?.Rollback(dataProvider());
+                SaveData.RestoreMetadata(dataProvider(), metadata);
 
                 Debug.LogError("[RecoveryStation] 회복 시작을 저장하지 못해 요청을 취소했습니다 - " +
                                "재화와 캐릭터 상태는 시작 전 그대로입니다.");
@@ -504,7 +524,9 @@ namespace Recovery
         {
             if (definition == null || !roster.Contains(definition)) return RecoveryRegisterBlockReason.NotInRoster;
             if (IndexOfRecoverySlot(definition) >= 0) return RecoveryRegisterBlockReason.AlreadyInRecovery;
-            if (PurificationService.IsCharacterIdInSavedSlot(dataProvider(), roster.GetCharacterId(definition)))
+            // 런타임 서비스가 주입되지 않은 이전 호출자는 정화 상태를 임의로 통과시키지 않는다.
+            // 실제 서비스 경로는 purificationService가 같은 저장 트랜잭션 안에서 정산·해제를 맡는다.
+            if (purificationService == null && PurificationService.IsCharacterIdInSavedSlot(dataProvider(), roster.GetCharacterId(definition)))
                 return RecoveryRegisterBlockReason.InPurification;
             if (roster.CurrentCharacter == definition) return RecoveryRegisterBlockReason.Active;
             if (GetMissingStamina(definition) <= 0) return RecoveryRegisterBlockReason.StaminaFull;

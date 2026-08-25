@@ -4,6 +4,7 @@ using Character;
 using Common;
 using Recovery;
 using Party;
+using Corruption;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -31,6 +32,7 @@ namespace CharacterArchive
         [SerializeField] private TMP_Text ownedCountText;
         [SerializeField] private LocalizedTMPText ownedCountLocalizer;
         [SerializeField] private PartyConfigCatalog partyConfigCatalog;
+        [SerializeField] private PurificationConfigCatalog purificationConfigCatalog;
         [Header("Party Toasts (Inspector에서만 연결)")]
         [SerializeField] private LocalizedTextReference recoveryLeaveBlockedToast;
         [SerializeField] private LocalizedTextReference partyJoinToast;
@@ -208,6 +210,33 @@ namespace CharacterArchive
             return candidates != null && candidates.Length > 0 ? candidates[0] : null;
         }
 
+        private PurificationService CreatePurificationService()
+        {
+            return new PurificationService(() => SaveSystem.Data, SaveSystem.Save, () => DateTime.UtcNow,
+                catalog, ResolvePurificationCatalog(), IsBuildingComplete);
+        }
+
+        private PurificationConfigCatalog ResolvePurificationCatalog()
+        {
+            if (purificationConfigCatalog != null) return purificationConfigCatalog;
+            PurificationConfigCatalog[] candidates = Resources.FindObjectsOfTypeAll<PurificationConfigCatalog>();
+            return candidates != null && candidates.Length > 0 ? candidates[0] : null;
+        }
+
+        private static bool IsBuildingComplete(string buildingId)
+        {
+            SaveData data = SaveSystem.Data;
+            if (data == null || data.buildingConstructions == null) return false;
+            for (int i = 0; i < data.buildingConstructions.Count; i++)
+            {
+                BuildingConstructionSaveState state = data.buildingConstructions[i];
+                if (state != null && string.Equals(state.buildingId, buildingId, StringComparison.Ordinal) &&
+                    SaveData.TryParseTimestamp(state.completeAtUtc, out DateTime completeAt) && completeAt <= DateTime.UtcNow)
+                    return true;
+            }
+            return false;
+        }
+
         private void RefreshPartySlots(SaveData data, CharacterDefinition current)
         {
             if (partyService == null) return;
@@ -232,6 +261,33 @@ namespace CharacterArchive
             }
 
             if (string.Equals(incomingId, outgoingId, StringComparison.Ordinal)) return;
+
+            // 정화 중인 용병의 파티 이동은 정화 서비스가 소유한다. 정산, 기도 해제, 고정 슬롯
+            // 반영을 하나의 저장 트랜잭션으로 묶기 위해 PartyCompositionService를 우회한다.
+            if (PurificationService.IsCharacterIdInSavedSlot(data, incomingId))
+            {
+                if (Same(current, outgoingId)) { ShowToast(activeCharacterBlockedToast); return; }
+                if (RecoveryStation.IsCharacterIdInSavedSlot(data, incomingId) || RecoveryStation.IsCharacterIdInSavedSlot(data, outgoingId))
+                {
+                    ShowToast(recoveryLeaveBlockedToast);
+                    return;
+                }
+
+                PartyCapacityResult capacity = partyService.GetCapacity();
+                if (!capacity.IsAvailable) return;
+                PurificationResult result = CreatePurificationService().TryMoveToParty(incomingId, target.SlotIndex, capacity.Capacity);
+                if (!result.Success)
+                {
+                    if (result.Code == PurificationResultCode.InRecovery) ShowToast(recoveryLeaveBlockedToast);
+                    return;
+                }
+
+                CharacterRoster.Instance?.RefreshPartyAfterExternalSave();
+                CharacterSwapPanel.RequestRefresh();
+                RecoveryService.NotifyRosterChangedAfterExternalSave();
+                RefreshContents();
+                return;
+            }
             if (string.IsNullOrEmpty(outgoingId))
             {
                 ApplyPartyResult(partyService.TryJoinAt(incomingId, target.SlotIndex), incoming, true);

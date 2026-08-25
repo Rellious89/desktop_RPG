@@ -1,6 +1,7 @@
 using System;
 using Character;
 using Common;
+using Corruption;
 using Inventory;
 using UnityEngine;
 
@@ -51,6 +52,7 @@ namespace Recovery
         private RecoveryStation station;
         private CharacterRosterRecoveryAdapter recoveryRoster;
         private PassiveStaminaRecoveryService passiveStaminaRecovery;
+        private PurificationService purificationService;
         private float tickTimer;
 
         /// <summary>
@@ -166,13 +168,18 @@ namespace Recovery
             }
 
             recoveryRoster = new CharacterRosterRecoveryAdapter(roster);
+            PurificationConfigCatalog[] purificationCatalogs = Resources.FindObjectsOfTypeAll<PurificationConfigCatalog>();
+            PurificationConfigCatalog purificationCatalog = purificationCatalogs != null && purificationCatalogs.Length > 0 ? purificationCatalogs[0] : null;
+            purificationService = new PurificationService(() => SaveSystem.Data, SaveSystem.Save, () => DateTime.UtcNow,
+                roster.Catalog, purificationCatalog, IsBuildingComplete);
             station = new RecoveryStation(
                 balance,
                 recoveryRoster,
                 new InventoryRecoveryWallet(inventory, balance.CurrencyId),
                 () => SaveSystem.Data,
                 SaveSystem.Save,
-                () => DateTime.UtcNow);
+                () => DateTime.UtcNow,
+                purificationService);
 
             passiveStaminaRecovery = new PassiveStaminaRecoveryService(
                 balance,
@@ -204,6 +211,7 @@ namespace Recovery
             if (passiveStaminaRecovery != null) passiveStaminaRecovery.StaminaChanged -= HandlePassiveStaminaChanged;
             station = null;
             passiveStaminaRecovery = null;
+            purificationService = null;
             recoveryRoster = null;
         }
 
@@ -229,6 +237,19 @@ namespace Recovery
             // 회복소 목록, 명부가 각자 별도 연결 없이 즉시 다시 그려진다.
             recoveryRoster.RaiseCharacterStateChanged(character);
             StaminaStepChanged?.Invoke(character, recoveryRoster.GetStamina(character), recoveryRoster.GetMaxStamina(character));
+        }
+
+        private static bool IsBuildingComplete(string buildingId)
+        {
+            SaveData data = SaveSystem.Data;
+            if (data == null || data.buildingConstructions == null) return false;
+            for (int i = 0; i < data.buildingConstructions.Count; i++)
+            {
+                BuildingConstructionSaveState state = data.buildingConstructions[i];
+                if (state != null && string.Equals(state.buildingId, buildingId, StringComparison.Ordinal) &&
+                    SaveData.TryParseTimestamp(state.completeAtUtc, out DateTime completeAt) && completeAt <= DateTime.UtcNow) return true;
+            }
+            return false;
         }
     }
 }
