@@ -25,6 +25,7 @@ namespace Corruption
         private int blinkingCell = -1;
         private float blinkElapsed;
         private bool fastBlink;
+        private string displayedCharacterId;
 
         private readonly struct CellImage
         {
@@ -63,18 +64,22 @@ namespace Corruption
             SetActive(enabledItem, occupied); SetActive(disabledItem, !occupied);
             if (!occupied)
             {
+                displayedCharacterId = null;
                 if (portrait != null) portrait.sprite = null;
                 if (percentText != null) percentText.text = string.Empty;
                 if (timerText != null) timerText.text = string.Empty;
                 ResetProgressVisuals();
                 return;
             }
+            bool characterChanged = !string.Equals(
+                displayedCharacterId, definition.CharacterId, StringComparison.Ordinal);
+            displayedCharacterId = definition.CharacterId;
             if (portrait != null) portrait.sprite = definition.Portrait;
             if (nameText != null) nameText.text = CharacterNameBinding.GetCurrent(definition);
             float percent = Mathf.Clamp((float)(corruption / 300d * 100d), 0f, 100f);
             if (percentText != null) percentText.text = string.Format("{0:0.#}%", percent);
             if (timerText != null) timerText.text = PurificationPanel.FormatRemaining(remaining);
-            RefreshProgressVisuals(percent, baseCorruption);
+            RefreshProgressVisuals(percent, baseCorruption, characterChanged);
         }
 
         internal void ResetProgressVisuals()
@@ -93,20 +98,31 @@ namespace Corruption
             panel?.Register(slotIndex, card.Definition);
         }
 
-        private void RefreshProgressVisuals(float percent, double baseCorruption)
+        private void RefreshProgressVisuals(float percent, double baseCorruption, bool forceRestart = false)
         {
-            blinkingCell = -1;
-            blinkElapsed = 0f;
-            fastBlink = false;
             int full = Mathf.Clamp(Mathf.FloorToInt(percent / 10f), 0, CellCount);
             float remainder = percent - full * 10f;
-            for (int i = 0; i < currentCells.Count; i++) SetAlpha(currentCells[i], i < full ? 1f : 0f);
-            if (full < currentCells.Count && remainder >= 5f)
+            int nextBlinkingCell = full < currentCells.Count && remainder >= 5f ? full : -1;
+            bool nextFastBlink = nextBlinkingCell >= 0 && remainder >= 9f;
+            bool preserveBlinkPhase = !forceRestart && nextBlinkingCell >= 0 &&
+                                      nextBlinkingCell == blinkingCell && nextFastBlink == fastBlink;
+
+            for (int i = 0; i < currentCells.Count; i++)
             {
-                blinkingCell = full;
-                SetAlpha(currentCells[full], 0.7f);
-                fastBlink = remainder >= 9f;
+                // 같은 셀을 같은 속도로 점멸하는 동안에는 Update가 만든 현재 알파를 보존한다.
+                // 기도 패널의 0.2초 표시 갱신이 점멸 위상을 되감지 않게 하기 위함이다.
+                if (preserveBlinkPhase && i == nextBlinkingCell) continue;
+                SetAlpha(currentCells[i], i < full ? 1f : 0f);
             }
+
+            if (!preserveBlinkPhase)
+            {
+                blinkElapsed = 0f;
+                if (nextBlinkingCell >= 0) SetAlpha(currentCells[nextBlinkingCell], 0.7f);
+            }
+
+            blinkingCell = nextBlinkingCell;
+            fastBlink = nextFastBlink;
             int fixedCount = Mathf.Clamp(Mathf.CeilToInt((float)(baseCorruption / 300d * CellCount)), 0, CellCount);
             for (int i = 0; i < baseCells.Count; i++) SetAlpha(baseCells[i], i < fixedCount ? 1f : 0f);
         }
