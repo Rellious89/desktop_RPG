@@ -90,7 +90,10 @@ namespace Building
         /// <summary>완성 시각이 아직 오지 않았다 - 짓는 중이다.</summary>
         InProgress,
 
-        /// <summary>완성 시각이 지났다(같은 순간도 포함) - 다 지었다.</summary>
+        /// <summary>예정 시각은 지났지만 사용자가 완료 버튼으로 확정하지 않았다.</summary>
+        AwaitingConfirmation,
+
+        /// <summary>사용자가 완료를 확정했고 그 표식이 저장됐다.</summary>
         Completed,
 
         /// <summary>기록은 있는데 완성 시각을 읽을 수 없다(손상된 값). <b>건설 버튼은 돌아오지
@@ -304,7 +307,8 @@ namespace Building
             if (completeAtUtc <= now)
             {
                 return new BuildingConstructionStatus(
-                    BuildingConstructionPhase.Completed, TimeSpan.Zero, state);
+                    state.completionNotified ? BuildingConstructionPhase.Completed : BuildingConstructionPhase.AwaitingConfirmation,
+                    TimeSpan.Zero, state);
             }
 
             return new BuildingConstructionStatus(
@@ -350,6 +354,8 @@ namespace Building
                     return BuildingConstructionCompleteCode.NotComplete;
                 case BuildingConstructionPhase.Unreadable:
                     return BuildingConstructionCompleteCode.Unreadable;
+                case BuildingConstructionPhase.Completed:
+                    return BuildingConstructionCompleteCode.AlreadyNotified;
             }
 
             BuildingConstructionSaveState state = status.State;
@@ -358,12 +364,17 @@ namespace Building
             completing = true;
             try
             {
+                SaveData data = dataProvider();
+                SaveMetadataSnapshot metadata = SaveMetadataSnapshot.Capture(data);
                 state.completionNotified = true;
-
-                if (!saveAction())
+                bool saved;
+                try { saved = saveAction(); }
+                catch { saved = false; }
+                if (!saved)
                 {
                     // 표식만 되돌린다 - 시각도, 목록의 순서도, 다른 항목도 건드리지 않는다.
                     state.completionNotified = false;
+                    SaveData.RestoreMetadata(data, metadata);
 
                     if (!completionSaveFailureLogged)
                     {

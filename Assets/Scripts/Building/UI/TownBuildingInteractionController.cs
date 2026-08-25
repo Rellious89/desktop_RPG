@@ -105,6 +105,9 @@ namespace Building
                  "없다 - 무엇이 열릴지는 다음 단계의 몫이다.")]
         [SerializeField] private GameObject openInnButton;
 
+        [Tooltip("예정 시각 후 사용자가 완공을 확정하는 버튼. 기존 openInnButton의 Button을 명시 연결한다.")]
+        [SerializeField] private Button completionButton;
+
         [Tooltip("건설 타이머 묶음(Interaction/pn_ConstructionTimer). 짓는 중에만 켜지며, 켜지는 " +
                  "자리는 건설 버튼과 같은 월드 앵커다. 시작 시 꺼져 있어야 한다.")]
         [SerializeField] private GameObject constructionTimerRoot;
@@ -198,6 +201,11 @@ namespace Building
                 buildButton.onClick.RemoveListener(HandleBuildClicked);
                 buildButton.onClick.AddListener(HandleBuildClicked);
             }
+            if (completionButton != null)
+            {
+                completionButton.onClick.RemoveListener(HandleCompletionClicked);
+                completionButton.onClick.AddListener(HandleCompletionClicked);
+            }
 
             UpdateInteraction();
         }
@@ -205,6 +213,7 @@ namespace Building
         private void OnDisable()
         {
             if (buildButton != null) buildButton.onClick.RemoveListener(HandleBuildClicked);
+            if (completionButton != null) completionButton.onClick.RemoveListener(HandleCompletionClicked);
 
             UnsubscribeStartedMessage();
             UnsubscribeCompletedMessage();
@@ -303,7 +312,6 @@ namespace Building
             BuildingConstructionStatus status = ResolveConstructionStatus();
             ConstructionPhase = status.Phase;
 
-            NotifyCompletionOnce(status);
             ApplyConstructionVisibility(status);
             ApplyTimerText(status);
 
@@ -361,7 +369,7 @@ namespace Building
             SetActiveIfNeeded(
                 constructionTimerRoot, status.Phase == BuildingConstructionPhase.InProgress);
             SetActiveIfNeeded(
-                openInnButton, status.Phase == BuildingConstructionPhase.Completed);
+                openInnButton, status.Phase == BuildingConstructionPhase.AwaitingConfirmation);
         }
 
         /// <summary>
@@ -395,12 +403,11 @@ namespace Building
         /// 마을 밖이거나 전환 연출 중이어도 물어본다 - 완성은 화면이 아니라 시각이 정하는 사실이고,
         /// 저장이 실패하면 서비스가 표식을 되돌리므로 다음 갱신이 그대로 다시 시도한다.
         /// </summary>
-        private void NotifyCompletionOnce(BuildingConstructionStatus status)
+        private void HandleCompletionClicked()
         {
             if (constructionService == null || building == null) return;
-            if (status.Phase != BuildingConstructionPhase.Completed) return;
-
-            constructionService.TryNotifyCompletion(building.BuildingId);
+            BuildingConstructionCompleteCode result = constructionService.TryNotifyCompletion(building.BuildingId);
+            if (result == BuildingConstructionCompleteCode.Notified) UpdateInteraction();
         }
 
         private static void SetActiveIfNeeded(GameObject target, bool active)
@@ -699,6 +706,7 @@ namespace Building
             // 입장 버튼도 같은 앵커를 따라가야 하므로 사각형을 함께 잡아 둔다 - 새 참조를 요구하지
             // 않고 이미 연결된 오브젝트에서 얻는다.
             if (openInnButton != null) openInnButtonRect = openInnButton.transform as RectTransform;
+            if (completionButton == null && openInnButton != null) completionButton = openInnButton.GetComponent<Button>();
 
             if (fieldModeManager == null)
             {

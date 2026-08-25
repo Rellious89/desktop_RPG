@@ -24,9 +24,7 @@ namespace Corruption
         private void Open() { if (IsComplete() && panel != null) panel.Open(); }
         private bool IsComplete()
         {
-            SaveData data = SaveSystem.Data; if (data == null || data.buildingConstructions == null) return false;
-            for (int i = 0; i < data.buildingConstructions.Count; i++) if (data.buildingConstructions[i] != null && data.buildingConstructions[i].buildingId == buildingId && SaveData.TryParseTimestamp(data.buildingConstructions[i].completeAtUtc, out DateTime at) && at <= DateTime.UtcNow) return true;
-            return false;
+            return BuildingCompletionPolicy.IsConfirmedCompleted(SaveSystem.Data, buildingId, DateTime.UtcNow);
         }
         private static PurificationPanel FindPanel() { PurificationPanel[] all = Resources.FindObjectsOfTypeAll<PurificationPanel>(); return all != null && all.Length > 0 ? all[0] : null; }
     }

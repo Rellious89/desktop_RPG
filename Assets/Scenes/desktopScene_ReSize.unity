@@ -3208,6 +3208,7 @@ MonoBehaviour:
   interactionParent: {fileID: 2065249270}
   buildButton: {fileID: 1017242664}
   openInnButton: {fileID: 940358989}
+  completionButton: {fileID: 940358992}
   constructionTimerRoot: {fileID: 992763575}
   constructionTimerText: {fileID: 101301460}
   constructionTimerAnimator: {fileID: 147613677}
@@ -3314,6 +3315,7 @@ MonoBehaviour:
   interactionParent: {fileID: 597025922}
   buildButton: {fileID: 1109028176}
   openInnButton: {fileID: 938732506}
+  completionButton: {fileID: 938732509}
   constructionTimerRoot: {fileID: 383920116}
   constructionTimerText: {fileID: 1455773843}
   constructionTimerAnimator: {fileID: 1787916260}

@@ -36,17 +36,7 @@ namespace Building
 
         public static bool IsCompleted(string id)
         {
-            SaveData data = SaveSystem.Data;
-            if (data == null || data.buildingConstructions == null || string.IsNullOrEmpty(id)) return false;
-            DateTime now = DateTime.UtcNow;
-            for (int i = 0; i < data.buildingConstructions.Count; i++)
-            {
-                BuildingConstructionSaveState state = data.buildingConstructions[i];
-                if (state != null && string.Equals(state.buildingId, id, StringComparison.Ordinal) &&
-                    SaveData.TryParseTimestamp(state.completeAtUtc, out DateTime completeAt) && completeAt <= now)
-                    return true;
-            }
-            return false;
+            return BuildingCompletionPolicy.IsConfirmedCompleted(SaveSystem.Data, id, DateTime.UtcNow);
         }
     }
 }

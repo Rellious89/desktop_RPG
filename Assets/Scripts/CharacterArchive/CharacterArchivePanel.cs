@@ -225,16 +225,7 @@ namespace CharacterArchive
 
         private static bool IsBuildingComplete(string buildingId)
         {
-            SaveData data = SaveSystem.Data;
-            if (data == null || data.buildingConstructions == null) return false;
-            for (int i = 0; i < data.buildingConstructions.Count; i++)
-            {
-                BuildingConstructionSaveState state = data.buildingConstructions[i];
-                if (state != null && string.Equals(state.buildingId, buildingId, StringComparison.Ordinal) &&
-                    SaveData.TryParseTimestamp(state.completeAtUtc, out DateTime completeAt) && completeAt <= DateTime.UtcNow)
-                    return true;
-            }
-            return false;
+            return Building.BuildingCompletionPolicy.IsConfirmedCompleted(SaveSystem.Data, buildingId, DateTime.UtcNow);
         }
 
         private void RefreshPartySlots(SaveData data, CharacterDefinition current)

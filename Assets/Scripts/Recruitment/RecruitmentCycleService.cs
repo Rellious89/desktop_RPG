@@ -137,6 +137,10 @@ namespace Recruitment
             {
                 return Status(RecruitmentCyclePhase.Locked);
             }
+            if (!construction.completionNotified)
+            {
+                return Status(RecruitmentCyclePhase.Locked);
+            }
 
             RecruitmentAccessResolution access =
                 RecruitmentAccessResolver.ResolveForBuilding(buildingId, accessCatalog, typeCatalog);
@@ -204,6 +208,10 @@ namespace Recruitment
             {
                 return Result(RecruitmentCycleInitializeCode.Locked);
             }
+            if (!construction.completionNotified)
+            {
+                return Result(RecruitmentCycleInitializeCode.Locked);
+            }
 
             RecruitmentAccessResolution access =
                 RecruitmentAccessResolver.ResolveForBuilding(buildingId, accessCatalog, typeCatalog);
@@ -220,12 +228,13 @@ namespace Recruitment
                 return Result(RecruitmentCycleInitializeCode.AlreadyInitialized, existing);
             }
 
+            DateTime initializedAtUtc = ToUtc(utcNowProvider());
             var state = new RecruitmentCycleSaveState
             {
                 recruitmentAccessId = accessId,
-                startedAtUtc = SaveData.FormatTimestamp(completeAtUtc),
+                startedAtUtc = SaveData.FormatTimestamp(initializedAtUtc),
                 readyAtUtc = SaveData.FormatTimestamp(
-                    AddSeconds(completeAtUtc, access.Access.ArrivalIntervalSeconds)),
+                    AddSeconds(initializedAtUtc, access.Access.ArrivalIntervalSeconds)),
             };
 
             List<RecruitmentCycleSaveState> originalCycles = data.recruitmentCycles;

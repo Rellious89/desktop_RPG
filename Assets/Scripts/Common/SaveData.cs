@@ -376,7 +376,7 @@ namespace Common
     /// <summary>
     /// 건설 기록 하나. <b>건물 하나가 시작된 사실 + 그 시각 두 개</b>가 전부다.
     ///
-    /// <b>진행률도 완료 여부도 담지 않는다.</b> 지금 얼마나 지어졌는지는 <see cref="startedAtUtc"/>와
+    /// <b>진행률은 담지 않는다.</b> 지금 얼마나 지어졌는지는 <see cref="startedAtUtc"/>와
     /// <see cref="completeAtUtc"/>만으로 다시 계산되고, 그래야 앱을 꺼 둔 동안 흐른 시간이 그대로
     /// 반영된다(<see cref="RecoverySlotSaveState"/>와 같은 규칙이다).
     ///
@@ -397,15 +397,14 @@ namespace Common
         public string completeAtUtc;
 
         /// <summary>
-        /// 완성 안내를 <b>이미 한 번 띄웠는가</b>. 진행률이 아니라 <b>알림을 보냈다는 사실</b>만
-        /// 담는다 - 완성 여부 자체는 여전히 <see cref="completeAtUtc"/>와 현재 시각의 비교로만
-        /// 파생되며, 이 칸은 그 판정에 끼어들지 않는다.
+        /// 사용자가 완료 버튼으로 건축을 <b>확정했는가</b>. 예정 시각을 지났더라도 이 값이 false면
+        /// 확인 대기이며, true일 때만 기능을 해금한다.
         ///
-        /// <b>이 칸이 있어야 앱을 다시 켤 때 같은 안내가 되풀이되지 않는다.</b> "완성됐다"는 사실은
-        /// 시각 비교라서 켤 때마다 참이지만, 안내는 한 번뿐이어야 하기 때문이다.
+        /// <b>이 칸이 있어야 앱을 다시 켜도 확정 상태가 유지된다.</b> 완료 토스트의 중복 방지도
+        /// 같은 영속 표식에서 자연스럽게 따라온다.
         ///
-        /// 이 칸이 없던 저장 파일은 JsonUtility가 false로 채우며, 그것이 곧 "아직 안내하지 않았다"라서
-        /// 그대로 옳다(이미 완성된 건물이라면 다음에 켤 때 안내가 한 번 뜨고 끝난다) - 그래서 이 칸을
+        /// 이 칸이 없던 저장 파일은 JsonUtility가 false로 채우며, 그것이 곧 "아직 완료를 확정하지
+        /// 않았다"라서 그대로 옳다 - 그래서 이 칸을
         /// 더하면서 <see cref="SaveData.CurrentSaveVersion"/>을 올리지 않았다.
         /// </summary>
         public bool completionNotified;
@@ -422,7 +421,7 @@ namespace Common
         /// <summary>RecruitmentAccessDefinition.RecruitmentAccessId와 같은 값. 항목의 유일한 키다.</summary>
         public string recruitmentAccessId;
 
-        /// <summary>이번 주기가 시작된 시각(UTC). 최초 주기에는 건물의 완성 시각이 들어간다.</summary>
+        /// <summary>이번 주기가 시작된 시각(UTC). 최초 주기는 건축 확정 뒤 초기화한 현재 시각을 쓴다.</summary>
         public string startedAtUtc;
 
         /// <summary>용병 방문이 READY가 되는 경계 시각(UTC).</summary>

@@ -139,14 +139,7 @@ namespace Corruption
         }
         private static bool IsBuildingComplete(string buildingId)
         {
-            SaveData data = SaveSystem.Data; if (data == null || data.buildingConstructions == null) return false;
-            for (int i = 0; i < data.buildingConstructions.Count; i++)
-            {
-                BuildingConstructionSaveState state = data.buildingConstructions[i];
-                if (state != null && string.Equals(state.buildingId, buildingId, StringComparison.Ordinal) &&
-                    SaveData.TryParseTimestamp(state.completeAtUtc, out DateTime completeAt) && completeAt <= DateTime.UtcNow) return true;
-            }
-            return false;
+            return BuildingCompletionPolicy.IsConfirmedCompleted(SaveSystem.Data, buildingId, DateTime.UtcNow);
         }
         private static CharacterSaveState FindState(SaveData data, string id) { if (data == null || data.characters == null) return null; for (int i = 0; i < data.characters.Count; i++) if (data.characters[i] != null && data.characters[i].characterId == id) return data.characters[i]; return null; }
         private static void ShowToast(string key, CharacterDefinition definition)
