@@ -239,8 +239,8 @@ namespace Recovery
             if (!balance.IsValid) return RecoveryRegisterBlockReason.InvalidBalance;
             if (definition == null || !roster.Contains(definition)) return RecoveryRegisterBlockReason.NotInRoster;
             if (IndexOfRecoverySlot(definition) >= 0) return RecoveryRegisterBlockReason.AlreadyInRecovery;
-            if (PurificationService.IsCharacterIdInSavedSlot(dataProvider(), roster.GetCharacterId(definition)))
-                return RecoveryRegisterBlockReason.InPurification;
+            // Pending은 아직 재화도 슬롯도 건드리지 않는 UI 대기 상태다. 기도 중인 캐릭터도 여기에는
+            // 올려 둘 수 있으며, 실제 시작 직전 ValidateForStart가 전환 가능 여부를 다시 확인한다.
             if (roster.CurrentCharacter == definition) return RecoveryRegisterBlockReason.Active;
             if (IndexOfPendingSlot(definition) >= 0) return RecoveryRegisterBlockReason.AlreadyPending;
             if (GetMissingStamina(definition) <= 0) return RecoveryRegisterBlockReason.StaminaFull;

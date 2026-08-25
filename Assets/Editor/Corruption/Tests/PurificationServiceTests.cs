@@ -73,7 +73,7 @@ namespace CorruptionEditor.Tests
         }
 
         [Test]
-        public void Register_SinglePartyRecoveryAndDuplicateOrOccupiedSlots_AreBlocked()
+        public void Register_SinglePartyRecoveryAndDuplicate_AreBlocked_ButOccupiedSlotIsReplaced()
         {
             data.partyCharacterIds = new List<string> { "A" };
             Assert.AreEqual(PurificationResultCode.MinimumPartySize, Service().TryRegister("prayer", "A", 0).Code);
@@ -84,8 +84,31 @@ namespace CorruptionEditor.Tests
             data.recoverySlots.Clear();
             data.purificationSlots.Add(new PurificationSlotSaveState { characterId = "B", purificationTypeId = "prayer" });
             Assert.AreEqual(PurificationResultCode.AlreadyInPurification, Service().TryRegister("prayer", "B", 1).Code);
-            Assert.AreEqual(PurificationResultCode.SlotOccupied, Service().TryRegister("prayer", "C", 0).Code);
-            Assert.AreEqual(0, saves);
+            data.purificationSlots[0].lastCalculatedAtUtc = SaveData.FormatTimestamp(now.AddSeconds(-60));
+            PurificationResult replaced = Service().TryRegister("prayer", "C", 0);
+            Assert.AreEqual(PurificationResultCode.Success, replaced.Code);
+            Assert.AreEqual("B", replaced.PreviousCharacterId);
+            Assert.AreEqual("C", replaced.CharacterId);
+            Assert.AreEqual("C", data.purificationSlots[0].characterId);
+            Assert.AreEqual(1, saves);
+        }
+
+        [Test]
+        public void MoveToParty_SettlesAndClearsPurificationInOneSave()
+        {
+            data.partyCharacterIds = new List<string> { "A", string.Empty };
+            data.purificationSlots.Add(new PurificationSlotSaveState
+            {
+                characterId = "C", purificationTypeId = "prayer",
+                lastCalculatedAtUtc = SaveData.FormatTimestamp(now.AddSeconds(-120)),
+            });
+
+            PurificationResult result = Service().TryMoveToParty("C", 1, 3);
+            Assert.AreEqual(PurificationResultCode.Success, result.Code);
+            CollectionAssert.AreEqual(new[] { "A", "C" }, data.partyCharacterIds);
+            Assert.IsFalse(data.purificationSlots[0].HasCharacter);
+            Assert.AreEqual(3d, data.characters[2].currentCorruption);
+            Assert.AreEqual(1, saves);
         }
 
         [Test]
