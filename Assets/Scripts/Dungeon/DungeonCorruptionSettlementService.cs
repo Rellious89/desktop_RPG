@@ -19,44 +19,44 @@ namespace Dungeon
             this.save = save;
         }
 
-        public bool TrySettle(DungeonSessionSnapshot snapshot, SaveData data)
+        /// <summary>
+        /// 유효한 한 번의 몬스터 처치에 따른 오염도를 즉시 적용하고 저장한다. 저장이 실패하거나
+        /// 예외가 나면 이 처치가 바꾼 오염도와 저장 메타데이터를 모두 되돌린다.
+        /// </summary>
+        public bool TryApplyDefeat(DungeonDefinition dungeon, string characterId, SaveData data)
         {
-            if (snapshot == null || data == null || snapshot.DefeatsByCharacter.Count == 0)
+            if (dungeon == null || data == null || string.IsNullOrEmpty(characterId))
                 return false;
 
             CorruptionConfigDefinition config = configs != null ? configs.Find("default") : null;
-            if (config == null || snapshot.DungeonDefinition == null) return false;
-            var changed = new List<Change>();
+            if (config == null) return false;
+
+            CharacterSaveState state = Find(data.characters, characterId);
+            CharacterDefinition definition = characters != null ? characters.Find(characterId) : null;
+            if (state == null || definition == null) return false;
+
+            double gain = CalculateGain(1L, dungeon.CorruptionGainPerDefeat);
+            if (gain <= 0d) return false;
+
+            double current = Valid(state.currentCorruption) ? state.currentCorruption : 0d;
+            current = Math.Max(current, definition.BaseCorruption);
+            double next = Math.Min(config.MaxCorruption, current + gain);
+            if (next == state.currentCorruption) return false;
+
             SaveMetadataSnapshot metadata = SaveMetadataSnapshot.Capture(data);
-            foreach (DungeonSessionDefeatRecord defeat in snapshot.DefeatsByCharacter)
-            {
-                string id = defeat.CharacterId;
-                CharacterSaveState state = Find(data.characters, id);
-                CharacterDefinition definition = characters != null ? characters.Find(id) : null;
-                if (state == null || definition == null) continue;
-                double gain = CalculateGain(defeat.DefeatedMonsterCount, snapshot.DungeonDefinition.CorruptionGainPerDefeat);
-                if (gain <= 0d) continue;
-
-                double current = Valid(state.currentCorruption) ? state.currentCorruption : 0d;
-                current = Math.Max(current, definition.BaseCorruption);
-                double next = Math.Min(config.MaxCorruption, current + gain);
-                if (next == state.currentCorruption) continue;
-
-                changed.Add(new Change(state, state.currentCorruption));
-                state.currentCorruption = next;
-            }
-            if (changed.Count == 0) return false;
+            double previous = state.currentCorruption;
+            state.currentCorruption = next;
             try
             {
                 if (save != null && save()) return true;
             }
             catch
             {
-                Rollback(data, metadata, changed);
+                Rollback(data, metadata, state, previous);
                 throw;
             }
 
-            Rollback(data, metadata, changed);
+            Rollback(data, metadata, state, previous);
             return false;
         }
 
@@ -76,21 +76,11 @@ namespace Dungeon
                     return state;
             return null;
         }
-        private static void Rollback(SaveData data, SaveMetadataSnapshot metadata, List<Change> changes)
+        private static void Rollback(
+            SaveData data, SaveMetadataSnapshot metadata, CharacterSaveState state, double previous)
         {
-            foreach (var change in changes) change.State.currentCorruption = change.Old;
+            state.currentCorruption = previous;
             SaveData.RestoreMetadata(data, metadata);
-        }
-        private readonly struct Change
-        {
-            public readonly CharacterSaveState State;
-            public readonly double Old;
-
-            public Change(CharacterSaveState state, double old)
-            {
-                State = state;
-                Old = old;
-            }
         }
     }
 }

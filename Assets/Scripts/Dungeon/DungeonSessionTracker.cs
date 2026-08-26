@@ -277,36 +277,6 @@ namespace Dungeon
             if (ledger.TryCompleteSession(elapsedSeconds, out DungeonSessionSnapshot snapshot))
             {
                 ClearActiveSessionTimer();
-                if (characterCatalog == null || corruptionConfigCatalog == null)
-                {
-                    LogSettlementConfigurationError(
-                        "CharacterCatalog 또는 CorruptionConfigCatalog 참조가 없어 오염도를 적용하지 않습니다.",
-                        snapshot);
-                }
-                else if (corruptionConfigCatalog.Find("default") == null)
-                {
-                    LogSettlementConfigurationError(
-                        "기본 오염도 설정 'default'를 찾지 못해 오염도를 적용하지 않습니다.",
-                        snapshot);
-                }
-                else
-                {
-                    if (SaveSystem.TryGetLoadedData(out SaveData data))
-                    {
-                        try
-                        {
-                            new DungeonCorruptionSettlementService(
-                                characterCatalog, corruptionConfigCatalog, SaveSystem.Save)
-                                .TrySettle(snapshot, data);
-                        }
-                        catch (Exception e)
-                        {
-                            Debug.LogError(
-                                "[DungeonSessionTracker] 오염도 정산 저장 예외: " + e.Message,
-                                this);
-                        }
-                    }
-                }
                 SessionCompleted?.Invoke(snapshot);
             }
         }
@@ -314,7 +284,22 @@ namespace Dungeon
         private void HandleMonsterDefeated(MonsterDefinition monster)
         {
             if (!IsRecordingAligned()) return;
-            ledger.RecordDefeat(monster, CharacterRoster.Instance?.Current?.CharacterId);
+            string characterId = CharacterRoster.Instance?.Current?.CharacterId;
+            ledger.RecordDefeat(monster, characterId);
+            if (monster == null || !monster.IsValid || string.IsNullOrEmpty(characterId)) return;
+            if (characterCatalog == null || corruptionConfigCatalog == null) return;
+            if (!SaveSystem.TryGetLoadedData(out SaveData data)) return;
+
+            try
+            {
+                new DungeonCorruptionSettlementService(
+                    characterCatalog, corruptionConfigCatalog, SaveSystem.Save)
+                    .TryApplyDefeat(fieldModeManager.CurrentDungeon, characterId, data);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[DungeonSessionTracker] 처치 오염도 저장 예외: " + e.Message, this);
+            }
         }
 
         private void HandleRewardApplied(InventoryRewardApplyResult result)
@@ -347,14 +332,6 @@ namespace Dungeon
         {
             activeSessionStartedAt = 0d;
             hasActiveSessionStartTime = false;
-        }
-
-        private void LogSettlementConfigurationError(string message, DungeonSessionSnapshot snapshot)
-        {
-            // 집중 EditMode 테스트의 독립 Tracker는 카탈로그를 연결하지 않는다. 실제 세션에서만
-            // 구성 누락을 로그로 드러내고, 테스트의 기존 보상/완료 계약은 그대로 둔다.
-            if (Application.isPlaying && snapshot != null && snapshot.ParticipantCharacterIds.Count > 0)
-                Debug.LogError("[DungeonSessionTracker] " + message, this);
         }
 
         private double GetRealtimeSeconds()

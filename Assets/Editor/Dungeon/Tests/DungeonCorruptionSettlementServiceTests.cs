@@ -40,32 +40,31 @@ namespace DungeonEditor.Tests
         }
 
         [Test]
-        public void Settle_OnlyDefeatingCharactersReceiveGain_AndSaveOnce()
+        public void ApplyDefeat_ChangesOnlyDefeatingCharacter_AndSavesOnce()
         {
             SaveData data = Data("A", "B", "C");
-            DungeonSessionSnapshot snapshot = Snapshot(60d, new[] { "A", "B", "C" }, ("A", 10L), ("B", 3L));
             int saves = 0;
             var service = new DungeonCorruptionSettlementService(
                 CharacterCatalog("A", "B", "C"), Config(300), () => { saves++; return true; });
 
-            Assert.IsTrue(service.TrySettle(snapshot, data));
+            Assert.IsTrue(service.TryApplyDefeat(Dungeon(0.2d), "A", data));
 
             Assert.AreEqual(1, saves);
-            Assert.AreEqual(10d, data.characters[0].currentCorruption, 0.000000001d);
-            Assert.AreEqual(3d, data.characters[1].currentCorruption, 0d);
+            Assert.AreEqual(0.2d, data.characters[0].currentCorruption, 0.000000001d);
+            Assert.AreEqual(0d, data.characters[1].currentCorruption, 0d);
             Assert.AreEqual(0d, data.characters[2].currentCorruption, 0d);
         }
 
         [Test]
-        public void Settle_UsesBaseCapsAtConfigMaximum_AndDoesNotCreateUnknownState()
+        public void ApplyDefeat_UsesBaseCapsAtConfigMaximum_AndSkipsUnknownState()
         {
             SaveData data = Data("A", "unknown");
             data.characters[0].currentCorruption = -2d;
-            DungeonSessionSnapshot snapshot = Snapshot(60d, new[] { "A", "unknown", "missing" }, ("A", 10L), ("unknown", 1L));
             var service = new DungeonCorruptionSettlementService(
                 CharacterCatalog(5, "A"), Config(5), () => true);
 
-            Assert.IsTrue(service.TrySettle(snapshot, data));
+            Assert.IsTrue(service.TryApplyDefeat(Dungeon(1d), "A", data));
+            Assert.IsFalse(service.TryApplyDefeat(Dungeon(1d), "unknown", data));
 
             Assert.AreEqual(5d, data.characters[0].currentCorruption, 0.000000001d,
                 "유효하지 않은 현재값은 BaseCorruption에서 시작하고 Config 최대치를 넘지 않는다");
@@ -75,12 +74,11 @@ namespace DungeonEditor.Tests
         }
 
         [Test]
-        public void Settle_SaveFailure_RollsBackAllCharacterAndMetadataChanges()
+        public void ApplyDefeat_SaveFailure_RollsBackCharacterAndMetadataChanges()
         {
             SaveData data = Data("A", "B");
             data.saveRevision = 7;
             data.lastSavedAtUtc = "before";
-            DungeonSessionSnapshot snapshot = Snapshot(60d, new[] { "A", "B" }, ("A", 1L), ("B", 1L));
             var service = new DungeonCorruptionSettlementService(
                 CharacterCatalog("A", "B"), Config(300), () =>
                 {
@@ -89,28 +87,26 @@ namespace DungeonEditor.Tests
                     return false;
                 });
 
-            Assert.IsFalse(service.TrySettle(snapshot, data));
+            Assert.IsFalse(service.TryApplyDefeat(Dungeon(0.2d), "A", data));
 
             Assert.AreEqual(0d, data.characters[0].currentCorruption);
-            Assert.AreEqual(0d, data.characters[1].currentCorruption);
             Assert.AreEqual(7, data.saveRevision);
             Assert.AreEqual("before", data.lastSavedAtUtc);
         }
 
         [Test]
-        public void Settle_SaveException_RollsBackBeforeRethrowing()
+        public void ApplyDefeat_SaveException_RollsBackBeforeRethrowing()
         {
             SaveData data = Data("A");
-            DungeonSessionSnapshot snapshot = Snapshot(60d, new[] { "A" }, ("A", 1L));
             var service = new DungeonCorruptionSettlementService(
                 CharacterCatalog("A"), Config(300), () => throw new InvalidOperationException("save"));
 
-            Assert.Throws<InvalidOperationException>(() => service.TrySettle(snapshot, data));
+            Assert.Throws<InvalidOperationException>(() => service.TryApplyDefeat(Dungeon(0.2d), "A", data));
             Assert.AreEqual(0d, data.characters[0].currentCorruption);
         }
 
         [Test]
-        public void Settle_AlreadyAtMaximum_DoesNotSave()
+        public void ApplyDefeat_AlreadyAtMaximum_DoesNotSave()
         {
             SaveData data = Data("A");
             data.characters[0].currentCorruption = 300d;
@@ -118,72 +114,45 @@ namespace DungeonEditor.Tests
             var service = new DungeonCorruptionSettlementService(
                 CharacterCatalog("A"), Config(300), () => { saves++; return true; });
 
-            Assert.IsFalse(service.TrySettle(Snapshot(60d, new[] { "A" }, ("A", 1L)), data));
+            Assert.IsFalse(service.TryApplyDefeat(Dungeon(0.2d), "A", data));
             Assert.AreEqual(0, saves);
         }
 
         [Test]
-        public void Settle_NoDefeats_DoesNotSaveRegardlessOfElapsedTime()
+        public void ApplyDefeat_ZeroGain_DoesNotSave()
         {
             SaveData data = Data("A");
             int saves = 0;
             var service = new DungeonCorruptionSettlementService(
                 CharacterCatalog("A"), Config(300), () => { saves++; return true; });
 
-            Assert.IsFalse(service.TrySettle(Snapshot(999999d, new[] { "A" }), data));
+            Assert.IsFalse(service.TryApplyDefeat(Dungeon(0d), "A", data));
             Assert.AreEqual(0d, data.characters[0].currentCorruption);
             Assert.AreEqual(0, saves);
         }
 
         [Test]
-        public void Settle_FractionalGain_IsIndependentOfElapsedTimeAndPartySize()
+        public void ApplyDefeat_FractionalGain_IsPreserved()
         {
-            SaveData shortSession = Data("A", "B", "C");
-            SaveData longSession = Data("A", "B", "C");
+            SaveData data = Data("A", "B", "C");
             var service = new DungeonCorruptionSettlementService(
                 CharacterCatalog("A", "B", "C"), Config(300), () => true);
 
-            Assert.IsTrue(service.TrySettle(Snapshot(1d, new[] { "A", "B", "C" }, 0.2d, ("A", 3L)), shortSession));
-            Assert.IsTrue(service.TrySettle(Snapshot(100000d, new[] { "A", "B", "C" }, 0.2d, ("A", 3L)), longSession));
+            Assert.IsTrue(service.TryApplyDefeat(Dungeon(0.2d), "A", data));
 
-            Assert.AreEqual(0.6d, shortSession.characters[0].currentCorruption, 0.000000001d);
-            Assert.AreEqual(shortSession.characters[0].currentCorruption, longSession.characters[0].currentCorruption, 0d);
-            Assert.AreEqual(0d, shortSession.characters[1].currentCorruption);
-            Assert.AreEqual(0d, shortSession.characters[2].currentCorruption);
+            Assert.AreEqual(0.2d, data.characters[0].currentCorruption, 0.000000001d);
+            Assert.AreEqual(0d, data.characters[1].currentCorruption);
+            Assert.AreEqual(0d, data.characters[2].currentCorruption);
         }
 
-        private DungeonSessionSnapshot Snapshot(
-            double elapsed, string[] participants, params (string characterId, long defeats)[] defeats)
-        {
-            return Snapshot(elapsed, participants, 1d, defeats);
-        }
-
-        private DungeonSessionSnapshot Snapshot(
-            double elapsed, string[] participants, double gainPerDefeat,
-            params (string characterId, long defeats)[] defeats)
+        private DungeonDefinition Dungeon(double gainPerDefeat)
         {
             DungeonDefinition dungeon = Track(ScriptableObject.CreateInstance<DungeonDefinition>());
-            SerializedObject serialized = new SerializedObject(dungeon);
+            var serialized = new SerializedObject(dungeon);
             serialized.FindProperty("dungeonId").stringValue = "test";
             serialized.FindProperty("corruptionGainPerDefeat").doubleValue = gainPerDefeat;
             serialized.ApplyModifiedPropertiesWithoutUndo();
-
-            var ledger = new DungeonSessionLedger();
-            Assert.AreEqual(SessionStartResult.Started, ledger.TryStartSession(dungeon, participants));
-            MonsterDefinition monster = Monster();
-            foreach ((string characterId, long count) in defeats)
-                for (long i = 0; i < count; i++) ledger.RecordDefeat(monster, characterId);
-            Assert.IsTrue(ledger.TryCompleteSession(elapsed, out DungeonSessionSnapshot snapshot));
-            return snapshot;
-        }
-
-        private MonsterDefinition Monster()
-        {
-            MonsterDefinition definition = Track(ScriptableObject.CreateInstance<MonsterDefinition>());
-            var serialized = new SerializedObject(definition);
-            serialized.FindProperty("monsterId").stringValue = "monster";
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-            return definition;
+            return dungeon;
         }
 
         private CharacterCatalog CharacterCatalog(params string[] ids)
