@@ -145,6 +145,17 @@ namespace DungeonEditor.Tests
             Assert.AreEqual(0d, data.characters[2].currentCorruption);
         }
 
+        [Test]
+        public void DefeatMutation_WithoutSave_PreservesFractionAndRollsBack()
+        {
+            SaveData data = Data("A");
+            var service = new DungeonCorruptionSettlementService(CharacterCatalog("A"), Config(300), () => throw new Exception());
+            var receipt = service.ApplyDefeatWithoutSave(Dungeon(0.2d), "A", data);
+            Assert.IsTrue(receipt.Changed); Assert.AreEqual(0d, receipt.CorruptionBefore); Assert.AreEqual(0.2d, data.characters[0].currentCorruption, 0.000000001d);
+            DungeonCorruptionSettlementService.RollbackDefeat(receipt);
+            Assert.AreEqual(0d, data.characters[0].currentCorruption);
+        }
+
         private DungeonDefinition Dungeon(double gainPerDefeat)
         {
             DungeonDefinition dungeon = Track(ScriptableObject.CreateInstance<DungeonDefinition>());

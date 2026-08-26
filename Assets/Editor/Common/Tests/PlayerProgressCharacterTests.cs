@@ -687,6 +687,64 @@ namespace CommonEditor.Tests
             CollectionAssert.IsEmpty(seen, "바뀐 캐릭터가 없으면 알릴 것도 없다.");
         }
 
+        [Test]
+        public void DefeatMutation_WithoutSave_RollsBackProgress_AndNotifiesOnlyAfterSuccess()
+        {
+            SaveData document = Inject(State("CatKnight", level: 1, exp: 8));
+            document.partyCharacterIds = new List<string> { "CatKnight" };
+            MemoryStorage storage = UseMemoryStorage();
+            CharacterRoster roster = ReadyRoster(current: "CatKnight");
+            PlayerProgress progress = ReadyProgress(expPerDefeat: 3);
+            CharacterDefinition character = roster.Current;
+
+            int expEvents = 0;
+            int levelEvents = 0;
+            int stateEvents = 0;
+            Action experienceHandler = () => expEvents++;
+            Action<int> levelHandler = _ => levelEvents++;
+            Action<CharacterDefinition> stateHandler = _ => stateEvents++;
+            PlayerProgress.OnExperienceChanged += experienceHandler;
+            PlayerProgress.OnLevelUp += levelHandler;
+            CharacterRoster.CharacterStateChanged += stateHandler;
+            try
+            {
+                PlayerProgress.DefeatProgressMutationReceipt receipt = progress.ApplyDefeatWithoutSave(character);
+
+                Assert.AreEqual(0, storage.WriteCalls, "메모리 전용 적용은 저장하지 않는다.");
+                Assert.AreEqual(0, expEvents);
+                Assert.AreEqual(0, levelEvents);
+                Assert.AreEqual(0, stateEvents);
+                Assert.AreEqual(0, receipt.KillCountBefore);
+                Assert.AreEqual(1, receipt.LevelBefore);
+                Assert.AreEqual(8, receipt.ExpBefore);
+                Assert.AreEqual(1, PlayerProgress.TotalKillCount);
+                Assert.AreEqual(2, document.characters[0].level);
+                Assert.AreEqual(1, document.characters[0].currentExp);
+                Assert.AreEqual(2, PlayerProgress.CurrentLevel, "표시 캐시도 메모리 결과를 즉시 반영한다.");
+
+                progress.RollbackDefeat(receipt);
+                Assert.AreEqual(0, PlayerProgress.TotalKillCount);
+                Assert.AreEqual(0, document.totalKillCount);
+                Assert.AreEqual(1, document.characters[0].level);
+                Assert.AreEqual(8, document.characters[0].currentExp);
+                Assert.AreEqual(1, PlayerProgress.CurrentLevel);
+                Assert.AreEqual(8, PlayerProgress.CurrentExp);
+
+                receipt = progress.ApplyDefeatWithoutSave(character);
+                progress.NotifyDefeatAfterExternalSave(receipt);
+                Assert.AreEqual(0, storage.WriteCalls, "성공 후 알림도 외부 저장을 다시 부르지 않는다.");
+                Assert.AreEqual(1, expEvents);
+                Assert.AreEqual(1, levelEvents);
+                Assert.AreEqual(1, stateEvents);
+            }
+            finally
+            {
+                PlayerProgress.OnExperienceChanged -= experienceHandler;
+                PlayerProgress.OnLevelUp -= levelHandler;
+                CharacterRoster.CharacterStateChanged -= stateHandler;
+            }
+        }
+
         // ---- 도우미 ----
 
         /// <summary>저장 문서를 직접 끼워 넣는다 - 저장소가 아예 불리지 않으므로 실제 파일을 읽지 않는다.</summary>

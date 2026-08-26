@@ -689,6 +689,31 @@ namespace InventoryEditor.Tests
             Assert.AreEqual(500, result.ItemDeltas[0].ActualCount);
         }
 
+        [Test]
+        public void DefeatMutation_WithoutSave_RollsBackOrder_AndNotifiesOnceAfterSuccess()
+        {
+            List<ItemDefinition> definitions = RegisterItems("item_a", "item_b");
+            SaveSystem.Data.currency = 7;
+            SaveSystem.Data.items.Add(new InventoryItemState { itemId = "item_a", count = 2 });
+            SaveSystem.Data.items.Add(new InventoryItemState { itemId = "item_b", count = 3 });
+
+            var receipt = inventory.ApplyDefeatRewardsWithoutSave(5,
+                new[] { new InventoryManager.RewardItemStack(definitions[0], 4) });
+
+            Assert.AreEqual(0, saveCount); Assert.AreEqual(0, changedCount); Assert.AreEqual(0, rewardAppliedCount);
+            Assert.AreEqual(7, receipt.CurrencyBefore); Assert.AreEqual(6, SaveSystem.Data.items[0].count);
+            inventory.RollbackDefeatRewards(receipt);
+            Assert.AreEqual(7, SaveSystem.Data.currency);
+            CollectionAssert.AreEqual(new[] { "item_a", "item_b" }, new[] { SaveSystem.Data.items[0].itemId, SaveSystem.Data.items[1].itemId });
+            CollectionAssert.AreEqual(new[] { 2, 3 }, new[] { SaveSystem.Data.items[0].count, SaveSystem.Data.items[1].count });
+
+            receipt = inventory.ApplyDefeatRewardsWithoutSave(5,
+                new[] { new InventoryManager.RewardItemStack(definitions[0], 4) });
+            inventory.NotifyDefeatRewardsAfterExternalSave(receipt);
+            Assert.AreEqual(1, changedCount); Assert.AreEqual(1, rewardAppliedCount);
+            Assert.AreEqual(5, lastRewardResult.ActualCurrencyDelta); Assert.AreEqual(4, lastRewardResult.ItemDeltas[0].ActualCount);
+        }
+
         // ---- Helpers ----
 
         private ItemDefinition RegisterItem(string itemId)

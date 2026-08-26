@@ -288,6 +288,60 @@ namespace CharacterEditor.Tests
         }
 
         [Test]
+        public void DefeatStaminaMutation_WithoutSave_RollsBack_AndAutoSwitchesOnlyAfterSuccess()
+        {
+            SaveData document = Inject(State("CatKnight", stamina: 1), State("ElfArcher", stamina: 5));
+            document.partyCharacterIds = new List<string> { "CatKnight", "ElfArcher" };
+            MemoryStorage storage = UseMemoryStorage();
+            CharacterRoster roster = Ready(Catalog("CatKnight", "ElfArcher"));
+            CharacterDefinition catKnight = roster.Entries[0].definition;
+            SetPrivate(roster, "current", catKnight);
+            SetPrivate(roster, "runtimeActor", RuntimeActor());
+            SetInstance(roster);
+
+            int stateEvents = 0;
+            int currentEvents = 0;
+            Action<CharacterDefinition> stateHandler = _ => stateEvents++;
+            Action<CharacterDefinition> currentHandler = _ => currentEvents++;
+            CharacterRoster.CharacterStateChanged += stateHandler;
+            CharacterRoster.CurrentCharacterChanged += currentHandler;
+            try
+            {
+                CharacterRoster.DefeatStaminaMutationReceipt receipt = roster.SpendDefeatStaminaWithoutSave(catKnight);
+
+                Assert.IsTrue(receipt.Changed);
+                Assert.AreEqual(1, receipt.StaminaBefore);
+                Assert.IsTrue(receipt.AutoSwitchNeeded);
+                Assert.AreEqual(0, storage.WriteCalls, "메모리 전용 행동력 차감은 저장하지 않는다.");
+                Assert.AreEqual(0, stateEvents);
+                Assert.AreEqual(0, currentEvents);
+                Assert.AreSame(catKnight, roster.Current, "성공 처리 전에는 자동 교체하지 않는다.");
+                Assert.AreEqual(0, document.characters[0].currentStamina);
+
+                roster.RollbackDefeatStamina(receipt);
+                Assert.AreEqual(1, document.characters[0].currentStamina);
+                Assert.AreSame(catKnight, roster.Current);
+
+                receipt = roster.SpendDefeatStaminaWithoutSave(catKnight);
+                LogAssert.ignoreFailingMessages = true;
+                roster.NotifyDefeatStaminaAfterExternalSave(receipt);
+                LogAssert.ignoreFailingMessages = false;
+
+                Assert.AreEqual(0, storage.WriteCalls, "성공 후 알림도 외부 저장을 다시 부르지 않는다.");
+                Assert.AreEqual(1, stateEvents);
+                Assert.AreEqual(1, currentEvents);
+                Assert.AreEqual("ElfArcher", roster.Current.CharacterId,
+                    "자동 교체는 저장 성공 뒤 명시적 성공 처리에서만 일어난다.");
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = false;
+                CharacterRoster.CharacterStateChanged -= stateHandler;
+                CharacterRoster.CurrentCharacterChanged -= currentHandler;
+            }
+        }
+
+        [Test]
         public void Scene_CharacterRosterHasGeneratedCorruptionConfig()
         {
             UnityEngine.SceneManagement.Scene scene =
