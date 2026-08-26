@@ -30,6 +30,10 @@ namespace CommonEditor.Save
         private Dictionary<string, BuildingDefinition> buildingsById;
         private Dictionary<string, CharacterDefinition> charactersById;
 
+        // 로컬라이징 이름 조회 캐시. OnGUI는 자주 호출되므로 매 프레임 같은 에디터 에셋을 다시 뒤지지 않는다.
+        // 키: 테이블 참조 + 엔트리 참조. 값: 확인된 문자열 또는 조회 실패(null). RefreshDefinitions에서 비운다.
+        private readonly Dictionary<string, string> localizedNameCache = new Dictionary<string, string>(StringComparer.Ordinal);
+
         // 삭제하려고 체크한 캐릭터 id. Character 비트가 켜질 때 삭제 가능한 캐릭터 전체로 채우고,
         // 개별 해제/재선택은 이 집합을 직접 고친다. 매 프레임 현재 삭제 가능 목록으로 걸러 낸다.
         private HashSet<string> selectedCharacterIds = new HashSet<string>(StringComparer.Ordinal);
@@ -423,6 +427,9 @@ namespace CommonEditor.Save
             itemsById = BuildMap<ItemDefinition>(def => def.ItemId);
             buildingsById = BuildMap<BuildingDefinition>(def => def.BuildingId);
             charactersById = BuildMap<CharacterDefinition>(def => def.CharacterId);
+
+            // 정의를 다시 읽었으니 이전 조회 결과도 버린다(테이블 값이 바뀌었을 수 있다).
+            localizedNameCache.Clear();
         }
 
         private static Dictionary<string, T> BuildMap<T>(Func<T, string> keyOf) where T : UnityEngine.Object
@@ -479,21 +486,26 @@ namespace CommonEditor.Save
             return buildingId;
         }
 
-        /// <summary>편집 모드에서 로컬라이징 문자열을 시도해 본다. 로케일/테이블이 준비되지 않았거나
-        /// 참조가 비어 있으면 조용히 null을 돌려준다 - 이름 표시가 실패해도 창은 계속 떠 있어야 한다.</summary>
-        private static string ResolveLocalized(LocalizedString reference)
+        /// <summary>편집 모드에서 이름의 ko-KR 로컬라이징 값을 에디터 에셋에서 직접 조회한다. 테이블·엔트리·값이
+        /// 없거나 참조가 비어 있으면 조용히 null을 돌려준다 - 이름 표시가 실패해도 창은 계속 떠 있어야 한다.
+        /// 런타임 <c>GetLocalizedString</c>·<c>SelectedLocale</c>을 쓰지 않으므로 Edit Mode에서 로케일이
+        /// 준비되지 않아도 오류 로그가 나지 않는다. 자주 호출되는 OnGUI를 위해 결과(실패 포함)를 캐시한다.</summary>
+        private string ResolveLocalized(LocalizedString reference)
         {
             if (reference == null || reference.IsEmpty) return null;
 
-            try
-            {
-                string value = reference.GetLocalizedString();
-                return string.IsNullOrEmpty(value) ? null : value;
-            }
-            catch
-            {
-                return null;
-            }
+            string key = LocalizedCacheKey(reference);
+            if (localizedNameCache.TryGetValue(key, out string cached)) return cached;
+
+            string value = SaveResetLocalization.Resolve(reference);
+            localizedNameCache[key] = value; // null(조회 실패)도 캐시해 매 프레임 재조회를 막는다.
+            return value;
+        }
+
+        /// <summary>테이블 참조 + 엔트리 참조로 캐시 키를 만든다.</summary>
+        private static string LocalizedCacheKey(LocalizedString reference)
+        {
+            return reference.TableReference + "|" + reference.TableEntryReference;
         }
 
         // ---- 강조 스타일 ----
