@@ -14191,7 +14191,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5859439085027589239}
-  - component: {fileID: 6420779553284401441}
   m_Layer: 5
   m_Name: dialog_ExitGame
   m_TagString: Untagged
@@ -15941,7 +15940,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 44.75, y: -13.005}
-  m_SizeDelta: {x: 22.01, y: 26.01}
+  m_SizeDelta: {x: 0, y: 26.01}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1939334350824377996
 GameObject:
@@ -16726,10 +16725,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 8267966353258953797}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 96, y: -20}
-  m_SizeDelta: {x: 192, y: 40}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &4684076808144943611
 GameObject:
@@ -17992,42 +17991,8 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 44.75, y: -13.005}
-  m_SizeDelta: {x: 22.01, y: 26.01}
+  m_SizeDelta: {x: 0, y: 26.01}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &6420779553284401441
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 521558146301147835}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 063fb21bf91c45adb66daa87cd79ec30, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  closeButton: {fileID: 7839891966623692668}
-  blockBackgroundInput: 0
-  inputBlocker: {fileID: 0}
-  inputBlockerColor: {r: 0, g: 0, b: 0, a: 0}
-  buildingNameText: {fileID: 246414905320939731}
-  descriptionText: {fileID: 0}
-  warningText: {fileID: 5761488354924821192}
-  descriptionFormat:
-    m_TableReference:
-      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
-    m_TableEntryReference:
-      m_KeyId: 8908411117756416
-      m_Key: 
-    m_FallbackState: 0
-    m_WaitForCompletion: 0
-    m_LocalVariables: []
-  confirmButton: {fileID: 4975995054088693364}
-  placementRect: {fileID: 2090398303977296976}
-  placementMargin: 8
-  references:
-    version: 2
-    RefIds: []
 --- !u!114 &6592857868450419674
 MonoBehaviour:
   m_ObjectHideFlags: 0
