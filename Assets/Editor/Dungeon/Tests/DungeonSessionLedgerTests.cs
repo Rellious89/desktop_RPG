@@ -235,6 +235,27 @@ namespace DungeonEditor.Tests
         }
 
         [Test]
+        public void RecordDefeat_WithCharacterId_AccumulatesPerCharacterInFirstDefeatOrder()
+        {
+            DungeonDefinition dungeon = MakeDungeon("forest_01");
+            MonsterDefinition monster = MakeMonster("slime_01");
+            ledger.TryStartSession(dungeon);
+
+            ledger.RecordDefeat(monster, "CatKnight");
+            ledger.RecordDefeat(monster, "CatMage");
+            ledger.RecordDefeat(monster, "CatKnight");
+            ledger.RecordDefeat(monster, string.Empty);
+            ledger.TryCompleteSession(out DungeonSessionSnapshot snapshot);
+
+            Assert.AreEqual(4L, snapshot.DefeatedMonsterCount);
+            Assert.AreEqual(2, snapshot.DefeatsByCharacter.Count);
+            Assert.AreEqual("CatKnight", snapshot.DefeatsByCharacter[0].CharacterId);
+            Assert.AreEqual(2L, snapshot.DefeatsByCharacter[0].DefeatedMonsterCount);
+            Assert.AreEqual("CatMage", snapshot.DefeatsByCharacter[1].CharacterId);
+            Assert.AreEqual(1L, snapshot.DefeatsByCharacter[1].DefeatedMonsterCount);
+        }
+
+        [Test]
         public void RecordDefeat_NullMonster_Ignored()
         {
             DungeonDefinition d = MakeDungeon("forest_01");

@@ -314,7 +314,7 @@ namespace Dungeon
         private void HandleMonsterDefeated(MonsterDefinition monster)
         {
             if (!IsRecordingAligned()) return;
-            ledger.RecordDefeat(monster);
+            ledger.RecordDefeat(monster, CharacterRoster.Instance?.Current?.CharacterId);
         }
 
         private void HandleRewardApplied(InventoryRewardApplyResult result)
