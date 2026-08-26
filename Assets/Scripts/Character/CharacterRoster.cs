@@ -298,14 +298,10 @@ namespace Character
 
         private void OnEnable()
         {
-            // 행동력이 줄어드는 유일한 근거. SessionKillCounter/PlayerProgress와 같은 구독 패턴이라
-            // 몬스터가 늘어나거나 종류가 달라져도 별도 연결이 필요 없다.
-            Target.AnyTargetDefeated += HandleAnyTargetDefeated;
         }
 
         private void OnDisable()
         {
-            Target.AnyTargetDefeated -= HandleAnyTargetDefeated;
         }
 
         private void OnDestroy()

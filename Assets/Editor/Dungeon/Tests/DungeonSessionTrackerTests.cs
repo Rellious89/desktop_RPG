@@ -28,11 +28,6 @@ namespace DungeonEditor.Tests
                 "HandleFieldModeChanged",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
-        private static readonly MethodInfo HandleDefeat =
-            typeof(DungeonSessionTracker).GetMethod(
-                "HandleMonsterDefeated",
-                BindingFlags.NonPublic | BindingFlags.Instance);
-
         private static readonly MethodInfo HandleReward =
             typeof(DungeonSessionTracker).GetMethod(
                 "HandleRewardApplied",
@@ -43,24 +38,9 @@ namespace DungeonEditor.Tests
                 "fieldModeManager",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
-        private static readonly FieldInfo QueueField =
-            typeof(DungeonSessionTracker).GetField(
-                "encounterQueue",
-                BindingFlags.NonPublic | BindingFlags.Instance);
-
         private static readonly FieldInfo ImField =
             typeof(DungeonSessionTracker).GetField(
                 "inventoryManager",
-                BindingFlags.NonPublic | BindingFlags.Instance);
-
-        private static readonly FieldInfo CharacterCatalogField =
-            typeof(DungeonSessionTracker).GetField(
-                "characterCatalog",
-                BindingFlags.NonPublic | BindingFlags.Instance);
-
-        private static readonly FieldInfo CorruptionConfigCatalogField =
-            typeof(DungeonSessionTracker).GetField(
-                "corruptionConfigCatalog",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
         private static readonly FieldInfo RealtimeProviderField =
@@ -76,11 +56,6 @@ namespace DungeonEditor.Tests
         private static readonly FieldInfo SubscribedFmmField =
             typeof(DungeonSessionTracker).GetField(
                 "subscribedFmm",
-                BindingFlags.NonPublic | BindingFlags.Instance);
-
-        private static readonly FieldInfo SubscribedQueueField =
-            typeof(DungeonSessionTracker).GetField(
-                "subscribedQueue",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
         private static readonly FieldInfo SubscribedImField =
@@ -120,7 +95,6 @@ namespace DungeonEditor.Tests
 
         private DungeonSessionTracker tracker;
         private FieldModeManager fmm;
-        private MonsterEncounterQueue queue;
         private InventoryManager im;
         private readonly List<UnityEngine.Object> created = new List<UnityEngine.Object>();
 
@@ -129,7 +103,6 @@ namespace DungeonEditor.Tests
         {
             Assert.IsNotNull(ResultCtor, "InventoryRewardApplyResult 생성자 리플렉션");
             Assert.IsNotNull(HandleFieldMode, "HandleFieldModeChanged 리플렉션");
-            Assert.IsNotNull(HandleDefeat, "HandleMonsterDefeated 리플렉션");
             Assert.IsNotNull(HandleReward, "HandleRewardApplied 리플렉션");
             Assert.IsNotNull(CurrentModeField, "CurrentMode 백킹필드 리플렉션");
             Assert.IsNotNull(CurrentDungeonField, "CurrentDungeon 백킹필드 리플렉션");
@@ -141,11 +114,6 @@ namespace DungeonEditor.Tests
             fmmGo.SetActive(true);
             created.Add(fmmGo);
 
-            var queueGo = new GameObject("TestQueue");
-            queueGo.SetActive(false);
-            queue = queueGo.AddComponent<MonsterEncounterQueue>();
-            created.Add(queueGo);
-
             var imGo = new GameObject("TestIM");
             imGo.SetActive(false);
             im = imGo.AddComponent<InventoryManager>();
@@ -155,7 +123,6 @@ namespace DungeonEditor.Tests
             trackerGo.SetActive(false);
             tracker = trackerGo.AddComponent<DungeonSessionTracker>();
             FmmField.SetValue(tracker, fmm);
-            QueueField.SetValue(tracker, queue);
             ImField.SetValue(tracker, im);
             SubscribeMethod.Invoke(tracker, null);
             trackerGo.SetActive(true);
@@ -905,14 +872,12 @@ namespace DungeonEditor.Tests
             SubscribeMethod.Invoke(tracker, null);
 
             Assert.IsNotNull(SubscribedFmmField.GetValue(tracker), "FMM은 구독됨");
-            Assert.IsNotNull(SubscribedQueueField.GetValue(tracker), "Queue는 구독됨");
             Assert.IsNull(SubscribedImField.GetValue(tracker), "IM은 아직 미구독");
 
             ImField.SetValue(tracker, im);
             StartMethod.Invoke(tracker, null);
 
             Assert.IsNotNull(SubscribedFmmField.GetValue(tracker), "Start 후 FMM 구독됨");
-            Assert.IsNotNull(SubscribedQueueField.GetValue(tracker), "Start 후 Queue 구독됨");
             Assert.IsNotNull(SubscribedImField.GetValue(tracker), "Start 후 IM도 구독됨");
         }
 
@@ -921,13 +886,11 @@ namespace DungeonEditor.Tests
         {
             SimulateDisable();
             Assert.IsNull(SubscribedFmmField.GetValue(tracker));
-            Assert.IsNull(SubscribedQueueField.GetValue(tracker));
             Assert.IsNull(SubscribedImField.GetValue(tracker));
 
             StartMethod.Invoke(tracker, null);
 
             Assert.IsNotNull(SubscribedFmmField.GetValue(tracker), "Start는 FMM 구독");
-            Assert.IsNotNull(SubscribedQueueField.GetValue(tracker), "Start는 Queue 구독");
             Assert.IsNotNull(SubscribedImField.GetValue(tracker), "Start는 IM 구독");
         }
 
@@ -980,8 +943,6 @@ namespace DungeonEditor.Tests
         {
             Assert.AreSame(fmm, SubscribedFmmField.GetValue(tracker),
                 "초기 FMM 구독 확인");
-            Assert.AreSame(queue, SubscribedQueueField.GetValue(tracker),
-                "초기 Queue 구독 확인");
             Assert.AreSame(im, SubscribedImField.GetValue(tracker),
                 "초기 IM 구독 확인");
 
@@ -991,25 +952,17 @@ namespace DungeonEditor.Tests
             newFmmGo.SetActive(true);
             created.Add(newFmmGo);
 
-            var newQueueGo = new GameObject("NewQueue");
-            newQueueGo.SetActive(false);
-            var newQueue = newQueueGo.AddComponent<MonsterEncounterQueue>();
-            created.Add(newQueueGo);
-
             var newImGo = new GameObject("NewIM");
             newImGo.SetActive(false);
             var newIm = newImGo.AddComponent<InventoryManager>();
             created.Add(newImGo);
 
             FmmField.SetValue(tracker, newFmm);
-            QueueField.SetValue(tracker, newQueue);
             ImField.SetValue(tracker, newIm);
             SubscribeMethod.Invoke(tracker, null);
 
             Assert.AreSame(newFmm, SubscribedFmmField.GetValue(tracker),
                 "Subscribe 후 새 FMM에 구독됨");
-            Assert.AreSame(newQueue, SubscribedQueueField.GetValue(tracker),
-                "Subscribe 후 새 Queue에 구독됨");
             Assert.AreSame(newIm, SubscribedImField.GetValue(tracker),
                 "Subscribe 후 새 IM에 구독됨");
         }
@@ -1057,27 +1010,15 @@ namespace DungeonEditor.Tests
 
                 DungeonSessionTracker sceneTracker = sceneTrackers[0];
                 var sceneFmm = (FieldModeManager)FmmField.GetValue(sceneTracker);
-                var sceneQueue = (MonsterEncounterQueue)QueueField.GetValue(sceneTracker);
                 var sceneIm = (InventoryManager)ImField.GetValue(sceneTracker);
-                var sceneCharacterCatalog = (CharacterCatalog)CharacterCatalogField.GetValue(sceneTracker);
-                var sceneCorruptionConfigCatalog =
-                    (CorruptionConfigCatalog)CorruptionConfigCatalogField.GetValue(sceneTracker);
 
                 Assert.IsNotNull(sceneFmm, "fieldModeManager 참조가 연결되어야 한다");
-                Assert.IsNotNull(sceneQueue, "encounterQueue 참조가 연결되어야 한다");
                 Assert.IsNotNull(sceneIm, "inventoryManager 참조가 연결되어야 한다");
-                Assert.IsNotNull(sceneCharacterCatalog, "characterCatalog 참조가 연결되어야 한다");
-                Assert.IsNotNull(sceneCorruptionConfigCatalog,
-                    "corruptionConfigCatalog 참조가 연결되어야 한다");
-                Assert.IsNotNull(sceneCorruptionConfigCatalog.Find("default"),
-                    "corruptionConfigCatalog에 default 정의가 있어야 한다");
 
                 Assert.AreSame(sceneTracker.gameObject, sceneFmm.gameObject,
                     "fieldModeManager는 트래커와 같은 GameObject에 있어야 한다");
                 Assert.AreEqual(scene, sceneFmm.gameObject.scene,
                     "fieldModeManager는 같은 씬의 컴포넌트여야 한다");
-                Assert.AreEqual(scene, sceneQueue.gameObject.scene,
-                    "encounterQueue는 같은 씬의 컴포넌트여야 한다");
                 Assert.AreEqual(scene, sceneIm.gameObject.scene,
                     "inventoryManager는 같은 씬의 컴포넌트여야 한다");
 
@@ -1116,7 +1057,7 @@ namespace DungeonEditor.Tests
 
         private void InvokeDefeat(MonsterDefinition monster)
         {
-            HandleDefeat.Invoke(tracker, new object[] { monster });
+            tracker.RecordDefeatFromTransaction(monster, "CatKnight");
         }
 
         private void InvokeReward(InventoryRewardApplyResult result)

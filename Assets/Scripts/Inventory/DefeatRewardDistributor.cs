@@ -1,7 +1,10 @@
 using System.Collections.Generic;
+using Character;
 using Common;
+using Corruption;
 using Dungeon;
 using Enemy;
+using Field;
 using UnityEngine;
 
 namespace Inventory
@@ -40,6 +43,24 @@ namespace Inventory
         [Header("References")]
         [Tooltip("보상을 적용할 InventoryManager. 비워두면 실행 시 InventoryManager.Instance를 쓴다.")]
         [SerializeField] private InventoryManager inventoryManager;
+
+        [Tooltip("처치 보상의 킬·경험치를 메모리에 적용할 PlayerProgress.")]
+        [SerializeField] private PlayerProgress playerProgress;
+
+        [Tooltip("처치 직전 캐릭터를 캡처하고 행동력을 적용할 CharacterRoster.")]
+        [SerializeField] private CharacterRoster characterRoster;
+
+        [Tooltip("결과 원장에 캡처된 처치 캐릭터를 기록할 DungeonSessionTracker.")]
+        [SerializeField] private DungeonSessionTracker sessionTracker;
+
+        [Tooltip("현재 던전 정의를 읽을 FieldModeManager.")]
+        [SerializeField] private FieldModeManager fieldModeManager;
+
+        [Tooltip("처치 오염도 적용에 쓸 캐릭터 정의 카탈로그.")]
+        [SerializeField] private CharacterCatalog characterCatalog;
+
+        [Tooltip("처치 오염도 상한에 쓸 오염도 설정 카탈로그.")]
+        [SerializeField] private CorruptionConfigCatalog corruptionConfigCatalog;
 
         [Tooltip("처치 이벤트를 받을 MonsterEncounterQueue. 비워두면 실행 시 씬에서 하나를 찾아 쓴다 - " +
                  "찾지 못하면 보상이 전혀 지급되지 않으므로 오류를 남긴다.")]
@@ -182,19 +203,75 @@ namespace Inventory
         private void HandleMonsterDefeated(MonsterDefinition defeatedMonster)
         {
             InventoryManager inventory = ResolveInventory();
-            if (inventory == null)
+            PlayerProgress progress = ResolvePlayerProgress();
+            CharacterRoster roster = ResolveCharacterRoster();
+            DungeonDefinition dungeon = ResolveDungeon();
+            if (inventory == null || progress == null || roster == null || dungeon == null ||
+                characterCatalog == null || corruptionConfigCatalog == null ||
+                !SaveSystem.TryGetLoadedData(out SaveData data))
             {
-                Debug.LogError("[DefeatRewardDistributor] InventoryManager를 찾지 못해 보상을 지급하지 " +
-                               "못했습니다.", this);
+                Debug.LogError("[DefeatRewardDistributor] 처치 저장 트랜잭션의 필수 참조 또는 저장 데이터를 " +
+                               "찾지 못했습니다.", this);
                 return;
             }
 
+            // MonsterDefeated는 Target.AnyTargetDefeated보다 먼저 발행된다. 여기서 한 번 잡은 캐릭터는
+            // 저장 성공 뒤의 자동 교체와 무관하게 이 처치의 경험치·행동력·오염도·원장 귀속 기준이다.
+            CharacterDefinition defeatedCharacter = roster.Current;
+            string defeatingCharacterId = defeatedCharacter != null ? defeatedCharacter.CharacterId : null;
+            ResolveSessionTracker()?.RecordDefeatFromTransaction(defeatedMonster, defeatingCharacterId);
+
             DefeatReward reward = BuildReward(defeatedMonster, UnityRollBelow);
+            SaveMetadataSnapshot metadata = SaveMetadataSnapshot.Capture(data);
+            DefeatRewardMutationReceipt inventoryReceipt = null;
+            PlayerProgress.DefeatProgressMutationReceipt progressReceipt = null;
+            CharacterRoster.DefeatStaminaMutationReceipt staminaReceipt = null;
+            DungeonCorruptionSettlementService.DefeatCorruptionMutationReceipt corruptionReceipt = null;
 
-            InventoryRewardApplyResult actual =
-                inventory.ApplyRewards(reward.Currency, ToRewardStacks(reward));
+            try
+            {
+                inventoryReceipt = inventory.ApplyDefeatRewardsWithoutSave(reward.Currency, ToRewardStacks(reward));
+                progressReceipt = progress.ApplyDefeatWithoutSave(defeatedCharacter);
+                staminaReceipt = roster.SpendDefeatStaminaWithoutSave(defeatedCharacter);
+                corruptionReceipt = new DungeonCorruptionSettlementService(
+                    characterCatalog, corruptionConfigCatalog, SaveSystem.Save)
+                    .ApplyDefeatWithoutSave(dungeon, defeatingCharacterId, data);
 
-            if (!actual.IsEmpty) ShowRewardToast(actual);
+                bool changed = inventoryReceipt.Changed || progressReceipt.Changed ||
+                               staminaReceipt.Changed || corruptionReceipt.Changed;
+                if (!changed) return;
+                if (!SaveSystem.Save())
+                {
+                    Rollback(data, metadata, inventory, inventoryReceipt, progress, progressReceipt,
+                        roster, staminaReceipt, corruptionReceipt);
+                    return;
+                }
+
+                inventory.NotifyDefeatRewardsAfterExternalSave(inventoryReceipt);
+                progress.NotifyDefeatAfterExternalSave(progressReceipt);
+                roster.NotifyDefeatStaminaAfterExternalSave(staminaReceipt);
+                if (!inventoryReceipt.Result.IsEmpty) ShowRewardToast(inventoryReceipt.Result);
+            }
+            catch (System.Exception exception)
+            {
+                Rollback(data, metadata, inventory, inventoryReceipt, progress, progressReceipt,
+                    roster, staminaReceipt, corruptionReceipt);
+                Debug.LogError("[DefeatRewardDistributor] 처치 저장 트랜잭션 예외: " + exception.Message, this);
+            }
+        }
+
+        private static void Rollback(
+            SaveData data, SaveMetadataSnapshot metadata,
+            InventoryManager inventory, DefeatRewardMutationReceipt inventoryReceipt,
+            PlayerProgress progress, PlayerProgress.DefeatProgressMutationReceipt progressReceipt,
+            CharacterRoster roster, CharacterRoster.DefeatStaminaMutationReceipt staminaReceipt,
+            DungeonCorruptionSettlementService.DefeatCorruptionMutationReceipt corruptionReceipt)
+        {
+            DungeonCorruptionSettlementService.RollbackDefeat(corruptionReceipt);
+            roster?.RollbackDefeatStamina(staminaReceipt);
+            progress?.RollbackDefeat(progressReceipt);
+            inventory?.RollbackDefeatRewards(inventoryReceipt);
+            SaveData.RestoreMetadata(data, metadata);
         }
 
         /// <summary>보상 결과를 <see cref="InventoryManager.ApplyRewards"/>가 받는 목록으로 바꾼다.
@@ -395,6 +472,37 @@ namespace Inventory
 
             inventoryManager = InventoryManager.Instance;
             return inventoryManager;
+        }
+
+        private PlayerProgress ResolvePlayerProgress()
+        {
+            if (playerProgress != null) return playerProgress;
+            playerProgress = FindObjectOfType<PlayerProgress>(true);
+            return playerProgress;
+        }
+
+        private CharacterRoster ResolveCharacterRoster()
+        {
+            if (characterRoster != null) return characterRoster;
+            characterRoster = CharacterRoster.Instance != null
+                ? CharacterRoster.Instance
+                : FindObjectOfType<CharacterRoster>(true);
+            return characterRoster;
+        }
+
+        private DungeonDefinition ResolveDungeon()
+        {
+            if (fieldModeManager == null) fieldModeManager = FindObjectOfType<FieldModeManager>(true);
+            return fieldModeManager != null && fieldModeManager.CurrentMode == FieldMode.Dungeon
+                ? fieldModeManager.CurrentDungeon
+                : null;
+        }
+
+        private DungeonSessionTracker ResolveSessionTracker()
+        {
+            if (sessionTracker != null) return sessionTracker;
+            sessionTracker = FindObjectOfType<DungeonSessionTracker>(true);
+            return sessionTracker;
         }
     }
 }

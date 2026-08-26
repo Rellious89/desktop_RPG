@@ -181,13 +181,11 @@ namespace Common
 
         private void OnEnable()
         {
-            Target.AnyTargetDefeated += HandleAnyTargetDefeated;
             CharacterRoster.CurrentCharacterChanged += HandleCurrentCharacterChanged;
         }
 
         private void OnDisable()
         {
-            Target.AnyTargetDefeated -= HandleAnyTargetDefeated;
             CharacterRoster.CurrentCharacterChanged -= HandleCurrentCharacterChanged;
         }
 

@@ -3416,10 +3416,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   fieldModeManager: {fileID: 468841861}
-  encounterQueue: {fileID: 324107453}
   inventoryManager: {fileID: 1047247884}
-  characterCatalog: {fileID: 11400000, guid: 5f24823f983054d358a82014246a9fa7, type: 2}
-  corruptionConfigCatalog: {fileID: 11400000, guid: 1b0f04d23c4bf4f278118382ebe826e0, type: 2}
 --- !u!114 &468841866
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7742,6 +7739,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   inventoryManager: {fileID: 1047247884}
+  playerProgress: {fileID: 628316359}
+  characterRoster: {fileID: 1900000011}
+  sessionTracker: {fileID: 468841865}
+  fieldModeManager: {fileID: 468841861}
+  characterCatalog: {fileID: 11400000, guid: 5f24823f983054d358a82014246a9fa7, type: 2}
+  corruptionConfigCatalog: {fileID: 11400000, guid: 1b0f04d23c4bf4f278118382ebe826e0, type: 2}
   encounterQueue: {fileID: 324107453}
   rewardToastFormat: "\uD68D\uB4DD: +{0} \uC7AC\uD654 / {1} x{2}"
   itemOnlyToastFormat: "\uD68D\uB4DD: {0} x{1}"

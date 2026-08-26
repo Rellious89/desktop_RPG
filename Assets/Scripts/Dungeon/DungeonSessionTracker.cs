@@ -3,7 +3,6 @@ using Enemy;
 using Field;
 using Inventory;
 using Character;
-using Corruption;
 using Common;
 using UnityEngine;
 
@@ -13,15 +12,11 @@ namespace Dungeon
     public class DungeonSessionTracker : MonoBehaviour
     {
         [SerializeField] private FieldModeManager fieldModeManager;
-        [SerializeField] private MonsterEncounterQueue encounterQueue;
         [SerializeField] private InventoryManager inventoryManager;
-        [SerializeField] private CharacterCatalog characterCatalog;
-        [SerializeField] private CorruptionConfigCatalog corruptionConfigCatalog;
 
         private readonly DungeonSessionLedger ledger = new DungeonSessionLedger();
 
         private FieldModeManager subscribedFmm;
-        private MonsterEncounterQueue subscribedQueue;
         private InventoryManager subscribedIm;
         private Func<double> realtimeSecondsProvider;
         private double activeSessionStartedAt;
@@ -70,13 +65,6 @@ namespace Dungeon
                     Debug.LogError("[DungeonSessionTracker] FieldModeManager를 찾지 못했습니다 - " +
                                    "Inspector에서 연결하세요.", this);
             }
-            if (encounterQueue == null)
-            {
-                encounterQueue = FindObjectOfType<MonsterEncounterQueue>(true);
-                if (encounterQueue == null)
-                    Debug.LogError("[DungeonSessionTracker] MonsterEncounterQueue를 찾지 못했습니다 - " +
-                                   "Inspector에서 연결하세요.", this);
-            }
             if (inventoryManager == null)
             {
                 inventoryManager = FindObjectOfType<InventoryManager>(true);
@@ -95,11 +83,6 @@ namespace Dungeon
                 fieldModeManager.FieldModeChanged += HandleFieldModeChanged;
                 subscribedFmm = fieldModeManager;
             }
-            if (encounterQueue != null)
-            {
-                encounterQueue.MonsterDefeated += HandleMonsterDefeated;
-                subscribedQueue = encounterQueue;
-            }
             if (inventoryManager != null)
             {
                 inventoryManager.RewardApplied += HandleRewardApplied;
@@ -113,11 +96,6 @@ namespace Dungeon
             {
                 subscribedFmm.FieldModeChanged -= HandleFieldModeChanged;
                 subscribedFmm = null;
-            }
-            if (subscribedQueue != null)
-            {
-                subscribedQueue.MonsterDefeated -= HandleMonsterDefeated;
-                subscribedQueue = null;
             }
             if (subscribedIm != null)
             {
@@ -281,25 +259,15 @@ namespace Dungeon
             }
         }
 
-        private void HandleMonsterDefeated(MonsterDefinition monster)
+        /// <summary>
+        /// 처치 저장 트랜잭션이 캡처한 불변 컨텍스트를 결과 원장에 기록한다. 이 클래스가 처치 이벤트에서
+        /// 현재 캐릭터를 다시 읽으면, 성공 후 자동 교체와 구독 순서에 따라 귀속 대상이 바뀔 수 있으므로
+        /// 원장은 조정자가 넘긴 id만 신뢰한다.
+        /// </summary>
+        public void RecordDefeatFromTransaction(MonsterDefinition monster, string defeatingCharacterId)
         {
             if (!IsRecordingAligned()) return;
-            string characterId = CharacterRoster.Instance?.Current?.CharacterId;
-            ledger.RecordDefeat(monster, characterId);
-            if (monster == null || !monster.IsValid || string.IsNullOrEmpty(characterId)) return;
-            if (characterCatalog == null || corruptionConfigCatalog == null) return;
-            if (!SaveSystem.TryGetLoadedData(out SaveData data)) return;
-
-            try
-            {
-                new DungeonCorruptionSettlementService(
-                    characterCatalog, corruptionConfigCatalog, SaveSystem.Save)
-                    .TryApplyDefeat(fieldModeManager.CurrentDungeon, characterId, data);
-            }
-            catch (Exception e)
-            {
-                Debug.LogError("[DungeonSessionTracker] 처치 오염도 저장 예외: " + e.Message, this);
-            }
+            ledger.RecordDefeat(monster, defeatingCharacterId);
         }
 
         private void HandleRewardApplied(InventoryRewardApplyResult result)
