@@ -3250,7 +3250,6 @@ MonoBehaviour:
   stageCamera: {fileID: 2046182837}
   uiAnchor: {fileID: 351379136}
   interactionParent: {fileID: 2065249270}
-  openInnButton: {fileID: 940358989}
   buildingId: 1
   accessCatalog: {fileID: 11400000, guid: 665e5cb37510d4a56bd7d47abcc446aa, type: 2}
   typeCatalog: {fileID: 11400000, guid: 0f6ffced4fca54e959cd4a3262b83f48, type: 2}
@@ -10647,45 +10646,47 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9edb2437c5064208b1ae672413b4eeae, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   fieldModeManager: {fileID: 468841861}
   buttons:
-  - label: 용병 교체
+  - label: "\uC6A9\uBCD1 \uAD50\uCCB4"
     buttonRoot: {fileID: 824223291}
     showInTown: 1
     showInDungeon: 1
     panelToCloseWhenHidden: {fileID: 0}
-  - label: 인벤토리
+  - label: "\uC778\uBCA4\uD1A0\uB9AC"
     buttonRoot: {fileID: 600576599}
     showInTown: 1
     showInDungeon: 1
     panelToCloseWhenHidden: {fileID: 0}
-  - label: 회복소
+  - label: "\uD68C\uBCF5\uC18C"
     buttonRoot: {fileID: 180827937}
     showInTown: 1
     showInDungeon: 0
     panelToCloseWhenHidden: {fileID: 8395936239265254763}
-  - label: 던전
+  - label: "\uB358\uC804"
     buttonRoot: {fileID: 1249835704}
     showInTown: 1
     showInDungeon: 0
     panelToCloseWhenHidden: {fileID: 5543210792707666732}
-  - label: 마을 복귀
+  - label: "\uB9C8\uC744 \uBCF5\uADC0"
     buttonRoot: {fileID: 1893651797}
     showInTown: 0
     showInDungeon: 1
     panelToCloseWhenHidden: {fileID: 0}
-  - label: 용병 명부
+  - label: "\uC6A9\uBCD1 \uBA85\uBD80"
     buttonRoot: {fileID: 328858084}
     showInTown: 1
     showInDungeon: 0
     panelToCloseWhenHidden: {fileID: 1170337707}
-  - label: 기도
+    requiredBuildingId: 1
+  - label: "\uAE30\uB3C4"
     buttonRoot: {fileID: 1140199824}
     showInTown: 1
     showInDungeon: 0
     panelToCloseWhenHidden: {fileID: 7599717200964692829}
+    requiredBuildingId: 2
 --- !u!4 &1452980433 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4371201966070470695, guid: 8cc938fe21b426a4daedf2f6c7e34c80, type: 3}

@@ -33,6 +33,10 @@ namespace CharacterArchive
         [SerializeField] private LocalizedTMPText ownedCountLocalizer;
         [SerializeField] private PartyConfigCatalog partyConfigCatalog;
         [SerializeField] private PurificationConfigCatalog purificationConfigCatalog;
+
+        [Tooltip("이 명부를 여는 데 완공이 전제되는 건물 ID(여관 = 1). 하단 버튼 게이트를 우회한 직접 " +
+                 "Open에서도 이 건물이 확정 완료되기 전에는 패널을 열지 않는다.")]
+        [SerializeField] private string requiredBuildingId = "1";
         [Header("Party Toasts (Inspector에서만 연결)")]
         [SerializeField] private LocalizedTextReference recoveryLeaveBlockedToast;
         [SerializeField] private LocalizedTextReference partyJoinToast;
@@ -63,6 +67,18 @@ namespace CharacterArchive
         {
             if (CharacterArchiveDragPreview.HasActivePreview) { pendingRefresh = true; return; }
             RefreshContents();
+        }
+
+        protected override void OnEnable()
+        {
+            // 하단 버튼 게이트를 우회해 직접 Open()을 호출해도 미완공 여관에서는 패널을 열지 않는다.
+            // 미완공 상태에서 잠깐 보였다가 닫히는 프레임이 없도록 base.OnEnable 전에 막는다(기도 패널과 동일).
+            if (!IsBuildingComplete(requiredBuildingId))
+            {
+                gameObject.SetActive(false);
+                return;
+            }
+            base.OnEnable();
         }
 
         protected override void OnModalOpened()

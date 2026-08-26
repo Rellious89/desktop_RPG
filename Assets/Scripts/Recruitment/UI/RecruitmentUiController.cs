@@ -39,7 +39,6 @@ namespace Recruitment
         [SerializeField] private Camera stageCamera;
         [SerializeField] private Transform uiAnchor;
         [SerializeField] private RectTransform interactionParent;
-        [SerializeField] private GameObject openInnButton;
         [SerializeField] private string buildingId = "1";
         [SerializeField] private RecruitmentAccessCatalog accessCatalog;
         [SerializeField] private RecruitmentTypeCatalog typeCatalog;
@@ -173,7 +172,8 @@ namespace Recruitment
             Set(standbyRoot, state == RecruitmentUiState.Standby);
             Set(exhaustedRoot, state == RecruitmentUiState.Exhausted);
             Set(resultRoot, state == RecruitmentUiState.Result);
-            Set(openInnButton, false);
+            // 여관 완료 확인 버튼(btn_Open_Inn)의 표시는 TownBuildingInteractionController 하나가 소유한다 -
+            // 여기서 매 프레임 끄면 건축 완료 확인 버튼이 곧바로 사라진다.
         }
 
         private bool IsTownReady() => fieldModeManager != null && fieldModeManager.CurrentMode == FieldMode.Town &&

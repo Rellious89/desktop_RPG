@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Building;
 using Dungeon;
 using Field;
 using UnityEngine;
@@ -66,9 +67,23 @@ namespace Common
                      "닫지 않는다 - 다시 보이게 되어도 이 패널을 대신 열어주지는 않는다.")]
             public ModalPanel panelToCloseWhenHidden;
 
-            /// <summary>이 항목이 해당 모드에서 보여야 하는지.</summary>
+            [Tooltip("이 버튼을 여는 기능이 특정 건물의 완공을 전제로 할 때 그 건물 ID(선택). 비워두면 " +
+                     "건축 조건 없이 필드 규칙만 따른다. 값이 있으면 해당 건물이 사용자 완료 확정" +
+                     "(BuildingCompletionPolicy.IsConfirmedCompleted)되기 전까지 마을에서도 숨는다.")]
+            public string requiredBuildingId;
+
+            /// <summary>이 항목이 필드 모드 규칙상 보여야 하는지(건축 조건은 별도).</summary>
             public bool ShouldShowIn(FieldMode mode) =>
                 mode == FieldMode.Town ? showInTown : showInDungeon;
+
+            /// <summary>건축 게이트가 열려 있는지 - 요구 건물이 없거나, 있으면 그 건물이 확정 완료됐는지.
+            /// 완료 판정은 공통 정책 하나만 재사용한다(새 판정을 만들지 않는다).</summary>
+            public bool IsBuildingGateOpen()
+            {
+                if (string.IsNullOrEmpty(requiredBuildingId)) return true;
+                return BuildingCompletionPolicy.IsConfirmedCompleted(
+                    SaveSystem.Data, requiredBuildingId, DateTime.UtcNow);
+            }
 
             /// <summary>로그에 쓸 이름. 메모가 비어 있으면 연결된 오브젝트 이름을 쓴다.</summary>
             public string DescribeForLog()
@@ -96,6 +111,13 @@ namespace Common
         /// 결과가 목록 순서에 좌우되므로, 조용히 한쪽이 이기게 두지 않고 뒤쪽 항목을 처리에서 뺀다.</summary>
         private readonly HashSet<ButtonVisibilityEntry> skippedEntries = new HashSet<ButtonVisibilityEntry>();
 
+        /// <summary>건축 요구 조건이 걸린 항목만 추린 것과, 마지막으로 반영한 완료 상태. 완료 확정은
+        /// 필드 전환 없이도 일어나므로, 값이 바뀐 프레임에만 다시 적용해 완료 버튼 클릭 직후 메뉴 표시가
+        /// 갱신되게 한다. 목록은 <see cref="ValidateOnce"/>에서 한 번만 만들고, 두 리스트의 인덱스는
+        /// 항상 짝을 이룬다.</summary>
+        private readonly List<ButtonVisibilityEntry> gatedEntries = new List<ButtonVisibilityEntry>();
+        private readonly List<bool> gatedStates = new List<bool>();
+
         private bool subscribed;
 
         /// <summary>가장 마지막으로 적용한 모드(읽기 전용 런타임 상태). 검증/디버깅용이다.</summary>
@@ -114,6 +136,23 @@ namespace Common
         private void OnDisable()
         {
             Unsubscribe();
+        }
+
+        /// <summary>건축 완료 확정은 필드 전환 없이도 일어난다. 게이트가 걸린 항목의 완료 상태가
+        /// <b>바뀐 프레임에만</b> 다시 적용한다 - 그 외에는 완료 여부만 읽고 아무 것도 켜거나 끄지 않으므로
+        /// 버튼에 매 프레임 SetActive나 문자열 할당이 생기지 않는다.</summary>
+        private void Update()
+        {
+            if (gatedEntries.Count == 0) return;
+
+            for (int i = 0; i < gatedEntries.Count; i++)
+            {
+                if (gatedEntries[i].IsBuildingGateOpen() != gatedStates[i])
+                {
+                    Apply(AppliedMode);
+                    return;
+                }
+            }
         }
 
         private void Subscribe()
@@ -161,13 +200,19 @@ namespace Common
                 // 처리를 여기서 멈추지 않는다.
                 if (entry == null || entry.buttonRoot == null || skippedEntries.Contains(entry)) continue;
 
-                bool show = entry.ShouldShowIn(mode);
+                // 최종 표시 = 현재 필드에서 보이도록 설정됨 AND 요구 건물이 없거나 확정 완료됨.
+                bool show = entry.ShouldShowIn(mode) && entry.IsBuildingGateOpen();
 
                 // 숨기기 전에 닫는다 - 버튼이 사라진 뒤에도 그 패널만 화면에 남아 있으면 안 된다.
+                // 건축 미완공으로 숨기는 경우에도 같은 경로를 지나므로, 완공 전 열려 있던 패널이나
+                // 건축 Reset 직후 열려 있던 패널이 그대로 남지 않는다.
                 if (!show) CloseAttachedPanelIfOpen(entry);
 
                 SetActiveIfNeeded(entry.buttonRoot, show);
             }
+
+            // 방금 반영한 완료 상태를 게이트 캐시에 남긴다 - 다음 Update가 곧바로 다시 적용하지 않게 한다.
+            SyncGateStates();
         }
 
         /// <summary>이 항목에 연결된 패널이 <b>열려 있을 때만</b> 닫는다. 여는 것은 언제나 사용자의 몫이라
@@ -235,6 +280,36 @@ namespace Common
             {
                 Debug.LogWarning($"[FieldModeMenuButtonVisibilityController] '{name}': Button Root가 비어 있는 " +
                                  $"항목이 있어 건너뜁니다 - {missing}. Inspector에서 버튼 루트를 연결하세요.", this);
+            }
+
+            BuildGateCache();
+        }
+
+        /// <summary>건축 요구 조건이 걸린 정상 항목만 추려 둔다. 중복/비어 있는 항목은 표시 처리와 같은
+        /// 규칙으로 제외해, 게이트 감시가 처리되지 않는 버튼을 켜려 들지 않게 한다.</summary>
+        private void BuildGateCache()
+        {
+            gatedEntries.Clear();
+            gatedStates.Clear();
+
+            for (int i = 0; i < buttons.Count; i++)
+            {
+                ButtonVisibilityEntry entry = buttons[i];
+                if (entry == null || entry.buttonRoot == null || skippedEntries.Contains(entry)) continue;
+                if (string.IsNullOrEmpty(entry.requiredBuildingId)) continue;
+
+                gatedEntries.Add(entry);
+                gatedStates.Add(entry.IsBuildingGateOpen());
+            }
+        }
+
+        /// <summary>방금 반영한 완료 상태를 게이트 캐시에 기록한다. 두 리스트는 짝을 이루므로 인덱스로
+        /// 맞춰 넣는다 - 다음 <see cref="Update"/>가 같은 상태를 변화로 오인해 다시 적용하지 않게 한다.</summary>
+        private void SyncGateStates()
+        {
+            for (int i = 0; i < gatedEntries.Count; i++)
+            {
+                gatedStates[i] = gatedEntries[i].IsBuildingGateOpen();
             }
         }
 
