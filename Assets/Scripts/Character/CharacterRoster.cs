@@ -44,6 +44,16 @@ namespace Character
     [DisallowMultipleComponent]
     public class CharacterRoster : MonoBehaviour, IPartyCharacterLevelSource
     {
+        public sealed class DefeatStaminaMutationReceipt
+        {
+            internal DefeatStaminaMutationReceipt(CharacterDefinition character, CharacterSaveState state, int before, bool autoSwitch)
+            { Character = character; State = state; StaminaBefore = before; AutoSwitchNeeded = autoSwitch; }
+            public CharacterDefinition Character { get; }
+            internal CharacterSaveState State { get; }
+            public int StaminaBefore { get; }
+            public bool AutoSwitchNeeded { get; }
+            public bool Changed { get; internal set; }
+        }
         /// <summary>교체가 막히는 이유. UI가 사용자에게 무엇을 보여줄지 결정하는 근거다 -
         /// "선택했는데 아무 반응 없이 실패"하는 경로를 만들지 않기 위해 항상 이유를 함께 돌려준다.</summary>
         public enum SwapBlockReason
@@ -837,6 +847,32 @@ namespace Character
         {
             if (definition == null || amount == 0) return;
             SetStamina(definition, GetStamina(definition) - amount);
+        }
+
+        public DefeatStaminaMutationReceipt SpendDefeatStaminaWithoutSave(CharacterDefinition definition)
+        {
+            if (!TryGetOwnedState(definition, out CharacterDefinition canonical, out CharacterSaveState state))
+                return new DefeatStaminaMutationReceipt(null, null, 0, false);
+            int before = state.currentStamina;
+            int cost = GetStaminaCostPerDefeat(canonical);
+            int next = Mathf.Clamp(before - cost, 0, canonical.MaxStamina);
+            bool auto = before > 0 && next == 0;
+            var receipt = new DefeatStaminaMutationReceipt(canonical, state, before, auto);
+            if (next != before) { state.currentStamina = next; receipt.Changed = true; }
+            return receipt;
+        }
+
+        public void RollbackDefeatStamina(DefeatStaminaMutationReceipt receipt)
+        {
+            if (receipt == null || receipt.State == null || !receipt.Changed) return;
+            receipt.State.currentStamina = receipt.StaminaBefore;
+        }
+
+        public void NotifyDefeatStaminaAfterExternalSave(DefeatStaminaMutationReceipt receipt)
+        {
+            if (receipt == null || !receipt.Changed) return;
+            RaiseCharacterStateChanged(receipt.Character);
+            if (receipt.AutoSwitchNeeded) TryAutoSwitchAfterDefeat(receipt.Character);
         }
 
         /// <summary>현재 행동력을 직접 지정한다(0 ~ Max Stamina로 잘린다). 값이 실제로 바뀐 경우에만

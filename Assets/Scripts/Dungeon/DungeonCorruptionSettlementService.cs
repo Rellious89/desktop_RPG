@@ -8,6 +8,14 @@ namespace Dungeon
 {
     public sealed class DungeonCorruptionSettlementService
     {
+        public sealed class DefeatCorruptionMutationReceipt
+        {
+            internal DefeatCorruptionMutationReceipt(CharacterSaveState state, double before, bool changed)
+            { State = state; CorruptionBefore = before; Changed = changed; }
+            internal CharacterSaveState State { get; }
+            public double CorruptionBefore { get; }
+            public bool Changed { get; }
+        }
         private readonly CharacterCatalog characters;
         private readonly CorruptionConfigCatalog configs;
         private readonly Func<bool> save;
@@ -25,39 +33,43 @@ namespace Dungeon
         /// </summary>
         public bool TryApplyDefeat(DungeonDefinition dungeon, string characterId, SaveData data)
         {
+            DefeatCorruptionMutationReceipt receipt = ApplyDefeatWithoutSave(dungeon, characterId, data);
+            if (!receipt.Changed) return false;
+            SaveMetadataSnapshot metadata = SaveMetadataSnapshot.Capture(data);
+            try { if (save != null && save()) return true; }
+            catch { RollbackDefeat(receipt); SaveData.RestoreMetadata(data, metadata); throw; }
+            RollbackDefeat(receipt); SaveData.RestoreMetadata(data, metadata); return false;
+        }
+
+        public DefeatCorruptionMutationReceipt ApplyDefeatWithoutSave(
+            DungeonDefinition dungeon, string characterId, SaveData data)
+        {
             if (dungeon == null || data == null || string.IsNullOrEmpty(characterId))
-                return false;
+                return new DefeatCorruptionMutationReceipt(null, 0d, false);
 
             CorruptionConfigDefinition config = configs != null ? configs.Find("default") : null;
-            if (config == null) return false;
+            if (config == null) return new DefeatCorruptionMutationReceipt(null, 0d, false);
 
             CharacterSaveState state = Find(data.characters, characterId);
             CharacterDefinition definition = characters != null ? characters.Find(characterId) : null;
-            if (state == null || definition == null) return false;
+            if (state == null || definition == null) return new DefeatCorruptionMutationReceipt(null, 0d, false);
 
             double gain = CalculateGain(1L, dungeon.CorruptionGainPerDefeat);
-            if (gain <= 0d) return false;
+            if (gain <= 0d) return new DefeatCorruptionMutationReceipt(state, state.currentCorruption, false);
 
             double current = Valid(state.currentCorruption) ? state.currentCorruption : 0d;
             current = Math.Max(current, definition.BaseCorruption);
             double next = Math.Min(config.MaxCorruption, current + gain);
-            if (next == state.currentCorruption) return false;
-
-            SaveMetadataSnapshot metadata = SaveMetadataSnapshot.Capture(data);
+            if (next == state.currentCorruption) return new DefeatCorruptionMutationReceipt(state, state.currentCorruption, false);
             double previous = state.currentCorruption;
             state.currentCorruption = next;
-            try
-            {
-                if (save != null && save()) return true;
-            }
-            catch
-            {
-                Rollback(data, metadata, state, previous);
-                throw;
-            }
+            return new DefeatCorruptionMutationReceipt(state, previous, true);
+        }
 
-            Rollback(data, metadata, state, previous);
-            return false;
+        public static void RollbackDefeat(DefeatCorruptionMutationReceipt receipt)
+        {
+            if (receipt == null || !receipt.Changed || receipt.State == null) return;
+            receipt.State.currentCorruption = receipt.CorruptionBefore;
         }
 
         public static double CalculateGain(long defeats, double gainPerDefeat)

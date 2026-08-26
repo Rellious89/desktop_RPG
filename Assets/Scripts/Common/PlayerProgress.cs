@@ -41,6 +41,22 @@ namespace Common
     /// </summary>
     public class PlayerProgress : MonoBehaviour
     {
+        public sealed class DefeatProgressMutationReceipt
+        {
+            internal DefeatProgressMutationReceipt(int kills, CharacterSaveState state, int level, int exp, int cacheLevel, int cacheExp, int cacheRequired, Growth growth)
+            { KillCountBefore = kills; State = state; LevelBefore = level; ExpBefore = exp; CacheLevelBefore = cacheLevel; CacheExpBefore = cacheExp; CacheRequiredBefore = cacheRequired; Growth = growth; }
+            public int KillCountBefore { get; }
+            internal CharacterSaveState State { get; }
+            public int LevelBefore { get; }
+            public int ExpBefore { get; }
+            public int CacheLevelBefore { get; }
+            public int CacheExpBefore { get; }
+            public int CacheRequiredBefore { get; }
+            internal Growth Growth { get; set; }
+            public bool Changed { get; internal set; }
+        }
+
+        public static PlayerProgress Instance { get; private set; }
         [Header("Kill Count (저장 파일이 없을 때만 쓰는 시작값)")]
         [SerializeField] private int totalKillCount = 0;
 
@@ -137,6 +153,7 @@ namespace Common
 
         private void Awake()
         {
+            Instance = this;
             IsInitialized = false;
 
             SaveData save = SaveSystem.Data;
@@ -155,6 +172,11 @@ namespace Common
             // 레벨업 연출과 실제 경험치 획득 연출을 가르는 경계다.
             IsInitialized = true;
             OnProgressInitialized?.Invoke();
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
         }
 
         private void OnEnable()
@@ -258,6 +280,44 @@ namespace Common
             RaiseGrowthEvents(growth);
         }
 
+        public DefeatProgressMutationReceipt ApplyDefeatWithoutSave(CharacterDefinition defeatedCharacter)
+        {
+            CharacterSaveState state = null;
+            CharacterDefinition canonical = null;
+            CharacterRoster roster = CharacterRoster.Instance;
+            if (roster != null && roster.TryGetCurrentState(out canonical, out state) &&
+                (defeatedCharacter == null || canonical.CharacterId == defeatedCharacter.CharacterId)) { }
+            else { roster = null; canonical = null; state = null; }
+            var receipt = new DefeatProgressMutationReceipt(TotalKillCount, state,
+                state != null ? state.level : 0, state != null ? state.currentExp : 0,
+                CurrentLevel, CurrentExp, ExpToNextLevel, default);
+            TotalKillCount++;
+            SaveSystem.Data.totalKillCount = TotalKillCount;
+            if (state == null || expPerTargetDefeat <= 0) { receipt.Changed = true; return receipt; }
+            CharacterProgressionResult result = Progression.Grant(state, expPerTargetDefeat);
+            if (result.Changed)
+            {
+                PublishSnapshot(result.NewLevel, result.NewExp);
+                receipt.Growth = new Growth(roster, canonical, result);
+            }
+            receipt.Changed = true;
+            return receipt;
+        }
+
+        public void RollbackDefeat(DefeatProgressMutationReceipt receipt)
+        {
+            if (receipt == null) return;
+            TotalKillCount = receipt.KillCountBefore; SaveSystem.Data.totalKillCount = receipt.KillCountBefore;
+            if (receipt.State != null) { receipt.State.level = receipt.LevelBefore; receipt.State.currentExp = receipt.ExpBefore; }
+            CurrentLevel = receipt.CacheLevelBefore; CurrentExp = receipt.CacheExpBefore; ExpToNextLevel = receipt.CacheRequiredBefore;
+        }
+
+        public void NotifyDefeatAfterExternalSave(DefeatProgressMutationReceipt receipt)
+        {
+            if (receipt == null || !receipt.Changed) return;
+            if (receipt.Growth.Result.Changed) RaiseGrowthEvents(receipt.Growth);
+        }
+
         /// <summary>
         /// 경험치를 실제로 적용하고 표시값을 맞춘다. <b>저장하지도 알리지도 않는다</b> - 저장과 알림의
         /// 순서를 부르는 쪽이 정할 수 있도록 "값 고치기"와 "알리기"를 갈라 둔다.
@@ -314,7 +374,7 @@ namespace Common
 
         /// <summary>값을 고친 결과 중 <b>알릴 때 필요한 것</b>만 담아 두는 자리. 알리는 시점에 저장
         /// 항목을 다시 읽지 않기 위해서다 - 그 사이에 값이 또 바뀌었는지 알 수 없다.</summary>
-        private readonly struct Growth
+        internal readonly struct Growth
         {
             public CharacterRoster Roster { get; }
 

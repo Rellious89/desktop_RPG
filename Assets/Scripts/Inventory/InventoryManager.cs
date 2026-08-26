@@ -52,6 +52,16 @@ namespace Inventory
         public bool IsEmpty => !Changed;
     }
 
+    public sealed class DefeatRewardMutationReceipt
+    {
+        internal DefeatRewardMutationReceipt(int currency, InventoryItemState[] items, InventoryRewardApplyResult result)
+        { CurrencyBefore = currency; ItemsBefore = items; Result = result; }
+        public int CurrencyBefore { get; }
+        internal InventoryItemState[] ItemsBefore { get; }
+        public InventoryRewardApplyResult Result { get; }
+        public bool Changed => Result != null && Result.Changed;
+    }
+
     /// <summary>
     /// <see cref="InventoryManager.TrySpendCostWithoutSave"/>가 <b>무엇을 뺐고, 빼기 <i>직전</i>의
     /// 인벤토리가 어떤 모양이었는지</b>를 함께 담는 영수증.
@@ -529,6 +539,37 @@ namespace Inventory
             return result;
         }
 
+        public DefeatRewardMutationReceipt ApplyDefeatRewardsWithoutSave(
+            int currencyAmount, IReadOnlyList<RewardItemStack> itemStacks)
+        {
+            int currencyBefore = SaveSystem.Data.currency;
+            InventoryItemState[] itemsBefore = CopyItems(SaveSystem.Data.items);
+            Dictionary<string, int> countsBefore = SnapshotItemCounts();
+            bool changed = ApplyCurrencyDelta(currencyAmount);
+            if (itemStacks != null)
+                for (int i = 0; i < itemStacks.Count; i++)
+                    changed |= ApplyItemDelta(itemStacks[i].Definition, itemStacks[i].Count);
+            InventoryRewardApplyResult result = changed
+                ? BuildResult(currencyBefore, countsBefore, itemStacks)
+                : InventoryRewardApplyResult.Empty;
+            return new DefeatRewardMutationReceipt(currencyBefore, itemsBefore, result);
+        }
+
+        public void RollbackDefeatRewards(DefeatRewardMutationReceipt receipt)
+        {
+            if (receipt == null) return;
+            SaveSystem.Data.currency = receipt.CurrencyBefore;
+            SaveSystem.Data.items = RestoreItems(receipt.ItemsBefore);
+            entryCacheDirty = true;
+        }
+
+        public void NotifyDefeatRewardsAfterExternalSave(DefeatRewardMutationReceipt receipt)
+        {
+            if (receipt == null || !receipt.Changed) return;
+            NotifyChangedAfterExternalSave();
+            RewardApplied?.Invoke(receipt.Result);
+        }
+
         /// <summary>
         /// 잔액이 충분할 때만 차감한다. 부족하면 <b>아무것도 바꾸지 않고</b> false를 돌려준다.
         ///
@@ -903,6 +944,23 @@ namespace Inventory
                     snapshot[states[i].itemId] = states[i].count;
             }
             return snapshot;
+        }
+
+        private static InventoryItemState[] CopyItems(List<InventoryItemState> source)
+        {
+            if (source == null) return Array.Empty<InventoryItemState>();
+            var copy = new InventoryItemState[source.Count];
+            for (int i = 0; i < source.Count; i++)
+                copy[i] = source[i] == null ? null : new InventoryItemState { itemId = source[i].itemId, count = source[i].count };
+            return copy;
+        }
+
+        private static List<InventoryItemState> RestoreItems(InventoryItemState[] source)
+        {
+            var result = new List<InventoryItemState>(source != null ? source.Length : 0);
+            if (source != null) for (int i = 0; i < source.Length; i++)
+                result.Add(source[i] == null ? null : new InventoryItemState { itemId = source[i].itemId, count = source[i].count });
+            return result;
         }
 
         private InventoryRewardApplyResult BuildResult(
