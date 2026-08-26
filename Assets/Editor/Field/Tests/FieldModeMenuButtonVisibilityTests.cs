@@ -45,6 +45,7 @@ namespace FieldEditor.Tests
         private const string ReturnTown = "btn_ReturnTown";
         private const string Archive = "btn_CharacterArchive";
         private const string Purification = "btn_Purification";
+        private const string ExitGame = "btn_exitGame";
 
         private readonly List<Object> created = new List<Object>();
 
@@ -141,13 +142,14 @@ namespace FieldEditor.Tests
                 new List<FieldModeMenuButtonVisibilityController.ButtonVisibilityEntry>(entries));
         }
 
-        /// <summary>씬에 등록된 7개 항목을 그대로 만든다.</summary>
+        /// <summary>씬에 등록된 8개 항목을 그대로 만든다.</summary>
         private void SetSceneEntries(
             ModalPanel recoveryPanel = null,
             ModalPanel dungeonPanel = null,
             ModalPanel archivePanel = null,
             ModalPanel purificationPanel = null)
         {
+            AddButton(ExitGame);
             AddButton(Switching);
             AddButton(Inventory);
             AddButton(Recovery);
@@ -157,6 +159,7 @@ namespace FieldEditor.Tests
             AddButton(Purification);
 
             SetEntries(
+                Entry("게임 종료", Root(ExitGame), true, true),
                 Entry("용병 교체", Root(Switching), true, true),
                 Entry("인벤토리", Root(Inventory), true, true),
                 Entry("회복소", Root(Recovery), true, false, recoveryPanel),
@@ -219,24 +222,39 @@ namespace FieldEditor.Tests
         // ---- 시험 ----
 
         [Test]
-        public void Town_ShowsSixButtons_AndHidesReturnTown()
+        public void Town_ShowsSevenButtons_AndHidesReturnTown()
         {
             SetSceneEntries();
 
             EnableController();
 
-            AssertVisible("마을", Switching, Inventory, Recovery, DungeonEntry, Archive, Purification);
+            AssertVisible("마을", ExitGame, Switching, Inventory, Recovery, DungeonEntry, Archive, Purification);
         }
 
         [Test]
-        public void Dungeon_ShowsOnlySwitchingInventoryAndReturnTown()
+        public void Dungeon_ShowsOnlyExitSwitchingInventoryAndReturnTown()
         {
             SetSceneEntries();
             EnableController();
 
             EnterDungeon();
 
-            AssertVisible("던전", Switching, Inventory, ReturnTown);
+            AssertVisible("던전", ExitGame, Switching, Inventory, ReturnTown);
+        }
+
+        [Test]
+        public void ExitGameButton_StaysVisibleInBothFields()
+        {
+            SetSceneEntries();
+            EnableController();
+
+            Assert.IsTrue(Root(ExitGame).activeSelf, "종료 버튼은 마을에서 보여야 한다");
+
+            EnterDungeon();
+            Assert.IsTrue(Root(ExitGame).activeSelf, "종료 버튼은 던전에서도 보여야 한다");
+
+            ReturnToTown();
+            Assert.IsTrue(Root(ExitGame).activeSelf, "마을로 돌아와도 그대로 보여야 한다");
         }
 
         [Test]
@@ -303,7 +321,7 @@ namespace FieldEditor.Tests
             EnterDungeon();
             ReturnToTown();
 
-            AssertVisible("마을 복귀", Switching, Inventory, Recovery, DungeonEntry, Archive, Purification);
+            AssertVisible("마을 복귀", ExitGame, Switching, Inventory, Recovery, DungeonEntry, Archive, Purification);
             Assert.IsFalse(archive.gameObject.activeSelf, "닫힌 패널을 대신 열어주지 않는다");
         }
 
@@ -349,14 +367,14 @@ namespace FieldEditor.Tests
             btnArea.SetActive(false);
 
             EnterDungeon();
-            AssertVisible("접힌 상태에서의 던전 전환", Switching, Inventory, ReturnTown);
+            AssertVisible("접힌 상태에서의 던전 전환", ExitGame, Switching, Inventory, ReturnTown);
 
             // 펼침: 접혀 있는 동안 정해진 표시 상태가 그대로 드러난다.
             btnArea.SetActive(true);
-            AssertVisible("펼친 뒤 던전", Switching, Inventory, ReturnTown);
+            AssertVisible("펼친 뒤 던전", ExitGame, Switching, Inventory, ReturnTown);
 
             ReturnToTown();
-            AssertVisible("펼친 뒤 마을", Switching, Inventory, Recovery, DungeonEntry, Archive, Purification);
+            AssertVisible("펼친 뒤 마을", ExitGame, Switching, Inventory, Recovery, DungeonEntry, Archive, Purification);
         }
 
         [Test]
@@ -368,7 +386,7 @@ namespace FieldEditor.Tests
             EnableController();
             EnableController();
 
-            AssertVisible("같은 상태 반복 적용", Switching, Inventory, Recovery, DungeonEntry, Archive, Purification);
+            AssertVisible("같은 상태 반복 적용", ExitGame, Switching, Inventory, Recovery, DungeonEntry, Archive, Purification);
         }
 
         [Test]
@@ -380,11 +398,11 @@ namespace FieldEditor.Tests
             DisableController();
             EnterDungeon();
 
-            AssertVisible("구독 해제 뒤", Switching, Inventory, Recovery, DungeonEntry, Archive, Purification);
+            AssertVisible("구독 해제 뒤", ExitGame, Switching, Inventory, Recovery, DungeonEntry, Archive, Purification);
 
             // 다시 켜면 놓친 전환을 그 자리에서 따라잡는다.
             EnableController();
-            AssertVisible("재활성화 뒤", Switching, Inventory, ReturnTown);
+            AssertVisible("재활성화 뒤", ExitGame, Switching, Inventory, ReturnTown);
         }
 
         [Test]
