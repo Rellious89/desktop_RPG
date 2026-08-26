@@ -111,6 +111,13 @@ namespace TableDataEditor
                 "Rebuild (PurificationConfig)", TableDataPaths.PurificationConfigOutputFolder);
         }
 
+        [MenuItem(MenuRoot + "Rebuild (Dungeon only)", priority = 108)]
+        public static void RebuildDungeonTable()
+        {
+            Run(TableDataRebuildScope.DungeonTable,
+                "Rebuild (Dungeon)", TableDataPaths.DungeonOutputFolder);
+        }
+
         private static void Run(TableDataRebuildScope scope, string label, string outputDescription)
         {
             TableDataRebuildResult result = TableDataRebuilder.Rebuild(scope);

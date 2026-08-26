@@ -77,6 +77,7 @@ namespace TableDataEditor
         PartyConfigTable = 4,
         CorruptionConfigTable = 5,
         PurificationConfigTable = 6,
+        DungeonTable = 7,
     }
 
     /// <summary>
@@ -95,7 +96,8 @@ namespace TableDataEditor
                    || scope == TableDataRebuildScope.RecruitmentTables
                    || scope == TableDataRebuildScope.PartyConfigTable
                    || scope == TableDataRebuildScope.CorruptionConfigTable
-                   || scope == TableDataRebuildScope.PurificationConfigTable;
+                   || scope == TableDataRebuildScope.PurificationConfigTable
+                   || scope == TableDataRebuildScope.DungeonTable;
         }
 
         /// <summary>지원하지 않는 값이면 <b>아무것도 하기 전에</b> 던진다.</summary>
@@ -109,7 +111,8 @@ namespace TableDataEditor
                 $"{nameof(TableDataRebuildScope.BuildingTable)}, " +
                 $"{nameof(TableDataRebuildScope.RecruitmentTables)}, " +
                 $"{nameof(TableDataRebuildScope.PartyConfigTable)}, " +
-                $"{nameof(TableDataRebuildScope.CorruptionConfigTable)}만 " +
+                $"{nameof(TableDataRebuildScope.CorruptionConfigTable)}, {nameof(TableDataRebuildScope.PurificationConfigTable)}, " +
+                $"{nameof(TableDataRebuildScope.DungeonTable)}만 " +
                 "쓸 수 있습니다. 임의의 부분집합을 허용하면 범위 밖 표를 가리키던 참조가 지워집니다.");
         }
 
@@ -158,6 +161,12 @@ namespace TableDataEditor
         {
             EnsureSupported(scope, nameof(scope));
             return scope == TableDataRebuildScope.All || scope == TableDataRebuildScope.PurificationConfigTable;
+        }
+
+        public static bool IncludesDungeonTable(TableDataRebuildScope scope)
+        {
+            EnsureSupported(scope, nameof(scope));
+            return scope == TableDataRebuildScope.All || scope == TableDataRebuildScope.DungeonTable;
         }
     }
 
@@ -257,8 +266,7 @@ namespace TableDataEditor
         private const string BaseCapacityField = "baseCapacity";
         private const string PartyConfigEnabledField = "enabled";
         private const string BaseCorruptionField = "baseCorruption";
-        private const string CorruptionIntervalSecondsField = "corruptionIntervalSeconds";
-        private const string CorruptionGainPerIntervalField = "corruptionGainPerInterval";
+        private const string CorruptionGainPerDefeatField = "corruptionGainPerDefeat";
 
         // 관계가 가리키는 두 참조 칸. 문자열로 되돌아가 있으면 objectReferenceValue에 넣은 값이
         // 조용히 버려지므로, 이름뿐 아니라 타입까지 미리 확인한다(재화 칸과 같은 이유다).
@@ -304,6 +312,7 @@ namespace TableDataEditor
 
             if (scope == TableDataRebuildScope.CorruptionConfigTable) return RebuildCorruptionConfigTable(result, snapshot);
             if (scope == TableDataRebuildScope.PurificationConfigTable) return RebuildPurificationConfigTable(result, snapshot);
+            if (scope == TableDataRebuildScope.DungeonTable) return RebuildDungeonTable(result, snapshot);
 
             if (scope == TableDataRebuildScope.CharacterSkillTables) return RebuildCharacterTables(result, snapshot);
             if (scope == TableDataRebuildScope.BuildingTable) return RebuildBuildingTable(result, snapshot);
@@ -424,6 +433,44 @@ namespace TableDataEditor
             serialized.FindProperty("dangerStaminaCostMultiplier").intValue = row.DangerStaminaCostMultiplier;
             serialized.FindProperty("enabled").boolValue = row.Enabled;
             serialized.ApplyModifiedPropertiesWithoutUndo(); EditorUtility.SetDirty(asset);
+        }
+
+        /// <summary>
+        /// Dungeon.csv만 다시 쓴다. 월드/몬스터/아이템은 생성된 기존 에셋을 읽어서 참조만 잇고,
+        /// 이 범위에서는 어떤 다른 도메인도 SetDirty하거나 저장하지 않는다.
+        /// </summary>
+        private static TableDataRebuildResult RebuildDungeonTable(TableDataRebuildResult result, TableDataSnapshot snapshot)
+        {
+            Dictionary<string, WorldDefinition> worlds = LoadGeneratedSingles<WorldDefinition>(
+                TableDataPaths.WorldOutputFolder, value => value.WorldId);
+            Dictionary<string, MonsterDefinition> monsters = LoadGeneratedSingles<MonsterDefinition>(
+                TableDataPaths.MonsterOutputFolder, value => value.MonsterId);
+            Dictionary<string, ItemDefinition> items = LoadGeneratedSingles<ItemDefinition>(
+                TableDataPaths.ItemOutputFolder, value => value.ItemId);
+            Dictionary<string, DungeonDefinition> dungeons = ResolveTargets<DungeonDefinition>(
+                TableDataPaths.DungeonOutputFolder, value => value.DungeonId,
+                snapshot.Dungeons.ConvertAll(row => row.Id), TableDataPaths.DungeonAssetPath,
+                TableDataPaths.DungeonCsvFileName, TableDataColumns.DungeonId, result);
+            DungeonCatalog catalog = ResolveSingleton<DungeonCatalog>(TableDataPaths.DungeonCatalogAssetPath, result);
+
+            AssetDatabase.StartAssetEditing();
+            try
+            {
+                foreach (DungeonRow row in snapshot.Dungeons)
+                    WriteDungeon(dungeons[row.Id], row, worlds, monsters, items);
+                WriteCatalog(catalog, "dungeons",
+                    SortForCatalog(snapshot.Dungeons, row => row.Enabled, row => row.DisplayOrder, row => row.Id, dungeons));
+            }
+            finally
+            {
+                AssetDatabase.StopAssetEditing();
+            }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            catalog.MarkDirty();
+            result.Wrote = true;
+            return result;
         }
 
         private static TableDataRebuildResult RebuildCorruptionConfigTable(TableDataRebuildResult result, TableDataSnapshot snapshot)
@@ -1159,6 +1206,9 @@ namespace TableDataEditor
                 EnsureFolder(TableDataPaths.OutputRoot, "Dungeon");
             }
 
+            if (TableDataRebuildScopes.IncludesDungeonTable(scope))
+                EnsureFolder(TableDataPaths.OutputRoot, "Dungeon");
+
             if (TableDataRebuildScopes.IncludesCharacterTables(scope))
             {
                 EnsureFolder(TableDataPaths.OutputRoot, "Character");
@@ -1390,8 +1440,7 @@ namespace TableDataEditor
             }
 
             serialized.FindProperty("requiredCharacterLevel").intValue = row.RequiredCharacterLevel;
-            serialized.FindProperty(CorruptionIntervalSecondsField).intValue = row.CorruptionIntervalSeconds;
-            serialized.FindProperty(CorruptionGainPerIntervalField).intValue = row.CorruptionGainPerInterval;
+            serialized.FindProperty(CorruptionGainPerDefeatField).doubleValue = row.CorruptionGainPerDefeat;
 
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(asset);
@@ -1624,8 +1673,8 @@ namespace TableDataEditor
             ok &= VerifyMonsterCurrencyIsAReference(log);
             ok &= VerifyDropEntryFields(log);
             ok &= VerifyFields<DungeonDefinition>(log, "dungeonId", "dungeonName", "world", "representativeSprite",
-                "monsters", "rewardItems", "requiredCharacterLevel", CorruptionIntervalSecondsField,
-                CorruptionGainPerIntervalField, "displayOrder");
+                "monsters", "rewardItems", "requiredCharacterLevel", CorruptionGainPerDefeatField,
+                "displayOrder");
             ok &= VerifyFields<WorldCatalog>(log, "worlds");
             ok &= VerifyFields<CurrencyCatalog>(log, "currencies");
             ok &= VerifyFields<ItemCatalog>(log, "items");

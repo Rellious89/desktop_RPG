@@ -163,8 +163,7 @@ namespace TableDataEditor
 
         /// <summary>표에 적힌 필요 캐릭터 레벨. 1 이상만 여기까지 오며 <b>상한은 없다</b>.</summary>
         public int RequiredCharacterLevel = 1;
-        public int CorruptionIntervalSeconds = 1;
-        public int CorruptionGainPerInterval = 1;
+        public double CorruptionGainPerDefeat;
 
         public int DisplayOrder;
         public bool Enabled;

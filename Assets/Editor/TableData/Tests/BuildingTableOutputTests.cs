@@ -89,6 +89,7 @@ namespace TableDataEditor.Tests
                     TableDataRebuildScope.BuildingTable,
                     TableDataRebuildScope.RecruitmentTables,
                     TableDataRebuildScope.PartyConfigTable, TableDataRebuildScope.CorruptionConfigTable, TableDataRebuildScope.PurificationConfigTable,
+                    TableDataRebuildScope.DungeonTable,
                 },
                 Enum.GetValues(typeof(TableDataRebuildScope)),
                 "선언된 범위와 지원하는 범위가 어긋나면 안 된다.");

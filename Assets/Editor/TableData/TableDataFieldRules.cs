@@ -318,6 +318,31 @@ namespace TableDataEditor
         }
 
         /// <summary>
+        /// 유한한 실수 칸. InvariantCulture만 사용하며 빈 값, NaN, Infinity 및 하한 미만 값은
+        /// 모두 오류다. 표의 수치를 보정하지 않아 CSV와 생성 에셋이 달라지지 않게 한다.
+        /// </summary>
+        public static bool TryReadFiniteDoubleAtLeast(
+            string file, int line, string column, string raw, double minimum,
+            TableDataDiagnosticLog log, out double value)
+        {
+            if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out value) ||
+                double.IsNaN(value) || double.IsInfinity(value))
+            {
+                log.Error(file, line, column, raw ?? string.Empty,
+                    "유한한 실수가 아닙니다 - InvariantCulture 실수만 허용하며 빈 값, NaN, Infinity는 쓸 수 없습니다.");
+                value = 0d;
+                return false;
+            }
+
+            if (value >= minimum) return true;
+
+            log.Error(file, line, column, raw ?? string.Empty,
+                $"{minimum.ToString(CultureInfo.InvariantCulture)} 이상이어야 합니다 - 값을 자동으로 올려 통과시키지 않습니다.");
+            value = 0d;
+            return false;
+        }
+
+        /// <summary>
         /// 비어 있어도 되는 정수 칸. <b>빈 칸과 값이 있는 칸은 서로 다른 상태</b>라, 빈 칸을 0으로
         /// 바꿔 읽지 않고 <paramref name="hasValue"/>로 구분해 돌려준다 - "아직 정하지 않았다"가
         /// 데이터에서 사라지지 않게 하기 위함이다. 값이 있으면 하한 검사까지 한다.

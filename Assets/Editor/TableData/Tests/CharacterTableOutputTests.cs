@@ -176,6 +176,8 @@ namespace TableDataEditor.Tests
                     TableDataRebuildScope.RecruitmentTables,
                     TableDataRebuildScope.PartyConfigTable,
                     TableDataRebuildScope.CorruptionConfigTable,
+                    TableDataRebuildScope.PurificationConfigTable,
+                    TableDataRebuildScope.DungeonTable,
                 },
                 Enum.GetValues(typeof(TableDataRebuildScope)),
                 "Rebuild 범위가 늘어나면 참조가 조용히 지워지는 경로가 생긴다.");

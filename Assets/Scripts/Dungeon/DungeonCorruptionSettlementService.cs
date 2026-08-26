@@ -21,29 +21,25 @@ namespace Dungeon
 
         public bool TrySettle(DungeonSessionSnapshot snapshot, SaveData data)
         {
-            if (snapshot == null || data == null || snapshot.ParticipantCharacterIds.Count == 0)
+            if (snapshot == null || data == null || snapshot.DefeatsByCharacter.Count == 0)
                 return false;
 
             CorruptionConfigDefinition config = configs != null ? configs.Find("default") : null;
             if (config == null || snapshot.DungeonDefinition == null) return false;
-            long total = CalculateTotal(
-                snapshot.ElapsedSeconds,
-                snapshot.DungeonDefinition.CorruptionIntervalSeconds,
-                snapshot.DungeonDefinition.CorruptionGainPerInterval);
-            if (total == 0L) return false;
-
-            double share = (double)total / snapshot.ParticipantCharacterIds.Count;
             var changed = new List<Change>();
             SaveMetadataSnapshot metadata = SaveMetadataSnapshot.Capture(data);
-            foreach (string id in snapshot.ParticipantCharacterIds)
+            foreach (DungeonSessionDefeatRecord defeat in snapshot.DefeatsByCharacter)
             {
+                string id = defeat.CharacterId;
                 CharacterSaveState state = Find(data.characters, id);
                 CharacterDefinition definition = characters != null ? characters.Find(id) : null;
                 if (state == null || definition == null) continue;
+                double gain = CalculateGain(defeat.DefeatedMonsterCount, snapshot.DungeonDefinition.CorruptionGainPerDefeat);
+                if (gain <= 0d) continue;
 
                 double current = Valid(state.currentCorruption) ? state.currentCorruption : 0d;
                 current = Math.Max(current, definition.BaseCorruption);
-                double next = Math.Min(config.MaxCorruption, current + share);
+                double next = Math.Min(config.MaxCorruption, current + gain);
                 if (next == state.currentCorruption) continue;
 
                 changed.Add(new Change(state, state.currentCorruption));
@@ -64,14 +60,11 @@ namespace Dungeon
             return false;
         }
 
-        public static long CalculateTotal(double elapsedSeconds, int intervalSeconds, int gain)
+        public static double CalculateGain(long defeats, double gainPerDefeat)
         {
-            if (!Valid(elapsedSeconds) || elapsedSeconds <= 0d || intervalSeconds < 1 || gain < 1)
-                return 0L;
-            double periods = Math.Floor(elapsedSeconds / intervalSeconds);
-            if (periods <= 0d) return 0L;
-            if (periods >= long.MaxValue / (double)gain) return long.MaxValue;
-            return (long)periods * gain;
+            if (defeats <= 0 || !Valid(gainPerDefeat) || gainPerDefeat <= 0d) return 0d;
+            double result = defeats * gainPerDefeat;
+            return Valid(result) ? result : double.MaxValue;
         }
         private static bool Valid(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
 

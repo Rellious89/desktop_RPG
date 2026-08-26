@@ -950,8 +950,13 @@ namespace TableDataEditor
 
                 if (row.Enabled)
                 {
-                    if (TableDataFieldRules.TryReadIntAtLeast(file, line, TableDataColumns.CorruptionIntervalSeconds, table.Get(record, TableDataColumns.CorruptionIntervalSeconds), 1, log, out int interval)) row.CorruptionIntervalSeconds = interval;
-                    if (TableDataFieldRules.TryReadIntAtLeast(file, line, TableDataColumns.CorruptionGainPerInterval, table.Get(record, TableDataColumns.CorruptionGainPerInterval), 1, log, out int gain)) row.CorruptionGainPerInterval = gain;
+                    if (TableDataFieldRules.TryReadFiniteDoubleAtLeast(
+                            file, line, TableDataColumns.CorruptionGainPerDefeat,
+                            table.Get(record, TableDataColumns.CorruptionGainPerDefeat), 0d, log,
+                            out double gain))
+                    {
+                        row.CorruptionGainPerDefeat = gain;
+                    }
                 }
 
                 if (!idOk) continue;
@@ -2409,6 +2414,9 @@ namespace TableDataEditor
                 folders.Add(TableDataPaths.DungeonOutputFolder);
             }
 
+            if (TableDataRebuildScopes.IncludesDungeonTable(outputScope))
+                folders.Add(TableDataPaths.DungeonOutputFolder);
+
             if (TableDataRebuildScopes.IncludesCharacterTables(outputScope))
             {
                 folders.Add(TableDataPaths.CharacterOutputFolder);
@@ -2574,6 +2582,9 @@ namespace TableDataEditor
                     TableDataPaths.DungeonCatalogAssetPath, null, null,
                     TableDataPaths.DungeonCsvFileName, TableDataDiagnostic.FileLevelRow,
                     TableDataColumns.FilePseudoColumn, TableDataPaths.DungeonCatalogAssetName, log);
+
+                if (!TableDataRebuildScopes.IncludesLegacyDomains(outputScope))
+                    CheckDungeonReferenceSourcesAreGenerated(snapshot, log);
             }
 
             if (InScope(selected, TableDataPaths.CharacterOutputFolder))
@@ -3105,6 +3116,48 @@ namespace TableDataEditor
                     RequireSingleGenerated(
                         items, cost.ItemId, TableDataPaths.ItemOutputFolder,
                         nameof(ItemDefinition), row.Line, TableDataColumns.CostItemIds, log);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Dungeon 전용 Rebuild는 World/Monster/Item을 다시 쓰지 않는다. 따라서 던전 행이 참조하는
+        /// 생성 에셋이 각각 정확히 하나인지 먼저 확인해 null 참조가 저장되는 것을 막는다.
+        /// </summary>
+        private static void CheckDungeonReferenceSourcesAreGenerated(
+            TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            Dictionary<string, List<WorldDefinition>> worlds =
+                TableDataAssetIndex.LoadGeneratedById<WorldDefinition>(
+                    TableDataPaths.WorldOutputFolder, value => value.WorldId);
+            Dictionary<string, List<MonsterDefinition>> monsters =
+                TableDataAssetIndex.LoadGeneratedById<MonsterDefinition>(
+                    TableDataPaths.MonsterOutputFolder, value => value.MonsterId);
+            Dictionary<string, List<ItemDefinition>> items =
+                TableDataAssetIndex.LoadGeneratedById<ItemDefinition>(
+                    TableDataPaths.ItemOutputFolder, value => value.ItemId);
+
+            foreach (DungeonRow row in snapshot.Dungeons)
+            {
+                if (!string.IsNullOrEmpty(row.WorldId))
+                {
+                    RequireSingleGenerated(worlds, row.WorldId, TableDataPaths.WorldOutputFolder,
+                        nameof(WorldDefinition), row.Line, TableDataColumns.WorldId, log,
+                        TableDataPaths.DungeonCsvFileName);
+                }
+
+                foreach (string monsterId in row.MonsterIds)
+                {
+                    RequireSingleGenerated(monsters, monsterId, TableDataPaths.MonsterOutputFolder,
+                        nameof(MonsterDefinition), row.Line, TableDataColumns.MonsterIds, log,
+                        TableDataPaths.DungeonCsvFileName);
+                }
+
+                foreach (string itemId in row.RewardItemIds)
+                {
+                    RequireSingleGenerated(items, itemId, TableDataPaths.ItemOutputFolder,
+                        nameof(ItemDefinition), row.Line, TableDataColumns.RewardItemIds, log,
+                        TableDataPaths.DungeonCsvFileName);
                 }
             }
         }

@@ -31,8 +31,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 8daf2b2fd616f49e9ac1505f2a26a95e, type: 2}
   rewardItems: []
   requiredCharacterLevel: 1
-  corruptionIntervalSeconds: 60
-  corruptionGainPerInterval: 1
+  corruptionGainPerDefeat: 0.2
   displayOrder: 10
   references:
     version: 2

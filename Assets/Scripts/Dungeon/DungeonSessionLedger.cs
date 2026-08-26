@@ -24,6 +24,19 @@ namespace Dungeon
         public long Count { get; }
     }
 
+    /// <summary>한 캐릭터가 완료된 세션에서 기록한 유효 몬스터 처치 수의 불변 값이다.</summary>
+    public sealed class DungeonSessionDefeatRecord
+    {
+        public DungeonSessionDefeatRecord(string characterId, long defeatedMonsterCount)
+        {
+            CharacterId = characterId ?? string.Empty;
+            DefeatedMonsterCount = Math.Max(0L, defeatedMonsterCount);
+        }
+
+        public string CharacterId { get; }
+        public long DefeatedMonsterCount { get; }
+    }
+
     /// <summary>
     /// 완료된 던전 세션의 불변 스냅샷. 생성 이후 내부 값이 바뀌지 않으며, 이후 세션이
     /// 이 스냅샷에 영향을 주지 않는다.
@@ -32,6 +45,7 @@ namespace Dungeon
     {
         private readonly ReadOnlyCollection<DungeonSessionItemReward> earnedItems;
         private readonly ReadOnlyCollection<string> participantCharacterIds;
+        private readonly ReadOnlyCollection<DungeonSessionDefeatRecord> defeatsByCharacter;
 
         internal DungeonSessionSnapshot(
             DungeonDefinition dungeon,
@@ -40,7 +54,8 @@ namespace Dungeon
             long earnedCurrency,
             long defeatedMonsterCount,
             double elapsedSeconds,
-            DungeonSessionItemReward[] items, string[] participants = null)
+            DungeonSessionItemReward[] items, string[] participants = null,
+            DungeonSessionDefeatRecord[] defeats = null)
         {
             DungeonDefinition = dungeon;
             DungeonId = dungeonId ?? string.Empty;
@@ -50,6 +65,7 @@ namespace Dungeon
             ElapsedSeconds = NormalizeElapsedSeconds(elapsedSeconds);
             earnedItems = Array.AsReadOnly(items ?? Array.Empty<DungeonSessionItemReward>());
             participantCharacterIds = Array.AsReadOnly(participants ?? Array.Empty<string>());
+            defeatsByCharacter = Array.AsReadOnly(defeats ?? Array.Empty<DungeonSessionDefeatRecord>());
         }
 
         public DungeonDefinition DungeonDefinition { get; }
@@ -60,6 +76,7 @@ namespace Dungeon
         public double ElapsedSeconds { get; }
         public ReadOnlyCollection<DungeonSessionItemReward> EarnedItems => earnedItems;
         public ReadOnlyCollection<string> ParticipantCharacterIds => participantCharacterIds;
+        public ReadOnlyCollection<DungeonSessionDefeatRecord> DefeatsByCharacter => defeatsByCharacter;
         public bool IsEmpty => EarnedCurrency == 0L && DefeatedMonsterCount == 0L && earnedItems.Count == 0;
 
         private static double NormalizeElapsedSeconds(double value)
@@ -109,6 +126,9 @@ namespace Dungeon
         private readonly List<ItemAccumulator> activeItems = new List<ItemAccumulator>();
         private readonly Dictionary<string, int> activeItemIndex =
             new Dictionary<string, int>(StringComparer.Ordinal);
+        private readonly List<DefeatAccumulator> activeDefeats = new List<DefeatAccumulator>();
+        private readonly Dictionary<string, int> activeDefeatIndex =
+            new Dictionary<string, int>(StringComparer.Ordinal);
 
         private readonly Queue<DungeonSessionSnapshot> completed = new Queue<DungeonSessionSnapshot>();
         private long lastSequence;
@@ -156,6 +176,8 @@ namespace Dungeon
             activeKills = 0L;
             activeItems.Clear();
             activeItemIndex.Clear();
+            activeDefeats.Clear();
+            activeDefeatIndex.Clear();
             activeParticipants = CopyParticipants(participantCharacterIds);
 
             return SessionStartResult.Started;
@@ -186,10 +208,16 @@ namespace Dungeon
                 ItemAccumulator acc = activeItems[i];
                 items[i] = new DungeonSessionItemReward(acc.ItemDefinition, acc.ItemId, acc.Count);
             }
+            var defeats = new DungeonSessionDefeatRecord[activeDefeats.Count];
+            for (int i = 0; i < activeDefeats.Count; i++)
+            {
+                DefeatAccumulator acc = activeDefeats[i];
+                defeats[i] = new DungeonSessionDefeatRecord(acc.CharacterId, acc.Count);
+            }
 
             snapshot = new DungeonSessionSnapshot(
                 activeDungeon, activeDungeonId, activeSequence,
-                activeCurrency, activeKills, elapsedSeconds, items, activeParticipants);
+                activeCurrency, activeKills, elapsedSeconds, items, activeParticipants, defeats);
 
             completed.Enqueue(snapshot);
             ClearActive();
@@ -223,10 +251,31 @@ namespace Dungeon
         /// </summary>
         public void RecordDefeat(MonsterDefinition monster)
         {
+            RecordDefeat(monster, null);
+        }
+
+        /// <summary>
+        /// 유효한 몬스터 처치를 총 처치 수에 기록하고, 유효한 캐릭터 ID가 있으면 해당 캐릭터의
+        /// 처치 원장에도 누적한다. 캐릭터를 찾지 못해도 결과용 총 처치는 잃지 않는다.
+        /// </summary>
+        public void RecordDefeat(MonsterDefinition monster, string characterId)
+        {
             if (activeDungeon == null) return;
             if (monster == null || !monster.IsValid) return;
 
             if (activeKills < long.MaxValue) activeKills++;
+            if (string.IsNullOrEmpty(characterId)) return;
+
+            if (activeDefeatIndex.TryGetValue(characterId, out int index))
+            {
+                DefeatAccumulator current = activeDefeats[index];
+                if (current.Count < long.MaxValue)
+                    activeDefeats[index] = new DefeatAccumulator(current.CharacterId, current.Count + 1L);
+                return;
+            }
+
+            activeDefeatIndex[characterId] = activeDefeats.Count;
+            activeDefeats.Add(new DefeatAccumulator(characterId, 1L));
         }
 
         /// <summary>
@@ -305,6 +354,8 @@ namespace Dungeon
             activeKills = 0L;
             activeItems.Clear();
             activeItemIndex.Clear();
+            activeDefeats.Clear();
+            activeDefeatIndex.Clear();
             activeParticipants = Array.Empty<string>();
         }
 
@@ -318,6 +369,18 @@ namespace Dungeon
             {
                 ItemDefinition = itemDefinition;
                 ItemId = itemId;
+                Count = count;
+            }
+        }
+
+        private readonly struct DefeatAccumulator
+        {
+            public readonly string CharacterId;
+            public readonly long Count;
+
+            public DefeatAccumulator(string characterId, long count)
+            {
+                CharacterId = characterId;
                 Count = count;
             }
         }

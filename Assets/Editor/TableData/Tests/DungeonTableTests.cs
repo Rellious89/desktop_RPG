@@ -42,21 +42,21 @@ namespace TableDataEditor.Tests
                 new[]
                 {
                     "dungeon_id", "name_category", "name_key", "world_id",
-                    "representative_sprite_key", "monster_ids", "corruption_interval_seconds",
-                    "corruption_gain_per_interval", "reward_item_ids", "display_order", "enabled", "memo",
+                    "representative_sprite_key", "corruption_gain_per_defeat", "monster_ids",
+                    "reward_item_ids", "display_order", "enabled", "memo",
                 },
                 TableDataColumns.Dungeon,
                 "Dungeon.csv의 필수 컬럼과 순서가 약속과 달라졌습니다.");
         }
 
         [Test]
-        public void Schema_PlacesCorruptionColumnsBeforeRewardItemIds()
+        public void Schema_PlacesDefeatGainBeforeMonsterIds()
         {
-            int index = Array.IndexOf(TableDataColumns.Dungeon, "corruption_interval_seconds");
+            int index = Array.IndexOf(TableDataColumns.Dungeon, "corruption_gain_per_defeat");
 
-            Assert.Greater(index, 0, "corruption_interval_seconds가 필수 컬럼에 없습니다.");
-            Assert.AreEqual("monster_ids", TableDataColumns.Dungeon[index - 1]);
-            Assert.AreEqual("corruption_gain_per_interval", TableDataColumns.Dungeon[index + 1]);
+            Assert.Greater(index, 0, "corruption_gain_per_defeat가 필수 컬럼에 없습니다.");
+            Assert.AreEqual("representative_sprite_key", TableDataColumns.Dungeon[index - 1]);
+            Assert.AreEqual("monster_ids", TableDataColumns.Dungeon[index + 1]);
         }
 
         [Test]
@@ -68,48 +68,50 @@ namespace TableDataEditor.Tests
         // ---- 헤더 검증 ----
 
         [Test]
-        public void Header_MissingCorruptionInterval_FailsWithRequiredColumnDiagnostic()
+        public void Header_MissingCorruptionGainPerDefeat_FailsWithRequiredColumnDiagnostic()
         {
             string[] headerWithout = TableDataColumns.Dungeon
-                .Where(c => c != TableDataColumns.CorruptionIntervalSeconds)
+                .Where(c => c != TableDataColumns.CorruptionGainPerDefeat)
                 .ToArray();
 
             var log = new TableDataDiagnosticLog();
             bool ok = (bool)ValidateHeaderMethod.Invoke(null,
                 new object[] { File, headerWithout, TableDataColumns.Dungeon, log });
 
-            Assert.IsFalse(ok, "corruption_interval_seconds가 빠진 헤더는 실패해야 한다.");
+            Assert.IsFalse(ok, "corruption_gain_per_defeat가 빠진 헤더는 실패해야 한다.");
             Assert.AreEqual(1, log.ErrorCount, Describe(log));
 
             TableDataDiagnostic diag = log.Entries[0];
             Assert.AreEqual(TableDataDiagnostic.HeaderRow, diag.Row);
-            Assert.AreEqual(TableDataColumns.CorruptionIntervalSeconds, diag.Column);
+            Assert.AreEqual(TableDataColumns.CorruptionGainPerDefeat, diag.Column);
             StringAssert.Contains("필수 컬럼이 없습니다", diag.Message);
         }
 
-        // ---- 오염도 주기/증가량 검증 ----
+        // ---- 처치당 오염도 검증 ----
 
         [Test]
-        public void CorruptionValues_ValidRow_EnterSnapshot()
+        [TestCase("0", 0d)]
+        [TestCase("0.1", 0.1d)]
+        [TestCase("0.3", 0.3d)]
+        public void CorruptionValues_ValidRow_EnterSnapshot(string gain, double expected)
         {
             TableDataSnapshot snapshot = SnapshotWithWorld("1");
             TableDataDiagnosticLog log = Validate(snapshot,
-                Row("1", interval: "5", gain: "2", worldId: "1", displayOrder: "10"));
+                Row("1", gain: gain, worldId: "1", displayOrder: "10"));
 
             Assert.AreEqual(0, log.ErrorCount, Describe(log));
             Assert.AreEqual(1, snapshot.Dungeons.Count);
-            Assert.AreEqual(5, snapshot.Dungeons[0].CorruptionIntervalSeconds);
-            Assert.AreEqual(2, snapshot.Dungeons[0].CorruptionGainPerInterval);
+            Assert.AreEqual(expected, snapshot.Dungeons[0].CorruptionGainPerDefeat, 0.000000001d);
         }
 
         [Test]
-        public void CorruptionInterval_MustBeAtLeastOne()
+        public void CorruptionGain_Zero_IsAllowed()
         {
             TableDataSnapshot snapshot = SnapshotWithWorld("1");
             TableDataDiagnosticLog log = Validate(snapshot,
-                Row("1", interval: "0", worldId: "1"));
+                Row("1", gain: "0", worldId: "1"));
 
-            Assert.AreEqual(1, CountErrors(log, TableDataColumns.CorruptionIntervalSeconds), Describe(log));
+            Assert.AreEqual(0, log.ErrorCount, Describe(log));
         }
 
         [Test]
@@ -119,7 +121,7 @@ namespace TableDataEditor.Tests
             TableDataDiagnosticLog log = Validate(snapshot,
                 Row("1", gain: "", worldId: "1"));
 
-            Assert.AreEqual(1, CountErrors(log, TableDataColumns.CorruptionGainPerInterval), Describe(log));
+            Assert.AreEqual(1, CountErrors(log, TableDataColumns.CorruptionGainPerDefeat), Describe(log));
         }
 
         [Test]
@@ -129,29 +131,17 @@ namespace TableDataEditor.Tests
             TableDataDiagnosticLog log = Validate(snapshot,
                 Row("1", gain: "-1", worldId: "1"));
 
-            Assert.AreEqual(1, CountErrors(log, TableDataColumns.CorruptionGainPerInterval), Describe(log));
+            Assert.AreEqual(1, CountErrors(log, TableDataColumns.CorruptionGainPerDefeat), Describe(log));
         }
 
         [Test]
-        public void CorruptionInterval_NonInteger_IsAnError()
+        public void CorruptionGain_NaNInfinityAndNonNumber_AreErrors()
         {
-            TableDataSnapshot snapshot = SnapshotWithWorld("1");
-            TableDataDiagnosticLog log = Validate(snapshot,
-                Row("1", interval: "abc", worldId: "1"));
-
-            Assert.AreEqual(1, CountErrors(log, TableDataColumns.CorruptionIntervalSeconds), Describe(log));
-        }
-
-        [Test]
-        public void CorruptionInterval_HasNoUpperBound()
-        {
-            TableDataSnapshot snapshot = SnapshotWithWorld("1");
-            TableDataDiagnosticLog log = Validate(snapshot,
-                Row("1", interval: "2147483647", worldId: "1", displayOrder: "10"));
-
-            Assert.AreEqual(0, log.ErrorCount,
-                "int.MaxValue는 유효한 값이다 - 상한을 두지 않는다: " + Describe(log));
-            Assert.AreEqual(2147483647, snapshot.Dungeons[0].CorruptionIntervalSeconds);
+            foreach (string value in new[] { "abc", "NaN", "Infinity" })
+            {
+                TableDataDiagnosticLog log = Validate(SnapshotWithWorld("1"), Row("1", gain: value, worldId: "1"));
+                Assert.AreEqual(1, CountErrors(log, TableDataColumns.CorruptionGainPerDefeat), Describe(log));
+            }
         }
 
         // ---- 생성 에셋의 필요 레벨 ----
@@ -168,12 +158,10 @@ namespace TableDataEditor.Tests
                 string path = TableDataPaths.DungeonAssetPath(row.Id);
                 var definition = AssetDatabase.LoadAssetAtPath<DungeonDefinition>(path);
                 Assert.IsNotNull(definition, $"생성 에셋 '{path}'가 없습니다.");
-                Assert.AreEqual(row.CorruptionIntervalSeconds, definition.CorruptionIntervalSeconds);
-                Assert.AreEqual(row.CorruptionGainPerInterval, definition.CorruptionGainPerInterval);
+                Assert.AreEqual(row.CorruptionGainPerDefeat, definition.CorruptionGainPerDefeat);
 
                 var so = new SerializedObject(definition);
-                Assert.AreEqual(row.CorruptionIntervalSeconds, so.FindProperty("corruptionIntervalSeconds").intValue);
-                Assert.AreEqual(row.CorruptionGainPerInterval, so.FindProperty("corruptionGainPerInterval").intValue);
+                Assert.AreEqual(row.CorruptionGainPerDefeat, so.FindProperty("corruptionGainPerDefeat").doubleValue);
             }
         }
 
@@ -187,8 +175,7 @@ namespace TableDataEditor.Tests
 
             foreach (DungeonRow row in snapshot.Dungeons)
             {
-                Assert.GreaterOrEqual(row.CorruptionIntervalSeconds, 1);
-                Assert.GreaterOrEqual(row.CorruptionGainPerInterval, 1);
+                Assert.GreaterOrEqual(row.CorruptionGainPerDefeat, 0d);
             }
         }
 
@@ -295,27 +282,25 @@ namespace TableDataEditor.Tests
         // ---- 저장 버전 ----
 
         [Test]
-        public void SaveVersion_RemainsExactlyFour()
+        public void SaveVersion_RemainsExactlySix()
         {
-            Assert.AreEqual(4, SaveData.CurrentSaveVersion,
-                "이 단계는 저장 형식을 바꾸지 않는다 - v4를 유지해야 합니다.");
+            Assert.AreEqual(6, SaveData.CurrentSaveVersion,
+                "이 단계는 저장 형식을 바꾸지 않는다 - v6를 유지해야 합니다.");
         }
 
         // ---- 런타임 에셋의 방어적 하한 ----
 
         [Test]
-        public void RuntimeDefinition_ClampsToAtLeastOne()
+        public void RuntimeDefinition_ClampsInvalidDefeatGainToZero()
         {
             var probe = UnityEngine.ScriptableObject.CreateInstance<DungeonDefinition>();
             try
             {
                 var serialized = new SerializedObject(probe);
-                serialized.FindProperty("corruptionIntervalSeconds").intValue = 0;
-                serialized.FindProperty("corruptionGainPerInterval").intValue = 0;
+                serialized.FindProperty("corruptionGainPerDefeat").doubleValue = double.NaN;
                 serialized.ApplyModifiedPropertiesWithoutUndo();
 
-                Assert.GreaterOrEqual(probe.CorruptionIntervalSeconds, 1);
-                Assert.GreaterOrEqual(probe.CorruptionGainPerInterval, 1);
+                Assert.AreEqual(0d, probe.CorruptionGainPerDefeat);
             }
             finally
             {
@@ -365,7 +350,6 @@ namespace TableDataEditor.Tests
             string worldId = "",
             string spriteKey = "",
             string monsterIds = "",
-            string interval = "1",
             string gain = "1",
             string rewardItemIds = "",
             string displayOrder = "10",
@@ -374,8 +358,8 @@ namespace TableDataEditor.Tests
         {
             return new[]
             {
-                dungeonId, nameCategory, nameKey, worldId, spriteKey, monsterIds,
-                interval, gain, rewardItemIds, displayOrder, enabled, memo,
+                dungeonId, nameCategory, nameKey, worldId, spriteKey, gain, monsterIds,
+                rewardItemIds, displayOrder, enabled, memo,
             };
         }
 

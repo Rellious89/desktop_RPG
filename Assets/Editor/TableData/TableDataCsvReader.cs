@@ -114,13 +114,12 @@ namespace TableDataEditor
         public const string RepresentativeSpriteKey = "representative_sprite_key";
         public const string MonsterIds = "monster_ids";
         public const string RewardItemIds = "reward_item_ids";
-        public const string CorruptionIntervalSeconds = "corruption_interval_seconds";
-        public const string CorruptionGainPerInterval = "corruption_gain_per_interval";
+        public const string CorruptionGainPerDefeat = "corruption_gain_per_defeat";
 
         public static readonly string[] Dungeon =
         {
-            DungeonId, NameCategory, NameKey, WorldId, RepresentativeSpriteKey, MonsterIds,
-            CorruptionIntervalSeconds, CorruptionGainPerInterval, RewardItemIds, DisplayOrder, Enabled, Memo,
+            DungeonId, NameCategory, NameKey, WorldId, RepresentativeSpriteKey, CorruptionGainPerDefeat,
+            MonsterIds, RewardItemIds, DisplayOrder, Enabled, Memo,
         };
 
         // Character.csv
