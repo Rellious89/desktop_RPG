@@ -10786,7 +10786,7 @@ MonoBehaviour:
     showInTown: 1
     showInDungeon: 1
     panelToCloseWhenHidden: {fileID: 0}
-    requiredBuildingId:
+    requiredBuildingId: 
   - label: "\uC6A9\uBCD1 \uAD50\uCCB4"
     buttonRoot: {fileID: 824223291}
     showInTown: 1
@@ -11084,19 +11084,6 @@ MonoBehaviour:
   references:
     version: 2
     RefIds: []
---- !u!114 &778415110442230530
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1483976876}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d9c06ac5905244d7a2c7219986aa2ad6, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  panel: {fileID: 5001245895153509971}
 --- !u!114 &1483976879
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14220,6 +14207,19 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 0
+--- !u!114 &523487334213287773
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 521558146301147835}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e4ae5c234a9946e8bc38aa044486d79b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  receiveMouseInput: 1
 --- !u!114 &617257716805750486
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14270,6 +14270,19 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 228.01, y: 20}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &778415110442230530
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1483976876}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9c06ac5905244d7a2c7219986aa2ad6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  panel: {fileID: 5001245895153509971}
 --- !u!1001 &807322865877774312
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -16921,6 +16934,37 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &5001245895153509971
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 521558146301147835}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b479aa6b6b4344b2a84382dcdf10edaa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  closeButton: {fileID: 7839891966623692668}
+  blockBackgroundInput: 1
+  inputBlocker: {fileID: 0}
+  inputBlockerColor: {r: 0, g: 0, b: 0, a: 0}
+  autoQuitSeconds: 5
+  confirmButton: {fileID: 4975995054088693364}
+  countdownText: {fileID: 5761488354924821192}
+  countdownMessage:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 10496539377000449
+      m_Key: 
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  references:
+    version: 2
+    RefIds: []
 --- !u!114 &5099860902679771699
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -17250,50 +17294,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &5001245895153509971
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 521558146301147835}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b479aa6b6b4344b2a84382dcdf10edaa, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  closeButton: {fileID: 7839891966623692668}
-  blockBackgroundInput: 1
-  inputBlocker: {fileID: 0}
-  inputBlockerColor: {r: 0, g: 0, b: 0, a: 0}
-  autoQuitSeconds: 5
-  confirmButton: {fileID: 4975995054088693364}
-  countdownText: {fileID: 5761488354924821192}
-  countdownMessage:
-    m_TableReference:
-      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
-    m_TableEntryReference:
-      m_KeyId: 10496539377000449
-      m_Key:
-    m_FallbackState: 0
-    m_WaitForCompletion: 0
-    m_LocalVariables: []
-  references:
-    version: 2
-    RefIds: []
---- !u!114 &523487334213287773
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 521558146301147835}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e4ae5c234a9946e8bc38aa044486d79b, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  receiveMouseInput: 1
 --- !u!114 &5894670379954758321 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 7741803445950812271, guid: 2613aee3f050a40fd847bd6d869eb216, type: 3}
