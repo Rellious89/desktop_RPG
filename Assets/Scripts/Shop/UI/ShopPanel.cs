@@ -7,7 +7,6 @@ using Inventory;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.Localization.Tables;
 
 namespace Shop.UI
 {
@@ -24,7 +23,7 @@ namespace Shop.UI
         [SerializeField] private CurrencyCatalog currencyCatalog;
         [SerializeField] private GameObject itemRowPrefab;
         [SerializeField] private LocalizedTextReference purchaseFailedMessage =
-            new LocalizedTextReference(new TableReference("01_UI"), new TableEntryReference("79"));
+            new LocalizedTextReference("GUID:32fd067a20b754a50b20446b9c78d2ae", "79");
 
         private GameObject buyRoot;
         private GameObject sellRoot;

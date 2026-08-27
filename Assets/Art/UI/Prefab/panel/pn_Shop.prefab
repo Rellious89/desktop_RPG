@@ -2143,6 +2143,7 @@ GameObject:
   - component: {fileID: 7405405773456425565}
   - component: {fileID: 635163712189324026}
   - component: {fileID: 2558046287439581708}
+  - component: {fileID: 5861508846987819771}
   m_Layer: 5
   m_Name: pn_Shop
   m_TagString: Untagged
@@ -2202,6 +2203,41 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   receiveMouseInput: 1
+--- !u!114 &5861508846987819771
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2953239195289289174}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3ad6a7b9cb0f4f0da847de5e65d6f001, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  closeButton: {fileID: 0}
+  blockBackgroundInput: 0
+  inputBlocker: {fileID: 0}
+  inputBlockerColor: {r: 0, g: 0, b: 0, a: 0}
+  shopId: general_shop
+  requiredBuildingId: 3
+  shopCatalog: {fileID: 11400000, guid: 0efbadbfc700047f3adc21497c179c48, type: 2}
+  productCatalog: {fileID: 11400000, guid: a8b1044e7568d4020a2abd665f97d404, type: 2}
+  itemCatalog: {fileID: 11400000, guid: 749d57bd062ae47619e6dc1de90453fd, type: 2}
+  currencyCatalog: {fileID: 11400000, guid: 88a00488cdf3246d3bc4d40efd091841, type: 2}
+  itemRowPrefab: {fileID: 1658272409490625414, guid: d6b2b06654e434b3994ae9f33637270d, type: 3}
+  purchaseFailedMessage:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 0
+      m_Key: 79
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  references:
+    version: 2
+    RefIds: []
 --- !u!1 &3057076656157790772
 GameObject:
   m_ObjectHideFlags: 0

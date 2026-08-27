@@ -81,7 +81,7 @@ namespace Shop.Editor
         {
             foreach (GameObject root in UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects())
             {
-                Transform t = Child(root.transform, name); if (t != null) return t.gameObject;
+                GameObject found = Child(root.transform, name); if (found != null) return found;
             }
             throw new System.InvalidOperationException("Missing scene object: " + name);
         }

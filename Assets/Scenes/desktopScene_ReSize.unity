@@ -11169,6 +11169,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1358418168}
+  - component: {fileID: 1358418169}
   m_Layer: 5
   m_Name: Interaction_Shop
   m_TagString: Untagged
@@ -11198,6 +11199,54 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1358418169
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1358418167}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6f2fa8ab7ea5445d95fa687c30e9b6f0, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  fieldModeManager: {fileID: 468841861}
+  transitionSequencer: {fileID: 119946296}
+  stageCamera: {fileID: 2046182837}
+  uiAnchor: {fileID: 392733944}
+  interactionRoot: {fileID: 639766286}
+  interactionParent: {fileID: 1358418168}
+  buildButton: {fileID: 1127613350}
+  openInnButton: {fileID: 976232702}
+  completionButton: {fileID: 976232705}
+  constructionTimerRoot: {fileID: 1853980670}
+  constructionTimerText: {fileID: 937699622}
+  constructionTimerAnimator: {fileID: 1834992047}
+  buildingPopup: {fileID: 6072216787366258619}
+  building: {fileID: 11400000, guid: b5c2c4d90c44841288ac1f802fb475bc, type: 2}
+  inventoryManager: {fileID: 1047247884}
+  constructionStartedMessage:
+    m_TableReference:
+      m_TableCollectionName:
+    m_TableEntryReference:
+      m_KeyId: 0
+      m_Key:
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  constructionCompletedMessage:
+    m_TableReference:
+      m_TableCollectionName:
+    m_TableEntryReference:
+      m_KeyId: 0
+      m_Key:
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  references:
+    version: 2
+    RefIds: []
 --- !u!1 &1372948857
 GameObject:
   m_ObjectHideFlags: 0
@@ -11814,7 +11863,7 @@ MonoBehaviour:
     buttonRoot: {fileID: 2133339270}
     showInTown: 1
     showInDungeon: 0
-    panelToCloseWhenHidden: {fileID: 7599717200964692829}
+    panelToCloseWhenHidden: {fileID: 2587038583982536830}
     requiredBuildingId: 3
 --- !u!4 &1452980433 stripped
 Transform:
@@ -15379,7 +15428,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d9c06ac5905244d7a2c7219986aa2ad6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  panel: {fileID: 0}
+  panel: {fileID: 2587038583982536830}
 --- !u!114 &2133339277
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -17963,6 +18012,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
+--- !u!114 &2587038583982536830 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5861508846987819771, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
+  m_PrefabInstance: {fileID: 2587038583982536829}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3ad6a7b9cb0f4f0da847de5e65d6f001, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
 --- !u!114 &2727636538909919449
 MonoBehaviour:
   m_ObjectHideFlags: 0
