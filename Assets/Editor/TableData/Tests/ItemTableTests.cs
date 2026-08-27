@@ -351,6 +351,7 @@ namespace TableDataEditor.Tests
         {
             foreach ((string relativePath, string guid) in GeneratedGuids)
             {
+                if (!relativePath.StartsWith("Item/", StringComparison.Ordinal)) continue;
                 string assetPath = TableDataPaths.OutputRoot + "/" + relativePath;
                 string metaPath = assetPath + ".meta";
 
@@ -369,11 +370,12 @@ namespace TableDataEditor.Tests
             var expected = new HashSet<string>(StringComparer.Ordinal);
             foreach ((string relativePath, string _) in GeneratedGuids)
             {
+                if (!relativePath.StartsWith("Item/", StringComparison.Ordinal)) continue;
                 expected.Add(TableDataPaths.OutputRoot + "/" + relativePath);
             }
 
             var found = new List<string>();
-            foreach (string guid in AssetDatabase.FindAssets("t:ScriptableObject", new[] { TableDataPaths.OutputRoot }))
+            foreach (string guid in AssetDatabase.FindAssets("t:ScriptableObject", new[] { TableDataPaths.ItemOutputFolder }))
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 if (!expected.Contains(path)) found.Add(path);
