@@ -423,6 +423,12 @@ namespace TableDataEditor
                     row.Enabled = enabled;
                 }
 
+                if (TableDataFieldRules.TryReadEnabled(file, line, TableDataColumns.Sellable, table.Get(record, TableDataColumns.Sellable), log, out bool sellable)) row.Sellable = sellable;
+                row.SellCurrencyId = table.Get(record, TableDataColumns.SellCurrencyId) ?? string.Empty;
+                if (!string.IsNullOrEmpty(table.Get(record, TableDataColumns.SellPrice)) && TableDataFieldRules.TryReadInt(file, line, TableDataColumns.SellPrice, table.Get(record, TableDataColumns.SellPrice), log, out int sellPrice)) row.SellPrice = sellPrice;
+                if (!string.IsNullOrEmpty(row.SellCurrencyId) && !snapshot.CurrenciesById.ContainsKey(row.SellCurrencyId)) log.Error(file, line, TableDataColumns.SellCurrencyId, row.SellCurrencyId, "알 수 없는 판매 재화입니다.");
+                if (row.SellPrice < 0 || (row.Sellable && (string.IsNullOrEmpty(row.SellCurrencyId) || row.SellPrice <= 0))) log.Error(file, line, TableDataColumns.SellPrice, row.SellPrice.ToString(), "판매 가능 아이템에는 양수 가격과 재화가 필요합니다.");
+
                 if (TableDataFieldRules.TryReadInt(
                         file, line, TableDataColumns.DisplayOrder, table.Get(record, TableDataColumns.DisplayOrder), log, out int order))
                 {

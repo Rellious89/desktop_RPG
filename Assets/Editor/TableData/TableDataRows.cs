@@ -73,7 +73,13 @@ namespace TableDataEditor
 
         public int DisplayOrder;
         public bool Enabled;
+        public bool Sellable;
+        public string SellCurrencyId = string.Empty;
+        public int SellPrice;
     }
+
+    public sealed class ShopRow { public int Line; public string Id = string.Empty; public LocalizedEntryRef Name; public int RequiredBuildingId; public bool AcceptItemSales; public int DisplayOrder; public bool Enabled; }
+    public sealed class ShopProductRow { public int Line; public string ShopId = string.Empty; public string ItemId = string.Empty; public string BuyCurrencyId = string.Empty; public int BuyPrice; public int DisplayOrder; public bool Enabled; }
 
     /// <summary>
     /// 드롭 슬롯 하나가 실제로 채워진 경우의 값. <b>빈 슬롯은 아예 만들지 않는다</b> - "비었음"을
@@ -445,6 +451,8 @@ namespace TableDataEditor
         public readonly List<WorldRow> Worlds = new List<WorldRow>();
         public readonly List<CurrencyRow> Currencies = new List<CurrencyRow>();
         public readonly List<ItemRow> Items = new List<ItemRow>();
+        public readonly List<ShopRow> Shops = new List<ShopRow>();
+        public readonly List<ShopProductRow> ShopProducts = new List<ShopProductRow>();
         public readonly List<MonsterRow> Monsters = new List<MonsterRow>();
         public readonly List<DungeonRow> Dungeons = new List<DungeonRow>();
         public readonly List<CharacterRow> Characters = new List<CharacterRow>();
@@ -466,6 +474,8 @@ namespace TableDataEditor
         public readonly Dictionary<string, WorldRow> WorldsById = new Dictionary<string, WorldRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, CurrencyRow> CurrenciesById = new Dictionary<string, CurrencyRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, ItemRow> ItemsById = new Dictionary<string, ItemRow>(StringComparer.Ordinal);
+        public readonly Dictionary<string, ShopRow> ShopsById = new Dictionary<string, ShopRow>(StringComparer.Ordinal);
+        public readonly Dictionary<string, ShopProductRow> ShopProductsByPair = new Dictionary<string, ShopProductRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, MonsterRow> MonstersById = new Dictionary<string, MonsterRow>(StringComparer.Ordinal);
         public readonly Dictionary<string, DungeonRow> DungeonsById = new Dictionary<string, DungeonRow>(StringComparer.Ordinal);
 

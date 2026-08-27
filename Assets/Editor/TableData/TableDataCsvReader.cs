@@ -33,12 +33,22 @@ namespace TableDataEditor
         // 절에 정의) - 두 표가 같은 뜻의 칸을 가리키므로 이름을 두 번 적어 두면 한쪽만 고쳐질 수 있다.
         public const string ItemId = "item_id";
         public const string IconKey = "icon_key";
+        public const string Sellable = "sellable";
+        public const string SellCurrencyId = "sell_currency_id";
+        public const string SellPrice = "sell_price";
 
         public static readonly string[] Item =
         {
-            ItemId, NameCategory, NameKey, DescriptionCategory, DescriptionKey, IconKey,
+            ItemId, NameCategory, NameKey, DescriptionCategory, DescriptionKey, IconKey, Sellable, SellCurrencyId, SellPrice,
             DisplayOrder, Enabled, Memo,
         };
+
+        public const string ShopId = "shop_id";
+        public const string AcceptItemSales = "accept_item_sales";
+        public static readonly string[] Shop = { ShopId, NameCategory, NameKey, RequiredBuildingId, AcceptItemSales, DisplayOrder, Enabled, Memo };
+        public const string BuyCurrencyId = "buy_currency_id";
+        public const string BuyPrice = "buy_price";
+        public static readonly string[] ShopProduct = { ShopId, ItemId, BuyCurrencyId, BuyPrice, DisplayOrder, Enabled, Memo };
 
         // Currency.csv
         //

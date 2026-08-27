@@ -1358,6 +1358,9 @@ namespace TableDataEditor
             var serialized = new SerializedObject(asset);
             serialized.FindProperty("itemId").stringValue = row.Id;
             serialized.FindProperty("displayOrder").intValue = row.DisplayOrder;
+            serialized.FindProperty("sellable").boolValue = row.Sellable;
+            serialized.FindProperty("sellCurrencyId").stringValue = row.SellCurrencyId;
+            serialized.FindProperty("sellPrice").intValue = row.SellPrice;
             serialized.FindProperty("icon").objectReferenceValue = row.Icon;
             ApplyLocalizedName(serialized.FindProperty("localizedName"), row.Name);
             ApplyLocalizedName(serialized.FindProperty("localizedDescription"), row.Description);

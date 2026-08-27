@@ -49,6 +49,11 @@ namespace Inventory
                  "목록의 순서는 ItemCatalog의 작성 순서가 결정한다.")]
         [SerializeField] private int displayOrder;
 
+        [Header("Shop Sale")]
+        [SerializeField] private bool sellable;
+        [SerializeField] private string sellCurrencyId;
+        [SerializeField] private int sellPrice;
+
         /// <summary>저장 데이터가 이 아이템을 가리키는 키. 비어 있으면 빈 문자열을 돌려준다 -
         /// <b>에셋 이름으로 대체하지 않는다</b>. 앞뒤 공백은 제거해서, 공백만 적힌 값이 유효한 id처럼
         /// 보이지 않게 한다.</summary>
@@ -83,5 +88,8 @@ namespace Inventory
 
         /// <summary>정렬용 순서 값. 작을수록 앞이며, 지정하지 않으면 0이다.</summary>
         public int DisplayOrder => displayOrder;
+        public bool Sellable => sellable;
+        public string SellCurrencyId => sellCurrencyId ?? string.Empty;
+        public int SellPrice => sellPrice;
     }
 }
