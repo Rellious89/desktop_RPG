@@ -8,6 +8,7 @@ using Dungeon;
 using Inventory;
 using Party;
 using Recruitment;
+using Shop;
 using Skill;
 using UnityEditor;
 using UnityEngine;
@@ -309,10 +310,6 @@ namespace TableDataEditor
 
             if (!result.Validation.CanRebuild) return result;
 
-            // Writer는 다음 단계에서 연결한다. 이 범위가 기존 All 경로로 떨어져 다른 도메인을 쓰지 않게
-            // 여기서 명시적으로 멈춘다.
-            if (scope == TableDataRebuildScope.ShopTables) return result;
-
             // 필드 이름이 런타임 클래스와 어긋나면 절반쯤 쓰고 실패한다. 메모리 안의 임시 인스턴스로
             // 미리 확인하고, 어긋나면 아무것도 쓰지 않고 끝낸다(에셋을 만들지 않는 순수 검사다).
             // 범위와 무관하게 전부 확인한다 - 아무것도 쓰지 않는 검사라 좁힐 이유가 없다.
@@ -325,6 +322,7 @@ namespace TableDataEditor
             if (scope == TableDataRebuildScope.CorruptionConfigTable) return RebuildCorruptionConfigTable(result, snapshot);
             if (scope == TableDataRebuildScope.PurificationConfigTable) return RebuildPurificationConfigTable(result, snapshot);
             if (scope == TableDataRebuildScope.DungeonTable) return RebuildDungeonTable(result, snapshot);
+            if (scope == TableDataRebuildScope.ShopTables) return RebuildShopTables(result, snapshot);
 
             if (scope == TableDataRebuildScope.CharacterSkillTables) return RebuildCharacterTables(result, snapshot);
             if (scope == TableDataRebuildScope.BuildingTable) return RebuildBuildingTable(result, snapshot);
@@ -371,6 +369,7 @@ namespace TableDataEditor
                 snapshot.PurificationConfigs.ConvertAll(r => r.Id), TableDataPaths.PurificationConfigAssetPath,
                 TableDataPaths.PurificationConfigCsvFileName, TableDataColumns.PurificationTypeId, result);
             var purificationCatalog = ResolveSingleton<PurificationConfigCatalog>(TableDataPaths.PurificationConfigCatalogAssetPath, result);
+            ShopTableTargets shopTargets = ResolveShopTableTargets(snapshot, result);
 
             AssetDatabase.StartAssetEditing();
             try
@@ -406,6 +405,10 @@ namespace TableDataEditor
                 WriteCatalog(corruptionCatalog, "configs", FilterForCatalog(snapshot.CorruptionConfigs, r => r.Enabled, r => r.Id, corruptionAssets));
                 foreach (PurificationConfigRow row in snapshot.PurificationConfigs) WritePurificationConfig(purificationAssets[row.Id], row);
                 WriteCatalog(purificationCatalog, "configs", FilterForCatalog(snapshot.PurificationConfigs, r => r.Enabled, r => r.Id, purificationAssets));
+
+                // ShopProduct는 Shop과 Item의 키를 문자열로 보존한다. 따라서 이 묶음은 다른 도메인의
+                // 정의를 참조로 다시 쓰지 않고도, 상점 세 표의 출력만 결정적으로 갱신할 수 있다.
+                WriteShopTables(snapshot, shopTargets);
             }
             finally
             {
@@ -429,6 +432,7 @@ namespace TableDataEditor
             partyConfigTargets.MarkDirty();
             corruptionCatalog.MarkDirty();
             purificationCatalog.MarkDirty();
+            shopTargets.MarkDirty();
 
             result.Wrote = true;
             return result;
@@ -631,6 +635,140 @@ namespace TableDataEditor
             serialized.FindProperty(PartyConfigEnabledField).boolValue = row.Enabled;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(asset);
+        }
+
+        // ---- Shop / ShopProduct ----
+
+        /// <summary>
+        /// ShopTables 범위의 생성 대상. Item은 이 범위에 포함하지만 Building 등 Legacy 도메인은
+        /// 절대로 확보하거나 쓰지 않는다. ShopProduct의 키는 CSV에 별도 id를 추가하지 않고
+        /// shop_id + item_id 조합으로만 만든다.
+        /// </summary>
+        private sealed class ShopTableTargets
+        {
+            public Dictionary<string, ItemDefinition> Items;
+            public ItemCatalog ItemCatalog;
+            public Dictionary<string, ShopDefinition> Shops;
+            public ShopCatalog ShopCatalog;
+            public Dictionary<string, ShopProductDefinition> Products;
+            public ShopProductCatalog ProductCatalog;
+
+            public void MarkDirty()
+            {
+                ItemCatalog.MarkDirty();
+                ShopCatalog.MarkDirty();
+                ProductCatalog.MarkDirty();
+            }
+
+            public List<UnityEngine.Object> AllTargets()
+            {
+                var all = new List<UnityEngine.Object>();
+                var seen = new HashSet<int>();
+
+                void Add(UnityEngine.Object asset)
+                {
+                    if (asset != null && seen.Add(asset.GetInstanceID())) all.Add(asset);
+                }
+
+                foreach (ItemDefinition item in Items.Values) Add(item);
+                foreach (ShopDefinition shop in Shops.Values) Add(shop);
+                foreach (ShopProductDefinition product in Products.Values) Add(product);
+                Add(ItemCatalog);
+                Add(ShopCatalog);
+                Add(ProductCatalog);
+                return all;
+            }
+        }
+
+        /// <summary>
+        /// Item, Shop, ShopProduct만 다시 만든다. ShopDefinition은 Building의 숫자 키만 보존하고
+        /// BuildingDefinition 참조를 쓰지 않으므로 BuildingTable을 함께 갱신할 필요가 없다.
+        /// </summary>
+        private static TableDataRebuildResult RebuildShopTables(
+            TableDataRebuildResult result, TableDataSnapshot snapshot)
+        {
+            ShopTableTargets targets = ResolveShopTableTargets(snapshot, result);
+
+            AssetDatabase.StartAssetEditing();
+            try
+            {
+                WriteShopTables(snapshot, targets);
+            }
+            finally
+            {
+                AssetDatabase.StopAssetEditing();
+            }
+
+            foreach (UnityEngine.Object asset in targets.AllTargets())
+            {
+                AssetDatabase.SaveAssetIfDirty(asset);
+            }
+
+            targets.MarkDirty();
+            result.Wrote = true;
+            return result;
+        }
+
+        private static ShopTableTargets ResolveShopTableTargets(
+            TableDataSnapshot snapshot, TableDataRebuildResult result)
+        {
+            var productRows = new Dictionary<string, ShopProductRow>(StringComparer.Ordinal);
+            foreach (ShopProductRow row in snapshot.ShopProducts)
+            {
+                productRows[ShopProductKey(row.ShopId, row.ItemId)] = row;
+            }
+
+            var productKeys = new List<string>();
+            foreach (ShopProductRow row in snapshot.ShopProducts)
+            {
+                productKeys.Add(ShopProductKey(row.ShopId, row.ItemId));
+            }
+
+            return new ShopTableTargets
+            {
+                Items = ResolveTargets<ItemDefinition>(
+                    TableDataPaths.ItemOutputFolder, item => item.ItemId,
+                    snapshot.Items.ConvertAll(row => row.Id), TableDataPaths.ItemAssetPath,
+                    TableDataPaths.ItemCsvFileName, TableDataColumns.ItemId, result),
+                ItemCatalog = ResolveSingleton<ItemCatalog>(TableDataPaths.ItemCatalogAssetPath, result),
+                Shops = ResolveTargets<ShopDefinition>(
+                    TableDataPaths.ShopOutputFolder, shop => shop.ShopId,
+                    snapshot.Shops.ConvertAll(row => row.Id), TableDataPaths.ShopAssetPath,
+                    TableDataPaths.ShopCsvFileName, TableDataColumns.ShopId, result),
+                ShopCatalog = ResolveSingleton<ShopCatalog>(TableDataPaths.ShopCatalogAssetPath, result),
+                Products = ResolveTargets<ShopProductDefinition>(
+                    TableDataPaths.ShopProductOutputFolder,
+                    product => ShopProductKey(product.ShopId, product.ItemId), productKeys,
+                    key => TableDataPaths.ShopProductAssetPath(productRows[key].ShopId, productRows[key].ItemId),
+                    TableDataPaths.ShopProductCsvFileName, TableDataColumns.ShopId, result),
+                ProductCatalog = ResolveSingleton<ShopProductCatalog>(
+                    TableDataPaths.ShopProductCatalogAssetPath, result),
+            };
+        }
+
+        private static void WriteShopTables(TableDataSnapshot snapshot, ShopTableTargets targets)
+        {
+            foreach (ItemRow row in snapshot.Items) WriteItem(targets.Items[row.Id], row);
+            foreach (ShopRow row in snapshot.Shops) WriteShop(targets.Shops[row.Id], row);
+            foreach (ShopProductRow row in snapshot.ShopProducts)
+            {
+                WriteShopProduct(targets.Products[ShopProductKey(row.ShopId, row.ItemId)], row);
+            }
+
+            WriteCatalog(targets.ItemCatalog, "items",
+                SortForCatalog(snapshot.Items, row => row.Enabled, row => row.DisplayOrder, row => row.Id, targets.Items));
+            WriteCatalog(targets.ShopCatalog, "shops",
+                SortForCatalog(snapshot.Shops, row => row.Enabled, row => row.DisplayOrder, row => row.Id, targets.Shops));
+            WriteCatalog(targets.ProductCatalog, "products",
+                SortForCatalog(snapshot.ShopProducts, row => row.Enabled, row => row.DisplayOrder,
+                    row => ShopProductKey(row.ShopId, row.ItemId), targets.Products));
+        }
+
+        private static string ShopProductKey(string shopId, string itemId)
+        {
+            // Validator가 빈 ID와 중복 조합을 이미 막는다. 제어 문자는 일반 ID 계약에서 허용되지 않아
+            // 두 값을 손실 없이 분리하는 내부 사전 키로 쓸 수 있다.
+            return shopId + "\u001f" + itemId;
         }
 
         // ---- Building ----
@@ -1386,6 +1524,32 @@ namespace TableDataEditor
             EditorUtility.SetDirty(asset);
         }
 
+        private static void WriteShop(ShopDefinition asset, ShopRow row)
+        {
+            var serialized = new SerializedObject(asset);
+            serialized.FindProperty("shopId").stringValue = row.Id;
+            ApplyLocalizedName(serialized.FindProperty("localizedName"), row.Name);
+            serialized.FindProperty("requiredBuildingId").intValue = row.RequiredBuildingId;
+            serialized.FindProperty("acceptItemSales").boolValue = row.AcceptItemSales;
+            serialized.FindProperty("displayOrder").intValue = row.DisplayOrder;
+            serialized.FindProperty("enabled").boolValue = row.Enabled;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(asset);
+        }
+
+        private static void WriteShopProduct(ShopProductDefinition asset, ShopProductRow row)
+        {
+            var serialized = new SerializedObject(asset);
+            serialized.FindProperty("shopId").stringValue = row.ShopId;
+            serialized.FindProperty("itemId").stringValue = row.ItemId;
+            serialized.FindProperty("buyCurrencyId").stringValue = row.BuyCurrencyId;
+            serialized.FindProperty("buyPrice").intValue = row.BuyPrice;
+            serialized.FindProperty("displayOrder").intValue = row.DisplayOrder;
+            serialized.FindProperty("enabled").boolValue = row.Enabled;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(asset);
+        }
+
         /// <summary>
         /// base_monster_id는 <b>문자열 그대로</b> 적는다 - 다른 에셋을 가리키는 참조로 만들지 않는 것은
         /// 의도적이다. 참조가 되는 순간 "base를 따라가면 값이 있다"는 경로가 생기고, 그러면 상속하지
@@ -1687,7 +1851,11 @@ namespace TableDataEditor
             ok &= VerifyFields<WorldDefinition>(log, "worldId", "localizedName", "displayOrder");
             ok &= VerifyFields<CurrencyDefinition>(log, "currencyId", "localizedName", "icon", "displayOrder");
             ok &= VerifyFields<ItemDefinition>(log, "itemId", "localizedName", "localizedDescription", "icon",
-                "displayOrder");
+                "displayOrder", "sellable", "sellCurrencyId", "sellPrice");
+            ok &= VerifyFields<ShopDefinition>(log, "shopId", "localizedName", "requiredBuildingId",
+                "acceptItemSales", "displayOrder", "enabled");
+            ok &= VerifyFields<ShopProductDefinition>(log, "shopId", "itemId", "buyCurrencyId", "buyPrice",
+                "displayOrder", "enabled");
             ok &= VerifyFields<MonsterDefinition>(log, "monsterId", "baseMonsterId", "localizedName", "world",
                 "motionProfile", "previewSprite", "maxDurability", DropsField,
                 CurrencyField, CurrencyAmountMinField, CurrencyAmountMaxField, "displayOrder");
@@ -1699,6 +1867,8 @@ namespace TableDataEditor
             ok &= VerifyFields<WorldCatalog>(log, "worlds");
             ok &= VerifyFields<CurrencyCatalog>(log, "currencies");
             ok &= VerifyFields<ItemCatalog>(log, "items");
+            ok &= VerifyFields<ShopCatalog>(log, "shops");
+            ok &= VerifyFields<ShopProductCatalog>(log, "products");
             ok &= VerifyFields<MonsterCatalog>(log, "monsters");
             ok &= VerifyFields<DungeonCatalog>(log, "dungeons");
 

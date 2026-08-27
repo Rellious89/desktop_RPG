@@ -9,34 +9,35 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 28929260c8064ee6b8c6c56b3595f725, type: 3}
-  m_Name: Item_50002
-  m_EditorClassIdentifier: 
-  itemId: 50002
-  displayName: 
+  m_Script: {fileID: 11500000, guid: 4c958528fe24418fa439aa5dc1cf6961, type: 3}
+  m_Name: Building_3
+  m_EditorClassIdentifier:
+  buildingId: 3
   localizedName:
     m_TableReference:
-      m_TableCollectionName: GUID:491e7b09eb9a34714b2294e2f3937670
+      m_TableCollectionName: GUID:161824df6b6eb43a1a6fa7c55deea323
     m_TableEntryReference:
-      m_KeyId: 681523011585
-      m_Key: 
+      m_KeyId: 1860797910212608
+      m_Key:
     m_FallbackState: 0
     m_WaitForCompletion: 0
     m_LocalVariables: []
-  localizedDescription:
+  localizedFunctionName:
     m_TableReference:
-      m_TableCollectionName: GUID:491e7b09eb9a34714b2294e2f3937670
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
     m_TableEntryReference:
-      m_KeyId: 6147560627494913
-      m_Key: 
+      m_KeyId: 10768807676076032
+      m_Key:
     m_FallbackState: 0
     m_WaitForCompletion: 0
     m_LocalVariables: []
-  icon: {fileID: 21300000, guid: 21c178995a4534283913dbac7785a8bd, type: 3}
+  buildTimeSeconds: 1
+  costCurrencyId: jewel
+  costCurrency: {fileID: 11400000, guid: 25530e3cfd6944ca4873f62520cd7d22, type: 2}
+  costCurrencyAmount: 0
+  costItems: []
   displayOrder: 30
-  sellable: 1
-  sellCurrencyId: jewel
-  sellPrice: 20
+  enabled: 1
   references:
     version: 2
     RefIds: []

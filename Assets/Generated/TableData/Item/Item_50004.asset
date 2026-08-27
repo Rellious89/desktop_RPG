@@ -34,6 +34,9 @@ MonoBehaviour:
     m_LocalVariables: []
   icon: {fileID: 21300000, guid: e0851b8ab38ac443b932d610222f6ee2, type: 3}
   displayOrder: 50
+  sellable: 0
+  sellCurrencyId: jewel
+  sellPrice: 30
   references:
     version: 2
     RefIds: []

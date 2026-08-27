@@ -414,7 +414,7 @@ namespace TableDataEditor.Tests
             TableDataSnapshot snapshot = Live().Snapshot;
             Assert.IsNotNull(snapshot, "아홉 표가 모두 읽혀야 스냅샷이 만들어진다: " + Live().Summary);
 
-            Assert.AreEqual(2, snapshot.Buildings.Count, "Building.csv에는 여관과 교회가 있다.");
+            Assert.AreEqual(3, snapshot.Buildings.Count, "Building.csv에는 여관·교회·상점이 있다.");
 
             BuildingRow row = snapshot.Buildings.Find(b => b.Id == LiveBuildingId);
             Assert.AreEqual(LiveBuildingId, row.Id);
@@ -669,7 +669,7 @@ namespace TableDataEditor.Tests
         {
             // 건설 기록이 생긴 뒤에도 형식 번호는 그대로다 - 칸을 <b>추가</b>하기만 했으므로
             // 예전 파일이 그대로 유효하다(없는 칸은 기본값으로 읽힌다).
-            Assert.AreEqual(5, SaveData.CurrentSaveVersion);
+            Assert.AreEqual(6, SaveData.CurrentSaveVersion);
         }
 
         // ---- 도우미 ----

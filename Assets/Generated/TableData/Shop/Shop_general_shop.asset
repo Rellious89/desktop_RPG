@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac3d15f00e9ec4e3eb33303a04698d4f, type: 3}
+  m_Name: Shop_general_shop
+  m_EditorClassIdentifier:
+  shopId: general_shop
+  localizedName:
+    m_TableReference:
+      m_TableCollectionName: GUID:24472ad8aa2bf4b34b07e7685383f17b
+    m_TableEntryReference:
+      m_KeyId: 25454174208
+      m_Key:
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  requiredBuildingId: 3
+  acceptItemSales: 1
+  displayOrder: 10
+  enabled: 1
+  references:
+    version: 2
+    RefIds: []
