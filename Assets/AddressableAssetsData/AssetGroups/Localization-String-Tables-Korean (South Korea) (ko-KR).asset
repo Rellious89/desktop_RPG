@@ -53,6 +53,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - Locale-ko-KR
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d8df4ce008c8a4b89bf7ae68f17e536b
+    m_Address: 08_Shop_ko-KR
+    m_ReadOnly: 1
+    m_SerializedLabels:
+    - Locale-ko-KR
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: da4bcf5c68e0841f2b6c22c857eb9312
     m_Address: 05_Currency_ko-KR
     m_ReadOnly: 1

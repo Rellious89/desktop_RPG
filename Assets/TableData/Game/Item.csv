@@ -1,6 +1,6 @@
-item_id,name_category,name_key,$item_name,description_category,description_key,$item_description,icon_key,$item_type,display_order,enabled,memo
-50000,4,1,더미아이템1,4,10001,더미아이템1의 툴팁 설명,item_ico_1,consumable,10,1,
-50001,4,2,더미아이템2,4,10002,더미아이템2의 툴팁 설명,item_ico_2,consumable,20,1,
-50002,4,3,더미아이템3,4,10003,더미아이템3의 툴팁 설명,item_ico_3,consumable,30,1,
-50003,4,4,더미아이템4,4,10004,더미아이템4의 툴팁 설명,item_ico_4,consumable,40,1,
-50004,4,5,더미아이템5,4,10005,더미아이템5의 툴팁 설명,item_ico_5,consumable,50,1,
+item_id,name_category,name_key,$item_name,description_category,description_key,$item_description,icon_key,$item_type,sellable,sell_currency_id,sell_price,display_order,enabled,memo
+50000,4,1,더미아이템1,4,10001,더미아이템1의 툴팁 설명,item_ico_1,consumable,1,jewel,10,10,1,
+50001,4,2,더미아이템2,4,10002,더미아이템2의 툴팁 설명,item_ico_2,consumable,1,jewel,15,20,1,
+50002,4,3,더미아이템3,4,10003,더미아이템3의 툴팁 설명,item_ico_3,consumable,1,jewel,20,30,1,
+50003,4,4,더미아이템4,4,10004,더미아이템4의 툴팁 설명,item_ico_4,consumable,1,jewel,25,40,1,
+50004,4,5,더미아이템5,4,10005,더미아이템5의 툴팁 설명,item_ico_5,consumable,0,jewel,30,50,1,

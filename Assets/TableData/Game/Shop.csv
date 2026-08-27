@@ -1,0 +1,2 @@
+shop_id,name_category,name_key,$shop_name,required_building_id,accept_item_sales,display_order,enabled,memo
+general_shop,8,1,상점,3,1,10,1,기본 상점 (테스트용)

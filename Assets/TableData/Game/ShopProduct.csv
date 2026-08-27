@@ -1,0 +1,2 @@
+shop_id,item_id,buy_currency_id,buy_price,display_order,enabled,memo
+general_shop,50000,jewel,100,10,1,
