@@ -161,6 +161,8 @@ namespace TableDataEditor
             CsvTable purificationConfigTable = TableDataCsvReader.Read(
                 TableDataPaths.PurificationConfigCsvPath, TableDataPaths.PurificationConfigCsvFileName,
                 TableDataColumns.PurificationConfig, log);
+            CsvTable shopTable = TableDataCsvReader.Read("Assets/TableData/Game/Shop.csv", "Shop.csv", TableDataColumns.Shop, log);
+            CsvTable shopProductTable = TableDataCsvReader.Read("Assets/TableData/Game/ShopProduct.csv", "ShopProduct.csv", TableDataColumns.ShopProduct, log);
 
             var snapshot = new TableDataSnapshot();
             bool allTablesRead = worldTable != null && currencyTable != null && itemTable != null
@@ -172,6 +174,7 @@ namespace TableDataEditor
                                  && partyConfigTable != null;
             allTablesRead = allTablesRead && corruptionConfigTable != null;
             allTablesRead = allTablesRead && purificationConfigTable != null;
+            allTablesRead = allTablesRead && shopTable != null && shopProductTable != null;
 
             try
             {
@@ -187,6 +190,8 @@ namespace TableDataEditor
 
                 // Building은 Currency와 Item을 가리키므로 두 표가 모두 읽힌 뒤에 온다.
                 if (buildingTable != null) ValidateBuildings(buildingTable, snapshot, log);
+                if (shopTable != null) ValidateShops(shopTable, snapshot, log);
+                if (shopProductTable != null) ValidateShopProducts(shopProductTable, snapshot, log);
                 if (purificationConfigTable != null) ValidatePurificationConfigs(purificationConfigTable, snapshot, log);
 
                 // 모집 네 표는 맨 뒤다 - Character와 Building을 가리키므로 두 표가 이미 앞에 있어야
@@ -423,11 +428,14 @@ namespace TableDataEditor
                     row.Enabled = enabled;
                 }
 
-                if (TableDataFieldRules.TryReadEnabled(file, line, TableDataColumns.Sellable, table.Get(record, TableDataColumns.Sellable), log, out bool sellable)) row.Sellable = sellable;
-                row.SellCurrencyId = table.Get(record, TableDataColumns.SellCurrencyId) ?? string.Empty;
-                if (!string.IsNullOrEmpty(table.Get(record, TableDataColumns.SellPrice)) && TableDataFieldRules.TryReadInt(file, line, TableDataColumns.SellPrice, table.Get(record, TableDataColumns.SellPrice), log, out int sellPrice)) row.SellPrice = sellPrice;
-                if (!string.IsNullOrEmpty(row.SellCurrencyId) && !snapshot.CurrenciesById.ContainsKey(row.SellCurrencyId)) log.Error(file, line, TableDataColumns.SellCurrencyId, row.SellCurrencyId, "알 수 없는 판매 재화입니다.");
-                if (row.SellPrice < 0 || (row.Sellable && (string.IsNullOrEmpty(row.SellCurrencyId) || row.SellPrice <= 0))) log.Error(file, line, TableDataColumns.SellPrice, row.SellPrice.ToString(), "판매 가능 아이템에는 양수 가격과 재화가 필요합니다.");
+                if (Array.IndexOf(table.Header, TableDataColumns.Sellable) >= 0)
+                {
+                    if (TableDataFieldRules.TryReadEnabled(file, line, TableDataColumns.Sellable, table.Get(record, TableDataColumns.Sellable), log, out bool sellable)) row.Sellable = sellable;
+                    row.SellCurrencyId = table.Get(record, TableDataColumns.SellCurrencyId) ?? string.Empty;
+                    if (!string.IsNullOrEmpty(table.Get(record, TableDataColumns.SellPrice)) && TableDataFieldRules.TryReadInt(file, line, TableDataColumns.SellPrice, table.Get(record, TableDataColumns.SellPrice), log, out int sellPrice)) row.SellPrice = sellPrice;
+                    if (!string.IsNullOrEmpty(row.SellCurrencyId) && !snapshot.CurrenciesById.ContainsKey(row.SellCurrencyId)) log.Error(file, line, TableDataColumns.SellCurrencyId, row.SellCurrencyId, "알 수 없는 판매 재화입니다.");
+                    if (row.SellPrice < 0 || (row.Sellable && (string.IsNullOrEmpty(row.SellCurrencyId) || row.SellPrice <= 0))) log.Error(file, line, TableDataColumns.SellPrice, row.SellPrice.ToString(), "판매 가능 아이템에는 양수 가격과 재화가 필요합니다.");
+                }
 
                 if (TableDataFieldRules.TryReadInt(
                         file, line, TableDataColumns.DisplayOrder, table.Get(record, TableDataColumns.DisplayOrder), log, out int order))
@@ -1463,6 +1471,44 @@ namespace TableDataEditor
         /// <b>영어와 한국어 번역이 같거나 한국어가 들어 있는 것은 여기서 보지 않는다.</b> 그것은
         /// 번역의 내용이고, 이 표가 확인하는 것은 "그 Entry가 실제로 있는가"까지다.
         /// </summary>
+        private static void ValidateShops(CsvTable table, TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            foreach (CsvRecord record in table.Records)
+            {
+                var row = new ShopRow { Line = record.Line };
+                bool ok = TableDataFieldRules.TryReadRequiredId(table.FileName, record.Line, TableDataColumns.ShopId, table.Get(record, TableDataColumns.ShopId), log, out string id);
+                row.Id = id;
+                if (ok && snapshot.ShopsById.ContainsKey(id)) { log.Error(table.FileName, record.Line, TableDataColumns.ShopId, id, "shop_id가 중복됩니다."); ok = false; }
+                TableDataFieldRules.TryReadEnabled(table.FileName, record.Line, TableDataColumns.Enabled, table.Get(record, TableDataColumns.Enabled), log, out row.Enabled);
+                TableDataFieldRules.TryReadEnabled(table.FileName, record.Line, TableDataColumns.AcceptItemSales, table.Get(record, TableDataColumns.AcceptItemSales), log, out row.AcceptItemSales);
+                TableDataFieldRules.TryReadInt(table.FileName, record.Line, TableDataColumns.DisplayOrder, table.Get(record, TableDataColumns.DisplayOrder), log, out row.DisplayOrder);
+                TableDataFieldRules.TryReadIntAtLeast(table.FileName, record.Line, TableDataColumns.RequiredBuildingId, table.Get(record, TableDataColumns.RequiredBuildingId), 0, log, out row.RequiredBuildingId);
+                if (row.RequiredBuildingId > 0 && !snapshot.BuildingsById.ContainsKey(row.RequiredBuildingId.ToString())) log.Error(table.FileName, record.Line, TableDataColumns.RequiredBuildingId, row.RequiredBuildingId.ToString(), "required_building_id가 Building.csv에 없습니다.");
+                row.Name = ReadLocalizedName(table, record, table.FileName, record.Line, row.Enabled, true, log);
+                if (!ok) continue; snapshot.Shops.Add(row); snapshot.ShopsById[row.Id] = row;
+            }
+        }
+
+        private static void ValidateShopProducts(CsvTable table, TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            foreach (CsvRecord record in table.Records)
+            {
+                var row = new ShopProductRow { Line = record.Line };
+                bool shopOk = TableDataFieldRules.TryReadRequiredId(table.FileName, record.Line, TableDataColumns.ShopId, table.Get(record, TableDataColumns.ShopId), log, out row.ShopId);
+                bool itemOk = TableDataFieldRules.TryReadRequiredId(table.FileName, record.Line, TableDataColumns.ItemId, table.Get(record, TableDataColumns.ItemId), log, out row.ItemId);
+                bool currencyOk = TableDataFieldRules.TryReadRequiredId(table.FileName, record.Line, TableDataColumns.BuyCurrencyId, table.Get(record, TableDataColumns.BuyCurrencyId), log, out row.BuyCurrencyId);
+                string key = row.ShopId + "\n" + row.ItemId;
+                if (shopOk && itemOk && snapshot.ShopProductsByPair.ContainsKey(key)) { log.Error(table.FileName, record.Line, TableDataColumns.ItemId, row.ItemId, "shop_id + item_id 조합이 중복됩니다."); itemOk = false; }
+                TableDataFieldRules.TryReadEnabled(table.FileName, record.Line, TableDataColumns.Enabled, table.Get(record, TableDataColumns.Enabled), log, out row.Enabled);
+                TableDataFieldRules.TryReadInt(table.FileName, record.Line, TableDataColumns.DisplayOrder, table.Get(record, TableDataColumns.DisplayOrder), log, out row.DisplayOrder);
+                if (!TableDataFieldRules.TryReadIntAtLeast(table.FileName, record.Line, TableDataColumns.BuyPrice, table.Get(record, TableDataColumns.BuyPrice), 1, log, out row.BuyPrice)) { }
+                if (shopOk && !snapshot.ShopsById.ContainsKey(row.ShopId)) log.Error(table.FileName, record.Line, TableDataColumns.ShopId, row.ShopId, "Shop.csv 참조가 없습니다.");
+                if (itemOk && !snapshot.ItemsById.ContainsKey(row.ItemId)) log.Error(table.FileName, record.Line, TableDataColumns.ItemId, row.ItemId, "Item.csv 참조가 없습니다.");
+                if (currencyOk && !snapshot.CurrenciesById.ContainsKey(row.BuyCurrencyId)) log.Error(table.FileName, record.Line, TableDataColumns.BuyCurrencyId, row.BuyCurrencyId, "Currency.csv 참조가 없습니다.");
+                if (!(shopOk && itemOk && currencyOk)) continue; snapshot.ShopProducts.Add(row); snapshot.ShopProductsByPair[key] = row;
+            }
+        }
+
         private static void ValidateBuildings(CsvTable table, TableDataSnapshot snapshot, TableDataDiagnosticLog log)
         {
             string file = table.FileName;

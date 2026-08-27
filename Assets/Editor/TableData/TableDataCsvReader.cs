@@ -39,7 +39,7 @@ namespace TableDataEditor
 
         public static readonly string[] Item =
         {
-            ItemId, NameCategory, NameKey, DescriptionCategory, DescriptionKey, IconKey, Sellable, SellCurrencyId, SellPrice,
+            ItemId, NameCategory, NameKey, DescriptionCategory, DescriptionKey, IconKey,
             DisplayOrder, Enabled, Memo,
         };
 
@@ -471,7 +471,7 @@ namespace TableDataEditor
                     continue;
                 }
 
-                if (!expectedSet.Contains(column))
+                if (!expectedSet.Contains(column) && !IsOptionalItemSellColumn(fileName, column))
                 {
                     log.Error(fileName, TableDataDiagnostic.HeaderRow, column, column,
                         "알 수 없는 컬럼입니다 - 오타를 조용히 무시하지 않기 위해 오류로 처리합니다. " +
@@ -491,6 +491,12 @@ namespace TableDataEditor
             }
 
             return ok;
+        }
+
+        private static bool IsOptionalItemSellColumn(string fileName, string column)
+        {
+            if (!string.Equals(fileName, TableDataPaths.ItemCsvFileName, StringComparison.Ordinal)) return false;
+            return column == TableDataColumns.Sellable || column == TableDataColumns.SellCurrencyId || column == TableDataColumns.SellPrice;
         }
 
         /// <summary>
