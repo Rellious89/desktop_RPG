@@ -2465,6 +2465,12 @@ namespace TableDataEditor
                 folders.Add(TableDataPaths.MonsterOutputFolder);
                 folders.Add(TableDataPaths.DungeonOutputFolder);
             }
+            if (TableDataRebuildScopes.IncludesShopTables(outputScope))
+            {
+                folders.Add(TableDataPaths.ItemOutputFolder);
+                folders.Add(TableDataPaths.ShopOutputFolder);
+                folders.Add(TableDataPaths.ShopProductOutputFolder);
+            }
 
             if (TableDataRebuildScopes.IncludesDungeonTable(outputScope))
                 folders.Add(TableDataPaths.DungeonOutputFolder);

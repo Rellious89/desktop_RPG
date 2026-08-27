@@ -78,6 +78,7 @@ namespace TableDataEditor
         CorruptionConfigTable = 5,
         PurificationConfigTable = 6,
         DungeonTable = 7,
+        ShopTables = 8,
     }
 
     /// <summary>
@@ -97,7 +98,8 @@ namespace TableDataEditor
                    || scope == TableDataRebuildScope.PartyConfigTable
                    || scope == TableDataRebuildScope.CorruptionConfigTable
                    || scope == TableDataRebuildScope.PurificationConfigTable
-                   || scope == TableDataRebuildScope.DungeonTable;
+                   || scope == TableDataRebuildScope.DungeonTable
+                   || scope == TableDataRebuildScope.ShopTables;
         }
 
         /// <summary>지원하지 않는 값이면 <b>아무것도 하기 전에</b> 던진다.</summary>
@@ -112,7 +114,7 @@ namespace TableDataEditor
                 $"{nameof(TableDataRebuildScope.RecruitmentTables)}, " +
                 $"{nameof(TableDataRebuildScope.PartyConfigTable)}, " +
                 $"{nameof(TableDataRebuildScope.CorruptionConfigTable)}, {nameof(TableDataRebuildScope.PurificationConfigTable)}, " +
-                $"{nameof(TableDataRebuildScope.DungeonTable)}만 " +
+                $"{nameof(TableDataRebuildScope.DungeonTable)}, {nameof(TableDataRebuildScope.ShopTables)}만 " +
                 "쓸 수 있습니다. 임의의 부분집합을 허용하면 범위 밖 표를 가리키던 참조가 지워집니다.");
         }
 
@@ -167,6 +169,12 @@ namespace TableDataEditor
         {
             EnsureSupported(scope, nameof(scope));
             return scope == TableDataRebuildScope.All || scope == TableDataRebuildScope.DungeonTable;
+        }
+
+        public static bool IncludesShopTables(TableDataRebuildScope scope)
+        {
+            EnsureSupported(scope, nameof(scope));
+            return scope == TableDataRebuildScope.All || scope == TableDataRebuildScope.ShopTables;
         }
     }
 
@@ -300,6 +308,10 @@ namespace TableDataEditor
             };
 
             if (!result.Validation.CanRebuild) return result;
+
+            // Writer는 다음 단계에서 연결한다. 이 범위가 기존 All 경로로 떨어져 다른 도메인을 쓰지 않게
+            // 여기서 명시적으로 멈춘다.
+            if (scope == TableDataRebuildScope.ShopTables) return result;
 
             // 필드 이름이 런타임 클래스와 어긋나면 절반쯤 쓰고 실패한다. 메모리 안의 임시 인스턴스로
             // 미리 확인하고, 어긋나면 아무것도 쓰지 않고 끝낸다(에셋을 만들지 않는 순수 검사다).
@@ -1204,6 +1216,12 @@ namespace TableDataEditor
                 EnsureFolder(TableDataPaths.OutputRoot, "Item");
                 EnsureFolder(TableDataPaths.OutputRoot, "Monster");
                 EnsureFolder(TableDataPaths.OutputRoot, "Dungeon");
+            }
+            if (TableDataRebuildScopes.IncludesShopTables(scope))
+            {
+                EnsureFolder(TableDataPaths.OutputRoot, "Item");
+                EnsureFolder(TableDataPaths.OutputRoot, "Shop");
+                EnsureFolder(TableDataPaths.OutputRoot, "ShopProduct");
             }
 
             if (TableDataRebuildScopes.IncludesDungeonTable(scope))

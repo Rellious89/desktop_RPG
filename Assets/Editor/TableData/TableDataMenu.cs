@@ -118,6 +118,13 @@ namespace TableDataEditor
                 "Rebuild (Dungeon)", TableDataPaths.DungeonOutputFolder);
         }
 
+        [MenuItem(MenuRoot + "Rebuild (Shop Tables)", priority = 109)]
+        public static void RebuildShopTables()
+        {
+            Run(TableDataRebuildScope.ShopTables, "Rebuild (Shop Tables)",
+                TableDataPaths.ItemOutputFolder + ", " + TableDataPaths.ShopOutputFolder + ", " + TableDataPaths.ShopProductOutputFolder);
+        }
+
         private static void Run(TableDataRebuildScope scope, string label, string outputDescription)
         {
             TableDataRebuildResult result = TableDataRebuilder.Rebuild(scope);

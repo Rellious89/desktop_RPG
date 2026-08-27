@@ -24,6 +24,8 @@ namespace TableDataEditor
         public const string SkillCsvFileName = "Skill.csv";
         public const string CharacterSkillCsvFileName = "CharacterSkill.csv";
         public const string BuildingCsvFileName = "Building.csv";
+        public const string ShopCsvFileName = "Shop.csv";
+        public const string ShopProductCsvFileName = "ShopProduct.csv";
         public const string CharacterAcquisitionCsvFileName = "CharacterAcquisition.csv";
         public const string RecruitmentTypeCsvFileName = "RecruitmentType.csv";
         public const string RecruitmentPoolCsvFileName = "RecruitmentPool.csv";
@@ -41,6 +43,8 @@ namespace TableDataEditor
         public const string SkillCsvPath = InputRoot + "/" + SkillCsvFileName;
         public const string CharacterSkillCsvPath = InputRoot + "/" + CharacterSkillCsvFileName;
         public const string BuildingCsvPath = InputRoot + "/" + BuildingCsvFileName;
+        public const string ShopCsvPath = InputRoot + "/" + ShopCsvFileName;
+        public const string ShopProductCsvPath = InputRoot + "/" + ShopProductCsvFileName;
 
         public const string CharacterAcquisitionCsvPath = InputRoot + "/" + CharacterAcquisitionCsvFileName;
         public const string RecruitmentTypeCsvPath = InputRoot + "/" + RecruitmentTypeCsvFileName;
@@ -104,6 +108,8 @@ namespace TableDataEditor
         /// 바꾸지 않는다는 것이 코드로 보이는 자리가 여기다.
         /// </summary>
         public const string BuildingOutputFolder = OutputRoot + "/Building";
+        public const string ShopOutputFolder = OutputRoot + "/Shop";
+        public const string ShopProductOutputFolder = OutputRoot + "/ShopProduct";
 
         /// <summary>
         /// 모집 네 표의 출력 폴더. <b>기존 아홉 도메인과 나란한 형제 폴더</b>들이며 서로의 안쪽을
@@ -142,6 +148,8 @@ namespace TableDataEditor
         public const string SkillAssetPrefix = "Skill_";
         public const string CharacterSkillAssetPrefix = "CharacterSkill_";
         public const string BuildingAssetPrefix = "Building_";
+        public const string ShopAssetPrefix = "Shop_";
+        public const string ShopProductAssetPrefix = "ShopProduct_";
         public const string CharacterAcquisitionAssetPrefix = "CharacterAcquisition_";
         public const string RecruitmentTypeAssetPrefix = "RecruitmentType_";
         public const string RecruitmentPoolAssetPrefix = "RecruitmentPool_";
@@ -159,6 +167,8 @@ namespace TableDataEditor
         public const string SkillCatalogAssetName = "SkillCatalog";
         public const string CharacterSkillCatalogAssetName = "CharacterSkillCatalog";
         public const string BuildingCatalogAssetName = "BuildingCatalog";
+        public const string ShopCatalogAssetName = "ShopCatalog";
+        public const string ShopProductCatalogAssetName = "ShopProductCatalog";
         public const string CharacterAcquisitionCatalogAssetName = "CharacterAcquisitionCatalog";
         public const string RecruitmentTypeCatalogAssetName = "RecruitmentTypeCatalog";
         public const string RecruitmentPoolCatalogAssetName = "RecruitmentPoolCatalog";
@@ -222,6 +232,8 @@ namespace TableDataEditor
         {
             return BuildingOutputFolder + "/" + BuildingAssetPrefix + buildingId + ".asset";
         }
+        public static string ShopAssetPath(string shopId) => ShopOutputFolder + "/" + ShopAssetPrefix + shopId + ".asset";
+        public static string ShopProductAssetPath(string shopId, string itemId) => ShopProductOutputFolder + "/" + ShopProductAssetPrefix + shopId + "__" + itemId + ".asset";
 
         public static string WorldCatalogAssetPath => WorldOutputFolder + "/" + WorldCatalogAssetName + ".asset";
 
@@ -243,6 +255,8 @@ namespace TableDataEditor
 
         public static string BuildingCatalogAssetPath =>
             BuildingOutputFolder + "/" + BuildingCatalogAssetName + ".asset";
+        public static string ShopCatalogAssetPath => ShopOutputFolder + "/" + ShopCatalogAssetName + ".asset";
+        public static string ShopProductCatalogAssetPath => ShopProductOutputFolder + "/" + ShopProductCatalogAssetName + ".asset";
 
         /// <summary>획득 방식 생성 에셋의 경로. <b>CSV에 적힌 acquisition_id를 한 글자도 바꾸지 않고</b>
         /// 파일 이름에 붙인다.</summary>
