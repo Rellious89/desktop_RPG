@@ -128,6 +128,16 @@ namespace Shop
     {
         private const string SupportedCurrencyId = "jewel";
 
+        /// <summary>판매 UI와 거래가 같은 ItemDefinition 판매 메타데이터를 판정하게 하는 공용 경로다.</summary>
+        public static bool TryGetSellUnitPrice(ItemDefinition item, out int unitPrice)
+        {
+            unitPrice = 0;
+            if (item == null || !item.IsValid || !item.Sellable || item.SellPrice <= 0 ||
+                !string.Equals(item.SellCurrencyId, SupportedCurrencyId, StringComparison.Ordinal)) return false;
+            unitPrice = item.SellPrice;
+            return true;
+        }
+
         private readonly Func<SaveData> dataProvider;
         private readonly Func<bool> saveAction;
         private readonly Func<DateTime> utcNowProvider;
@@ -209,10 +219,10 @@ namespace Shop
                         return BatchResult(ShopTradeResultCode.ItemNotSellable, shopId, data.currency);
                     if (!string.Equals(item.SellCurrencyId, SupportedCurrencyId, StringComparison.Ordinal))
                         return BatchResult(ShopTradeResultCode.UnsupportedCurrency, shopId, data.currency);
-                    if (item.SellPrice <= 0)
+                    if (!TryGetSellUnitPrice(item, out int unitPrice))
                         return BatchResult(ShopTradeResultCode.InvalidPrice, shopId, data.currency);
 
-                    long lineTotal = (long)item.SellPrice * line.Quantity;
+                    long lineTotal = (long)unitPrice * line.Quantity;
                     if (lineTotal > int.MaxValue)
                         return BatchResult(ShopTradeResultCode.TotalPriceOverflow, shopId, data.currency);
                     totalPriceLong += lineTotal;
@@ -221,7 +231,7 @@ namespace Shop
 
                     int lineTotalInt = (int)lineTotal;
                     mutations.Add(new InventoryTradeBatchLine(item, -line.Quantity));
-                    results.Add(new ShopSellBatchItemResult(item.ItemId, line.Quantity, item.SellPrice, lineTotalInt));
+                    results.Add(new ShopSellBatchItemResult(item.ItemId, line.Quantity, unitPrice, lineTotalInt));
                 }
 
                 if ((long)data.currency + totalPriceLong > int.MaxValue)
@@ -375,16 +385,15 @@ namespace Shop
             item = itemCatalog.Find(itemId);
             if (item == null) return ShopTradeResultCode.UnknownItem;
             if (!item.Sellable) return ShopTradeResultCode.ItemNotSellable;
-            if (item.SellPrice <= 0) return ShopTradeResultCode.InvalidPrice;
             if (!string.Equals(item.SellCurrencyId, SupportedCurrencyId, StringComparison.Ordinal))
             {
                 return ShopTradeResultCode.UnsupportedCurrency;
             }
+            if (!TryGetSellUnitPrice(item, out unitPrice)) return ShopTradeResultCode.InvalidPrice;
 
             long total = (long)item.SellPrice * quantity;
             if (total > int.MaxValue) return ShopTradeResultCode.TotalPriceOverflow;
 
-            unitPrice = item.SellPrice;
             itemDelta = -quantity;
             currencyDelta = (int)total;
             return ShopTradeResultCode.Sold;

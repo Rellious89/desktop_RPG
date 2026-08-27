@@ -28,7 +28,8 @@ namespace Common
     /// 참조를 비워두면 프리팹의 기존 오브젝트 이름(sp_ItemIcon / lb_count)으로 자동 탐색한다.
     /// </summary>
     [DisallowMultipleComponent]
-    public class InventorySlotView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+    public class InventorySlotView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler,
+        IPointerClickHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
         private const string IconName = "sp_ItemIcon";
         private const string CountTextName = "lb_count";
@@ -136,6 +137,27 @@ namespace Common
         public void OnPointerExit(PointerEventData eventData)
         {
             CancelTooltip();
+        }
+
+        /// <summary>오른쪽 클릭은 현재 열린 등록 대상에만 전달한다. 평소 인벤토리에는 대상이 없어 아무 일도 없다.</summary>
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            if (eventData != null && eventData.button == PointerEventData.InputButton.Right)
+                InventoryItemRegistrationContext.TryRegister(definition);
+        }
+
+        public void OnBeginDrag(PointerEventData eventData)
+        {
+        }
+
+        public void OnDrag(PointerEventData eventData)
+        {
+        }
+
+        public void OnEndDrag(PointerEventData eventData)
+        {
+            if (eventData != null)
+                InventoryItemRegistrationContext.TryRegisterAt(definition, eventData.position, eventData.pressEventCamera);
         }
 
         /// <summary>패널이 닫히거나 슬롯이 꺼질 때도 툴팁이 남지 않게 한다. 슬롯이 꺼지면 Exit
