@@ -23,6 +23,50 @@ namespace Inventory
         NoChange,
     }
 
+    /// <summary>여러 아이템 변화를 한 저장 트랜잭션으로 묶는 불변 요청 줄이다.</summary>
+    public readonly struct InventoryTradeBatchLine
+    {
+        public InventoryTradeBatchLine(ItemDefinition item, int itemDelta)
+        {
+            Item = item;
+            ItemDelta = itemDelta;
+        }
+
+        public ItemDefinition Item { get; }
+        public int ItemDelta { get; }
+    }
+
+    /// <summary>여러 아이템 거래 메모리 적용의 결과 코드다.</summary>
+    public enum InventoryTradeBatchMutationCode
+    {
+        Success,
+        InvalidRequest,
+        NoSaveData,
+        UnknownItem,
+        DuplicateItem,
+        InsufficientCurrency,
+        InsufficientItem,
+        CurrencyOverflow,
+        ItemOverflow,
+    }
+
+    /// <summary>다중 거래 메모리 적용의 불변 결과다.</summary>
+    public readonly struct InventoryTradeBatchMutationResult
+    {
+        internal InventoryTradeBatchMutationResult(InventoryTradeBatchMutationCode code,
+            int currencyBefore, int currencyAfter)
+        {
+            Code = code;
+            CurrencyBefore = currencyBefore;
+            CurrencyAfter = currencyAfter;
+        }
+
+        public InventoryTradeBatchMutationCode Code { get; }
+        public int CurrencyBefore { get; }
+        public int CurrencyAfter { get; }
+        public bool Success => Code == InventoryTradeBatchMutationCode.Success;
+    }
+
     /// <summary>거래 메모리 적용의 불변 결과. 실패 시 before/after는 동일하고 영수증은 빈 값이다.</summary>
     public readonly struct InventoryTradeMutationResult
     {
@@ -63,6 +107,51 @@ namespace Inventory
 
         internal InventoryTradeMutationReceipt(
             int currencyBefore, InventoryCostReceipt.ItemSlot[] itemsBefore, bool itemsWereNull, bool changed)
+        {
+            CurrencyBefore = currencyBefore;
+            ItemsBefore = itemsBefore ?? Array.Empty<InventoryCostReceipt.ItemSlot>();
+            ItemsWereNull = itemsWereNull;
+            Changed = changed;
+        }
+
+        public int CurrencyBefore { get; }
+        public bool Changed { get; }
+        internal InventoryCostReceipt.ItemSlot[] ItemsBefore { get; }
+        internal bool ItemsWereNull { get; }
+
+        internal void Restore(SaveData data)
+        {
+            if (!Changed || data == null) return;
+
+            data.currency = CurrencyBefore;
+            if (ItemsWereNull)
+            {
+                data.items = null;
+                return;
+            }
+
+            if (data.items == null) data.items = new List<InventoryItemState>();
+            data.items.Clear();
+            for (int i = 0; i < ItemsBefore.Length; i++)
+            {
+                InventoryCostReceipt.ItemSlot slot = ItemsBefore[i];
+                if (slot.State != null) slot.State.count = slot.Count;
+                data.items.Add(slot.State);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 다중 거래가 저장되기 전 실패했을 때 거래 직전 인벤토리 전체를 되돌리는 영수증이다.
+    /// 목록 객체/순서/null 칸/수량을 모두 보존한다.
+    /// </summary>
+    public sealed class InventoryTradeBatchMutationReceipt
+    {
+        public static readonly InventoryTradeBatchMutationReceipt Empty =
+            new InventoryTradeBatchMutationReceipt(0, Array.Empty<InventoryCostReceipt.ItemSlot>(), false, false);
+
+        internal InventoryTradeBatchMutationReceipt(int currencyBefore, InventoryCostReceipt.ItemSlot[] itemsBefore,
+            bool itemsWereNull, bool changed)
         {
             CurrencyBefore = currencyBefore;
             ItemsBefore = itemsBefore ?? Array.Empty<InventoryCostReceipt.ItemSlot>();
@@ -783,12 +872,84 @@ namespace Inventory
             entryCacheDirty = true;
         }
 
+        /// <summary>
+        /// 여러 아이템과 재화를 하나의 거래 단위로 메모리에만 적용한다. 모든 요청 줄, 보유 수량,
+        /// 넘침을 먼저 검사하므로 실패하면 인벤토리에는 아무 변화도 남지 않는다. 중복 ItemId는
+        /// 호출자가 의도한 수량을 추측하지 않도록 명시적으로 거절한다. 저장과 이벤트는 호출하지 않는다.
+        /// </summary>
+        public InventoryTradeBatchMutationResult TryApplyTradeBatchWithoutSave(
+            IReadOnlyList<InventoryTradeBatchLine> lines, int currencyDelta,
+            out InventoryTradeBatchMutationReceipt receipt)
+        {
+            receipt = InventoryTradeBatchMutationReceipt.Empty;
+            if (!SaveSystem.TryGetLoadedData(out SaveData data) || data == null)
+                return BatchTradeResult(InventoryTradeBatchMutationCode.NoSaveData, 0, 0);
+
+            int currencyBefore = data.currency;
+            if (lines == null || lines.Count == 0)
+                return BatchTradeResult(InventoryTradeBatchMutationCode.InvalidRequest, currencyBefore, currencyBefore);
+
+            var itemAfterById = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (int i = 0; i < lines.Count; i++)
+            {
+                InventoryTradeBatchLine line = lines[i];
+                ItemDefinition item = line.Item;
+                if (item == null || !item.IsValid || line.ItemDelta == 0)
+                    return BatchTradeResult(InventoryTradeBatchMutationCode.InvalidRequest, currencyBefore, currencyBefore);
+                if (!definitionsById.ContainsKey(item.ItemId))
+                    return BatchTradeResult(InventoryTradeBatchMutationCode.UnknownItem, currencyBefore, currencyBefore);
+                if (itemAfterById.ContainsKey(item.ItemId))
+                    return BatchTradeResult(InventoryTradeBatchMutationCode.DuplicateItem, currencyBefore, currencyBefore);
+
+                long itemAfterLong = (long)GetStoredItemCount(data.items, item.ItemId) + line.ItemDelta;
+                if (itemAfterLong < 0L)
+                    return BatchTradeResult(InventoryTradeBatchMutationCode.InsufficientItem, currencyBefore, currencyBefore);
+                if (itemAfterLong > int.MaxValue)
+                    return BatchTradeResult(InventoryTradeBatchMutationCode.ItemOverflow, currencyBefore, currencyBefore);
+                itemAfterById.Add(item.ItemId, (int)itemAfterLong);
+            }
+
+            long currencyAfterLong = (long)currencyBefore + currencyDelta;
+            if (currencyAfterLong < 0L)
+                return BatchTradeResult(InventoryTradeBatchMutationCode.InsufficientCurrency, currencyBefore, currencyBefore);
+            if (currencyAfterLong > int.MaxValue)
+                return BatchTradeResult(InventoryTradeBatchMutationCode.CurrencyOverflow, currencyBefore, currencyBefore);
+
+            receipt = new InventoryTradeBatchMutationReceipt(currencyBefore,
+                InventoryCostReceipt.Capture(data.items), data.items == null, changed: true);
+            data.currency = (int)currencyAfterLong;
+            for (int i = 0; i < lines.Count; i++)
+            {
+                InventoryTradeBatchLine line = lines[i];
+                ApplyTradeItemDelta(data, line.Item.ItemId, line.ItemDelta, itemAfterById[line.Item.ItemId]);
+            }
+
+            entryCacheDirty = true;
+            return BatchTradeResult(InventoryTradeBatchMutationCode.Success, currencyBefore, data.currency);
+        }
+
+        /// <summary>외부 저장 실패·예외 경로에서 다중 거래 직전의 전체 인벤토리를 복원한다.</summary>
+        public void RollbackTradeBatchWithoutSave(InventoryTradeBatchMutationReceipt receipt)
+        {
+            if (receipt == null || !receipt.Changed) return;
+            if (!SaveSystem.TryGetLoadedData(out SaveData data) || data == null) return;
+
+            receipt.Restore(data);
+            entryCacheDirty = true;
+        }
+
         private static InventoryTradeMutationResult TradeResult(
             InventoryTradeMutationCode code, ItemDefinition item, int itemDelta, int currencyDelta,
             int currencyBefore, int currencyAfter, int itemBefore, int itemAfter)
         {
             return new InventoryTradeMutationResult(code, item != null ? item.ItemId : string.Empty,
                 itemDelta, currencyDelta, currencyBefore, currencyAfter, itemBefore, itemAfter);
+        }
+
+        private static InventoryTradeBatchMutationResult BatchTradeResult(
+            InventoryTradeBatchMutationCode code, int currencyBefore, int currencyAfter)
+        {
+            return new InventoryTradeBatchMutationResult(code, currencyBefore, currencyAfter);
         }
 
         private static int GetStoredItemCount(List<InventoryItemState> states, string itemId)
