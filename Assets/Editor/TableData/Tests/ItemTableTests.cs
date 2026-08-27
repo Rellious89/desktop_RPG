@@ -198,6 +198,51 @@ namespace TableDataEditor.Tests
             Assert.AreEqual(1, snapshot.Items.Count, "비활성 행도 에셋을 만들 수 있도록 스냅샷에는 남는다.");
         }
 
+        // ---- 상점 판매 계약 ----
+
+        [Test]
+        public void SaleMetadata_AllowsSellableAndDisabledItems_AndPreservesDisabledPrice()
+        {
+            TableDataSnapshot snapshot = ValidateSale(out TableDataDiagnosticLog log,
+                SaleRow("50000", "1", "jewel", "10", displayOrder: "10"),
+                SaleRow("50004", "0", "jewel", "30", displayOrder: "20"));
+
+            Assert.AreEqual(0, log.ErrorCount, Describe(log));
+            Assert.AreEqual(2, snapshot.Items.Count);
+            Assert.IsTrue(snapshot.ItemsById["50000"].Sellable);
+            Assert.AreEqual("jewel", snapshot.ItemsById["50000"].SellCurrencyId);
+            Assert.AreEqual(10, snapshot.ItemsById["50000"].SellPrice);
+
+            ItemRow disabled = snapshot.ItemsById["50004"];
+            Assert.IsFalse(disabled.Sellable, "판매 허용의 최종 스위치는 sellable이다.");
+            Assert.AreEqual("jewel", disabled.SellCurrencyId);
+            Assert.AreEqual(30, disabled.SellPrice,
+                "sellable=0이어도 미리 설정된 가격은 스냅샷에서 지우지 않는다.");
+        }
+
+        [Test]
+        public void LiveDisabledSaleItem_PreservesItsAuthoredPriceMetadata()
+        {
+            ItemRow item = Live().Snapshot.ItemsById["50004"];
+
+            Assert.IsFalse(item.Sellable);
+            Assert.AreEqual("jewel", item.SellCurrencyId);
+            Assert.AreEqual(30, item.SellPrice);
+        }
+
+        [TestCase("1", "", "10")]
+        [TestCase("1", "jewel", "0")]
+        [TestCase("1", "jewel", "-1")]
+        [TestCase("1", "jewel", "1.5")]
+        [TestCase("1", "unknown", "10")]
+        [TestCase("2", "jewel", "10")]
+        public void SaleMetadata_InvalidContracts_AreRejected(string sellable, string currency, string price)
+        {
+            ValidateSale(out TableDataDiagnosticLog log, SaleRow("50000", sellable, currency, price));
+
+            Assert.Greater(log.ErrorCount, 0, Describe(log));
+        }
+
         // ---- 행 검증: 두 참조의 관계 ----
 
         [Test]
@@ -405,6 +450,40 @@ namespace TableDataEditor.Tests
 
             ValidateItemsMethod.Invoke(null, new object[] { table, snapshot, new TableDataAssetIndex(), log });
             return snapshot;
+        }
+
+        /// <summary>판매 세 칸이 포함된 Item.csv 헤더를 쓰는 순수 메모리 검증 경로다.</summary>
+        private static TableDataSnapshot ValidateSale(out TableDataDiagnosticLog log, params string[][] rows)
+        {
+            var records = new List<CsvRecord>();
+            for (int i = 0; i < rows.Length; i++) records.Add(new CsvRecord(i + 2, rows[i]));
+
+            var table = new CsvTable(File, SaleColumns, records);
+            var snapshot = new TableDataSnapshot();
+            snapshot.CurrenciesById["jewel"] = new CurrencyRow { Id = "jewel", Enabled = true };
+            log = new TableDataDiagnosticLog();
+
+            ValidateItemsMethod.Invoke(null, new object[] { table, snapshot, new TableDataAssetIndex(), log });
+            return snapshot;
+        }
+
+        private static readonly string[] SaleColumns =
+        {
+            TableDataColumns.ItemId, TableDataColumns.NameCategory, TableDataColumns.NameKey,
+            TableDataColumns.DescriptionCategory, TableDataColumns.DescriptionKey, TableDataColumns.IconKey,
+            TableDataColumns.Sellable, TableDataColumns.SellCurrencyId, TableDataColumns.SellPrice,
+            TableDataColumns.DisplayOrder, TableDataColumns.Enabled, TableDataColumns.Memo,
+        };
+
+        private static string[] SaleRow(
+            string id, string sellable, string currency, string price,
+            string displayOrder = "10", string enabled = "1")
+        {
+            return new[]
+            {
+                id, "4", "1", "4", "10001", string.Empty,
+                sellable, currency, price, displayOrder, enabled, string.Empty,
+            };
         }
 
         /// <summary>컬럼 순서는 <see cref="TableDataColumns.Item"/>과 같다. 아이콘은 늘 비운다 -

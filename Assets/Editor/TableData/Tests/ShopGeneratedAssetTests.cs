@@ -1,4 +1,5 @@
 using Building;
+using System.Collections.Generic;
 using Inventory;
 using NUnit.Framework;
 using Shop;
@@ -12,6 +13,29 @@ namespace TableDataEditor.Tests
     /// </summary>
     public sealed class ShopGeneratedAssetTests
     {
+        [Test]
+        public void ShopTablesScope_OwnsOnlyItemShopAndShopProductOutputs()
+        {
+            Assert.IsTrue(TableDataRebuildScopes.IsSupported(TableDataRebuildScope.ShopTables));
+            Assert.IsTrue(TableDataRebuildScopes.IncludesShopTables(TableDataRebuildScope.ShopTables));
+            Assert.IsTrue(TableDataRebuildScopes.IncludesShopTables(TableDataRebuildScope.All));
+            Assert.IsFalse(TableDataRebuildScopes.IncludesLegacyDomains(TableDataRebuildScope.ShopTables));
+
+            IReadOnlyList<string> folders = TableDataValidator.GeneratedOutputFolders(TableDataRebuildScope.ShopTables);
+            CollectionAssert.AreEqual(new[]
+            {
+                TableDataPaths.ItemOutputFolder,
+                TableDataPaths.ShopOutputFolder,
+                TableDataPaths.ShopProductOutputFolder,
+            }, folders);
+            CollectionAssert.DoesNotContain(folders, TableDataPaths.BuildingOutputFolder);
+            CollectionAssert.DoesNotContain(folders, TableDataPaths.DungeonOutputFolder);
+            CollectionAssert.Contains(TableDataValidator.GeneratedOutputFolders(TableDataRebuildScope.All),
+                TableDataPaths.ShopOutputFolder);
+            CollectionAssert.Contains(TableDataValidator.GeneratedOutputFolders(TableDataRebuildScope.All),
+                TableDataPaths.ShopProductOutputFolder);
+        }
+
         [Test]
         public void GeneratedItems_PreserveAllSaleMetadata()
         {
