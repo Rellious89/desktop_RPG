@@ -7,6 +7,97 @@ using UnityEngine;
 namespace Inventory
 {
     /// <summary>
+    /// 저장을 외부 트랜잭션이 소유하는 아이템/재화 동시 변경의 결과다. Shop은 아직 이 타입을 소비하지
+    /// 않는다. 다음 단계가 구매와 판매를 같은 계약으로 처리할 수 있게 인벤토리 경계에만 둔다.
+    /// </summary>
+    public enum InventoryTradeMutationCode
+    {
+        Success,
+        InvalidRequest,
+        NoSaveData,
+        UnknownItem,
+        InsufficientCurrency,
+        InsufficientItem,
+        CurrencyOverflow,
+        ItemOverflow,
+        NoChange,
+    }
+
+    /// <summary>거래 메모리 적용의 불변 결과. 실패 시 before/after는 동일하고 영수증은 빈 값이다.</summary>
+    public readonly struct InventoryTradeMutationResult
+    {
+        internal InventoryTradeMutationResult(
+            InventoryTradeMutationCode code, string itemId, int requestedItemDelta, int requestedCurrencyDelta,
+            int currencyBefore, int currencyAfter, int itemCountBefore, int itemCountAfter)
+        {
+            Code = code;
+            ItemId = itemId ?? string.Empty;
+            RequestedItemDelta = requestedItemDelta;
+            RequestedCurrencyDelta = requestedCurrencyDelta;
+            CurrencyBefore = currencyBefore;
+            CurrencyAfter = currencyAfter;
+            ItemCountBefore = itemCountBefore;
+            ItemCountAfter = itemCountAfter;
+        }
+
+        public InventoryTradeMutationCode Code { get; }
+        public string ItemId { get; }
+        public int RequestedItemDelta { get; }
+        public int RequestedCurrencyDelta { get; }
+        public int CurrencyBefore { get; }
+        public int CurrencyAfter { get; }
+        public int ItemCountBefore { get; }
+        public int ItemCountAfter { get; }
+        public bool Success => Code == InventoryTradeMutationCode.Success;
+        public bool Changed => Success;
+    }
+
+    /// <summary>
+    /// 외부 저장 실패 시 거래 직전 상태를 통째로 복원하는 영수증. 변화량을 반대로 적용하지 않는다.
+    /// 목록의 객체·순서·수량·null 칸과 원래 목록 자체가 null이었던 상태까지 보존한다.
+    /// </summary>
+    public sealed class InventoryTradeMutationReceipt
+    {
+        public static readonly InventoryTradeMutationReceipt Empty =
+            new InventoryTradeMutationReceipt(0, Array.Empty<InventoryCostReceipt.ItemSlot>(), false, false);
+
+        internal InventoryTradeMutationReceipt(
+            int currencyBefore, InventoryCostReceipt.ItemSlot[] itemsBefore, bool itemsWereNull, bool changed)
+        {
+            CurrencyBefore = currencyBefore;
+            ItemsBefore = itemsBefore ?? Array.Empty<InventoryCostReceipt.ItemSlot>();
+            ItemsWereNull = itemsWereNull;
+            Changed = changed;
+        }
+
+        public int CurrencyBefore { get; }
+        public bool Changed { get; }
+        internal InventoryCostReceipt.ItemSlot[] ItemsBefore { get; }
+        internal bool ItemsWereNull { get; }
+
+        internal void Restore(SaveData data)
+        {
+            if (!Changed || data == null) return;
+
+            data.currency = CurrencyBefore;
+            if (ItemsWereNull)
+            {
+                data.items = null;
+                return;
+            }
+
+            if (data.items == null) data.items = new List<InventoryItemState>();
+            data.items.Clear();
+            for (int i = 0; i < ItemsBefore.Length; i++)
+            {
+                InventoryCostReceipt.ItemSlot slot = ItemsBefore[i];
+                if (slot.State != null) slot.State.count = slot.Count;
+                data.items.Add(slot.State);
+            }
+        }
+    }
+
+    /// <summary>
     /// 보상 적용의 실제 결과 - 아이템 한 칸이 실제로 얼마나 늘었는가. 요청한 수량이 아니라
     /// <b>적용 후 인벤토리에 실제로 더해진 수량</b>이며, 포화(int.MaxValue)로 잘린 분은 제외된다.
     /// 같은 ItemId가 요청에 여러 번 나타나면 하나의 결과로 합산된다(첫 성공 순서 유지).
@@ -620,6 +711,113 @@ namespace Inventory
         {
             entryCacheDirty = true;
             InventoryChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// 아이템과 재화를 하나의 거래 단위로 <b>메모리에만</b> 적용한다. 모든 잔액과 넘침을 먼저
+        /// 확인한 뒤에만 둘을 함께 바꾸므로, 구매 비용만 빠지거나 판매 아이템만 사라지는 부분 성공은
+        /// 없다. 저장과 이벤트는 호출하지 않으며, 다음 단계의 거래 서비스가 저장 성공 뒤
+        /// <see cref="NotifyChangedAfterExternalSave"/>를 정확히 한 번 호출한다.
+        /// </summary>
+        public InventoryTradeMutationResult TryApplyTradeWithoutSave(
+            ItemDefinition item, int itemDelta, int currencyDelta, out InventoryTradeMutationReceipt receipt)
+        {
+            receipt = InventoryTradeMutationReceipt.Empty;
+
+            // Data 프로퍼티는 아직 읽지 않은 경우 파일을 열 수 있으므로, 이 메모리 전용 API는 명시적으로
+            // 준비된 문서만 받는다. 전투/상점 트랜잭션은 이미 로드된 SaveData 위에서만 실행해야 한다.
+            if (!SaveSystem.TryGetLoadedData(out SaveData data) || data == null)
+                return TradeResult(InventoryTradeMutationCode.NoSaveData, item, itemDelta, currencyDelta, 0, 0, 0, 0);
+
+            if (item == null || !item.IsValid)
+                return TradeResult(InventoryTradeMutationCode.InvalidRequest, item, itemDelta, currencyDelta,
+                    data.currency, data.currency, 0, 0);
+
+            if (!definitionsById.ContainsKey(item.ItemId))
+                return TradeResult(InventoryTradeMutationCode.UnknownItem, item, itemDelta, currencyDelta,
+                    data.currency, data.currency, GetStoredItemCount(data.items, item.ItemId),
+                    GetStoredItemCount(data.items, item.ItemId));
+
+            int itemBefore = GetStoredItemCount(data.items, item.ItemId);
+            int currencyBefore = data.currency;
+            if (itemDelta == 0 && currencyDelta == 0)
+                return TradeResult(InventoryTradeMutationCode.NoChange, item, itemDelta, currencyDelta,
+                    currencyBefore, currencyBefore, itemBefore, itemBefore);
+
+            long currencyAfterLong = (long)currencyBefore + currencyDelta;
+            if (currencyAfterLong < 0L)
+                return TradeResult(InventoryTradeMutationCode.InsufficientCurrency, item, itemDelta, currencyDelta,
+                    currencyBefore, currencyBefore, itemBefore, itemBefore);
+            if (currencyAfterLong > int.MaxValue)
+                return TradeResult(InventoryTradeMutationCode.CurrencyOverflow, item, itemDelta, currencyDelta,
+                    currencyBefore, currencyBefore, itemBefore, itemBefore);
+
+            long itemAfterLong = (long)itemBefore + itemDelta;
+            if (itemAfterLong < 0L)
+                return TradeResult(InventoryTradeMutationCode.InsufficientItem, item, itemDelta, currencyDelta,
+                    currencyBefore, currencyBefore, itemBefore, itemBefore);
+            if (itemAfterLong > int.MaxValue)
+                return TradeResult(InventoryTradeMutationCode.ItemOverflow, item, itemDelta, currencyDelta,
+                    currencyBefore, currencyBefore, itemBefore, itemBefore);
+
+            InventoryCostReceipt.ItemSlot[] itemsBefore = InventoryCostReceipt.Capture(data.items);
+            receipt = new InventoryTradeMutationReceipt(currencyBefore, itemsBefore, data.items == null, changed: true);
+
+            int currencyAfter = (int)currencyAfterLong;
+            int itemAfter = (int)itemAfterLong;
+            data.currency = currencyAfter;
+            ApplyTradeItemDelta(data, item.ItemId, itemDelta, itemAfter);
+            entryCacheDirty = true;
+
+            return TradeResult(InventoryTradeMutationCode.Success, item, itemDelta, currencyDelta,
+                currencyBefore, currencyAfter, itemBefore, itemAfter);
+        }
+
+        /// <summary>외부 저장 실패·예외 경로 전용. 저장과 이벤트 없이 영수증의 스냅샷으로 되돌린다.</summary>
+        public void RollbackTradeWithoutSave(InventoryTradeMutationReceipt receipt)
+        {
+            if (receipt == null || !receipt.Changed) return;
+            if (!SaveSystem.TryGetLoadedData(out SaveData data) || data == null) return;
+
+            receipt.Restore(data);
+            entryCacheDirty = true;
+        }
+
+        private static InventoryTradeMutationResult TradeResult(
+            InventoryTradeMutationCode code, ItemDefinition item, int itemDelta, int currencyDelta,
+            int currencyBefore, int currencyAfter, int itemBefore, int itemAfter)
+        {
+            return new InventoryTradeMutationResult(code, item != null ? item.ItemId : string.Empty,
+                itemDelta, currencyDelta, currencyBefore, currencyAfter, itemBefore, itemAfter);
+        }
+
+        private static int GetStoredItemCount(List<InventoryItemState> states, string itemId)
+        {
+            if (states == null || string.IsNullOrEmpty(itemId)) return 0;
+            for (int i = 0; i < states.Count; i++)
+            {
+                if (states[i] != null && states[i].itemId == itemId) return states[i].count;
+            }
+            return 0;
+        }
+
+        private static void ApplyTradeItemDelta(SaveData data, string itemId, int itemDelta, int itemAfter)
+        {
+            if (itemDelta == 0) return;
+
+            if (data.items == null) data.items = new List<InventoryItemState>();
+            for (int i = 0; i < data.items.Count; i++)
+            {
+                InventoryItemState state = data.items[i];
+                if (state == null || state.itemId != itemId) continue;
+
+                if (itemAfter == 0) data.items.RemoveAt(i);
+                else state.count = itemAfter;
+                return;
+            }
+
+            // itemDelta > 0은 위 사전 검증에서 itemAfter > 0임이 확정된 경우만 여기 도달한다.
+            data.items.Add(new InventoryItemState { itemId = itemId, count = itemAfter });
         }
 
         // ---- 비용 지불 ----
