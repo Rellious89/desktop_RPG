@@ -136,22 +136,32 @@ namespace Common
         /// <summary>공용 도킹 핸들이 두 패널을 함께 옮길 때 쓰는 화면 이탈 제한값이다.</summary>
         public Vector2 ClampMoveDelta(Vector2 requestedDelta)
         {
+            GetMoveDeltaLimits(out Vector2 minDelta, out Vector2 maxDelta);
+
+            // 기존 위치가 이미 경계를 약간 벗어나 있거나 영역이 Canvas보다 큰 경우에도, 현재 동작의
+            // "완전히 사라지지 않음" 원칙을 깨지 않도록 가능한 쪽으로만 보정한다.
+            requestedDelta.x = ClampAxis(requestedDelta.x, minDelta.x, maxDelta.x);
+            requestedDelta.y = ClampAxis(requestedDelta.y, minDelta.y, maxDelta.y);
+            return requestedDelta;
+        }
+
+        /// <summary>현재 위치에서 화면 안에 남기 위해 허용되는 이동량의 최소/최대값을 반환한다.</summary>
+        /// <remarks>
+        /// 도킹 핸들은 드래그 시작 위치를 기준으로 한 누적 이동량을 사용하므로, 이 값도 드래그 시작 시
+        /// 한 번만 읽어야 한다. 이후 이동한 현재 위치에서 다시 계산하면 누적값과 기준점이 섞인다.
+        /// </remarks>
+        public void GetMoveDeltaLimits(out Vector2 minDelta, out Vector2 maxDelta)
+        {
             ResolveReferences();
-            if (canvasRect == null || keepInsideRect == null || parentRect == null) return requestedDelta;
+            minDelta = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+            maxDelta = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+            if (canvasRect == null || keepInsideRect == null || parentRect == null) return;
 
             GetRectInParentSpace(canvasRect, out Vector2 canvasMin, out Vector2 canvasMax);
             GetRectInParentSpace(keepInsideRect, out Vector2 keepMin, out Vector2 keepMax);
 
-            float minX = canvasMin.x - keepMin.x;
-            float maxX = canvasMax.x - keepMax.x;
-            float minY = canvasMin.y - keepMin.y;
-            float maxY = canvasMax.y - keepMax.y;
-
-            // 기존 위치가 이미 경계를 약간 벗어나 있거나 영역이 Canvas보다 큰 경우에도, 현재 동작의
-            // "완전히 사라지지 않음" 원칙을 깨지 않도록 가능한 쪽으로만 보정한다.
-            requestedDelta.x = ClampAxis(requestedDelta.x, minX, maxX);
-            requestedDelta.y = ClampAxis(requestedDelta.y, minY, maxY);
-            return requestedDelta;
+            minDelta = new Vector2(canvasMin.x - keepMin.x, canvasMin.y - keepMin.y);
+            maxDelta = new Vector2(canvasMax.x - keepMax.x, canvasMax.y - keepMax.y);
         }
 
         /// <summary>도킹 관리자가 두 패널에 <b>같은</b> 이동량을 적용할 때 사용한다.</summary>

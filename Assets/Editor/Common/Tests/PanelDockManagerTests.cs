@@ -129,6 +129,36 @@ namespace CommonEditor.Tests
         }
 
         [Test]
+        public void DockHandle_연속_누적드래그는_시작위치_기준으로_실제경계까지_따라간다()
+        {
+            PanelDragHandle a = CreatePanel("A", new Vector2(90f, 60f));
+            PanelDragHandle b = CreatePanel("B", new Vector2(200f, 0f));
+            DragToEnd(a);
+            DockHandleDrag dockHandle = panelUi.GetComponentInChildren<DockHandleDrag>();
+            Vector2 aStart = a.TargetPanel.anchoredPosition;
+            Vector2 bStart = b.TargetPanel.anchoredPosition;
+
+            manager.BeginDockHandleDrag(dockHandle);
+            foreach (float deltaX in new[] { 50f, 100f, 150f, 200f, 250f })
+            {
+                manager.MoveDockHandleDrag(dockHandle, new Vector2(deltaX, 0f));
+                Assert.AreEqual(deltaX, a.TargetPanel.anchoredPosition.x - aStart.x, 0.01f,
+                    "같은 드래그의 누적 요청은 시작 위치 기준으로 적용되어야 한다.");
+                Assert.AreEqual(a.TargetPanel.anchoredPosition - aStart, b.TargetPanel.anchoredPosition - bStart);
+            }
+
+            manager.MoveDockHandleDrag(dockHandle, new Vector2(1000f, 0f));
+            Assert.AreEqual(250f, a.TargetPanel.anchoredPosition.x - aStart.x, 0.01f,
+                "오른쪽 실제 Canvas 경계에서만 제한한다.");
+
+            manager.MoveDockHandleDrag(dockHandle, new Vector2(200f, 0f));
+            Assert.AreEqual(200f, a.TargetPanel.anchoredPosition.x - aStart.x, 0.01f,
+                "경계에 닿은 뒤 반대 방향 요청은 같은 드래그에서 즉시 반영되어야 한다.");
+            Assert.AreEqual(a.TargetPanel.anchoredPosition - aStart, b.TargetPanel.anchoredPosition - bStart);
+            manager.EndDockHandleDrag(dockHandle);
+        }
+
+        [Test]
         public void 비활성화_시_링크와_핸들을_즉시_정리한다()
         {
             PanelDragHandle a = CreatePanel("A", new Vector2(90f, 60f));

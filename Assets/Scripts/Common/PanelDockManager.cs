@@ -30,6 +30,8 @@ namespace Common
         private DockLink dockDragLink;
         private Vector2 dockDragAStart;
         private Vector2 dockDragBStart;
+        private Vector2 dockDragMinDelta;
+        private Vector2 dockDragMaxDelta;
 
         /// <summary>테스트와 진단용 현재 링크 개수.</summary>
         public int LinkCount => links.Count;
@@ -133,15 +135,20 @@ namespace Common
             FocusPair(dockDragLink);
             dockDragAStart = dockDragLink.a.TargetPanel.anchoredPosition;
             dockDragBStart = dockDragLink.b.TargetPanel.anchoredPosition;
+            dockDragLink.a.GetMoveDeltaLimits(out Vector2 aMinDelta, out Vector2 aMaxDelta);
+            dockDragLink.b.GetMoveDeltaLimits(out Vector2 bMinDelta, out Vector2 bMaxDelta);
+            dockDragMinDelta = Vector2.Max(aMinDelta, bMinDelta);
+            dockDragMaxDelta = Vector2.Min(aMaxDelta, bMaxDelta);
         }
 
         public void MoveDockHandleDrag(DockHandleDrag handle, Vector2 requestedDelta)
         {
             if (dockDragLink == null || dockDragLink.handle != handle || !IsLinkValid(dockDragLink)) return;
 
-            // 양쪽 제한의 교집합만 사용한다. 이 방식이면 한쪽만 경계에 닿아 상대 위치가 틀어지는 일이 없다.
-            Vector2 sharedDelta = dockDragLink.a.ClampMoveDelta(requestedDelta);
-            sharedDelta = dockDragLink.b.ClampMoveDelta(sharedDelta);
+            // DockHandleDrag가 시작점 기준 누적 이동량을 전달하므로, Begin에서 캡처한 양쪽 제한의
+            // 교집합으로만 제한한다. 현재 위치로 한계를 다시 계산하면 누적값과 섞여 가상의 중간
+            // 경계가 생긴다. 두 패널에는 반드시 같은 최종 이동량을 적용한다.
+            Vector2 sharedDelta = ClampDockDragDelta(requestedDelta);
             dockDragLink.a.SetAnchoredPositionFromDock(dockDragAStart + sharedDelta);
             dockDragLink.b.SetAnchoredPositionFromDock(dockDragBStart + sharedDelta);
             PositionHandle(dockDragLink);
@@ -150,6 +157,19 @@ namespace Common
         public void EndDockHandleDrag(DockHandleDrag handle)
         {
             if (dockDragLink != null && dockDragLink.handle == handle) dockDragLink = null;
+        }
+
+        private Vector2 ClampDockDragDelta(Vector2 requestedDelta)
+        {
+            requestedDelta.x = ClampAxis(requestedDelta.x, dockDragMinDelta.x, dockDragMaxDelta.x);
+            requestedDelta.y = ClampAxis(requestedDelta.y, dockDragMinDelta.y, dockDragMaxDelta.y);
+            return requestedDelta;
+        }
+
+        private static float ClampAxis(float value, float min, float max)
+        {
+            if (min <= max) return Mathf.Clamp(value, min, max);
+            return Mathf.Abs(value - min) <= Mathf.Abs(value - max) ? min : max;
         }
 
         // ---- Link creation / layout ----
