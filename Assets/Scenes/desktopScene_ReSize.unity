@@ -5892,8 +5892,10 @@ MonoBehaviour:
   snapDistance: 24
   detachDistance: 48
   dockHandlePrefab: {fileID: 2602915006436244403, guid: 71daf097f72174131bb33b6a70851fc2, type: 3}
-  dockHandleSize: {x: 22, y: 24}
+  dockHandleSize: {x: 60, y: 24}
   fallbackDockHandleColor: {r: 0.25, g: 0.8, b: 1, a: 0.9}
+  dockHandleVerticalAlignment: 1
+  dockHandlePositionOffset: {x: 0, y: 12}
 --- !u!1 &812099548
 GameObject:
   m_ObjectHideFlags: 0

@@ -365,6 +365,10 @@ MonoBehaviour:
     m_Localized: "\uC544\uC774\uD15C\uC774 \uD310\uB9E4\uB418\uC5C8\uC2B5\uB2C8\uB2E4."
     m_Metadata:
       m_Items: []
+  - m_Id: 11273183419162624
+    m_Localized: "UI \uC774\uB3D9"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
