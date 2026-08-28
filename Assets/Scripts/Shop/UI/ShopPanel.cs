@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using Building;
@@ -25,6 +26,16 @@ namespace Shop.UI
         [SerializeField] private LocalizedTextReference purchaseFailedMessage =
             new LocalizedTextReference("GUID:32fd067a20b754a50b20446b9c78d2ae", "79");
 
+        [Header("Card Swap")]
+        [Tooltip("구매/판매 카드가 서로 자리를 바꾸는 데 걸리는 시간(초). 0 이하면 즉시 전환한다.")]
+        [SerializeField, Min(0f)] private float swapDuration = 0.22f;
+        [Tooltip("카드가 화면 밖으로 빠졌다 들어올 때의 수평 거리. 0 이하면 즉시 전환한다.")]
+        [SerializeField, Min(0f)] private float swapHorizontalDistance = 150f;
+        [Tooltip("뒤 카드로 물러날 때 곱할 스케일. 0~1 이외 값은 안전한 기본값으로 보정한다.")]
+        [SerializeField, Range(0f, 1f)] private float swapBackgroundScale = 0.94f;
+        [Tooltip("뒤 카드로 물러날 때의 알파. 0~1 이외 값은 안전한 기본값으로 보정한다.")]
+        [SerializeField, Range(0f, 1f)] private float swapBackgroundAlpha = 0.55f;
+
         private GameObject buyRoot;
         private GameObject sellRoot;
         private GameObject purchaseDialog;
@@ -32,7 +43,7 @@ namespace Shop.UI
         private RectTransform buyListRoot;
         private RectTransform sellListRoot;
         private TextMeshProUGUI[] currencyTexts;
-        private Button swapButton;
+        private readonly List<Button> swapButtons = new List<Button>();
         private Button buyCloseButton;
         private Button sellCloseButton;
         private Button purchaseCancelButton;
@@ -58,6 +69,22 @@ namespace Shop.UI
         private bool referencesResolved;
         private bool warnedMissingItem;
         private GameObject sellDialogBlocker;
+        private CardBaseline buyBaseline;
+        private CardBaseline sellBaseline;
+        private Coroutine swapRoutine;
+        private bool isShowingBuy = true;
+        private bool isSwapping;
+
+        private sealed class CardBaseline
+        {
+            public RectTransform Rect;
+            public CanvasGroup Group;
+            public Vector2 AnchoredPosition;
+            public Vector2 SizeDelta;
+            public Vector3 LocalScale;
+            public float Alpha;
+            public int SiblingIndex;
+        }
 
         protected override void OnEnable()
         {
@@ -73,7 +100,8 @@ namespace Shop.UI
         protected override void OnModalOpened()
         {
             ResolveReferences();
-            SetMode(true);
+            CaptureCardBaselines();
+            StopSwapAndRestoreBuy();
             CloseDialogs();
             InventoryManager.InventoryChanged += RefreshContents;
             BindButtons();
@@ -85,6 +113,14 @@ namespace Shop.UI
             UnbindButtons();
             ResetSellSession();
             CloseDialogs();
+        }
+
+        protected override void OnDisable()
+        {
+            // 외부 SetActive(false), 필드 전환, 건축 Reset도 이 경로를 지난다.
+            // 다음 Open은 언제나 구매 카드의 저작 기준 자세에서 시작해야 한다.
+            StopSwapAndRestoreBuy();
+            base.OnDisable();
         }
 
         protected override void OnCloseRequested()
@@ -117,7 +153,9 @@ namespace Shop.UI
             buyListRoot = FindDeepChild(buyRoot != null ? buyRoot.transform : transform, "list") as RectTransform;
             sellListRoot = FindDeepChild(sellRoot != null ? sellRoot.transform : transform, "list") as RectTransform;
             currencyTexts = GetComponentsInChildren<TextMeshProUGUI>(true);
-            swapButton = FindDeepChild(transform, "btn_swap")?.GetComponent<Button>();
+            swapButtons.AddRange(GetComponentsInChildren<Button>(true));
+            for (int i = swapButtons.Count - 1; i >= 0; i--)
+                if (swapButtons[i] == null || swapButtons[i].name != "btn_swap") swapButtons.RemoveAt(i);
             buyCloseButton = FindDeepChild(buyRoot != null ? buyRoot.transform : transform, "btn_close")?.GetComponent<Button>();
             sellCloseButton = FindDeepChild(sellRoot != null ? sellRoot.transform : transform, "btn_close")?.GetComponent<Button>();
             purchaseCancelButton = FindDeepChild(purchaseDialog != null ? purchaseDialog.transform : transform, "btn_cancle")?.GetComponent<Button>();
@@ -137,7 +175,7 @@ namespace Shop.UI
 
         private void BindButtons()
         {
-            Bind(swapButton, ToggleMode);
+            for (int i = 0; i < swapButtons.Count; i++) Bind(swapButtons[i], ToggleMode);
             Bind(buyCloseButton, Close);
             Bind(sellCloseButton, Close);
             Bind(purchaseCancelButton, ClosePurchaseDialog);
@@ -149,7 +187,8 @@ namespace Shop.UI
 
         private void UnbindButtons()
         {
-            Unbind(swapButton, ToggleMode); Unbind(buyCloseButton, Close); Unbind(sellCloseButton, Close);
+            for (int i = 0; i < swapButtons.Count; i++) Unbind(swapButtons[i], ToggleMode);
+            Unbind(buyCloseButton, Close); Unbind(sellCloseButton, Close);
             Unbind(purchaseCancelButton, ClosePurchaseDialog); Unbind(purchaseConfirmButton, ConfirmPurchase);
             Unbind(sellButton, OpenSellConfirmation); Unbind(sellCancelButton, CloseSellDialog); Unbind(sellConfirmButton, ConfirmSell);
         }
@@ -163,17 +202,97 @@ namespace Shop.UI
             if (button != null) button.onClick.RemoveListener(action);
         }
 
-        private void ToggleMode() => SetMode(sellRoot == null || !sellRoot.activeSelf);
-
-        /// <summary>후속 연출도 이 한 경로에 끼워 넣는다. 현재는 즉시 전환만 한다.</summary>
-        private void SetMode(bool buy)
+        private void ToggleMode()
         {
-            if (buyRoot != null) buyRoot.SetActive(buy);
-            if (sellRoot != null) sellRoot.SetActive(!buy);
+            // 확인창의 딤은 기존처럼 swap 입력을 먹고, 코루틴이 겹쳐 상태가 역전되는 것도 막는다.
+            if (isSwapping || IsDialogOpen()) return;
+            if (buyRoot == null || sellRoot == null)
+            {
+                SetModeImmediately(true);
+                return;
+            }
+            bool targetBuy = !isShowingBuy;
+            if (!CanAnimateSwap())
+            {
+                SetModeImmediately(targetBuy);
+                return;
+            }
+            swapRoutine = StartCoroutine(PlayCardSwap(targetBuy));
+        }
+
+        private IEnumerator PlayCardSwap(bool targetBuy)
+        {
+            isSwapping = true;
+            SetSwapButtonsInteractable(false);
+            InventoryItemRegistrationContext.ClearActiveTarget(this);
+            SetCardInput(buyBaseline, false);
+            SetCardInput(sellBaseline, false);
+
+            CardBaseline outgoing = isShowingBuy ? buyBaseline : sellBaseline;
+            CardBaseline incoming = targetBuy ? buyBaseline : sellBaseline;
+            RestoreCard(outgoing, true);
+            RestoreCard(incoming, true);
+            SetCardInput(outgoing, false);
+            SetCardInput(incoming, false);
+
+            float distance = Mathf.Max(0f, swapHorizontalDistance);
+            float backgroundScale = ValidUnitValue(swapBackgroundScale, 0.94f);
+            float backgroundAlpha = ValidUnitValue(swapBackgroundAlpha, 0.55f);
+            float exitDirection = isShowingBuy ? -1f : 1f;
+            incoming.Rect.anchoredPosition = incoming.AnchoredPosition + Vector2.right * (-exitDirection * distance);
+            incoming.Rect.localScale = incoming.LocalScale * backgroundScale;
+            incoming.Group.alpha = incoming.Alpha * backgroundAlpha;
+            incoming.Rect.SetAsFirstSibling();
+            outgoing.Rect.SetAsLastSibling();
+
+            float duration = Mathf.Max(0.0001f, swapDuration);
+            float elapsed = 0f;
+            bool broughtIncomingForward = false;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                float eased = t * t * (3f - 2f * t);
+                ApplySwapPose(outgoing, outgoing.AnchoredPosition,
+                    outgoing.AnchoredPosition + Vector2.right * (exitDirection * distance),
+                    outgoing.LocalScale, outgoing.LocalScale * backgroundScale,
+                    outgoing.Alpha, outgoing.Alpha * backgroundAlpha, eased);
+                ApplySwapPose(incoming, incoming.AnchoredPosition + Vector2.right * (-exitDirection * distance),
+                    incoming.AnchoredPosition, incoming.LocalScale * backgroundScale, incoming.LocalScale,
+                    incoming.Alpha * backgroundAlpha, incoming.Alpha, eased);
+                if (!broughtIncomingForward && t >= 0.5f)
+                {
+                    incoming.Rect.SetAsLastSibling();
+                    broughtIncomingForward = true;
+                }
+                yield return null;
+            }
+
+            RestoreCard(outgoing, false);
+            RestoreCard(incoming, true);
+            incoming.Rect.SetAsLastSibling();
+            CompleteMode(targetBuy);
+            isSwapping = false;
+            swapRoutine = null;
+            SetSwapButtonsInteractable(true);
+        }
+
+        private void SetModeImmediately(bool buy)
+        {
+            StopSwapAndRestoreBuy();
+            RestoreCard(buy ? sellBaseline : buyBaseline, false);
+            RestoreCard(buy ? buyBaseline : sellBaseline, true);
+            CardBaseline active = buy ? buyBaseline : sellBaseline;
+            if (active != null && active.Rect != null) active.Rect.SetAsLastSibling();
+            CompleteMode(buy);
+        }
+
+        private void CompleteMode(bool buy)
+        {
+            isShowingBuy = buy;
             CloseDialogs();
             if (buy)
             {
-                InventoryItemRegistrationContext.ClearActiveTarget(this);
                 ResetSellSession();
             }
             else
@@ -182,6 +301,88 @@ namespace Shop.UI
                 InventoryItemRegistrationContext.SetActiveTarget(this);
                 RefreshSellContents();
             }
+            SetCardInput(buy ? buyBaseline : sellBaseline, true);
+        }
+
+        private void CaptureCardBaselines()
+        {
+            if (buyBaseline == null) buyBaseline = CaptureCard(buyRoot);
+            if (sellBaseline == null) sellBaseline = CaptureCard(sellRoot);
+        }
+
+        private static CardBaseline CaptureCard(GameObject root)
+        {
+            if (root == null || !root.TryGetComponent(out RectTransform rect)) return null;
+            CanvasGroup group = root.GetComponent<CanvasGroup>();
+            if (group == null) group = root.AddComponent<CanvasGroup>();
+            return new CardBaseline
+            {
+                Rect = rect,
+                Group = group,
+                AnchoredPosition = rect.anchoredPosition,
+                SizeDelta = rect.sizeDelta,
+                LocalScale = rect.localScale,
+                Alpha = group.alpha,
+                SiblingIndex = rect.GetSiblingIndex(),
+            };
+        }
+
+        private void StopSwapAndRestoreBuy()
+        {
+            if (swapRoutine != null) StopCoroutine(swapRoutine);
+            swapRoutine = null;
+            isSwapping = false;
+            RestoreCard(sellBaseline, false);
+            RestoreCard(buyBaseline, true);
+            if (buyBaseline != null && buyBaseline.Rect != null) buyBaseline.Rect.SetAsLastSibling();
+            isShowingBuy = true;
+            SetSwapButtonsInteractable(true);
+        }
+
+        private static void RestoreCard(CardBaseline card, bool active)
+        {
+            if (card == null || card.Rect == null) return;
+            card.Rect.anchoredPosition = card.AnchoredPosition;
+            card.Rect.sizeDelta = card.SizeDelta;
+            card.Rect.localScale = card.LocalScale;
+            card.Group.alpha = card.Alpha;
+            card.Group.interactable = active;
+            card.Group.blocksRaycasts = active;
+            card.Rect.gameObject.SetActive(active);
+        }
+
+        private static void SetCardInput(CardBaseline card, bool enabled)
+        {
+            if (card == null || card.Group == null) return;
+            card.Group.interactable = enabled;
+            card.Group.blocksRaycasts = enabled;
+        }
+
+        private static void ApplySwapPose(CardBaseline card, Vector2 startPosition, Vector2 endPosition,
+            Vector3 startScale, Vector3 endScale, float startAlpha, float endAlpha, float t)
+        {
+            card.Rect.anchoredPosition = Vector2.LerpUnclamped(startPosition, endPosition, t);
+            card.Rect.localScale = Vector3.LerpUnclamped(startScale, endScale, t);
+            card.Group.alpha = Mathf.LerpUnclamped(startAlpha, endAlpha, t);
+        }
+
+        private bool CanAnimateSwap()
+        {
+            return buyBaseline != null && sellBaseline != null && buyBaseline.Rect != null && sellBaseline.Rect != null &&
+                swapDuration > 0f && swapHorizontalDistance > 0f;
+        }
+
+        private static float ValidUnitValue(float value, float fallback) => value >= 0f && value <= 1f ? value : fallback;
+
+        private bool IsDialogOpen()
+        {
+            return (purchaseDialog != null && purchaseDialog.activeSelf) || (sellDialog != null && sellDialog.activeSelf);
+        }
+
+        private void SetSwapButtonsInteractable(bool interactable)
+        {
+            for (int i = 0; i < swapButtons.Count; i++)
+                if (swapButtons[i] != null) swapButtons[i].interactable = interactable;
         }
 
         private void RefreshCurrency()
@@ -425,13 +626,13 @@ namespace Shop.UI
 
         public bool CanRegisterInventoryItem(ItemDefinition item)
         {
-            return isActiveAndEnabled && sellRoot != null && sellRoot.activeSelf &&
+            return isActiveAndEnabled && !isSwapping && sellRoot != null && sellRoot.activeSelf &&
                 (sellDialog == null || !sellDialog.activeSelf) && sellSession != null && sellSession.CanAdd(item);
         }
 
         public bool IsInventoryItemRegistrationDrop(Vector2 screenPosition, Camera eventCamera)
         {
-            return isActiveAndEnabled && sellRoot != null && sellRoot.activeSelf && sellListRoot != null &&
+            return isActiveAndEnabled && !isSwapping && sellRoot != null && sellRoot.activeSelf && sellListRoot != null &&
                 (sellDialog == null || !sellDialog.activeSelf) &&
                 RectTransformUtility.RectangleContainsScreenPoint(sellListRoot, screenPosition, eventCamera);
         }
