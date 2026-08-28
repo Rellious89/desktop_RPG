@@ -3405,6 +3405,86 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 56e2a525e0fbd93419c9b313c362934d, type: 3}
+--- !u!1 &445422824
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 445422825}
+  - component: {fileID: 445422826}
+  m_Layer: 0
+  m_Name: BuildingConstruction_Shop
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &445422825
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 445422824}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 468841862}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &445422826
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 445422824}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6f2fa8ab7ea5445d95fa687c30e9b6f0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  fieldModeManager: {fileID: 468841861}
+  transitionSequencer: {fileID: 119946296}
+  stageCamera: {fileID: 2046182837}
+  uiAnchor: {fileID: 392733944}
+  interactionRoot: {fileID: 639766286}
+  interactionParent: {fileID: 1358418168}
+  buildButton: {fileID: 1127613350}
+  openInnButton: {fileID: 976232702}
+  completionButton: {fileID: 976232705}
+  constructionTimerRoot: {fileID: 1853980670}
+  constructionTimerText: {fileID: 937699622}
+  constructionTimerAnimator: {fileID: 1834992047}
+  buildingPopup: {fileID: 6072216787366258619}
+  building: {fileID: 11400000, guid: b5c2c4d90c44841288ac1f802fb475bc, type: 2}
+  inventoryManager: {fileID: 1047247884}
+  constructionStartedMessage:
+    m_TableReference:
+      m_TableCollectionName: 
+    m_TableEntryReference:
+      m_KeyId: 0
+      m_Key: 
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  constructionCompletedMessage:
+    m_TableReference:
+      m_TableCollectionName: 
+    m_TableEntryReference:
+      m_KeyId: 0
+      m_Key: 
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  references:
+    version: 2
+    RefIds: []
 --- !u!1 &461577825
 GameObject:
   m_ObjectHideFlags: 0
@@ -3489,6 +3569,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 324107452}
+  - {fileID: 445422825}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &468841863
@@ -11169,7 +11250,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1358418168}
-  - component: {fileID: 1358418169}
   m_Layer: 5
   m_Name: Interaction_Shop
   m_TagString: Untagged
@@ -11199,54 +11279,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &1358418169
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1358418167}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6f2fa8ab7ea5445d95fa687c30e9b6f0, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  fieldModeManager: {fileID: 468841861}
-  transitionSequencer: {fileID: 119946296}
-  stageCamera: {fileID: 2046182837}
-  uiAnchor: {fileID: 392733944}
-  interactionRoot: {fileID: 639766286}
-  interactionParent: {fileID: 1358418168}
-  buildButton: {fileID: 1127613350}
-  openInnButton: {fileID: 976232702}
-  completionButton: {fileID: 976232705}
-  constructionTimerRoot: {fileID: 1853980670}
-  constructionTimerText: {fileID: 937699622}
-  constructionTimerAnimator: {fileID: 1834992047}
-  buildingPopup: {fileID: 6072216787366258619}
-  building: {fileID: 11400000, guid: b5c2c4d90c44841288ac1f802fb475bc, type: 2}
-  inventoryManager: {fileID: 1047247884}
-  constructionStartedMessage:
-    m_TableReference:
-      m_TableCollectionName:
-    m_TableEntryReference:
-      m_KeyId: 0
-      m_Key:
-    m_FallbackState: 0
-    m_WaitForCompletion: 0
-    m_LocalVariables: []
-  constructionCompletedMessage:
-    m_TableReference:
-      m_TableCollectionName:
-    m_TableEntryReference:
-      m_KeyId: 0
-      m_Key:
-    m_FallbackState: 0
-    m_WaitForCompletion: 0
-    m_LocalVariables: []
-  references:
-    version: 2
-    RefIds: []
 --- !u!1 &1372948857
 GameObject:
   m_ObjectHideFlags: 0
@@ -17883,49 +17915,9 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 800551649}
     m_Modifications:
-    - target: {fileID: 972592163030594219, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
-      propertyPath: fillImage
-      value: 
-      objectReference: {fileID: 0}
-    - target: {fileID: 972592163030594219, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
-      propertyPath: fillSlider
-      value: 
-      objectReference: {fileID: 0}
-    - target: {fileID: 972592163030594219, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
-      propertyPath: previewFill
-      value: 
-      objectReference: {fileID: 0}
-    - target: {fileID: 972592163030594219, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
-      propertyPath: previewFillImage
-      value: 
-      objectReference: {fileID: 0}
     - target: {fileID: 2953239195289289174, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
       propertyPath: m_Name
       value: pn_Shop
-      objectReference: {fileID: 0}
-    - target: {fileID: 4100262686500018440, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
-      propertyPath: fillImage
-      value: 
-      objectReference: {fileID: 0}
-    - target: {fileID: 4100262686500018440, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
-      propertyPath: fillSlider
-      value: 
-      objectReference: {fileID: 0}
-    - target: {fileID: 4100262686500018440, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
-      propertyPath: previewFill
-      value: 
-      objectReference: {fileID: 0}
-    - target: {fileID: 4100262686500018440, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
-      propertyPath: previewFillImage
-      value: 
-      objectReference: {fileID: 0}
-    - target: {fileID: 5766100443363989442, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
-      propertyPath: stateBackgroundImage
-      value: 
-      objectReference: {fileID: 0}
-    - target: {fileID: 7322032306379947105, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
-      propertyPath: stateBackgroundImage
-      value: 
       objectReference: {fileID: 0}
     - target: {fileID: 7405405773456425565, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
       propertyPath: m_Pivot.x
@@ -18021,8 +18013,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3ad6a7b9cb0f4f0da847de5e65d6f001, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!114 &2727636538909919449
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -1187,14 +1187,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: list_ShopItem
       objectReference: {fileID: 0}
-    - target: {fileID: 1658272409490625414, guid: d6b2b06654e434b3994ae9f33637270d, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 2152005341409370020, guid: d6b2b06654e434b3994ae9f33637270d, type: 3}
-      propertyPath: m_SizeDelta.y
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 5034378069043303465, guid: d6b2b06654e434b3994ae9f33637270d, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
