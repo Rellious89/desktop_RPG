@@ -174,7 +174,7 @@ namespace ShopEditor.Tests
         }
 
         [Test]
-        public void ExplicitDialogs_OpenAboveCardsAndOtherShopChildren()
+        public void Dialogs_OpenAboveCardsAndRepeatedOpenClose_DoesNotCreateInputBlocker()
         {
             GameObject purchaseDialog = new GameObject("dialog_ItemBuy", typeof(RectTransform));
             GameObject sellDialog = new GameObject("dialog_ItemSell", typeof(RectTransform));
@@ -188,17 +188,25 @@ namespace ShopEditor.Tests
             InvokeStatic("OpenDialog", purchaseDialog.transform);
             Assert.IsTrue(purchaseDialog.activeSelf);
             Assert.AreEqual(host.transform.childCount - 1, purchaseDialog.transform.GetSiblingIndex());
+            purchaseDialog.SetActive(false);
 
             InvokeStatic("OpenDialog", sellDialog.transform);
             Assert.IsTrue(sellDialog.activeSelf);
             Assert.AreEqual(host.transform.childCount - 1, sellDialog.transform.GetSiblingIndex());
+            sellDialog.SetActive(false);
 
-            ShopPanel panel = host.AddComponent<ShopPanel>();
-            Invoke(panel, "SetDialogInputBlocker", sellDialog.transform, true);
-            Transform blocker = host.transform.Find("ShopDialogInputBlocker");
-            Assert.IsNotNull(blocker);
-            Assert.IsTrue(blocker.gameObject.activeSelf);
-            Assert.AreEqual(sellDialog.transform.GetSiblingIndex() - 1, blocker.GetSiblingIndex());
+            for (int i = 0; i < 3; i++)
+            {
+                InvokeStatic("OpenDialog", purchaseDialog.transform);
+                Assert.AreEqual(host.transform.childCount - 1, purchaseDialog.transform.GetSiblingIndex());
+                purchaseDialog.SetActive(false);
+                Assert.IsNull(host.transform.Find("ShopDialogInputBlocker"));
+
+                InvokeStatic("OpenDialog", sellDialog.transform);
+                Assert.AreEqual(host.transform.childCount - 1, sellDialog.transform.GetSiblingIndex());
+                sellDialog.SetActive(false);
+                Assert.IsNull(host.transform.Find("ShopDialogInputBlocker"));
+            }
         }
 
         private static void Set(object target, string name, object value) =>

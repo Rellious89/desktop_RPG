@@ -82,7 +82,6 @@ namespace Shop.UI
         private bool selling;
         private bool referencesResolved;
         private bool warnedMissingItem;
-        private GameObject dialogInputBlocker;
         private CardBaseline buyBaseline;
         private CardBaseline sellBaseline;
         private Coroutine swapRoutine;
@@ -511,14 +510,12 @@ namespace Shop.UI
             CurrencyDefinition currency = currencyCatalog != null ? currencyCatalog.Find(product.BuyCurrencyId) : null;
             if (purchaseCurrencyIcon != null && currency != null) purchaseCurrencyIcon.sprite = currency.Icon;
             OpenDialog(purchaseDialog);
-            SetDialogInputBlocker(purchaseDialog, true);
         }
 
         private void ClosePurchaseDialog()
         {
             selectedProduct = null;
             if (purchaseDialog != null && purchaseDialog.gameObject.activeSelf) purchaseDialog.gameObject.SetActive(false);
-            SetDialogInputBlocker(purchaseDialog, false);
         }
 
         private void CloseDialogs()
@@ -627,14 +624,12 @@ namespace Shop.UI
             CurrencyDefinition currency = currencyCatalog != null ? currencyCatalog.Find(currencyId) : null;
             if (sellCurrencyIcon != null && currency != null) sellCurrencyIcon.sprite = currency.Icon;
             OpenDialog(sellDialog);
-            SetDialogInputBlocker(sellDialog, true);
         }
 
         private void CloseSellDialog()
         {
             sellConfirmationSnapshot = null;
             if (sellDialog != null && sellDialog.gameObject.activeSelf) sellDialog.gameObject.SetActive(false);
-            SetDialogInputBlocker(sellDialog, false);
         }
 
         private string BuildSellSnapshotLabel()
@@ -718,31 +713,6 @@ namespace Shop.UI
         public void RegisterInventoryItem(ItemDefinition item)
         {
             if (CanRegisterInventoryItem(item) && sellSession.TryAdd(item)) RefreshSellContents();
-        }
-
-        private void SetDialogInputBlocker(RectTransform dialog, bool active)
-        {
-            if (dialog == null) return;
-            if (active && dialogInputBlocker == null)
-            {
-                Transform parent = dialog.parent;
-                if (parent == null) return;
-                dialogInputBlocker = new GameObject("ShopDialogInputBlocker", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-                dialogInputBlocker.layer = gameObject.layer;
-                RectTransform rect = dialogInputBlocker.GetComponent<RectTransform>();
-                rect.SetParent(parent, false);
-                Stretch(rect);
-                Image image = dialogInputBlocker.GetComponent<Image>();
-                image.color = new Color(0f, 0f, 0f, 0.45f);
-                image.raycastTarget = true;
-            }
-            if (dialogInputBlocker == null) return;
-            if (active)
-            {
-                dialogInputBlocker.SetActive(true);
-                dialogInputBlocker.transform.SetSiblingIndex(dialog.GetSiblingIndex());
-            }
-            else dialogInputBlocker.SetActive(false);
         }
 
         private static Image FindCurrencyImage(Transform root)
