@@ -9,11 +9,12 @@ namespace Common
     {
         private static GameObject previewRoot;
         private static Canvas rootCanvas;
-        private static InventorySlotView owner;
+        private static MonoBehaviour owner;
 
         public static bool HasActivePreview => previewRoot != null;
 
-        public static void Begin(InventorySlotView source, Vector2 screenPosition)
+        /// <summary>어떤 판매 행이든 원본을 바꾸지 않고 전체 모양을 복제해 보여 준다.</summary>
+        public static void Begin(MonoBehaviour source, Vector2 screenPosition)
         {
             End();
             if (source == null) return;
@@ -67,7 +68,7 @@ namespace Common
                 ((RectTransform)previewRoot.transform).anchoredPosition = local;
         }
 
-        public static void End(InventorySlotView expectedOwner = null)
+        public static void End(MonoBehaviour expectedOwner = null)
         {
             if (expectedOwner != null && !ReferenceEquals(owner, expectedOwner)) return;
             if (previewRoot != null)
@@ -88,7 +89,9 @@ namespace Common
         private static void DisableInteraction(GameObject clone)
         {
             foreach (Selectable selectable in clone.GetComponentsInChildren<Selectable>(true)) selectable.enabled = false;
-            foreach (InventorySlotView slot in clone.GetComponentsInChildren<InventorySlotView>(true)) slot.enabled = false;
+            // 복제본은 보여 주기만 한다. 원래 행의 클릭·드래그·hover도 꺼 이벤트를 가로채지 않는다.
+            foreach (MonoBehaviour behaviour in clone.GetComponentsInChildren<MonoBehaviour>(true))
+                if (behaviour is UnityEngine.EventSystems.IEventSystemHandler) behaviour.enabled = false;
             foreach (Graphic graphic in clone.GetComponentsInChildren<Graphic>(true)) graphic.raycastTarget = false;
         }
     }

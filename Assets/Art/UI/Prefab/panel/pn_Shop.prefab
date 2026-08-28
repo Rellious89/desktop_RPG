@@ -2235,6 +2235,24 @@ MonoBehaviour:
     m_FallbackState: 0
     m_WaitForCompletion: 0
     m_LocalVariables: []
+  purchaseSucceededMessage:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 0
+      m_Key: 80
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  sellSucceededMessage:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 0
+      m_Key: 81
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
   swapLabel: {fileID: 9091457567029464918}
   switchToSellText:
     m_TableReference:

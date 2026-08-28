@@ -1,4 +1,5 @@
 using System;
+using Common;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -26,17 +27,36 @@ namespace Shop.UI
 
         public void OnBeginDrag(PointerEventData eventData)
         {
+            if (eventData != null) InventorySellDragPreview.Begin(this, eventData.position);
         }
 
         public void OnDrag(PointerEventData eventData)
         {
+            if (eventData != null) InventorySellDragPreview.UpdatePosition(eventData.position);
         }
 
         public void OnEndDrag(PointerEventData eventData)
         {
-            if (eventData == null || listRoot == null) return;
-            if (!RectTransformUtility.RectangleContainsScreenPoint(listRoot, eventData.position, eventData.pressEventCamera))
-                Remove();
+            try
+            {
+                if (eventData == null || listRoot == null) return;
+                if (!RectTransformUtility.RectangleContainsScreenPoint(listRoot, eventData.position, eventData.pressEventCamera))
+                    Remove();
+            }
+            finally
+            {
+                InventorySellDragPreview.End(this);
+            }
+        }
+
+        private void OnDisable()
+        {
+            InventorySellDragPreview.End(this);
+        }
+
+        private void OnDestroy()
+        {
+            InventorySellDragPreview.End(this);
         }
 
         private void Remove()

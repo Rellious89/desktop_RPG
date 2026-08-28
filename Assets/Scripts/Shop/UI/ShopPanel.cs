@@ -25,6 +25,10 @@ namespace Shop.UI
         [SerializeField] private GameObject itemRowPrefab;
         [SerializeField] private LocalizedTextReference purchaseFailedMessage =
             new LocalizedTextReference("GUID:32fd067a20b754a50b20446b9c78d2ae", "79");
+        [SerializeField] private LocalizedTextReference purchaseSucceededMessage =
+            new LocalizedTextReference("GUID:32fd067a20b754a50b20446b9c78d2ae", "80");
+        [SerializeField] private LocalizedTextReference sellSucceededMessage =
+            new LocalizedTextReference("GUID:32fd067a20b754a50b20446b9c78d2ae", "81");
 
         [Header("Mode Switch Localization")]
         [Tooltip("btn_swap 아래의 현재 전환 문구를 표시할 TMP 텍스트(lb_swap).")]
@@ -500,6 +504,9 @@ namespace Shop.UI
             Image currencyIcon = FindCurrencyImage(row.transform); CurrencyDefinition currency = currencyCatalog != null ? currencyCatalog.Find(product.BuyCurrencyId) : null;
             if (currencyIcon != null && currency != null) currencyIcon.sprite = currency.Icon;
             Button button = row.GetComponent<Button>(); if (button != null) button.onClick.AddListener(() => OpenPurchase(product));
+            ShopItemTooltipView tooltip = row.GetComponent<ShopItemTooltipView>();
+            if (tooltip == null) tooltip = row.AddComponent<ShopItemTooltipView>();
+            tooltip.Bind(item, 1);
         }
 
         private void OpenPurchase(ShopProductDefinition product)
@@ -532,9 +539,15 @@ namespace Shop.UI
             try
             {
                 ShopTradeResult result = tradeService.TryBuy(shopId, selectedProduct.ItemId, 1);
-                if (result.Success) { ClosePurchaseDialog(); RefreshContents(); return; }
+                if (result.Success)
+                {
+                    ClosePurchaseDialog();
+                    RefreshContents();
+                    ShowToast(purchaseSucceededMessage);
+                    return;
+                }
                 if (result.Code == ShopTradeResultCode.ShopLocked || result.Code == ShopTradeResultCode.UnknownShop) { Close(); return; }
-                ToastManager.Instance?.Show(purchaseFailedMessage.GetLocalizedString());
+                ShowToast(purchaseFailedMessage);
             }
             finally { purchasing = false; }
         }
@@ -600,6 +613,9 @@ namespace Shop.UI
             ShopSellEntryView view = row.GetComponent<ShopSellEntryView>();
             if (view == null) view = row.AddComponent<ShopSellEntryView>();
             view.Bind(entry.Item.ItemId, sellListRoot, RemoveSellEntry);
+            ShopItemTooltipView tooltip = row.GetComponent<ShopItemTooltipView>();
+            if (tooltip == null) tooltip = row.AddComponent<ShopItemTooltipView>();
+            tooltip.Bind(entry.Item, 1);
         }
 
         private void RemoveSellEntry(string itemId)
@@ -660,6 +676,7 @@ namespace Shop.UI
                     CloseSellDialog();
                     sellSession?.Clear();
                     RefreshContents();
+                    ShowToast(sellSucceededMessage);
                     return;
                 }
 
@@ -671,7 +688,7 @@ namespace Shop.UI
                 }
                 sellSession?.Revalidate();
                 RefreshSellContents();
-                ToastManager.Instance?.Show(purchaseFailedMessage.GetLocalizedString());
+                ShowToast(purchaseFailedMessage);
             }
             catch (Exception exception)
             {
@@ -679,7 +696,7 @@ namespace Shop.UI
                 CloseSellDialog();
                 sellSession?.Revalidate();
                 RefreshSellContents();
-                ToastManager.Instance?.Show(purchaseFailedMessage.GetLocalizedString());
+                ShowToast(purchaseFailedMessage);
             }
             finally
             {
@@ -713,6 +730,13 @@ namespace Shop.UI
         public void RegisterInventoryItem(ItemDefinition item)
         {
             if (CanRegisterInventoryItem(item) && sellSession.TryAdd(item)) RefreshSellContents();
+        }
+
+        /// <summary>토스트 구성 누락은 거래 성공 여부와 무관하다. 문자열도 성공 순간의 현재 locale로 읽는다.</summary>
+        private static void ShowToast(LocalizedTextReference message)
+        {
+            if (ToastManager.Instance == null || message == null || !message.HasReference) return;
+            ToastManager.Instance.Show(message.GetLocalizedString());
         }
 
         private static Image FindCurrencyImage(Transform root)
