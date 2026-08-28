@@ -21,6 +21,8 @@ namespace Common
         [SerializeField] private RectTransform dockHandlePrefab;
         [SerializeField] private Vector2 dockHandleSize = new Vector2(16f, 48f);
         [SerializeField] private Color fallbackDockHandleColor = new Color(0.25f, 0.8f, 1f, 0.9f);
+        [SerializeField, Range(0f, 1f)] private float dockHandleVerticalAlignment = 0.5f;
+        [SerializeField] private Vector2 dockHandlePositionOffset;
 
         private readonly List<DockLink> links = new List<DockLink>();
         private readonly Vector3[] worldCorners = new Vector3[4];
@@ -59,6 +61,7 @@ namespace Common
         private void Update()
         {
             PruneUnavailableLinks();
+            for (int i = 0; i < links.Count; i++) PositionHandle(links[i]);
         }
 
         private void OnDestroy()
@@ -197,7 +200,7 @@ namespace Common
             // 후보 위치의 bounds를 상대의 좌우 면 및 상단에 정확히 맞춘다.
             moving.SetAnchoredPositionFromDock(moving.TargetPanel.anchoredPosition + bestCandidate.positionDelta);
             DockLink link = new DockLink(moving, bestTarget);
-            link.handle = CreateDockHandle();
+            link.handle = CreateDockHandle(out link.anchor);
             links.Add(link);
             PositionHandle(link);
         }
@@ -221,45 +224,56 @@ namespace Common
             return true;
         }
 
-        private DockHandleDrag CreateDockHandle()
+        private DockHandleDrag CreateDockHandle(out RectTransform anchor)
         {
+            var anchorObject = new GameObject("DockHandleAnchor", typeof(RectTransform));
+            anchorObject.layer = gameObject.layer;
+            anchor = (RectTransform)anchorObject.transform;
+            anchor.SetParent(PanelUi, false);
+            anchor.anchorMin = anchor.anchorMax = new Vector2(0.5f, 0.5f);
+            anchor.pivot = new Vector2(0.5f, 0.5f);
+            anchor.sizeDelta = Vector2.zero;
+
             RectTransform handleRect;
             if (dockHandlePrefab != null)
             {
-                handleRect = Instantiate(dockHandlePrefab, PanelUi, false);
+                // The anchor owns the edge-relative position. Keep every authored RectTransform
+                // value on the prefab root (including its local position) as its visual offset.
+                handleRect = Instantiate(dockHandlePrefab, anchor, false);
             }
             else
             {
                 var handleObject = new GameObject("DockHandle", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
                 handleObject.layer = gameObject.layer;
                 handleRect = (RectTransform)handleObject.transform;
-                handleRect.SetParent(PanelUi, false);
+                handleRect.SetParent(anchor, false);
                 Image image = handleObject.GetComponent<Image>();
                 // Sprite가 없어도 Image는 기본 흰 텍스처로 색상 사각형을 그린다. 내장 스프라이트의
                 // 경로에 의존하지 않아 headless 테스트/플랫폼별 리소스 차이도 피한다.
                 image.color = fallbackDockHandleColor;
                 image.raycastTarget = true;
+                handleRect.anchorMin = handleRect.anchorMax = new Vector2(0.5f, 0.5f);
+                handleRect.pivot = new Vector2(0.5f, 0.5f);
+                handleRect.sizeDelta = dockHandleSize;
             }
 
-            handleRect.name = "DockHandle";
-            handleRect.anchorMin = handleRect.anchorMax = new Vector2(0.5f, 0.5f);
-            handleRect.pivot = new Vector2(0.5f, 0.5f);
-            handleRect.sizeDelta = dockHandleSize;
-            handleRect.SetAsLastSibling();
+            anchor.SetAsLastSibling();
 
-            DockHandleDrag drag = handleRect.GetComponent<DockHandleDrag>();
+            DockHandleDrag drag = handleRect.GetComponentInChildren<DockHandleDrag>(true);
             if (drag == null) drag = handleRect.gameObject.AddComponent<DockHandleDrag>();
-            drag.Configure(this);
+            drag.Configure(this, PanelUi);
 
-            WindowInputRegion inputRegion = handleRect.GetComponent<WindowInputRegion>();
-            if (inputRegion == null) inputRegion = handleRect.gameObject.AddComponent<WindowInputRegion>();
+            // Prefer an authored region so custom prefabs do not gain a duplicate component.
+            // When none exists, the drag RectTransform is also the native click-through region.
+            WindowInputRegion inputRegion = handleRect.GetComponentInChildren<WindowInputRegion>(true);
+            if (inputRegion == null) inputRegion = drag.gameObject.AddComponent<WindowInputRegion>();
             inputRegion.ReceiveMouseInput = true;
             return drag;
         }
 
         private void PositionHandle(DockLink link)
         {
-            if (link.handle == null || !IsLinkValid(link)) return;
+            if (link.handle == null || link.anchor == null || !IsLinkValid(link)) return;
             GetRectInPanelUiSpace(link.a.SnapBoundsRect, out Vector2 aMin, out Vector2 aMax);
             GetRectInPanelUiSpace(link.b.SnapBoundsRect, out Vector2 bMin, out Vector2 bMax);
 
@@ -268,8 +282,8 @@ namespace Common
                 : (bMax.x + aMin.x) * 0.5f;
             float commonTop = Mathf.Min(aMax.y, bMax.y);
             float commonBottom = Mathf.Max(aMin.y, bMin.y);
-            RectTransform handleRect = link.handle.transform as RectTransform;
-            handleRect.anchoredPosition = new Vector2(sharedX, (commonTop + commonBottom) * 0.5f);
+            float alignedY = Mathf.Lerp(commonBottom, commonTop, dockHandleVerticalAlignment);
+            link.anchor.anchoredPosition = new Vector2(sharedX, alignedY) + dockHandlePositionOffset;
         }
 
         private void FocusPair(DockLink link)
@@ -278,7 +292,7 @@ namespace Common
             PanelDragHandle second = first == link.a ? link.b : link.a;
             FocusPanel(first);
             FocusPanel(second);
-            if (link.handle != null) link.handle.transform.SetAsLastSibling();
+            if (link.anchor != null) link.anchor.SetAsLastSibling();
         }
 
         private static void FocusPanel(PanelDragHandle handle)
@@ -334,13 +348,13 @@ namespace Common
             if (link == null) return;
             links.Remove(link);
             if (dockDragLink == link) dockDragLink = null;
-            if (link.handle != null)
+            if (link.anchor != null)
             {
                 // Destroy는 프레임 끝에 실행되므로, 그 전까지도 Windows 네이티브 입력 영역이 남지 않게
                 // 우선 비활성화한다.
-                link.handle.gameObject.SetActive(false);
-                if (Application.isPlaying) Destroy(link.handle.gameObject);
-                else DestroyImmediate(link.handle.gameObject);
+                link.anchor.gameObject.SetActive(false);
+                if (Application.isPlaying) Destroy(link.anchor.gameObject);
+                else DestroyImmediate(link.anchor.gameObject);
             }
         }
 
@@ -373,6 +387,7 @@ namespace Common
             detachDistance = Mathf.Max(snapDistance + 0.01f, detachDistance);
             dockHandleSize.x = Mathf.Max(1f, dockHandleSize.x);
             dockHandleSize.y = Mathf.Max(1f, dockHandleSize.y);
+            dockHandleVerticalAlignment = Mathf.Clamp01(dockHandleVerticalAlignment);
         }
 
         private sealed class DockLink
@@ -380,6 +395,7 @@ namespace Common
             public readonly PanelDragHandle a;
             public readonly PanelDragHandle b;
             public DockHandleDrag handle;
+            public RectTransform anchor;
 
             public DockLink(PanelDragHandle a, PanelDragHandle b)
             {

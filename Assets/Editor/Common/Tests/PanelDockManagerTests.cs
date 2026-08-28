@@ -125,6 +125,10 @@ namespace CommonEditor.Tests
 
             Assert.AreEqual(new Vector2(30f, -20f), a.TargetPanel.anchoredPosition - aStart);
             Assert.AreEqual(a.TargetPanel.anchoredPosition - aStart, b.TargetPanel.anchoredPosition - bStart);
+            RectTransform anchor = panelUi.Find("DockHandleAnchor") as RectTransform;
+            Assert.AreEqual(180f, anchor.anchoredPosition.x, 0.01f);
+            Assert.AreEqual(-20f, anchor.anchoredPosition.y, 0.01f,
+                "페어 이동 중 anchor도 동일한 공용 엣지를 계속 추적한다.");
             Assert.AreEqual(1, manager.LinkCount, "페어 이동은 다른 패널을 탐색하거나 스냅하지 않는다.");
         }
 
@@ -185,6 +189,65 @@ namespace CommonEditor.Tests
             DockHandleDrag handle = panelUi.GetComponentInChildren<DockHandleDrag>();
             Assert.IsNotNull(handle.GetComponent<Image>());
             Assert.IsTrue(handle.GetComponent<WindowInputRegion>().ReceiveMouseInput);
+            Assert.AreEqual(new Vector2(16f, 48f), (handle.transform as RectTransform).sizeDelta);
+            Assert.AreEqual(new Color(0.25f, 0.8f, 1f, 0.9f), handle.GetComponent<Image>().color);
+            RectTransform anchor = panelUi.Find("DockHandleAnchor") as RectTransform;
+            Assert.AreEqual(150f, anchor.anchoredPosition.x, 0.01f);
+            Assert.AreEqual(0f, anchor.anchoredPosition.y, 0.01f,
+                "기본 alignment=0.5는 기존 공용 엣지 중앙을 유지한다.");
+        }
+
+        [Test]
+        public void DockHandleAnchor는_공용엣지_정렬과_관리자_오프셋을_적용한다()
+        {
+            SetDockHandleLayout(alignment: 1f, offset: new Vector2(7f, 13f));
+            PanelDragHandle a = CreatePanel("A", new Vector2(90f, 60f));
+            PanelDragHandle b = CreatePanel("B", new Vector2(200f, 0f));
+            DragToEnd(a);
+
+            RectTransform anchor = panelUi.Find("DockHandleAnchor") as RectTransform;
+            Assert.IsNotNull(anchor);
+            Assert.AreEqual(157f, anchor.anchoredPosition.x, 0.01f,
+                "alignment=1은 공용 세로 구간의 상단에 manager offset을 더한다.");
+            Assert.AreEqual(63f, anchor.anchoredPosition.y, 0.01f,
+                "alignment=1은 공용 세로 구간의 상단에 manager offset을 더한다.");
+        }
+
+        [Test]
+        public void CustomDockHandlePrefab의_RectTransform_디자인값과_기존입력컴포넌트를_보존한다()
+        {
+            GameObject prefabObject = Create("DesignedHandle", null);
+            RectTransform prefab = prefabObject.GetComponent<RectTransform>();
+            prefab.anchorMin = prefab.anchorMax = new Vector2(0.25f, 0.75f);
+            prefab.pivot = new Vector2(0.2f, 0.8f);
+            prefab.sizeDelta = new Vector2(31f, 73f);
+            prefab.anchoredPosition = new Vector2(11f, -19f);
+            prefab.localScale = new Vector3(1.5f, 0.75f, 1f);
+            prefab.localRotation = Quaternion.Euler(0f, 0f, 15f);
+            DockHandleDrag authoredDrag = prefabObject.AddComponent<DockHandleDrag>();
+            prefabObject.AddComponent<WindowInputRegion>();
+            SetDockHandlePrefab(prefab);
+
+            PanelDragHandle a = CreatePanel("A", new Vector2(90f, 60f));
+            CreatePanel("B", new Vector2(200f, 0f));
+            DragToEnd(a);
+
+            DockHandleDrag handle = panelUi.GetComponentInChildren<DockHandleDrag>();
+            RectTransform instance = handle.transform as RectTransform;
+            Assert.AreNotSame(authoredDrag, handle);
+            Assert.AreEqual(prefab.anchorMin, instance.anchorMin);
+            Assert.AreEqual(prefab.anchorMax, instance.anchorMax);
+            Assert.AreEqual(prefab.pivot, instance.pivot);
+            Assert.AreEqual(prefab.sizeDelta, instance.sizeDelta);
+            Assert.AreEqual(prefab.anchoredPosition, instance.anchoredPosition);
+            Assert.AreEqual(prefab.localScale, instance.localScale);
+            Assert.AreEqual(prefab.localRotation, instance.localRotation);
+            Assert.AreEqual(1, instance.GetComponents<WindowInputRegion>().Length,
+                "프리팹의 입력 영역을 재사용하고 중복 생성하지 않는다.");
+            Assert.IsTrue(instance.GetComponent<WindowInputRegion>().ReceiveMouseInput);
+
+            manager.NotifyPanelUnavailable(a);
+            Assert.IsNull(panelUi.Find("DockHandleAnchor"), "링크 해제 시 anchor와 handle을 함께 제거한다.");
         }
 
         [Test]
@@ -223,6 +286,21 @@ namespace CommonEditor.Tests
         {
             manager.BeginPanelDrag(handle);
             manager.EndPanelDrag(handle);
+        }
+
+        private void SetDockHandleLayout(float alignment, Vector2 offset)
+        {
+            SerializedObject serialized = new SerializedObject(manager);
+            serialized.FindProperty("dockHandleVerticalAlignment").floatValue = alignment;
+            serialized.FindProperty("dockHandlePositionOffset").vector2Value = offset;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private void SetDockHandlePrefab(RectTransform prefab)
+        {
+            SerializedObject serialized = new SerializedObject(manager);
+            serialized.FindProperty("dockHandlePrefab").objectReferenceValue = prefab;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static void AssertBoundsTouchAndTopAlign(PanelDragHandle a, PanelDragHandle b)

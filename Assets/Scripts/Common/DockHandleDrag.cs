@@ -13,10 +13,10 @@ namespace Common
         private Vector2 dragStartLocalPoint;
         private bool dragging;
 
-        public void Configure(PanelDockManager owner)
+        public void Configure(PanelDockManager owner, RectTransform dragSpace = null)
         {
             manager = owner;
-            parentRect = transform.parent as RectTransform;
+            parentRect = dragSpace != null ? dragSpace : transform.parent as RectTransform;
         }
 
         public void OnPointerDown(PointerEventData eventData)
