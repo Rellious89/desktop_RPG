@@ -118,8 +118,9 @@ namespace Shop.UI
         protected override void OnDisable()
         {
             // 외부 SetActive(false), 필드 전환, 건축 Reset도 이 경로를 지난다.
-            // 다음 Open은 언제나 구매 카드의 저작 기준 자세에서 시작해야 한다.
-            StopSwapAndRestoreBuy();
+            // 부모가 비활성화되는 도중에는 자식의 활성 상태나 형제 순서를 바꿀 수 없다.
+            // 여기서는 진행 중인 연출과 시각값만 정리하고, 다음 Open에서 계층 상태까지 복원한다.
+            StopSwapBeforeDisable();
             base.OnDisable();
         }
 
@@ -329,17 +330,28 @@ namespace Shop.UI
 
         private void StopSwapAndRestoreBuy()
         {
+            StopSwapAndRestoreBuyCore(true);
+        }
+
+        private void StopSwapBeforeDisable()
+        {
+            StopSwapAndRestoreBuyCore(false);
+        }
+
+        private void StopSwapAndRestoreBuyCore(bool restoreHierarchyState)
+        {
             if (swapRoutine != null) StopCoroutine(swapRoutine);
             swapRoutine = null;
             isSwapping = false;
-            RestoreCard(sellBaseline, false);
-            RestoreCard(buyBaseline, true);
-            if (buyBaseline != null && buyBaseline.Rect != null) buyBaseline.Rect.SetAsLastSibling();
+            RestoreCard(sellBaseline, false, restoreHierarchyState);
+            RestoreCard(buyBaseline, true, restoreHierarchyState);
+            if (restoreHierarchyState && buyBaseline != null && buyBaseline.Rect != null)
+                buyBaseline.Rect.SetAsLastSibling();
             isShowingBuy = true;
             SetSwapButtonsInteractable(true);
         }
 
-        private static void RestoreCard(CardBaseline card, bool active)
+        private static void RestoreCard(CardBaseline card, bool active, bool restoreActiveState = true)
         {
             if (card == null || card.Rect == null) return;
             card.Rect.anchoredPosition = card.AnchoredPosition;
@@ -348,7 +360,7 @@ namespace Shop.UI
             card.Group.alpha = card.Alpha;
             card.Group.interactable = active;
             card.Group.blocksRaycasts = active;
-            card.Rect.gameObject.SetActive(active);
+            if (restoreActiveState) card.Rect.gameObject.SetActive(active);
         }
 
         private static void SetCardInput(CardBaseline card, bool enabled)

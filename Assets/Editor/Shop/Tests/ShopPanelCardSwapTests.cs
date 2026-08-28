@@ -80,6 +80,34 @@ namespace ShopEditor.Tests
             Assert.IsFalse((bool)Invoke(panel, "CanAnimateSwap"));
         }
 
+        [Test]
+        public void DisablePreparation_RestoresVisualsWithoutChangingHierarchyState()
+        {
+            ShopPanel panel = host.AddComponent<ShopPanel>();
+            Set(panel, "buyRoot", buy);
+            Set(panel, "sellRoot", sell);
+            Invoke(panel, "CaptureCardBaselines");
+
+            buy.SetActive(false);
+            sell.SetActive(true);
+            buy.transform.SetAsFirstSibling();
+            sell.transform.SetAsLastSibling();
+            int buySibling = buy.transform.GetSiblingIndex();
+            int sellSibling = sell.transform.GetSiblingIndex();
+
+            buy.GetComponent<RectTransform>().anchoredPosition = new Vector2(999f, 999f);
+            sell.GetComponent<RectTransform>().anchoredPosition = new Vector2(-999f, -999f);
+
+            Invoke(panel, "StopSwapBeforeDisable");
+
+            Assert.IsFalse(buy.activeSelf, "부모 비활성화 중에는 구매 카드 활성 상태를 바꾸지 않아야 한다.");
+            Assert.IsTrue(sell.activeSelf, "부모 비활성화 중에는 판매 카드 활성 상태를 바꾸지 않아야 한다.");
+            Assert.AreEqual(buySibling, buy.transform.GetSiblingIndex());
+            Assert.AreEqual(sellSibling, sell.transform.GetSiblingIndex());
+            Assert.AreEqual(new Vector2(12f, 8f), buy.GetComponent<RectTransform>().anchoredPosition);
+            Assert.AreEqual(new Vector2(-6f, 4f), sell.GetComponent<RectTransform>().anchoredPosition);
+        }
+
         private static void Set(object target, string name, object value) =>
             target.GetType().GetField(name, InstancePrivate).SetValue(target, value);
 
