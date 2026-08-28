@@ -2254,8 +2254,8 @@ MonoBehaviour:
     m_FallbackState: 0
     m_WaitForCompletion: 0
     m_LocalVariables: []
-  purchaseDialog: {fileID: 2387233005909282556}
-  sellDialog: {fileID: 2914776057438662392}
+  purchaseDialog: {fileID: 1648285711874080118}
+  sellDialog: {fileID: 73730036463636915}
   swapDuration: 0.22
   swapHorizontalDistance: 150
   swapBackgroundScale: 0.94
