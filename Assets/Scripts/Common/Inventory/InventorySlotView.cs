@@ -48,6 +48,7 @@ namespace Common
 
         private ItemTooltipController tooltipController;
         private bool tooltipControllerResolved;
+        private bool isSellRegistrationDrag;
 
         /// <summary>이 슬롯이 지금 그리고 있는 아이템. 빈 칸이면 null이다.</summary>
         public ItemDefinition Definition => definition;
@@ -83,6 +84,7 @@ namespace Common
             count = itemCount;
 
             if (changed) CancelTooltip();
+            if (changed) InventorySellDragPreview.End(this);
 
             Sprite icon = itemDefinition != null ? itemDefinition.Icon : null;
 
@@ -110,6 +112,7 @@ namespace Common
             definition = null;
             count = 0;
             CancelTooltip();
+            InventorySellDragPreview.End(this);
 
             if (iconImage != null)
             {
@@ -148,16 +151,25 @@ namespace Common
 
         public void OnBeginDrag(PointerEventData eventData)
         {
+            isSellRegistrationDrag = definition != null && count > 0 &&
+                InventoryItemRegistrationContext.ActiveTarget != null &&
+                InventoryItemRegistrationContext.ActiveTarget.CanRegisterInventoryItem(definition);
+            if (isSellRegistrationDrag && eventData != null)
+                InventorySellDragPreview.Begin(this, eventData.position);
         }
 
         public void OnDrag(PointerEventData eventData)
         {
+            if (isSellRegistrationDrag && eventData != null)
+                InventorySellDragPreview.UpdatePosition(eventData.position);
         }
 
         public void OnEndDrag(PointerEventData eventData)
         {
-            if (eventData != null)
+            if (isSellRegistrationDrag && eventData != null)
                 InventoryItemRegistrationContext.TryRegisterAt(definition, eventData.position, eventData.pressEventCamera);
+            isSellRegistrationDrag = false;
+            InventorySellDragPreview.End(this);
         }
 
         /// <summary>패널이 닫히거나 슬롯이 꺼질 때도 툴팁이 남지 않게 한다. 슬롯이 꺼지면 Exit
@@ -165,6 +177,13 @@ namespace Common
         private void OnDisable()
         {
             CancelTooltip();
+            isSellRegistrationDrag = false;
+            InventorySellDragPreview.End(this);
+        }
+
+        private void OnDestroy()
+        {
+            InventorySellDragPreview.End(this);
         }
 
         /// <summary>이 슬롯이 툴팁의 주인일 때만 내린다 - 다른 슬롯이 이미 주인이 되었다면

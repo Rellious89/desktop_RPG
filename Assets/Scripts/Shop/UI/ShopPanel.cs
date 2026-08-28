@@ -26,6 +26,22 @@ namespace Shop.UI
         [SerializeField] private LocalizedTextReference purchaseFailedMessage =
             new LocalizedTextReference("GUID:32fd067a20b754a50b20446b9c78d2ae", "79");
 
+        [Header("Mode Switch Localization")]
+        [Tooltip("btn_swap 아래의 현재 전환 문구를 표시할 TMP 텍스트(lb_swap).")]
+        [SerializeField] private TextMeshProUGUI swapLabel;
+        [Tooltip("구매 화면에서 표시할 '판매 전환' 문구(01_UI / 74).")]
+        [SerializeField] private LocalizedTextReference switchToSellText =
+            new LocalizedTextReference("GUID:32fd067a20b754a50b20446b9c78d2ae", "74");
+        [Tooltip("판매 화면에서 표시할 '구매 전환' 문구(01_UI / 75).")]
+        [SerializeField] private LocalizedTextReference switchToBuyText =
+            new LocalizedTextReference("GUID:32fd067a20b754a50b20446b9c78d2ae", "75");
+
+        [Header("Dialogs")]
+        [Tooltip("pn_Shop 직계의 실제 구매 확인 다이얼로그(dialog_ItemBuy).")]
+        [SerializeField] private RectTransform purchaseDialog;
+        [Tooltip("pn_Shop 직계의 실제 판매 확인 다이얼로그(dialog_ItemSell).")]
+        [SerializeField] private RectTransform sellDialog;
+
         [Header("Card Swap")]
         [Tooltip("구매/판매 카드가 서로 자리를 바꾸는 데 걸리는 시간(초). 0 이하면 즉시 전환한다.")]
         [SerializeField, Min(0f)] private float swapDuration = 0.22f;
@@ -38,8 +54,6 @@ namespace Shop.UI
 
         private GameObject buyRoot;
         private GameObject sellRoot;
-        private GameObject purchaseDialog;
-        private GameObject sellDialog;
         private RectTransform buyListRoot;
         private RectTransform sellListRoot;
         private TextMeshProUGUI[] currencyTexts;
@@ -68,12 +82,13 @@ namespace Shop.UI
         private bool selling;
         private bool referencesResolved;
         private bool warnedMissingItem;
-        private GameObject sellDialogBlocker;
+        private GameObject dialogInputBlocker;
         private CardBaseline buyBaseline;
         private CardBaseline sellBaseline;
         private Coroutine swapRoutine;
         private bool isShowingBuy = true;
         private bool isSwapping;
+        private LocalizedTextReference boundSwapText;
 
         private sealed class CardBaseline
         {
@@ -105,12 +120,14 @@ namespace Shop.UI
             CloseDialogs();
             InventoryManager.InventoryChanged += RefreshContents;
             BindButtons();
+            RefreshSwapLabel();
         }
 
         protected override void OnModalClosed()
         {
             InventoryManager.InventoryChanged -= RefreshContents;
             UnbindButtons();
+            UnbindSwapLabel();
             ResetSellSession();
             CloseDialogs();
         }
@@ -149,8 +166,14 @@ namespace Shop.UI
             referencesResolved = true;
             buyRoot = FindDeepChild(transform, "bg_Buy")?.gameObject;
             sellRoot = FindDeepChild(transform, "bg_Sell")?.gameObject;
-            purchaseDialog = FindDeepChild(transform, "dialog_ItemBuy")?.gameObject;
-            sellDialog = FindDeepChild(transform, "dialog_ItemSell")?.gameObject;
+            // 중복된 내부 시각 패널을 건드리지 않는다. Inspector 참조가 없을 때만 pn_Shop 직계 후보를 쓴다.
+            if (purchaseDialog == null) purchaseDialog = FindDirectChild(transform, "dialog_ItemBuy") as RectTransform;
+            if (sellDialog == null) sellDialog = FindDirectChild(transform, "dialog_ItemSell") as RectTransform;
+            if (swapLabel == null)
+            {
+                Transform swapButton = FindDirectChild(transform, "btn_swap");
+                swapLabel = FindDeepChild(swapButton != null ? swapButton : transform, "lb_swap")?.GetComponent<TextMeshProUGUI>();
+            }
             buyListRoot = FindDeepChild(buyRoot != null ? buyRoot.transform : transform, "list") as RectTransform;
             sellListRoot = FindDeepChild(sellRoot != null ? sellRoot.transform : transform, "list") as RectTransform;
             currencyTexts = GetComponentsInChildren<TextMeshProUGUI>(true);
@@ -159,19 +182,19 @@ namespace Shop.UI
                 if (swapButtons[i] == null || swapButtons[i].name != "btn_swap") swapButtons.RemoveAt(i);
             buyCloseButton = FindDeepChild(buyRoot != null ? buyRoot.transform : transform, "btn_close")?.GetComponent<Button>();
             sellCloseButton = FindDeepChild(sellRoot != null ? sellRoot.transform : transform, "btn_close")?.GetComponent<Button>();
-            purchaseCancelButton = FindDeepChild(purchaseDialog != null ? purchaseDialog.transform : transform, "btn_cancle")?.GetComponent<Button>();
-            purchaseConfirmButton = FindDeepChild(purchaseDialog != null ? purchaseDialog.transform : transform, "btn_confirm")?.GetComponent<Button>();
+            purchaseCancelButton = FindDeepChild(purchaseDialog != null ? purchaseDialog : transform, "btn_cancle")?.GetComponent<Button>();
+            purchaseConfirmButton = FindDeepChild(purchaseDialog != null ? purchaseDialog : transform, "btn_confirm")?.GetComponent<Button>();
             sellButton = FindDeepChild(sellRoot != null ? sellRoot.transform : transform, "btn_sell")?.GetComponent<Button>();
-            sellCancelButton = FindDeepChild(sellDialog != null ? sellDialog.transform : transform, "btn_cancle")?.GetComponent<Button>();
-            sellConfirmButton = FindDeepChild(sellDialog != null ? sellDialog.transform : transform, "btn_confirm")?.GetComponent<Button>();
-            purchaseCostText = FindDeepChild(purchaseDialog != null ? purchaseDialog.transform : transform, "lb_CostValue")?.GetComponent<TextMeshProUGUI>();
-            purchaseCurrencyIcon = FindCurrencyImage(purchaseDialog != null ? purchaseDialog.transform : null);
-            sellItemsText = FindDeepChild(sellDialog != null ? sellDialog.transform : transform, "lb_Sell")?.GetComponent<TextMeshProUGUI>();
-            sellCostText = FindDeepChild(sellDialog != null ? sellDialog.transform : transform, "lb_CostValue")?.GetComponent<TextMeshProUGUI>();
-            sellCurrencyIcon = FindCurrencyImage(sellDialog != null ? sellDialog.transform : null);
+            sellCancelButton = FindDeepChild(sellDialog != null ? sellDialog : transform, "btn_cancle")?.GetComponent<Button>();
+            sellConfirmButton = FindDeepChild(sellDialog != null ? sellDialog : transform, "btn_confirm")?.GetComponent<Button>();
+            purchaseCostText = FindDeepChild(purchaseDialog != null ? purchaseDialog : transform, "lb_CostValue")?.GetComponent<TextMeshProUGUI>();
+            purchaseCurrencyIcon = FindCurrencyImage(purchaseDialog);
+            sellItemsText = FindDeepChild(sellDialog != null ? sellDialog : transform, "lb_Sell")?.GetComponent<TextMeshProUGUI>();
+            sellCostText = FindDeepChild(sellDialog != null ? sellDialog : transform, "lb_CostValue")?.GetComponent<TextMeshProUGUI>();
+            sellCurrencyIcon = FindCurrencyImage(sellDialog);
             sellEmptyMessage = FindDeepChild(sellRoot != null ? sellRoot.transform : transform, "lb_emptyMsg")?.gameObject;
-            if (purchaseDialog != null) purchaseDialog.SetActive(false);
-            if (sellDialog != null) sellDialog.SetActive(false);
+            if (purchaseDialog != null) purchaseDialog.gameObject.SetActive(false);
+            if (sellDialog != null) sellDialog.gameObject.SetActive(false);
         }
 
         private void BindButtons()
@@ -243,8 +266,7 @@ namespace Shop.UI
             incoming.Rect.anchoredPosition = incoming.AnchoredPosition + Vector2.right * (-exitDirection * distance);
             incoming.Rect.localScale = incoming.LocalScale * backgroundScale;
             incoming.Group.alpha = incoming.Alpha * backgroundAlpha;
-            incoming.Rect.SetAsFirstSibling();
-            outgoing.Rect.SetAsLastSibling();
+            SetCardOrder(incoming, outgoing);
 
             float duration = Mathf.Max(0.0001f, swapDuration);
             float elapsed = 0f;
@@ -263,7 +285,7 @@ namespace Shop.UI
                     incoming.Alpha * backgroundAlpha, incoming.Alpha, eased);
                 if (!broughtIncomingForward && t >= 0.5f)
                 {
-                    incoming.Rect.SetAsLastSibling();
+                    SetCardOrder(outgoing, incoming);
                     broughtIncomingForward = true;
                 }
                 yield return null;
@@ -271,7 +293,7 @@ namespace Shop.UI
 
             RestoreCard(outgoing, false);
             RestoreCard(incoming, true);
-            incoming.Rect.SetAsLastSibling();
+            SetCardOrder(outgoing, incoming);
             CompleteMode(targetBuy);
             isSwapping = false;
             swapRoutine = null;
@@ -284,13 +306,14 @@ namespace Shop.UI
             RestoreCard(buy ? sellBaseline : buyBaseline, false);
             RestoreCard(buy ? buyBaseline : sellBaseline, true);
             CardBaseline active = buy ? buyBaseline : sellBaseline;
-            if (active != null && active.Rect != null) active.Rect.SetAsLastSibling();
+            SetCardOrder(buy ? sellBaseline : buyBaseline, active);
             CompleteMode(buy);
         }
 
         private void CompleteMode(bool buy)
         {
             isShowingBuy = buy;
+            RefreshSwapLabel();
             CloseDialogs();
             if (buy)
             {
@@ -345,9 +368,9 @@ namespace Shop.UI
             isSwapping = false;
             RestoreCard(sellBaseline, false, restoreHierarchyState);
             RestoreCard(buyBaseline, true, restoreHierarchyState);
-            if (restoreHierarchyState && buyBaseline != null && buyBaseline.Rect != null)
-                buyBaseline.Rect.SetAsLastSibling();
+            if (restoreHierarchyState) SetCardOrder(sellBaseline, buyBaseline);
             isShowingBuy = true;
+            RefreshSwapLabel();
             SetSwapButtonsInteractable(true);
         }
 
@@ -386,9 +409,51 @@ namespace Shop.UI
 
         private static float ValidUnitValue(float value, float fallback) => value >= 0f && value <= 1f ? value : fallback;
 
+        /// <summary>두 카드가 원래 차지한 sibling 범위 안에서만 앞뒤를 바꾼다.
+        /// 다이얼로그와 다른 pn_Shop 직계 자식은 이 메서드로 이동하지 않는다.</summary>
+        private void SetCardOrder(CardBaseline rear, CardBaseline front)
+        {
+            if (rear == null || front == null || rear.Rect == null || front.Rect == null || rear.Rect.parent != front.Rect.parent) return;
+            int first = Mathf.Min(buyBaseline.SiblingIndex, sellBaseline.SiblingIndex);
+            int last = Mathf.Max(buyBaseline.SiblingIndex, sellBaseline.SiblingIndex);
+            rear.Rect.SetSiblingIndex(first);
+            front.Rect.SetSiblingIndex(last);
+        }
+
+        private void RefreshSwapLabel()
+        {
+            LocalizedTextReference next = GetCurrentSwapTextReference();
+            if (!ReferenceEquals(boundSwapText, next))
+            {
+                UnbindSwapLabel();
+                boundSwapText = next;
+                if (boundSwapText != null && boundSwapText.HasReference)
+                    boundSwapText.StringChanged += ApplySwapLabel;
+            }
+
+            if (swapLabel != null && next != null && next.HasReference)
+                ApplySwapLabel(next.GetLocalizedString());
+        }
+
+        private LocalizedTextReference GetCurrentSwapTextReference()
+        {
+            return isShowingBuy ? switchToSellText : switchToBuyText;
+        }
+
+        private void UnbindSwapLabel()
+        {
+            if (boundSwapText != null) boundSwapText.StringChanged -= ApplySwapLabel;
+            boundSwapText = null;
+        }
+
+        private void ApplySwapLabel(string value)
+        {
+            if (swapLabel != null) swapLabel.text = value ?? string.Empty;
+        }
+
         private bool IsDialogOpen()
         {
-            return (purchaseDialog != null && purchaseDialog.activeSelf) || (sellDialog != null && sellDialog.activeSelf);
+            return (purchaseDialog != null && purchaseDialog.gameObject.activeSelf) || (sellDialog != null && sellDialog.gameObject.activeSelf);
         }
 
         private void SetSwapButtonsInteractable(bool interactable)
@@ -445,13 +510,15 @@ namespace Shop.UI
             if (purchaseCostText != null) purchaseCostText.text = product.BuyPrice.ToString("N0", CultureInfo.InvariantCulture);
             CurrencyDefinition currency = currencyCatalog != null ? currencyCatalog.Find(product.BuyCurrencyId) : null;
             if (purchaseCurrencyIcon != null && currency != null) purchaseCurrencyIcon.sprite = currency.Icon;
-            purchaseDialog.SetActive(true);
+            OpenDialog(purchaseDialog);
+            SetDialogInputBlocker(purchaseDialog, true);
         }
 
         private void ClosePurchaseDialog()
         {
             selectedProduct = null;
-            if (purchaseDialog != null && purchaseDialog.activeSelf) purchaseDialog.SetActive(false);
+            if (purchaseDialog != null && purchaseDialog.gameObject.activeSelf) purchaseDialog.gameObject.SetActive(false);
+            SetDialogInputBlocker(purchaseDialog, false);
         }
 
         private void CloseDialogs()
@@ -497,7 +564,7 @@ namespace Shop.UI
             if (sellSession == null) return;
             bool sessionChanged = sellSession.Revalidate();
             // 확인창이 띄운 스냅샷과 현재 세션이 달라지면 그 스냅샷을 거래에 쓰지 않는다.
-            if (sessionChanged && sellDialog != null && sellDialog.activeSelf) CloseSellDialog();
+            if (sessionChanged && sellDialog != null && sellDialog.gameObject.activeSelf) CloseSellDialog();
 
             for (int i = 0; i < sellRows.Count; i++) if (sellRows[i] != null) Destroy(sellRows[i]);
             sellRows.Clear();
@@ -559,16 +626,15 @@ namespace Shop.UI
             string currencyId = sellSession.Entries.Count > 0 ? sellSession.Entries[0].Item.SellCurrencyId : string.Empty;
             CurrencyDefinition currency = currencyCatalog != null ? currencyCatalog.Find(currencyId) : null;
             if (sellCurrencyIcon != null && currency != null) sellCurrencyIcon.sprite = currency.Icon;
-            SetSellDialogBlocker(true);
-            sellDialog.SetActive(true);
-            sellDialog.transform.SetAsLastSibling();
+            OpenDialog(sellDialog);
+            SetDialogInputBlocker(sellDialog, true);
         }
 
         private void CloseSellDialog()
         {
             sellConfirmationSnapshot = null;
-            if (sellDialog != null && sellDialog.activeSelf) sellDialog.SetActive(false);
-            SetSellDialogBlocker(false);
+            if (sellDialog != null && sellDialog.gameObject.activeSelf) sellDialog.gameObject.SetActive(false);
+            SetDialogInputBlocker(sellDialog, false);
         }
 
         private string BuildSellSnapshotLabel()
@@ -639,13 +705,13 @@ namespace Shop.UI
         public bool CanRegisterInventoryItem(ItemDefinition item)
         {
             return isActiveAndEnabled && !isSwapping && sellRoot != null && sellRoot.activeSelf &&
-                (sellDialog == null || !sellDialog.activeSelf) && sellSession != null && sellSession.CanAdd(item);
+                (sellDialog == null || !sellDialog.gameObject.activeSelf) && sellSession != null && sellSession.CanAdd(item);
         }
 
         public bool IsInventoryItemRegistrationDrop(Vector2 screenPosition, Camera eventCamera)
         {
             return isActiveAndEnabled && !isSwapping && sellRoot != null && sellRoot.activeSelf && sellListRoot != null &&
-                (sellDialog == null || !sellDialog.activeSelf) &&
+                (sellDialog == null || !sellDialog.gameObject.activeSelf) &&
                 RectTransformUtility.RectangleContainsScreenPoint(sellListRoot, screenPosition, eventCamera);
         }
 
@@ -654,29 +720,29 @@ namespace Shop.UI
             if (CanRegisterInventoryItem(item) && sellSession.TryAdd(item)) RefreshSellContents();
         }
 
-        private void SetSellDialogBlocker(bool active)
+        private void SetDialogInputBlocker(RectTransform dialog, bool active)
         {
-            if (sellDialog == null) return;
-            if (active && sellDialogBlocker == null)
+            if (dialog == null) return;
+            if (active && dialogInputBlocker == null)
             {
-                Transform parent = sellDialog.transform.parent;
+                Transform parent = dialog.parent;
                 if (parent == null) return;
-                sellDialogBlocker = new GameObject("SellDialogInputBlocker", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-                sellDialogBlocker.layer = gameObject.layer;
-                RectTransform rect = sellDialogBlocker.GetComponent<RectTransform>();
+                dialogInputBlocker = new GameObject("ShopDialogInputBlocker", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+                dialogInputBlocker.layer = gameObject.layer;
+                RectTransform rect = dialogInputBlocker.GetComponent<RectTransform>();
                 rect.SetParent(parent, false);
                 Stretch(rect);
-                Image image = sellDialogBlocker.GetComponent<Image>();
+                Image image = dialogInputBlocker.GetComponent<Image>();
                 image.color = new Color(0f, 0f, 0f, 0.45f);
                 image.raycastTarget = true;
             }
-            if (sellDialogBlocker == null) return;
+            if (dialogInputBlocker == null) return;
             if (active)
             {
-                sellDialogBlocker.SetActive(true);
-                sellDialogBlocker.transform.SetSiblingIndex(sellDialog.transform.GetSiblingIndex());
+                dialogInputBlocker.SetActive(true);
+                dialogInputBlocker.transform.SetSiblingIndex(dialog.GetSiblingIndex());
             }
-            else sellDialogBlocker.SetActive(false);
+            else dialogInputBlocker.SetActive(false);
         }
 
         private static Image FindCurrencyImage(Transform root)
@@ -693,6 +759,29 @@ namespace Shop.UI
                 if (node != null && node.TryGetComponent(out Image image)) return image;
             }
             return null;
+        }
+
+        private static Transform FindDirectChild(Transform root, string childName)
+        {
+            if (root == null) return null;
+            for (int i = 0; i < root.childCount; i++)
+            {
+                Transform child = root.GetChild(i);
+                if (child.name == childName) return child;
+            }
+            return null;
+        }
+
+        private static void BringDialogToFront(RectTransform dialog)
+        {
+            if (dialog != null) dialog.SetAsLastSibling();
+        }
+
+        private static void OpenDialog(RectTransform dialog)
+        {
+            if (dialog == null) return;
+            dialog.gameObject.SetActive(true);
+            BringDialogToFront(dialog);
         }
     }
 }

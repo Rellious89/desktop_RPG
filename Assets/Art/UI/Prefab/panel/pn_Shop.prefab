@@ -833,7 +833,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: '{0}'
+  m_text: ''
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8b0950d02f08e461885e337917d59bc9, type: 2}
   m_sharedMaterial: {fileID: 2100000, guid: 0cbc58f1e2168420aa593613f63766cc, type: 2}
@@ -2235,6 +2235,27 @@ MonoBehaviour:
     m_FallbackState: 0
     m_WaitForCompletion: 0
     m_LocalVariables: []
+  swapLabel: {fileID: 9091457567029464918}
+  switchToSellText:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 0
+      m_Key: 74
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  switchToBuyText:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 0
+      m_Key: 75
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  purchaseDialog: {fileID: 2387233005909282556}
+  sellDialog: {fileID: 2914776057438662392}
   swapDuration: 0.22
   swapHorizontalDistance: 150
   swapBackgroundScale: 0.94
