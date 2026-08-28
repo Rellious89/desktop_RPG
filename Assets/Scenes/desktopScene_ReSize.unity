@@ -5813,6 +5813,7 @@ GameObject:
   - component: {fileID: 800551649}
   - component: {fileID: 800551650}
   - component: {fileID: 800551651}
+  - component: {fileID: 800551652}
   m_Layer: 5
   m_Name: Panel_UI
   m_TagString: Untagged
@@ -5876,6 +5877,23 @@ MonoBehaviour:
   tooltipRoot: {fileID: 800551649}
   tooltipDelay: 0
   horizontalOffset: 8
+--- !u!114 &800551652
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 800551648}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1ee0fb1d6ce47039f79c00aa464492a, type: 3}
+  m_Name: ''
+  m_EditorClassIdentifier:
+  snapDistance: 24
+  detachDistance: 48
+  dockHandlePrefab: {fileID: 0}
+  dockHandleSize: {x: 16, y: 48}
+  fallbackDockHandleColor: {r: 0.25, g: 0.8, b: 1, a: 0.9}
 --- !u!1 &812099548
 GameObject:
   m_ObjectHideFlags: 0

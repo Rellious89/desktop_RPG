@@ -38,6 +38,9 @@ namespace Common
                  "닫기 버튼)를 쓰고, 부모도 없으면 핸들 자신을 쓴다.")]
         [SerializeField] private RectTransform keepInsideRect;
 
+        [Tooltip("도킹할 때 패널의 시각 외곽으로 쓸 영역. 비워두면 Target Panel 자체를 사용한다.")]
+        [SerializeField] private RectTransform snapBoundsRect;
+
         // 패널의 좌표계 기준이 되는 부모. anchoredPosition의 변화량과 이 공간의 이동량이 1:1이라
         // 앵커 설정(점 앵커/스트레치)에 상관없이 같은 계산을 쓸 수 있다.
         private RectTransform parentRect;
@@ -55,6 +58,12 @@ namespace Common
         private bool dragging;
         private bool resolved;
 
+        /// <summary>이 핸들이 움직이는 패널 루트.</summary>
+        public RectTransform TargetPanel => targetPanel;
+
+        /// <summary>도킹의 좌우 외곽과 상단을 계산할 영역.</summary>
+        public RectTransform SnapBoundsRect => snapBoundsRect != null ? snapBoundsRect : targetPanel;
+
         private void Awake()
         {
             ResolveReferences();
@@ -70,14 +79,7 @@ namespace Common
         {
             ResolveReferences();
             if (targetPanel == null) return;
-
-            if (targetModalPanel != null && PopupPanelManager.Instance != null)
-            {
-                PopupPanelManager.Instance.FocusPanel(targetModalPanel);
-                return;
-            }
-
-            targetPanel.SetAsLastSibling();
+            FocusPanel();
         }
 
         public void OnBeginDrag(PointerEventData eventData)
@@ -94,6 +96,7 @@ namespace Common
 
             dragStartAnchoredPosition = targetPanel.anchoredPosition;
             dragging = true;
+            FindDockManager()?.BeginPanelDrag(this);
         }
 
         public void OnDrag(PointerEventData eventData)
@@ -110,17 +113,74 @@ namespace Common
             // 크게 움직여도 패널이 그만큼만 따라가고, 누른 지점과의 간격이 그대로 유지된다.
             targetPanel.anchoredPosition = dragStartAnchoredPosition + (localPoint - dragStartLocalPoint);
             ClampIntoCanvas();
+            FindDockManager()?.MovePanelDuringDrag(this, targetPanel.anchoredPosition);
         }
 
         public void OnEndDrag(PointerEventData eventData)
         {
-            // 놓은 자리에 그대로 둔다 - 되돌리거나 스냅하지 않는다.
+            if (dragging) FindDockManager()?.EndPanelDrag(this);
             dragging = false;
         }
 
         private void OnDisable()
         {
             dragging = false;
+            FindDockManager()?.NotifyPanelUnavailable(this);
+        }
+
+        private void OnDestroy()
+        {
+            FindDockManager()?.NotifyPanelUnavailable(this);
+        }
+
+        /// <summary>공용 도킹 핸들이 두 패널을 함께 옮길 때 쓰는 화면 이탈 제한값이다.</summary>
+        public Vector2 ClampMoveDelta(Vector2 requestedDelta)
+        {
+            ResolveReferences();
+            if (canvasRect == null || keepInsideRect == null || parentRect == null) return requestedDelta;
+
+            GetRectInParentSpace(canvasRect, out Vector2 canvasMin, out Vector2 canvasMax);
+            GetRectInParentSpace(keepInsideRect, out Vector2 keepMin, out Vector2 keepMax);
+
+            float minX = canvasMin.x - keepMin.x;
+            float maxX = canvasMax.x - keepMax.x;
+            float minY = canvasMin.y - keepMin.y;
+            float maxY = canvasMax.y - keepMax.y;
+
+            // 기존 위치가 이미 경계를 약간 벗어나 있거나 영역이 Canvas보다 큰 경우에도, 현재 동작의
+            // "완전히 사라지지 않음" 원칙을 깨지 않도록 가능한 쪽으로만 보정한다.
+            requestedDelta.x = ClampAxis(requestedDelta.x, minX, maxX);
+            requestedDelta.y = ClampAxis(requestedDelta.y, minY, maxY);
+            return requestedDelta;
+        }
+
+        /// <summary>도킹 관리자가 두 패널에 <b>같은</b> 이동량을 적용할 때 사용한다.</summary>
+        public void SetAnchoredPositionFromDock(Vector2 anchoredPosition)
+        {
+            ResolveReferences();
+            if (targetPanel != null) targetPanel.anchoredPosition = anchoredPosition;
+        }
+
+        private static float ClampAxis(float value, float min, float max)
+        {
+            if (min <= max) return Mathf.Clamp(value, min, max);
+            return Mathf.Abs(value - min) <= Mathf.Abs(value - max) ? min : max;
+        }
+
+        private void FocusPanel()
+        {
+            if (targetModalPanel != null && PopupPanelManager.Instance != null)
+            {
+                PopupPanelManager.Instance.FocusPanel(targetModalPanel);
+                return;
+            }
+
+            targetPanel.SetAsLastSibling();
+        }
+
+        private PanelDockManager FindDockManager()
+        {
+            return targetPanel != null ? targetPanel.GetComponentInParent<PanelDockManager>() : null;
         }
 
         /// <summary>패널이 화면 밖으로 완전히 사라지지 않도록, <see cref="keepInsideRect"/>(기본값은
@@ -180,7 +240,11 @@ namespace Common
 
             if (keepInsideRect == null)
             {
-                keepInsideRect = transform.parent as RectTransform;
+                // 기존 프리팹 중에는 핸들이 패널 루트에 직접 붙어 있는 경우가 있다. 그 경우 부모인
+                // Panel_UI를 제한 영역으로 쓰면 패널을 아무 데로나 옮길 수 있으므로, 패널 자체를 쓴다.
+                keepInsideRect = transform == targetPanel
+                    ? targetPanel
+                    : transform.parent as RectTransform;
                 if (keepInsideRect == null) keepInsideRect = (RectTransform)transform;
             }
 
