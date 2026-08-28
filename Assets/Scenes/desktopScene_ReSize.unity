@@ -5887,12 +5887,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a1ee0fb1d6ce47039f79c00aa464492a, type: 3}
-  m_Name: ''
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   snapDistance: 24
   detachDistance: 48
-  dockHandlePrefab: {fileID: 0}
-  dockHandleSize: {x: 16, y: 48}
+  dockHandlePrefab: {fileID: 2602915006436244403, guid: 71daf097f72174131bb33b6a70851fc2, type: 3}
+  dockHandleSize: {x: 22, y: 24}
   fallbackDockHandleColor: {r: 0.25, g: 0.8, b: 1, a: 0.9}
 --- !u!1 &812099548
 GameObject:
