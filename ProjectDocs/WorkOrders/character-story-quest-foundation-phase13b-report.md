@@ -32,6 +32,7 @@ No scene, prefab, or production quest UI was created. Localization assets were n
 ## Verification actually run
 
 - `git diff --check`: passed before commits.
+- Added narrow EditMode coverage for immediate state evaluation and multi-objective AND/progress clamping in `Assets/Editor/Quest/Tests/CharacterStoryQuestServiceTests.cs`; execution was blocked by the Unity project lock described below.
 - Unity narrow EditMode invocation was attempted with the `CharacterStoryQuest` filter. Unity exited before compilation/tests because another Unity instance already has this project open, and therefore did not create the requested XML result.
 - The generated `Assembly-CSharp.csproj` was also checked with `dotnet build --no-restore`; it could not start compilation because Unity's ignored `Temp/obj/Assembly-CSharp/project.assets.json` was not present. No package restore was run.
 - Compile error count: not verified by Unity batch runner (not reported as zero).
