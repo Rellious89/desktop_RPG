@@ -5,6 +5,7 @@ using Corruption;
 using Dungeon;
 using Enemy;
 using Field;
+using Quest;
 using UnityEngine;
 
 namespace Inventory
@@ -227,6 +228,7 @@ namespace Inventory
             PlayerProgress.DefeatProgressMutationReceipt progressReceipt = null;
             CharacterRoster.DefeatStaminaMutationReceipt staminaReceipt = null;
             DungeonCorruptionSettlementService.DefeatCorruptionMutationReceipt corruptionReceipt = null;
+            CharacterStoryQuestMutationReceipt questReceipt = null;
 
             try
             {
@@ -237,13 +239,25 @@ namespace Inventory
                     characterCatalog, corruptionConfigCatalog, SaveSystem.Save)
                     .ApplyDefeatWithoutSave(dungeon, defeatingCharacterId, data);
 
+                // 서사 진행은 이 처치 저장 트랜잭션 안에서만 바꾼다. 실제 행동력 차감값을 전달해
+                // 오염도 배율/0 행동력 포화 뒤에 실제로 빠진 값만 STAMINA_SPENT에 적는다.
+                CharacterStoryQuestService questService = CharacterStoryQuestService.Instance;
+                if (questService != null)
+                {
+                    int actualStaminaSpent = staminaReceipt != null && staminaReceipt.State != null
+                        ? Mathf.Max(0, staminaReceipt.StaminaBefore - staminaReceipt.State.currentStamina) : 0;
+                    questReceipt = questService.ApplyDefeatWithoutSave(
+                        data, defeatingCharacterId, defeatedMonster != null ? defeatedMonster.MonsterId : null,
+                        actualStaminaSpent);
+                }
+
                 bool changed = inventoryReceipt.Changed || progressReceipt.Changed ||
-                               staminaReceipt.Changed || corruptionReceipt.Changed;
+                               staminaReceipt.Changed || corruptionReceipt.Changed || (questReceipt?.Changed ?? false);
                 if (!changed) return;
                 if (!SaveSystem.Save())
                 {
                     Rollback(data, metadata, inventory, inventoryReceipt, progress, progressReceipt,
-                        roster, staminaReceipt, corruptionReceipt);
+                        roster, staminaReceipt, corruptionReceipt, questReceipt);
                     return;
                 }
 
@@ -255,7 +269,7 @@ namespace Inventory
             catch (System.Exception exception)
             {
                 Rollback(data, metadata, inventory, inventoryReceipt, progress, progressReceipt,
-                    roster, staminaReceipt, corruptionReceipt);
+                    roster, staminaReceipt, corruptionReceipt, questReceipt);
                 Debug.LogError("[DefeatRewardDistributor] 처치 저장 트랜잭션 예외: " + exception.Message, this);
             }
         }
@@ -265,8 +279,10 @@ namespace Inventory
             InventoryManager inventory, DefeatRewardMutationReceipt inventoryReceipt,
             PlayerProgress progress, PlayerProgress.DefeatProgressMutationReceipt progressReceipt,
             CharacterRoster roster, CharacterRoster.DefeatStaminaMutationReceipt staminaReceipt,
-            DungeonCorruptionSettlementService.DefeatCorruptionMutationReceipt corruptionReceipt)
+            DungeonCorruptionSettlementService.DefeatCorruptionMutationReceipt corruptionReceipt,
+            CharacterStoryQuestMutationReceipt questReceipt)
         {
+            CharacterStoryQuestService.Instance?.Rollback(questReceipt);
             DungeonCorruptionSettlementService.RollbackDefeat(corruptionReceipt);
             roster?.RollbackDefeatStamina(staminaReceipt);
             progress?.RollbackDefeat(progressReceipt);
