@@ -11,12 +11,12 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a5226df44dbf4ed096edd557cbf8eaf7, type: 3}
   m_Name: CharacterUnlockCondition_unlock_elfarcher
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier:
   conditionId: unlock_elfarcher
   entries:
   - entryId: 1
     groupId: 1
     conditionType: OWNED_CHARACTER_COUNT_AT_LEAST
-    targetId: 
+    targetId:
     requiredValue: 2
     enabled: 1

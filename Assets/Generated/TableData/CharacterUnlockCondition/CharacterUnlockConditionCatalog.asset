@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e5fdd089b40042598587f9c2d2f6cc08, type: 3}
   m_Name: CharacterUnlockConditionCatalog
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier:
   conditions:
   - {fileID: 11400000, guid: 355debd2c4ce4bf2a4aba5ffe2177ba9, type: 2}
   - {fileID: 11400000, guid: d282a9b3685c40d3acaf6e3791872d5b, type: 2}
