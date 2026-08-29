@@ -131,7 +131,7 @@ namespace TableDataEditor.Tests
         }
 
         [Test]
-        public void Scope_RecruitmentOnlyWritesTheFourRecruitmentFolders()
+        public void Scope_RecruitmentOnlyWritesTheConditionAndRecruitmentFolders()
         {
             IReadOnlyList<string> folders =
                 TableDataValidator.GeneratedOutputFolders(TableDataRebuildScope.RecruitmentTables);
@@ -140,6 +140,7 @@ namespace TableDataEditor.Tests
                 new[]
                 {
                     TableDataPaths.CharacterAcquisitionOutputFolder,
+                    TableDataPaths.CharacterUnlockConditionOutputFolder,
                     TableDataPaths.RecruitmentTypeOutputFolder,
                     TableDataPaths.RecruitmentPoolOutputFolder,
                     TableDataPaths.RecruitmentAccessOutputFolder,
@@ -202,7 +203,7 @@ namespace TableDataEditor.Tests
         }
 
         [Test]
-        public void LiveCsv_EveryAcquisitionIsRecruitOnlyAndUnconditional()
+        public void LiveCsv_AcquisitionsKeepTheirConfiguredConditions()
         {
             TableDataSnapshot snapshot = Live.Snapshot;
             Assert.IsNotNull(snapshot);
@@ -213,7 +214,9 @@ namespace TableDataEditor.Tests
                 Assert.AreEqual(RecruitmentAcquisitionTypes.RecruitOnly, row.AcquisitionType);
                 Assert.IsFalse(row.AllowDuplicateRecruitment,
                     $"'{row.CharacterId}'는 지금 중복 모집을 허용하지 않는 것이 표의 값이다.");
-                Assert.AreEqual(string.Empty, row.ConditionId);
+                string expectedCondition = row.CharacterId == "Barbarian" ? "unlock_barbarian" :
+                    row.CharacterId == "ElfArcher" ? "unlock_elfarcher" : string.Empty;
+                Assert.AreEqual(expectedCondition, row.ConditionId);
                 Assert.IsTrue(row.Enabled);
             }
         }
@@ -231,7 +234,7 @@ namespace TableDataEditor.Tests
                 Assert.AreEqual(LiveRecruitmentTypeId, row.RecruitmentTypeId);
                 Assert.AreEqual(LivePool[i].CharacterId, row.CharacterId, $"{i}번째 후보의 순서가 달라졌습니다.");
                 Assert.AreEqual(LivePool[i].Weight, row.Weight, $"'{row.CharacterId}'의 가중치가 달라졌습니다.");
-                Assert.IsTrue(row.Enabled);
+                Assert.AreEqual(i < 3, row.Enabled);
             }
         }
 
