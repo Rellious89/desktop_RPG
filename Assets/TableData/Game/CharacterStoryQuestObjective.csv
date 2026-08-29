@@ -1,0 +1,5 @@
+objective_id,quest_id,condition_type,$condition_name,target_ids,required_value,display_order,enabled,memo
+CatKnight_10001,CatKnight_10001,CHARACTER_LEVEL_AT_LEAST,캐릭터 레벨 달성,,5,10,1,
+CatKnight_10002,CatKnight_10002,DUNGEON_ENTER_COUNT,던전 입장 카운트,4|5|6,5,20,1,
+CatKnight_10003_01,CatKnight_10003,MONSTER_DEFEAT_COUNT,몬스터 처치 카운트,,30,30,1,
+CatKnight_10003_02,CatKnight_10003,STAMINA_SPENT,행동력 소모,,50,40,1,

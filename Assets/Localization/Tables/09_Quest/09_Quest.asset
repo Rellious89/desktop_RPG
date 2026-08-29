@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5be51871efa6c3e4eae1703925c8f5ac, type: 3}
+  m_Name: 09_Quest
+  m_EditorClassIdentifier: 
+  m_SharedTableData: {fileID: 11400000, guid: 11805744adb144cd3bb37f325635e0d9, type: 2}
+  m_Tables:
+  - {fileID: 11400000, guid: cadc4654753a34dfeb1584a04cf7fed2, type: 2}
+  - {fileID: 11400000, guid: 767f8c33424a74b1c826d75d7d2279a5, type: 2}
+  m_Extensions: []
+  m_Group: String Table
+  references:
+    version: 2
+    RefIds: []
