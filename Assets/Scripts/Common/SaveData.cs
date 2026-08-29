@@ -22,7 +22,7 @@ namespace Common
         /// <see cref="SaveMigrationRunner"/>에 그 한 단계를 등록한다. 필드를 새로 <i>추가</i>하기만
         /// 할 때는 올리지 않는다 - JsonUtility가 없는 필드를 기본값으로 채우므로 예전 파일이 그대로
         /// 유효하다.</summary>
-        public const int CurrentSaveVersion = 7;
+        public const int CurrentSaveVersion = 8;
 
         /// <summary>버전 필드가 아예 없던 시절의 저장 파일 번호. 파일 안에 <c>saveVersion</c> 항목이
         /// 없으면(빈 객체 <c>{}</c> 포함) 그 파일은 이 버전이다 - 없는 것 자체가 곧 표식이라
@@ -164,6 +164,10 @@ namespace Common
         /// 대상 캐릭터, 마지막 계산 시각 및 다음 정화 단계로 넘길 잔여 시간만 기록한다.
         /// </summary>
         public List<PurificationSlotSaveState> purificationSlots = new List<PurificationSlotSaveState>();
+
+        /// <summary>캐릭터별 서사 퀘스트의 영구 진행도. 보유 캐릭터의 성장 상태와 분리해, 표가 잠시
+        /// 빠져도 기록을 잃지 않는다. 항목 하나가 캐릭터 하나를 가리킨다.</summary>
+        public List<CharacterStoryQuestSaveState> characterStoryQuests = new List<CharacterStoryQuestSaveState>();
 
         /// <summary>저장 계층이 보장하는 최소 슬롯 수. 실제 사용 가능한 슬롯 수는 회복 밸런스 테이블의
         /// Max Slots가 정하며, 그 값이 더 크면 회복소가 목록을 더 늘린다.</summary>

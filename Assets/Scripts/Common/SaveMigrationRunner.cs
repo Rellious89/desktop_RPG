@@ -143,6 +143,7 @@ namespace Common
                 new V4ToV5Step(),
                 new V5ToV6Step(),
                 new V6ToV7Step(),
+                new V7ToV8Step(),
             };
         }
 
@@ -248,6 +249,34 @@ namespace Common
             target.recruitmentCycles = CopyRecruitmentCycles(source.recruitmentCycles);
             target.unlockedRecruitmentCharacterIds = source.unlockedRecruitmentCharacterIds == null
                 ? new List<string>() : new List<string>(source.unlockedRecruitmentCharacterIds);
+            target.characterStoryQuests = CopyCharacterStoryQuests(source.characterStoryQuests);
+        }
+
+        private static List<CharacterStoryQuestSaveState> CopyCharacterStoryQuests(
+            List<CharacterStoryQuestSaveState> source)
+        {
+            var copy = new List<CharacterStoryQuestSaveState>();
+            if (source == null) return copy;
+            foreach (CharacterStoryQuestSaveState state in source)
+            {
+                if (state == null) { copy.Add(null); continue; }
+                var item = new CharacterStoryQuestSaveState
+                {
+                    characterId = state.characterId,
+                    activeQuestId = state.activeQuestId,
+                    readyToComplete = state.readyToComplete,
+                    graduated = state.graduated,
+                    completedQuestIds = state.completedQuestIds == null
+                        ? new List<string>() : new List<string>(state.completedQuestIds),
+                    objectiveProgress = new List<CharacterStoryObjectiveProgressSaveState>(),
+                };
+                if (state.objectiveProgress != null)
+                    foreach (CharacterStoryObjectiveProgressSaveState progress in state.objectiveProgress)
+                        item.objectiveProgress.Add(progress == null ? null : new CharacterStoryObjectiveProgressSaveState
+                        { objectiveId = progress.objectiveId, progress = progress.progress });
+                copy.Add(item);
+            }
+            return copy;
         }
 
         private static List<CharacterSaveState> CopyCharacters(List<CharacterSaveState> source)
@@ -684,6 +713,19 @@ namespace Common
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
             data.unlockedRecruitmentCharacterIds = new List<string>();
+        }
+    }
+
+    /// <summary>v7의 보유 캐릭터는 v8에서 각자 루트 서사 퀘스트를 받을 후보가 된다. 표를 읽지 않는
+    /// 마이그레이션 원칙 때문에 여기서는 빈 상태만 만들며, 실제 루트 활성화는 런타임 서비스가 한다.</summary>
+    public sealed class V7ToV8Step : ISaveMigrationStep
+    {
+        public int FromVersion => 7;
+        public int ToVersion => 8;
+        public void Apply(SaveData data)
+        {
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            data.characterStoryQuests = new List<CharacterStoryQuestSaveState>();
         }
     }
 }

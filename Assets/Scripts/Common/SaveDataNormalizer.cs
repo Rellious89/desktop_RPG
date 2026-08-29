@@ -34,6 +34,7 @@ namespace Common
             }
             data.partyCharacterIds = CompactPartyCharacterIds(data.partyCharacterIds, data.characters);
             data.items = CompactItems(data.items);
+            data.characterStoryQuests = CompactCharacterStoryQuests(data.characterStoryQuests);
 
             // 건설 기록도 buildingId로 찾으므로 null 항목은 아무것도 가리키지 않는 쓰레기다. 지우는
             // 것은 <b>null 항목뿐</b>이다 - 모르는 buildingId(표에서 잠시 빠진 건물)도, 같은 id가 두 줄
@@ -70,6 +71,24 @@ namespace Common
             if (data.saveRevision < 0) data.saveRevision = 0;
 
             return data;
+        }
+
+        private static List<CharacterStoryQuestSaveState> CompactCharacterStoryQuests(
+            List<CharacterStoryQuestSaveState> source)
+        {
+            var result = new List<CharacterStoryQuestSaveState>();
+            if (source == null) return result;
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (CharacterStoryQuestSaveState entry in source)
+            {
+                if (entry == null || string.IsNullOrWhiteSpace(entry.characterId) || !seen.Add(entry.characterId)) continue;
+                entry.objectiveProgress = entry.objectiveProgress ?? new List<CharacterStoryObjectiveProgressSaveState>();
+                entry.completedQuestIds = entry.completedQuestIds ?? new List<string>();
+                entry.objectiveProgress.RemoveAll(p => p == null || string.IsNullOrWhiteSpace(p.objectiveId));
+                entry.completedQuestIds.RemoveAll(string.IsNullOrWhiteSpace);
+                result.Add(entry);
+            }
+            return result;
         }
 
         private static List<CharacterSaveState> CompactCharacters(List<CharacterSaveState> source)
