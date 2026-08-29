@@ -17,5 +17,5 @@ MonoBehaviour:
   character: {fileID: 11400000, guid: 26424a01213dc4878ba2d84e1fd898f7, type: 2}
   acquisitionType: RECRUIT_ONLY
   allowDuplicateRecruitment: 0
-  conditionId: 
+  conditionId: unlock_elfarcher
   enabled: 1

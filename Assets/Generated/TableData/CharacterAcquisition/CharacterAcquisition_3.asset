@@ -17,5 +17,5 @@ MonoBehaviour:
   character: {fileID: 11400000, guid: 248d14fc02c4142c49d3913832fb519e, type: 2}
   acquisitionType: RECRUIT_ONLY
   allowDuplicateRecruitment: 0
-  conditionId: 
+  conditionId: unlock_barbarian
   enabled: 1

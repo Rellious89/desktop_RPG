@@ -138,6 +138,18 @@ namespace RecruitmentEditor.Tests
         }
 
         [Test]
+        public void 조건부후보는_영구해금콜백이없거나_false면_통과하지않는다()
+        {
+            RecruitmentPoolCatalog pool = Pool(); CharacterAcquisitionCatalog acquisitions = Acquisitions();
+            Assert.AreEqual(0, RecruitmentCandidateSelector.CollectEligible("Inn_Normal", pool, acquisitions,
+                RecruitmentOwnership.Of("CatKnight")).Count);
+            Assert.AreEqual(0, RecruitmentCandidateSelector.CollectEligible("Inn_Normal", pool, acquisitions,
+                RecruitmentOwnership.Of("CatKnight"), _ => false).Count);
+            CollectionAssert.AreEqual(new[] { "Barbarian" }, Ids(RecruitmentCandidateSelector.CollectEligible(
+                "Inn_Normal", pool, acquisitions, RecruitmentOwnership.Of("CatKnight"), id => id == "Barbarian")));
+        }
+
+        [Test]
         public void V6에서V7_정규화_깊은복사와_Reset을_보존한다()
         {
             var old = Data("Barbarian", 10); old.saveVersion = 6; old.unlockedRecruitmentCharacterIds = null;

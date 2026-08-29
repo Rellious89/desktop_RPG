@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
 using Recruitment;
+using UnityEditor;
+using UnityEngine;
 
 namespace TableDataEditor.Tests
 {
@@ -218,6 +220,48 @@ namespace TableDataEditor.Tests
                     row.CharacterId == "ElfArcher" ? "unlock_elfarcher" : string.Empty;
                 Assert.AreEqual(expectedCondition, row.ConditionId);
                 Assert.IsTrue(row.Enabled);
+            }
+        }
+
+        [Test]
+        public void GeneratedAcquisitions_KeepTheCsvConditionIds()
+        {
+            CharacterAcquisitionDefinition elf = AssetDatabase.LoadAssetAtPath<CharacterAcquisitionDefinition>(
+                TableDataPaths.CharacterAcquisitionAssetPath("2"));
+            CharacterAcquisitionDefinition barbarian = AssetDatabase.LoadAssetAtPath<CharacterAcquisitionDefinition>(
+                TableDataPaths.CharacterAcquisitionAssetPath("3"));
+
+            Assert.IsNotNull(elf);
+            Assert.IsNotNull(barbarian);
+            Assert.AreEqual("unlock_elfarcher", elf.ConditionId);
+            Assert.AreEqual("unlock_barbarian", barbarian.ConditionId);
+        }
+
+        [Test]
+        public void RebuildWriter_CopiesConditionIdIntoAnExistingAcquisitionAsset()
+        {
+            MethodInfo writer = typeof(TableDataRebuilder).GetMethod(
+                "WriteCharacterAcquisition", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.IsNotNull(writer);
+            var target = ScriptableObject.CreateInstance<CharacterAcquisitionDefinition>();
+            try
+            {
+                writer.Invoke(null, new object[]
+                {
+                    target,
+                    new CharacterAcquisitionRow
+                    {
+                        Id = "2", CharacterId = "ElfArcher", AcquisitionType = RecruitmentAcquisitionTypes.RecruitOnly,
+                        ConditionId = "unlock_elfarcher", Enabled = true,
+                    },
+                    new Dictionary<string, Character.CharacterDefinition>(),
+                });
+                Assert.AreEqual("unlock_elfarcher", target.ConditionId,
+                    "Recruitment/CharacterUnlockCondition 범위 Rebuild는 기존 획득 에셋의 조건도 반드시 갱신해야 합니다.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(target);
             }
         }
 
