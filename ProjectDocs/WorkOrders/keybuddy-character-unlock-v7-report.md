@@ -1,6 +1,7 @@
 # KeyBuddy 캐릭터 등장 조건 영구 해금 기반 작업 보고
 
 - 기준 브랜치/커밋: `save-system` / `c3ce1524`
+- 구현 커밋: `c7131bef` (`Implement permanent recruitment unlock conditions`)
 - SaveData: v7. `unlockedRecruitmentCharacterIds`에 캐릭터 ID별 최초 해금을 저장하며, v6→v7은 기존 진행을 보존하고 빈 목록을 만든다.
 - 테이블: `CharacterUnlockCondition.csv`의 두 지원 타입, AND(동일 group) / OR(서로 다른 group), entry 중복·수치·target_id·참조 검증과 전용 Generated 폴더를 추가했다.
 - 모집: 조건 최초 만족을 한 번 저장해 확정한 후 후보에 넣고, 이후 조건이 후퇴해도 기록을 기준으로 유지한다. 실패 또는 예외는 새 해금 목록과 저장 메타데이터를 되돌린다.
