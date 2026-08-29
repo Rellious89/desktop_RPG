@@ -1,4 +1,4 @@
 quest_id,character_id,$character_name,previous_quest_id,title_category,title_key,description_category,description_key,display_order,is_final,enabled,memo
-10001,CatKnight,고양이기사,,9,1,9,10001,10,0,1,
-10002,CatKnight,고양이기사,10001,9,2,9,10002,20,0,1,
-10003,CatKnight,고양이기사,10002,9,3,9,10003,30,0,1,
+CatKnigt_10001,CatKnight,고양이기사,,9,1,9,10001,10,0,1,
+CatKnigt_10002,CatKnight,고양이기사,10001,9,2,9,10002,20,0,1,
+CatKnigt_10003,CatKnight,고양이기사,10002,9,3,9,10003,30,0,1,
