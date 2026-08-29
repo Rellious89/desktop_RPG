@@ -1,0 +1,3 @@
+condition_id,entry_id,group_id,condition_type,$condition_type,target_id,required_value,enabled,memo
+unlock_barbarian,1,1,MAX_OWNED_CHARACTER_LEVEL_AT_LEAST,보유 캐릭터 중 최고레벨 조건,,10,1,보유 캐릭터 중 최고 레벨 10 이상
+unlock_elfarcher,1,1,OWNED_CHARACTER_COUNT_AT_LEAST,보유 캐릭터 수량 조건,,2,1,보유 캐릭터 2명 이상
