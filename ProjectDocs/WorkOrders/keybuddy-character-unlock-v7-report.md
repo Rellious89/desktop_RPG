@@ -4,6 +4,7 @@
 - 구현 커밋: `c7131bef` (`Implement permanent recruitment unlock conditions`)
 - 집중 테스트 커밋: `5e081787` (`Add recruitment unlock edit mode tests`)
 - Generated 보정 커밋: `58dfbd5e` (`Fix generated recruitment unlock conditions`)
+- 후보 소진 안전 보완 커밋: `1d34987a` (`Guard exhausted recruitment draws`)
 - SaveData: v7. `unlockedRecruitmentCharacterIds`에 캐릭터 ID별 최초 해금을 저장하며, v6→v7은 기존 진행을 보존하고 빈 목록을 만든다.
 - 테이블: `CharacterUnlockCondition.csv`의 두 지원 타입, AND(동일 group) / OR(서로 다른 group), entry 중복·수치·target_id·참조 검증과 전용 Generated 폴더를 추가했다.
 - 모집: 조건 최초 만족을 한 번 저장해 확정한 후 후보에 넣고, 이후 조건이 후퇴해도 기록을 기준으로 유지한다. 실패 또는 예외는 새 해금 목록과 저장 메타데이터를 되돌린다.
@@ -12,6 +13,9 @@
   기존 Generated 변경은 `CharacterAcquisition/CharacterAcquisition_2.asset` 및
   `CharacterAcquisition/CharacterAcquisition_3.asset` 두 파일뿐이다. Catalog GUID·순서와 범위 밖
   Generated는 변경하지 않았다.
+- 후보 소진 Generated 범위: `RecruitmentPool_Inn_Normal__4.asset`, `__5.asset`, `__6.asset`의
+  `enabled`만 CSV와 같이 false로 보정했다. 1/2/3의 enabled·가중치, Pool Catalog GUID·순서, 다른
+  Generated 도메인은 보존했다.
 - 집중 테스트 수: 신규·보강 EditMode 14건(정상 2행/참조, 계약 오류 5종과 중복·없는 참조, AND/OR,
   영구화·저장 횟수·실패/예외 롤백, 실제 진행 순서, v0→…→v7·v6→v7·정규화·Reset)을 추가했다.
   기존 모집 테이블 회귀는 조건부 획득 행과 활성 후보 3행을 기준으로 갱신했다.
@@ -21,6 +25,10 @@
   격리 복제본의 복원/컴파일이 실행 제한 시간 내 완료되지 않아 통과 여부를 확정하지 않았다.
   보정 뒤에도 Editor 테스트 어셈블리 정적 컴파일을 격리 복제본에서 다시 시도했으나 같은 실행 제한으로
   완료 결과를 얻지 못했다.
+- 13A-3 보완: 실제 Generated 모집 풀의 1~3=true/4~6=false, Rebuild writer의 enabled 복사,
+  조건부 후보 0명의 Select/Draw 불변성, NoEligibleCandidate 클릭 토스트 요청 1회를 추가 검증한다.
+  씬의 `RecruitmentUiController.noEligibleCandidateToastMessage`는 `01_UI` 키 `83`을 가리킨다.
+  새 UI 런타임 소스를 포함한 격리 정적 `Assembly-CSharp` 컴파일은 오류 0개·기존 경고 3개였다.
 - 정적 확인: `git diff --check` 통과.
 - 작업 트리: 보고서 커밋 직전 변경 사항만 존재.
 - 원격 미푸시, 실제 persistentDataPath 미사용.
