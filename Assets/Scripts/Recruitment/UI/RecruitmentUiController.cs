@@ -44,6 +44,7 @@ namespace Recruitment
         [SerializeField] private RecruitmentTypeCatalog typeCatalog;
         [SerializeField] private RecruitmentPoolCatalog poolCatalog;
         [SerializeField] private CharacterAcquisitionCatalog acquisitionCatalog;
+        [SerializeField] private CharacterUnlockConditionCatalog unlockConditionCatalog;
         [SerializeField] private CharacterCatalog characterCatalog;
         [SerializeField] private GameObject progressRoot;
         [SerializeField] private Slider progressSlider;
@@ -101,7 +102,7 @@ namespace Recruitment
             cycle = new RecruitmentCycleService(() => SaveSystem.Data, SaveSystem.Save, () => DateTime.UtcNow,
                 accessCatalog, typeCatalog);
             draw = new RecruitmentCandidateDrawService(() => SaveSystem.Data, SaveSystem.Save, () => DateTime.UtcNow,
-                cycle, accessCatalog, typeCatalog, poolCatalog, acquisitionCatalog, new SystemRecruitmentRandom());
+                cycle, accessCatalog, typeCatalog, poolCatalog, acquisitionCatalog, new SystemRecruitmentRandom(), unlockConditionCatalog);
             resolution = new RecruitmentCandidateResolutionService(() => SaveSystem.Data, SaveSystem.Save,
                 () => DateTime.UtcNow, cycle, characterCatalog);
         }
@@ -111,6 +112,8 @@ namespace Recruitment
             initializedThisRefresh = false;
             if (!IsTownReady() || !TryPosition()) { Apply(RecruitmentUiState.Hidden); return; }
             EnsureServices();
+            var unlocks = new RecruitmentUnlockService(() => SaveSystem.Data, SaveSystem.Save, acquisitionCatalog, unlockConditionCatalog);
+            if (!unlocks.TryPersistCurrentUnlocks()) { Apply(RecruitmentUiState.Hidden); return; }
             RecruitmentCycleStatus status = cycle.GetStatus(buildingId);
             if (status.Phase == RecruitmentCyclePhase.NotInitialized)
             {
@@ -160,7 +163,8 @@ namespace Recruitment
         private bool HasEligibleCandidate(RecruitmentAccessResolution access)
         {
             return RecruitmentCandidateSelector.HasEligibleCandidate(
-                access.RecruitmentTypeId, poolCatalog, acquisitionCatalog, Ownership);
+                access.RecruitmentTypeId, poolCatalog, acquisitionCatalog, Ownership,
+                id => SaveSystem.Data.unlockedRecruitmentCharacterIds != null && SaveSystem.Data.unlockedRecruitmentCharacterIds.Contains(id));
         }
 
         /// <summary>고른 화면 하나만 켠다. 켜고 끄는 자리가 <b>여기 하나뿐</b>이어서, 새 화면을 더할 때

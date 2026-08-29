@@ -3722,6 +3722,7 @@ MonoBehaviour:
   typeCatalog: {fileID: 11400000, guid: 0f6ffced4fca54e959cd4a3262b83f48, type: 2}
   poolCatalog: {fileID: 11400000, guid: 09535842b04d24e92a253dcf9cf17ce7, type: 2}
   acquisitionCatalog: {fileID: 11400000, guid: 96e8731f155dd4acb82f20a84660c9f0, type: 2}
+  unlockConditionCatalog: {fileID: 11400000, guid: b9bcf5f260294895aa0debd20f430529, type: 2}
   characterCatalog: {fileID: 11400000, guid: 5f24823f983054d358a82014246a9fa7, type: 2}
   progressRoot: {fileID: 2162940568666274758}
   progressSlider: {fileID: 2162940568666274757}

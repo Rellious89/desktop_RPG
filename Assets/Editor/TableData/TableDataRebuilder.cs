@@ -256,6 +256,8 @@ namespace TableDataEditor
         private const string AcquisitionTypeField = "acquisitionType";
         private const string AllowDuplicateRecruitmentField = "allowDuplicateRecruitment";
         private const string ConditionIdField = "conditionId";
+        private const string UnlockConditionIdField = "conditionId";
+        private const string UnlockEntriesField = "entries";
         private const string RecruitmentCharacterIdField = "characterId";
         private const string RecruitmentCharacterField = "character";
         private const string RecruitmentTypeIdField = "recruitmentTypeId";
@@ -953,11 +955,13 @@ namespace TableDataEditor
         private sealed class RecruitmentTableTargets
         {
             public Dictionary<string, CharacterAcquisitionDefinition> Acquisitions;
+            public Dictionary<string, CharacterUnlockConditionDefinition> UnlockConditions;
             public Dictionary<string, RecruitmentTypeDefinition> Types;
             public Dictionary<string, RecruitmentPoolEntryDefinition> PoolEntries;
             public Dictionary<string, RecruitmentAccessDefinition> Accesses;
 
             public CharacterAcquisitionCatalog AcquisitionCatalog;
+            public CharacterUnlockConditionCatalog UnlockConditionCatalog;
             public RecruitmentTypeCatalog TypeCatalog;
             public RecruitmentPoolCatalog PoolCatalog;
             public RecruitmentAccessCatalog AccessCatalog;
@@ -965,6 +969,7 @@ namespace TableDataEditor
             public void MarkDirty()
             {
                 AcquisitionCatalog.MarkDirty();
+                UnlockConditionCatalog.MarkDirty();
                 TypeCatalog.MarkDirty();
                 PoolCatalog.MarkDirty();
                 AccessCatalog.MarkDirty();
@@ -984,11 +989,13 @@ namespace TableDataEditor
                 }
 
                 foreach (CharacterAcquisitionDefinition entry in Acquisitions.Values) Add(entry);
+                foreach (CharacterUnlockConditionDefinition entry in UnlockConditions.Values) Add(entry);
                 foreach (RecruitmentTypeDefinition entry in Types.Values) Add(entry);
                 foreach (RecruitmentPoolEntryDefinition entry in PoolEntries.Values) Add(entry);
                 foreach (RecruitmentAccessDefinition entry in Accesses.Values) Add(entry);
 
                 Add(AcquisitionCatalog);
+                Add(UnlockConditionCatalog);
                 Add(TypeCatalog);
                 Add(PoolCatalog);
                 Add(AccessCatalog);
@@ -1046,6 +1053,11 @@ namespace TableDataEditor
                     TableDataPaths.CharacterAcquisitionAssetPath,
                     TableDataPaths.CharacterAcquisitionCsvFileName, TableDataColumns.AcquisitionId, result),
 
+                UnlockConditions = ResolveTargets<CharacterUnlockConditionDefinition>(
+                    TableDataPaths.CharacterUnlockConditionOutputFolder, a => a.ConditionId,
+                    new List<string>(snapshot.CharacterUnlockConditionsById.Keys), TableDataPaths.CharacterUnlockConditionAssetPath,
+                    TableDataPaths.CharacterUnlockConditionCsvFileName, TableDataColumns.ConditionId, result),
+
                 Types = ResolveTargets<RecruitmentTypeDefinition>(
                     TableDataPaths.RecruitmentTypeOutputFolder, t => t.RecruitmentTypeId,
                     snapshot.RecruitmentTypes.ConvertAll(r => r.Id), TableDataPaths.RecruitmentTypeAssetPath,
@@ -1063,6 +1075,8 @@ namespace TableDataEditor
 
                 AcquisitionCatalog = ResolveSingleton<CharacterAcquisitionCatalog>(
                     TableDataPaths.CharacterAcquisitionCatalogAssetPath, result),
+                UnlockConditionCatalog = ResolveSingleton<CharacterUnlockConditionCatalog>(
+                    TableDataPaths.CharacterUnlockConditionCatalogAssetPath, result),
                 TypeCatalog = ResolveSingleton<RecruitmentTypeCatalog>(
                     TableDataPaths.RecruitmentTypeCatalogAssetPath, result),
                 PoolCatalog = ResolveSingleton<RecruitmentPoolCatalog>(
@@ -1095,6 +1109,9 @@ namespace TableDataEditor
                 WriteCharacterAcquisition(targets.Acquisitions[row.Id], row, characters);
             }
 
+            foreach (KeyValuePair<string, List<CharacterUnlockConditionRow>> pair in snapshot.CharacterUnlockConditionsById)
+                WriteCharacterUnlockCondition(targets.UnlockConditions[pair.Key], pair.Key, pair.Value);
+
             foreach (RecruitmentPoolRow row in snapshot.RecruitmentPools)
             {
                 WriteRecruitmentPoolEntry(targets.PoolEntries[row.PairId], row, characters);
@@ -1107,6 +1124,8 @@ namespace TableDataEditor
 
             WriteCatalog(targets.AcquisitionCatalog, "acquisitions",
                 FilterForCatalog(snapshot.CharacterAcquisitions, r => r.Enabled, r => r.Id, targets.Acquisitions));
+            WriteCatalog(targets.UnlockConditionCatalog, "conditions",
+                new List<CharacterUnlockConditionDefinition>(targets.UnlockConditions.Values));
             WriteCatalog(targets.TypeCatalog, "types",
                 FilterForCatalog(snapshot.RecruitmentTypes, r => r.Enabled, r => r.Id, targets.Types));
             WriteCatalog(targets.PoolCatalog, "entries",
@@ -1147,6 +1166,26 @@ namespace TableDataEditor
             serialized.FindProperty(RecruitmentEnabledField).boolValue = row.Enabled;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(asset);
+        }
+
+        private static void WriteCharacterUnlockCondition(CharacterUnlockConditionDefinition asset, string id,
+            List<CharacterUnlockConditionRow> rows)
+        {
+            var serialized = new SerializedObject(asset);
+            serialized.FindProperty(UnlockConditionIdField).stringValue = id;
+            SerializedProperty entries = serialized.FindProperty(UnlockEntriesField);
+            entries.arraySize = rows.Count;
+            for (int i = 0; i < rows.Count; i++)
+            {
+                SerializedProperty entry = entries.GetArrayElementAtIndex(i);
+                entry.FindPropertyRelative("entryId").stringValue = rows[i].EntryId;
+                entry.FindPropertyRelative("groupId").stringValue = rows[i].GroupId;
+                entry.FindPropertyRelative("conditionType").stringValue = rows[i].ConditionType;
+                entry.FindPropertyRelative("targetId").stringValue = rows[i].TargetId;
+                entry.FindPropertyRelative("requiredValue").intValue = rows[i].RequiredValue;
+                entry.FindPropertyRelative("enabled").boolValue = rows[i].Enabled;
+            }
+            serialized.ApplyModifiedPropertiesWithoutUndo(); EditorUtility.SetDirty(asset);
         }
 
         private static void WriteRecruitmentPoolEntry(
@@ -1380,6 +1419,7 @@ namespace TableDataEditor
             if (TableDataRebuildScopes.IncludesRecruitmentTables(scope))
             {
                 EnsureFolder(TableDataPaths.OutputRoot, "CharacterAcquisition");
+                EnsureFolder(TableDataPaths.OutputRoot, "CharacterUnlockCondition");
                 EnsureFolder(TableDataPaths.OutputRoot, "RecruitmentType");
                 EnsureFolder(TableDataPaths.OutputRoot, "RecruitmentPool");
                 EnsureFolder(TableDataPaths.OutputRoot, "RecruitmentAccess");
@@ -1951,6 +1991,9 @@ namespace TableDataEditor
             ok &= VerifyPropertyType<CharacterAcquisitionDefinition>(
                 log, RecruitmentEnabledField, SerializedPropertyType.Boolean,
                 "표의 enabled 값은 참/거짓 칸이어야 합니다.");
+
+            ok &= VerifyFields<CharacterUnlockConditionDefinition>(log, UnlockConditionIdField, UnlockEntriesField);
+            ok &= VerifyFields<CharacterUnlockConditionCatalog>(log, "conditions");
 
             ok &= VerifyFields<RecruitmentTypeDefinition>(log, RecruitmentTypeIdField, RecruitmentEnabledField);
             ok &= VerifyPropertyType<RecruitmentTypeDefinition>(

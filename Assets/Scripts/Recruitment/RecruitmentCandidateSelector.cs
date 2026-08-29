@@ -100,7 +100,8 @@ namespace Recruitment
             string recruitmentTypeId,
             RecruitmentPoolCatalog pool,
             CharacterAcquisitionCatalog acquisitions,
-            IRecruitmentOwnership ownership)
+            IRecruitmentOwnership ownership,
+            Func<string, bool> isPermanentlyUnlocked = null)
         {
             if (string.IsNullOrWhiteSpace(recruitmentTypeId) || pool == null) return EmptyCandidates;
 
@@ -116,7 +117,7 @@ namespace Recruitment
 
                 if (!PassesEntryRules(entry)) continue;
                 if (!seenCharacters.Add(entry.CharacterId)) continue;
-                if (!PassesCharacterRules(entry.CharacterId, acquisitions, ownership)) continue;
+                if (!PassesCharacterRules(entry.CharacterId, acquisitions, ownership, isPermanentlyUnlocked)) continue;
 
                 eligible.Add(entry);
             }
@@ -140,7 +141,8 @@ namespace Recruitment
             string recruitmentTypeId,
             RecruitmentPoolCatalog pool,
             CharacterAcquisitionCatalog acquisitions,
-            IRecruitmentOwnership ownership)
+            IRecruitmentOwnership ownership,
+            Func<string, bool> isPermanentlyUnlocked = null)
         {
             if (string.IsNullOrWhiteSpace(recruitmentTypeId) || pool == null) return false;
 
@@ -155,7 +157,7 @@ namespace Recruitment
 
                 if (entry == null || !entry.BelongsTo(recruitmentTypeId)) continue;
                 if (!PassesEntryRules(entry)) continue;
-                if (!PassesCharacterRules(entry.CharacterId, acquisitions, ownership)) continue;
+                if (!PassesCharacterRules(entry.CharacterId, acquisitions, ownership, isPermanentlyUnlocked)) continue;
 
                 return true;
             }
@@ -171,7 +173,8 @@ namespace Recruitment
 
         /// <summary>그 캐릭터를 지금 지급할 수 있는지 - 획득 방식과 보유 여부를 본다.</summary>
         private static bool PassesCharacterRules(
-            string characterId, CharacterAcquisitionCatalog acquisitions, IRecruitmentOwnership ownership)
+            string characterId, CharacterAcquisitionCatalog acquisitions, IRecruitmentOwnership ownership,
+            Func<string, bool> isPermanentlyUnlocked)
         {
             CharacterAcquisitionDefinition acquisition =
                 acquisitions != null ? acquisitions.FindByCharacterId(characterId) : null;
@@ -180,7 +183,7 @@ namespace Recruitment
             if (acquisition == null) return false;
             if (!acquisition.Enabled) return false;
             if (!acquisition.IsRecruitable) return false;
-            if (acquisition.HasCondition) return false;
+            if (acquisition.HasCondition && (isPermanentlyUnlocked == null || !isPermanentlyUnlocked(characterId))) return false;
 
             bool owned = ownership != null && ownership.IsOwned(characterId);
             return !owned || acquisition.AllowDuplicateRecruitment;
@@ -205,10 +208,11 @@ namespace Recruitment
             RecruitmentPoolCatalog pool,
             CharacterAcquisitionCatalog acquisitions,
             IRecruitmentOwnership ownership,
-            IRecruitmentRandom random)
+            IRecruitmentRandom random,
+            Func<string, bool> isPermanentlyUnlocked = null)
         {
             IReadOnlyList<RecruitmentPoolEntryDefinition> candidates =
-                CollectEligible(recruitmentTypeId, pool, acquisitions, ownership);
+                CollectEligible(recruitmentTypeId, pool, acquisitions, ownership, isPermanentlyUnlocked);
 
             return SelectFrom(candidates, random);
         }

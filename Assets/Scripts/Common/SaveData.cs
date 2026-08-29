@@ -22,7 +22,7 @@ namespace Common
         /// <see cref="SaveMigrationRunner"/>에 그 한 단계를 등록한다. 필드를 새로 <i>추가</i>하기만
         /// 할 때는 올리지 않는다 - JsonUtility가 없는 필드를 기본값으로 채우므로 예전 파일이 그대로
         /// 유효하다.</summary>
-        public const int CurrentSaveVersion = 6;
+        public const int CurrentSaveVersion = 7;
 
         /// <summary>버전 필드가 아예 없던 시절의 저장 파일 번호. 파일 안에 <c>saveVersion</c> 항목이
         /// 없으면(빈 객체 <c>{}</c> 포함) 그 파일은 이 버전이다 - 없는 것 자체가 곧 표식이라
@@ -153,6 +153,10 @@ namespace Common
         /// </summary>
         public List<RecruitmentCycleSaveState> recruitmentCycles =
             new List<RecruitmentCycleSaveState>();
+
+        /// <summary>조건을 한 번 만족해 모집 풀에 등장할 자격을 얻은 캐릭터의 id. 순서는 최초 해금
+        /// 순서이며, 이 목록은 보유 목록과 독립적이다. 캐릭터를 잃어도 해금은 남는다.</summary>
+        public List<string> unlockedRecruitmentCharacterIds = new List<string>();
 
         /// <summary>
         /// 오염도 정화 슬롯. 목록 인덱스가 슬롯 번호이며 빈 슬롯도 보존한다. 현재 오염도는

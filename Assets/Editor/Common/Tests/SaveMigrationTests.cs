@@ -1086,7 +1086,7 @@ namespace CommonEditor.Tests
                 "saveVersion", "saveRevision", "lastSavedAtUtc",
                 "currentLevel", "currentExp", "totalKillCount",
                 "characters", "partyCharacterIds", "currency", "items", "recoverySlots", "buildingConstructions",
-                "recruitmentCycles", "purificationSlots",
+                "recruitmentCycles", "unlockedRecruitmentCharacterIds", "purificationSlots",
             };
 
             List<string> actual = new List<string>();

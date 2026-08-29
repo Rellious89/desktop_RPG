@@ -78,6 +78,7 @@ namespace TableDataEditor
             Run(TableDataRebuildScope.RecruitmentTables,
                 "Rebuild (Recruitment)",
                 TableDataPaths.CharacterAcquisitionOutputFolder + ", " +
+                TableDataPaths.CharacterUnlockConditionOutputFolder + ", " +
                 TableDataPaths.RecruitmentTypeOutputFolder + ", " +
                 TableDataPaths.RecruitmentPoolOutputFolder + ", " +
                 TableDataPaths.RecruitmentAccessOutputFolder);

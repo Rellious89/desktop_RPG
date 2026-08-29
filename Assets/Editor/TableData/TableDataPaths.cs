@@ -27,6 +27,7 @@ namespace TableDataEditor
         public const string ShopCsvFileName = "Shop.csv";
         public const string ShopProductCsvFileName = "ShopProduct.csv";
         public const string CharacterAcquisitionCsvFileName = "CharacterAcquisition.csv";
+        public const string CharacterUnlockConditionCsvFileName = "CharacterUnlockCondition.csv";
         public const string RecruitmentTypeCsvFileName = "RecruitmentType.csv";
         public const string RecruitmentPoolCsvFileName = "RecruitmentPool.csv";
         public const string RecruitmentAccessCsvFileName = "RecruitmentAccess.csv";
@@ -47,6 +48,7 @@ namespace TableDataEditor
         public const string ShopProductCsvPath = InputRoot + "/" + ShopProductCsvFileName;
 
         public const string CharacterAcquisitionCsvPath = InputRoot + "/" + CharacterAcquisitionCsvFileName;
+        public const string CharacterUnlockConditionCsvPath = InputRoot + "/" + CharacterUnlockConditionCsvFileName;
         public const string RecruitmentTypeCsvPath = InputRoot + "/" + RecruitmentTypeCsvFileName;
         public const string RecruitmentPoolCsvPath = InputRoot + "/" + RecruitmentPoolCsvFileName;
         public const string RecruitmentAccessCsvPath = InputRoot + "/" + RecruitmentAccessCsvFileName;
@@ -120,6 +122,7 @@ namespace TableDataEditor
         /// 기존 규칙을 그대로 따르면, orphan 검사와 충돌 검사가 표마다 자기 폴더만 보면 된다.
         /// </summary>
         public const string CharacterAcquisitionOutputFolder = OutputRoot + "/CharacterAcquisition";
+        public const string CharacterUnlockConditionOutputFolder = OutputRoot + "/CharacterUnlockCondition";
 
         public const string RecruitmentTypeOutputFolder = OutputRoot + "/RecruitmentType";
         public const string RecruitmentPoolOutputFolder = OutputRoot + "/RecruitmentPool";
@@ -151,6 +154,7 @@ namespace TableDataEditor
         public const string ShopAssetPrefix = "Shop_";
         public const string ShopProductAssetPrefix = "ShopProduct_";
         public const string CharacterAcquisitionAssetPrefix = "CharacterAcquisition_";
+        public const string CharacterUnlockConditionAssetPrefix = "CharacterUnlockCondition_";
         public const string RecruitmentTypeAssetPrefix = "RecruitmentType_";
         public const string RecruitmentPoolAssetPrefix = "RecruitmentPool_";
         public const string RecruitmentAccessAssetPrefix = "RecruitmentAccess_";
@@ -170,6 +174,7 @@ namespace TableDataEditor
         public const string ShopCatalogAssetName = "ShopCatalog";
         public const string ShopProductCatalogAssetName = "ShopProductCatalog";
         public const string CharacterAcquisitionCatalogAssetName = "CharacterAcquisitionCatalog";
+        public const string CharacterUnlockConditionCatalogAssetName = "CharacterUnlockConditionCatalog";
         public const string RecruitmentTypeCatalogAssetName = "RecruitmentTypeCatalog";
         public const string RecruitmentPoolCatalogAssetName = "RecruitmentPoolCatalog";
         public const string RecruitmentAccessCatalogAssetName = "RecruitmentAccessCatalog";
@@ -264,6 +269,8 @@ namespace TableDataEditor
         {
             return CharacterAcquisitionOutputFolder + "/" + CharacterAcquisitionAssetPrefix + acquisitionId + ".asset";
         }
+        public static string CharacterUnlockConditionAssetPath(string conditionId) =>
+            CharacterUnlockConditionOutputFolder + "/" + CharacterUnlockConditionAssetPrefix + conditionId + ".asset";
 
         /// <summary>모집 종류 생성 에셋의 경로. recruitment_type_id는 대소문자와 밑줄만 쓰는 값이라
         /// (<see cref="TableDataFieldRules.RecruitmentIdPatternText"/>) 파일 이름에 그대로 쓸 수 있다.</summary>
@@ -289,6 +296,8 @@ namespace TableDataEditor
 
         public static string CharacterAcquisitionCatalogAssetPath =>
             CharacterAcquisitionOutputFolder + "/" + CharacterAcquisitionCatalogAssetName + ".asset";
+        public static string CharacterUnlockConditionCatalogAssetPath =>
+            CharacterUnlockConditionOutputFolder + "/" + CharacterUnlockConditionCatalogAssetName + ".asset";
 
         public static string RecruitmentTypeCatalogAssetPath =>
             RecruitmentTypeOutputFolder + "/" + RecruitmentTypeCatalogAssetName + ".asset";

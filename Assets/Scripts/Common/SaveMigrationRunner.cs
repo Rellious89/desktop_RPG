@@ -142,6 +142,7 @@ namespace Common
                 new V3ToV4Step(),
                 new V4ToV5Step(),
                 new V5ToV6Step(),
+                new V6ToV7Step(),
             };
         }
 
@@ -245,6 +246,8 @@ namespace Common
             target.purificationSlots = CopyPurificationSlots(source.purificationSlots);
             target.buildingConstructions = CopyBuildingConstructions(source.buildingConstructions);
             target.recruitmentCycles = CopyRecruitmentCycles(source.recruitmentCycles);
+            target.unlockedRecruitmentCharacterIds = source.unlockedRecruitmentCharacterIds == null
+                ? new List<string>() : new List<string>(source.unlockedRecruitmentCharacterIds);
         }
 
         private static List<CharacterSaveState> CopyCharacters(List<CharacterSaveState> source)
@@ -669,6 +672,18 @@ namespace Common
             {
                 new PurificationSlotSaveState(),
             };
+        }
+    }
+
+    /// <summary>v6에는 조건부 모집의 영구 등장 기록이 없었다. 기존 진행은 손대지 않고 빈 기록만 만든다.</summary>
+    public sealed class V6ToV7Step : ISaveMigrationStep
+    {
+        public int FromVersion => 6;
+        public int ToVersion => 7;
+        public void Apply(SaveData data)
+        {
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            data.unlockedRecruitmentCharacterIds = new List<string>();
         }
     }
 }

@@ -58,6 +58,7 @@ namespace Recruitment
         private readonly RecruitmentTypeCatalog typeCatalog;
         private readonly RecruitmentPoolCatalog poolCatalog;
         private readonly CharacterAcquisitionCatalog acquisitionCatalog;
+        private readonly CharacterUnlockConditionCatalog unlockConditionCatalog;
         private readonly IRecruitmentRandom random;
 
         private bool drawing;
@@ -71,7 +72,8 @@ namespace Recruitment
             RecruitmentTypeCatalog typeCatalog,
             RecruitmentPoolCatalog poolCatalog,
             CharacterAcquisitionCatalog acquisitionCatalog,
-            IRecruitmentRandom random)
+            IRecruitmentRandom random,
+            CharacterUnlockConditionCatalog unlockConditionCatalog = null)
         {
             this.dataProvider = dataProvider ?? throw new ArgumentNullException(nameof(dataProvider));
             this.saveAction = saveAction ?? throw new ArgumentNullException(nameof(saveAction));
@@ -82,6 +84,7 @@ namespace Recruitment
             this.poolCatalog = poolCatalog;
             this.acquisitionCatalog = acquisitionCatalog;
             this.random = random;
+            this.unlockConditionCatalog = unlockConditionCatalog;
         }
 
         /// <summary>
@@ -145,12 +148,16 @@ namespace Recruitment
                 return Result(RecruitmentCandidateDrawCode.PendingCandidateExists);
             }
 
+            var unlocks = new RecruitmentUnlockService(dataProvider, saveAction, acquisitionCatalog, unlockConditionCatalog);
+            if (!unlocks.TryPersistCurrentUnlocks()) return Result(RecruitmentCandidateDrawCode.SaveFailed);
+
             RecruitmentSelection selection = RecruitmentCandidateSelector.Select(
                 access.RecruitmentTypeId,
                 poolCatalog,
                 acquisitionCatalog,
                 RecruitmentOwnership.Of(OwnedCharacterIds(data.characters)),
-                random);
+                random,
+                unlocks.IsUnlocked);
 
             if (!selection.IsSelected || string.IsNullOrEmpty(selection.CharacterId))
             {

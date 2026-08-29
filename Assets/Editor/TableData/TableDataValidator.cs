@@ -143,6 +143,9 @@ namespace TableDataEditor
             CsvTable acquisitionTable = TableDataCsvReader.Read(
                 TableDataPaths.CharacterAcquisitionCsvPath, TableDataPaths.CharacterAcquisitionCsvFileName,
                 TableDataColumns.CharacterAcquisition, log);
+            CsvTable unlockConditionTable = TableDataCsvReader.Read(
+                TableDataPaths.CharacterUnlockConditionCsvPath, TableDataPaths.CharacterUnlockConditionCsvFileName,
+                TableDataColumns.CharacterUnlockCondition, log);
             CsvTable recruitmentTypeTable = TableDataCsvReader.Read(
                 TableDataPaths.RecruitmentTypeCsvPath, TableDataPaths.RecruitmentTypeCsvFileName,
                 TableDataColumns.RecruitmentType, log);
@@ -170,6 +173,7 @@ namespace TableDataEditor
                                  && characterTable != null && skillTable != null && characterSkillTable != null
                                  && buildingTable != null
                                  && acquisitionTable != null && recruitmentTypeTable != null
+                                 && unlockConditionTable != null
                                  && recruitmentPoolTable != null && recruitmentAccessTable != null
                                  && partyConfigTable != null;
             allTablesRead = allTablesRead && corruptionConfigTable != null;
@@ -196,6 +200,7 @@ namespace TableDataEditor
 
                 // 모집 네 표는 맨 뒤다 - Character와 Building을 가리키므로 두 표가 이미 앞에 있어야
                 // 한다. 넷 사이의 순서도 같은 규칙을 따른다(RecruitmentType → Pool/Access).
+                if (unlockConditionTable != null) ValidateCharacterUnlockConditions(unlockConditionTable, snapshot, log);
                 if (acquisitionTable != null) ValidateCharacterAcquisitions(acquisitionTable, snapshot, log);
                 if (recruitmentTypeTable != null) ValidateRecruitmentTypes(recruitmentTypeTable, snapshot, log);
                 if (recruitmentPoolTable != null) ValidateRecruitmentPools(recruitmentPoolTable, snapshot, log);
@@ -1773,6 +1778,40 @@ namespace TableDataEditor
 
         // ---- CharacterAcquisition ----
 
+        private static void ValidateCharacterUnlockConditions(
+            CsvTable table, TableDataSnapshot snapshot, TableDataDiagnosticLog log)
+        {
+            var pairIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (CsvRecord record in table.Records)
+            {
+                int line = record.Line;
+                var row = new CharacterUnlockConditionRow { Line = line };
+                bool ok = TableDataFieldRules.TryReadRequiredId(table.FileName, line, TableDataColumns.ConditionId,
+                    table.Get(record, TableDataColumns.ConditionId), log, out row.ConditionId);
+                ok &= TableDataFieldRules.TryReadRequiredId(table.FileName, line, TableDataColumns.UnlockEntryId,
+                    table.Get(record, TableDataColumns.UnlockEntryId), log, out row.EntryId);
+                ok &= TableDataFieldRules.TryReadRequiredId(table.FileName, line, TableDataColumns.UnlockGroupId,
+                    table.Get(record, TableDataColumns.UnlockGroupId), log, out row.GroupId);
+                string type = table.Get(record, TableDataColumns.UnlockConditionType);
+                if (type != "MAX_OWNED_CHARACTER_LEVEL_AT_LEAST" && type != "OWNED_CHARACTER_COUNT_AT_LEAST")
+                { log.Error(table.FileName, line, TableDataColumns.UnlockConditionType, type, "지원하지 않는 character unlock condition_type입니다."); ok = false; }
+                row.ConditionType = type;
+                row.TargetId = table.Get(record, TableDataColumns.UnlockTargetId);
+                if (!string.IsNullOrEmpty(row.TargetId)) { log.Error(table.FileName, line, TableDataColumns.UnlockTargetId, row.TargetId, "현재 지원 조건은 target_id가 비어 있어야 합니다."); ok = false; }
+                ok &= TableDataFieldRules.TryReadIntAtLeast(table.FileName, line, TableDataColumns.UnlockRequiredValue,
+                    table.Get(record, TableDataColumns.UnlockRequiredValue), 1, log, out row.RequiredValue);
+                ok &= TableDataFieldRules.TryReadEnabled(table.FileName, line, TableDataColumns.Enabled,
+                    table.Get(record, TableDataColumns.Enabled), log, out row.Enabled);
+                string pair = row.ConditionId + "\u001f" + row.EntryId;
+                if (ok && !pairIds.Add(pair)) { log.Error(table.FileName, line, TableDataColumns.UnlockEntryId, row.EntryId, "condition_id + entry_id가 중복됩니다."); ok = false; }
+                if (!ok) continue;
+                snapshot.CharacterUnlockConditions.Add(row);
+                if (!snapshot.CharacterUnlockConditionsById.TryGetValue(row.ConditionId, out List<CharacterUnlockConditionRow> entries))
+                    snapshot.CharacterUnlockConditionsById.Add(row.ConditionId, entries = new List<CharacterUnlockConditionRow>());
+                entries.Add(row);
+            }
+        }
+
         /// <summary>
         /// CharacterAcquisition.csv 한 장. 이 표는 스스로 캐릭터를 정의하지 않고 <b>Character.csv의
         /// 행에 획득 방식을 붙이기만</b> 한다 - 그래서 모든 행의 character_id가 그 표에 실재해야 하고,
@@ -1841,6 +1880,14 @@ namespace TableDataEditor
                         table.Get(record, TableDataColumns.ConditionId), log, out string conditionId))
                 {
                     row.ConditionId = conditionId;
+                }
+
+                if (!string.IsNullOrEmpty(row.ConditionId) &&
+                    !snapshot.CharacterUnlockConditionsById.ContainsKey(row.ConditionId))
+                {
+                    log.Error(file, line, TableDataColumns.ConditionId, row.ConditionId,
+                        $"{TableDataPaths.CharacterUnlockConditionCsvFileName}에 없는 condition_id입니다.");
+                    idOk = false;
                 }
 
                 if (characterOk)
@@ -2490,6 +2537,7 @@ namespace TableDataEditor
             if (TableDataRebuildScopes.IncludesRecruitmentTables(outputScope))
             {
                 folders.Add(TableDataPaths.CharacterAcquisitionOutputFolder);
+                folders.Add(TableDataPaths.CharacterUnlockConditionOutputFolder);
                 folders.Add(TableDataPaths.RecruitmentTypeOutputFolder);
                 folders.Add(TableDataPaths.RecruitmentPoolOutputFolder);
                 folders.Add(TableDataPaths.RecruitmentAccessOutputFolder);

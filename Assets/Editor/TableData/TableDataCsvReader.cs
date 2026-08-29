@@ -271,6 +271,17 @@ namespace TableDataEditor
             Enabled, Memo,
         };
 
+        public const string UnlockEntryId = "entry_id";
+        public const string UnlockGroupId = "group_id";
+        public const string UnlockConditionType = "condition_type";
+        public const string UnlockTargetId = "target_id";
+        public const string UnlockRequiredValue = "required_value";
+        public static readonly string[] CharacterUnlockCondition =
+        {
+            ConditionId, UnlockEntryId, UnlockGroupId, UnlockConditionType, UnlockTargetId,
+            UnlockRequiredValue, Enabled, Memo,
+        };
+
         // RecruitmentType.csv
         //
         // 이 표에는 display_order도 이름 참조도 없다 - 화면에 줄지어 보이는 목록이 아니라 다른 표가

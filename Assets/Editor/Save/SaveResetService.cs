@@ -136,10 +136,12 @@ namespace CommonEditor.Save
             }
 
             bool removeCharacters = removeSet != null && removeSet.Count > 0;
+            bool resetAllUnlocks = effective == SaveResetTargets.All && data.unlockedRecruitmentCharacterIds != null &&
+                                   data.unlockedRecruitmentCharacterIds.Count > 0;
 
             // 실제로 바뀌는 것이 하나도 없으면 저장하지 않는다. (아이템/재화/건축은 비트만으로 "적용"으로
             // 치지만, 캐릭터는 실제로 지울 대상이 있을 때만 적용이다.)
-            if (!resetItems && !resetCurrency && !resetConstruction && !removeCharacters)
+            if (!resetItems && !resetCurrency && !resetConstruction && !removeCharacters && !resetAllUnlocks)
             {
                 return new SaveResetResult(SaveResetOutcome.NothingSelected, SaveResetTargets.None, 0);
             }
@@ -154,6 +156,8 @@ namespace CommonEditor.Save
                 resetConstruction ? data.recruitmentCycles : null;
             List<PurificationSlotSaveState> oldPurificationSlots =
                 resetConstruction ? data.purificationSlots : null;
+            List<string> oldUnlockedRecruitmentCharacterIds = null;
+            if (resetAllUnlocks) oldUnlockedRecruitmentCharacterIds = data.unlockedRecruitmentCharacterIds;
 
             List<CharacterSaveState> oldCharacters = null;
             List<string> oldPartyCharacterIds = null;
@@ -169,10 +173,12 @@ namespace CommonEditor.Save
                 data.recruitmentCycles = new List<RecruitmentCycleSaveState>();
                 data.purificationSlots = new List<PurificationSlotSaveState> { new PurificationSlotSaveState() };
             }
+            if (resetAllUnlocks) data.unlockedRecruitmentCharacterIds = new List<string>();
 
             if (removeCharacters)
             {
                 oldCharacters = data.characters;
+                if (!resetAllUnlocks) oldUnlockedRecruitmentCharacterIds = data.unlockedRecruitmentCharacterIds;
 
                 // 지울 대상을 뺀 새 목록으로 교체한다. 살아남는 캐릭터의 순서는 그대로 유지한다.
                 var survivors = new List<CharacterSaveState>(oldCharacters.Count);
@@ -201,6 +207,12 @@ namespace CommonEditor.Save
                 }
 
                 data.characters = survivors;
+                if (data.unlockedRecruitmentCharacterIds != null)
+                {
+                    var remainingUnlocks = new List<string>(data.unlockedRecruitmentCharacterIds);
+                    remainingUnlocks.RemoveAll(id => removeSet.Contains(id));
+                    data.unlockedRecruitmentCharacterIds = remainingUnlocks;
+                }
 
                 oldPartyCharacterIds = data.partyCharacterIds;
                 if (oldPartyCharacterIds != null)
@@ -239,7 +251,7 @@ namespace CommonEditor.Save
                 // 남는 것보다 호출부가 실패를 알아채는 편이 낫다.
                 Rollback(data, resetItems, oldItems, resetCurrency, oldCurrency, resetConstruction,
                     oldConstructions, oldRecruitmentCycles, oldPurificationSlots, removeCharacters, oldCharacters,
-                    oldPartyCharacterIds, slotBackups, purificationBackups);
+                    oldPartyCharacterIds, oldUnlockedRecruitmentCharacterIds, resetAllUnlocks, slotBackups, purificationBackups);
                 throw;
             }
 
@@ -247,7 +259,7 @@ namespace CommonEditor.Save
             {
                 Rollback(data, resetItems, oldItems, resetCurrency, oldCurrency, resetConstruction,
                     oldConstructions, oldRecruitmentCycles, oldPurificationSlots, removeCharacters, oldCharacters,
-                    oldPartyCharacterIds, slotBackups, purificationBackups);
+                    oldPartyCharacterIds, oldUnlockedRecruitmentCharacterIds, resetAllUnlocks, slotBackups, purificationBackups);
                 return new SaveResetResult(SaveResetOutcome.SaveFailed, effective, 0);
             }
 
@@ -302,6 +314,7 @@ namespace CommonEditor.Save
             List<RecruitmentCycleSaveState> oldRecruitmentCycles,
             List<PurificationSlotSaveState> oldPurificationSlots,
             bool removeCharacters, List<CharacterSaveState> oldCharacters, List<string> oldPartyCharacterIds,
+            List<string> oldUnlockedRecruitmentCharacterIds, bool resetAllUnlocks,
             List<RecoverySlotBackup> slotBackups, List<PurificationSlotBackup> purificationBackups)
         {
             if (resetItems) data.items = oldItems;
@@ -317,6 +330,7 @@ namespace CommonEditor.Save
             {
                 data.characters = oldCharacters;
                 data.partyCharacterIds = oldPartyCharacterIds;
+                data.unlockedRecruitmentCharacterIds = oldUnlockedRecruitmentCharacterIds;
 
                 // 빈 상태로 바꿨던 회복 슬롯을 원래 값으로 되돌린다(같은 객체, 같은 인덱스).
                 if (slotBackups != null && data.recoverySlots != null)
@@ -340,6 +354,7 @@ namespace CommonEditor.Save
                     }
                 }
             }
+            if (resetAllUnlocks) data.unlockedRecruitmentCharacterIds = oldUnlockedRecruitmentCharacterIds;
         }
 
         /// <summary>빈 상태로 바꾼 회복 슬롯 한 칸의 원래 값. 저장 실패 시 <see cref="RestoreTo"/>로 되돌린다.</summary>

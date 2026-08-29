@@ -342,6 +342,13 @@ namespace TableDataEditor
         public bool Enabled;
     }
 
+    public sealed class CharacterUnlockConditionRow
+    {
+        public int Line; public string ConditionId = string.Empty; public string EntryId = string.Empty;
+        public string GroupId = string.Empty; public string ConditionType = string.Empty;
+        public string TargetId = string.Empty; public int RequiredValue; public bool Enabled;
+    }
+
     /// <summary>RecruitmentType.csv 한 행. 담기는 것은 키와 활성 여부뿐이며 <b>일부러 얇다</b> -
     /// 후보도 창구도 각자의 표가 말한다.</summary>
     public sealed class RecruitmentTypeRow
@@ -461,6 +468,7 @@ namespace TableDataEditor
         public readonly List<BuildingRow> Buildings = new List<BuildingRow>();
 
         public readonly List<CharacterAcquisitionRow> CharacterAcquisitions = new List<CharacterAcquisitionRow>();
+        public readonly List<CharacterUnlockConditionRow> CharacterUnlockConditions = new List<CharacterUnlockConditionRow>();
         public readonly List<RecruitmentTypeRow> RecruitmentTypes = new List<RecruitmentTypeRow>();
         public readonly List<RecruitmentPoolRow> RecruitmentPools = new List<RecruitmentPoolRow>();
         public readonly List<RecruitmentAccessRow> RecruitmentAccesses = new List<RecruitmentAccessRow>();
@@ -495,6 +503,8 @@ namespace TableDataEditor
 
         public readonly Dictionary<string, CharacterAcquisitionRow> CharacterAcquisitionsById =
             new Dictionary<string, CharacterAcquisitionRow>(StringComparer.Ordinal);
+        public readonly Dictionary<string, List<CharacterUnlockConditionRow>> CharacterUnlockConditionsById =
+            new Dictionary<string, List<CharacterUnlockConditionRow>>(StringComparer.Ordinal);
 
         /// <summary>획득 방식은 <b>캐릭터 하나에 하나</b>다 - 같은 캐릭터를 두 방식으로 적으면 어느
         /// 쪽이 참인지 정할 수 없으므로, character_id로도 사전을 두어 중복을 잡는다.</summary>

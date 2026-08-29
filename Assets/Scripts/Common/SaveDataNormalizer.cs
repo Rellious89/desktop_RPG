@@ -44,6 +44,7 @@ namespace Common
             // 모집 주기도 null 목록과 null 항목만 정리한다. 모르는 Access Id, 중복 키, 손상된 시각은
             // 원본 그대로 남겨 두어 서비스가 Unreadable로 판정하고 이후 데이터 복구 가능성을 보존한다.
             data.recruitmentCycles = CompactRecruitmentCycles(data.recruitmentCycles);
+            data.unlockedRecruitmentCharacterIds = CompactIds(data.unlockedRecruitmentCharacterIds);
 
             // 회복 슬롯만 규칙이 다르다. 여기서는 <b>목록의 인덱스가 곧 슬롯 번호</b>라서 null을 지우면
             // 뒤 슬롯들이 앞으로 밀려 남의 진행이 다른 슬롯으로 옮겨간다. 그래서 지우지 않고 빈 슬롯으로
@@ -142,6 +143,16 @@ namespace Common
             }
 
             return source;
+        }
+
+        private static List<string> CompactIds(List<string> source)
+        {
+            if (source == null) return new List<string>();
+            var result = new List<string>(source.Count);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string id in source)
+                if (!string.IsNullOrEmpty(id) && seen.Add(id)) result.Add(id);
+            return result;
         }
     }
 }
