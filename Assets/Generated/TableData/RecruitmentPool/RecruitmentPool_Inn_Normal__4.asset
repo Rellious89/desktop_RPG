@@ -17,4 +17,4 @@ MonoBehaviour:
   characterId: ElfGuardian
   character: {fileID: 11400000, guid: 40051d3b8e28b470aa140f0bad4cdb10, type: 2}
   weight: 50
-  enabled: 1
+  enabled: 0

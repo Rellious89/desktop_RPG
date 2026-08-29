@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Character;
 using Common;
 using NUnit.Framework;
@@ -118,16 +119,41 @@ namespace RecruitmentEditor.Tests
             RecruitmentCycleSaveState cycle = AddReadyCycle();
             string started = cycle.startedAtUtc;
             string ready = cycle.readyAtUtc;
+            string dataBefore = JsonUtility.ToJson(data);
             pool = Pool(Entry("1", "CatKnight", 0));
             RecordingRandom random = new RecordingRandom(0);
 
             RecruitmentCandidateDrawResult result = Draw(random).TryDraw(BuildingId);
 
             Assert.AreEqual(RecruitmentCandidateDrawCode.NoEligibleCandidate, result.Code);
+            Assert.IsFalse(result.Success);
+            Assert.IsNull(result.Selection, "후보가 없을 때 결과 카드를 열 근거가 되는 Selection을 만들지 않는다.");
+            Assert.IsNull(result.State);
             Assert.AreEqual(started, cycle.startedAtUtc);
             Assert.AreEqual(ready, cycle.readyAtUtc);
             Assert.IsTrue(string.IsNullOrEmpty(cycle.pendingCharacterId));
             Assert.AreEqual(0, random.Calls);
+            Assert.AreEqual(0, saves.Value);
+            Assert.AreEqual(dataBefore, JsonUtility.ToJson(data),
+                "후보가 없을 때는 pending, 모집 주기, 저장 문서 어떤 값도 바꾸지 않는다.");
+        }
+
+        [Test]
+        public void NoEligibleCandidate_클릭방어선은_토스트를_정확히한번_요청한다()
+        {
+            RecruitmentCycleSaveState cycle = AddReadyCycle();
+            pool = Pool(Entry("1", "CatKnight", 0));
+            RecruitmentCandidateDrawResult result = Draw(new RecordingRandom(0)).TryDraw(BuildingId);
+            int requests = 0;
+            MethodInfo handler = typeof(RecruitmentUiController).GetMethod(
+                "RequestNoEligibleCandidateToast", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.IsNotNull(handler);
+            handler.Invoke(null, new object[] { result, new LocalizedTextReference(),
+                new Action<LocalizedTextReference>(_ => requests++) });
+
+            Assert.AreEqual(RecruitmentCandidateDrawCode.NoEligibleCandidate, result.Code);
+            Assert.AreEqual(1, requests);
+            Assert.IsTrue(string.IsNullOrEmpty(cycle.pendingCharacterId));
             Assert.AreEqual(0, saves.Value);
         }
 

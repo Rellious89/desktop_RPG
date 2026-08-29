@@ -238,6 +238,19 @@ namespace TableDataEditor.Tests
         }
 
         [Test]
+        public void GeneratedRecruitmentPool_ReflectsEveryAuthoredEnabledValue()
+        {
+            for (int entryId = 1; entryId <= 6; entryId++)
+            {
+                RecruitmentPoolEntryDefinition entry = AssetDatabase.LoadAssetAtPath<RecruitmentPoolEntryDefinition>(
+                    TableDataPaths.RecruitmentPoolAssetPath(
+                        RecruitmentPoolEntryDefinition.BuildPairId(LiveRecruitmentTypeId, entryId.ToString())));
+                Assert.IsNotNull(entry, $"pool entry {entryId} 생성 에셋이 없습니다.");
+                Assert.AreEqual(entryId <= 3, entry.Enabled, $"pool entry {entryId}의 enabled가 CSV와 다릅니다.");
+            }
+        }
+
+        [Test]
         public void RebuildWriter_CopiesConditionIdIntoAnExistingAcquisitionAsset()
         {
             MethodInfo writer = typeof(TableDataRebuilder).GetMethod(
@@ -258,6 +271,34 @@ namespace TableDataEditor.Tests
                 });
                 Assert.AreEqual("unlock_elfarcher", target.ConditionId,
                     "Recruitment/CharacterUnlockCondition 범위 Rebuild는 기존 획득 에셋의 조건도 반드시 갱신해야 합니다.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(target);
+            }
+        }
+
+        [Test]
+        public void RebuildWriter_CopiesEnabledIntoAnExistingRecruitmentPoolAsset()
+        {
+            MethodInfo writer = typeof(TableDataRebuilder).GetMethod(
+                "WriteRecruitmentPoolEntry", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.IsNotNull(writer);
+            var target = ScriptableObject.CreateInstance<RecruitmentPoolEntryDefinition>();
+            try
+            {
+                writer.Invoke(null, new object[]
+                {
+                    target,
+                    new RecruitmentPoolRow
+                    {
+                        RecruitmentTypeId = LiveRecruitmentTypeId, PoolEntryId = "4", CharacterId = "ElfGuardian",
+                        Weight = 50, Enabled = false,
+                    },
+                    new Dictionary<string, Character.CharacterDefinition>(),
+                });
+                Assert.IsFalse(target.Enabled,
+                    "RecruitmentTables Rebuild는 기존 모집 풀 에셋의 enabled도 반드시 CSV대로 갱신해야 합니다.");
             }
             finally
             {

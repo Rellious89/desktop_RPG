@@ -17,4 +17,4 @@ MonoBehaviour:
   characterId: RabbitHealer
   character: {fileID: 11400000, guid: 157d45a3c95e243789cc99d02d3b662b, type: 2}
   weight: 30
-  enabled: 1
+  enabled: 0

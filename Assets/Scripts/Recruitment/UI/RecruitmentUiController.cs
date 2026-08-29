@@ -62,6 +62,7 @@ namespace Recruitment
         [SerializeField] private Button cancelButton;
         [SerializeField] private LocalizedTextReference acquiredToastMessage = new LocalizedTextReference();
         [SerializeField] private LocalizedTextReference returnedToastMessage = new LocalizedTextReference();
+        [SerializeField] private LocalizedTextReference noEligibleCandidateToastMessage = new LocalizedTextReference();
 
         /// <summary>저장 문서를 <b>그때그때 읽는</b> 보유 판정. 매 프레임 새로 만들지 않으려고 하나만 둔다 -
         /// HashSet을 미리 지어 두면 캐릭터를 얻은 순간과 화면이 어긋난다.</summary>
@@ -235,7 +236,11 @@ namespace Recruitment
                 !string.IsNullOrEmpty(status.State.pendingCharacterId)) return;
 
             drawing = true;
-            try { draw.TryDraw(buildingId); }
+            try
+            {
+                RecruitmentCandidateDrawResult result = draw.TryDraw(buildingId);
+                RequestNoEligibleCandidateToast(result, noEligibleCandidateToastMessage, ShowToast);
+            }
             finally
             {
                 drawing = false;
@@ -305,6 +310,19 @@ namespace Recruitment
                 !character.HasLocalizedName || ToastManager.Instance == null) return;
 
             ToastManager.Instance.Show(message.GetLocalizedString(character.LocalizedName.GetLocalizedString()));
+        }
+        private static void ShowToast(LocalizedTextReference message)
+        {
+            if (message == null || !message.HasReference || ToastManager.Instance == null) return;
+            ToastManager.Instance.Show(message.GetLocalizedString());
+        }
+        /// <summary>후보가 없는 최종 방어선은 클릭 결과 하나에만 반응한다. Refresh/Exhausted 표시는
+        /// 이 메서드를 부르지 않으므로 같은 클릭에서 토스트가 중복될 수 없다.</summary>
+        private static void RequestNoEligibleCandidateToast(
+            RecruitmentCandidateDrawResult result, LocalizedTextReference message,
+            Action<LocalizedTextReference> request)
+        {
+            if (result.Code == RecruitmentCandidateDrawCode.NoEligibleCandidate && request != null) request(message);
         }
         private void SetResultButtonsInteractable(bool value)
         {

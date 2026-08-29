@@ -17,4 +17,4 @@ MonoBehaviour:
   characterId: CatMage
   character: {fileID: 11400000, guid: 0af03590e26f24a0fa9976bcb738f27b, type: 2}
   weight: 60
-  enabled: 1
+  enabled: 0
