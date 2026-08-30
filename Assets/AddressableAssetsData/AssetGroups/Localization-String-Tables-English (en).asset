@@ -53,6 +53,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - Locale-en
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: cadc4654753a34dfeb1584a04cf7fed2
+    m_Address: 09_Quest_en
+    m_ReadOnly: 1
+    m_SerializedLabels:
+    - Locale-en
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e502bcddd512a46319fea73eb37a6ba5
     m_Address: 02_World&Dungeon_en
     m_ReadOnly: 1

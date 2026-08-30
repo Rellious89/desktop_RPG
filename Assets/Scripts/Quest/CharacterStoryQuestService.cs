@@ -18,6 +18,9 @@ namespace Quest
 
         public static CharacterStoryQuestService Instance { get; private set; }
 
+        /// <summary>씬 wiring 검사와 부트스트랩 실패 차단에 쓰는 최소 구성 계약.</summary>
+        public bool HasRequiredReferences => questCatalog != null && objectiveCatalog != null && roster != null;
+
         private void Awake()
         {
             if (Instance != null && Instance != this) { enabled = false; return; }
@@ -26,18 +29,24 @@ namespace Quest
 
         private void OnEnable()
         {
-            DungeonEntryService.DungeonEnterRequested += HandleDungeonEntered;
+            DungeonEntryService.DungeonEntered += HandleDungeonEntered;
             CharacterRoster.CharacterStateChanged += HandleCharacterChanged;
         }
 
         private void Start()
         {
+            if (!HasRequiredReferences)
+            {
+                Debug.LogError("[CharacterStoryQuestService] Quest Catalog, Objective Catalog, Character Roster를 모두 연결해야 합니다.", this);
+                enabled = false;
+                return;
+            }
             if (SaveSystem.TryGetLoadedData(out SaveData data) && EnsureRootsForOwned(data)) SaveSystem.Save();
         }
 
         private void OnDisable()
         {
-            DungeonEntryService.DungeonEnterRequested -= HandleDungeonEntered;
+            DungeonEntryService.DungeonEntered -= HandleDungeonEntered;
             CharacterRoster.CharacterStateChanged -= HandleCharacterChanged;
             if (Instance == this) Instance = null;
         }
@@ -70,6 +79,16 @@ namespace Quest
             changed |= AddForCondition(data, characterId, CharacterStoryQuestConditionType.StaminaSpent, null,
                 Mathf.Max(0, actualStaminaSpent));
             receipt.Changed = changed;
+            return receipt;
+        }
+
+        /// <summary>모집처럼 캐릭터를 새로 보유하게 만드는 저장 트랜잭션 안에서 루트만 열어 준다.
+        /// 이 메서드는 저장하지 않으므로 호출자가 자기 트랜잭션의 저장 한 번과 롤백을 계속 소유한다.</summary>
+        public CharacterStoryQuestMutationReceipt ActivateForCharacterWithoutSave(
+            SaveData data, string characterId, int level)
+        {
+            CharacterStoryQuestMutationReceipt receipt = Capture(data, characterId);
+            receipt.Changed = EnsureRootWithoutSave(data, characterId, level);
             return receipt;
         }
 
@@ -243,7 +262,7 @@ namespace Quest
         internal bool Changed;
         internal CharacterStoryQuestMutationReceipt(SaveData data) { this.data = data; }
         internal void Capture(string id, CharacterStoryQuestSaveState state) { if (!before.ContainsKey(id)) before[id] = Clone(state); }
-        internal void Restore()
+        public void Restore()
         {
             if (data == null) return;
             foreach (var pair in before)

@@ -3169,6 +3169,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 207279996}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &397995664
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 397995666}
+  - component: {fileID: 397995665}
+  m_Layer: 0
+  m_Name: CharacterStoryQuestService
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &397995665
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 397995664}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c853fa3b5e3524c1ca9019eef5d2171b, type: 3}
+  m_Name: CharacterStoryQuestService
+  m_EditorClassIdentifier: ""
+  questCatalog: {fileID: 11400000, guid: ac4ef6a93ca73405b9e6d3e23b75f32a, type: 2}
+  objectiveCatalog: {fileID: 11400000, guid: 25c0dc7582a904651aceb74e9c37cf76, type: 2}
+  roster: {fileID: 1900000011}
+--- !u!4 &397995666
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 397995664}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1199, y: 381, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &407334993
 GameObject:
   m_ObjectHideFlags: 0
@@ -20970,3 +21017,4 @@ SceneRoots:
   - {fileID: 1500000301}
   - {fileID: 468841862}
   - {fileID: 1315932675}
+  - {fileID: 397995666}

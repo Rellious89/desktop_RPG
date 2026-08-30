@@ -120,6 +120,9 @@ namespace Field
             if (!CanBeginTransition($"던전 '{dungeon.DungeonId}' 입장")) return false;
 
             ApplyMode(FieldMode.Dungeon, dungeon);
+            // 요청 승인과 실제 모드 전환은 다른 단계다. ApplyMode가 FieldModeChanged를 모두 알린 뒤에만
+            // 확정 이벤트를 내므로, 전환 중/거부된 요청이 퀘스트 던전 입장 카운트에 들어가지 않는다.
+            DungeonEntryService.NotifyDungeonEntered(dungeon);
             return true;
         }
 

@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4c992e16a67684862954f0e4d2e4ebf9, type: 3}
+  m_Name: Objective_CatKnight_10002
+  m_EditorClassIdentifier:
+  objectiveId: CatKnight_10002
+  questId: CatKnight_10002
+  conditionType: 2
+  targetIds:
+  - 4
+  - 5
+  - 6
+  requiredValue: 5
+  displayOrder: 20
+  enabled: 1

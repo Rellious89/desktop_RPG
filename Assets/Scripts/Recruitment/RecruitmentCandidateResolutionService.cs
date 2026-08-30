@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Character;
 using Common;
+using Quest;
 
 namespace Recruitment
 {
@@ -120,17 +121,24 @@ namespace Recruitment
 
             data.characters.Add(granted);
             state.pendingCharacterId = null;
+            // 영입과 루트 수락은 같은 저장 문서의 한 트랜잭션이다. 성공한 영입 뒤에 별도 저장으로
+            // 퀘스트를 열면 중간 실패에서 "보유했지만 루트 없음"이 남으므로, 여기서 함께 적용한다.
+            CharacterStoryQuestMutationReceipt questReceipt = CharacterStoryQuestService.Instance != null
+                ? CharacterStoryQuestService.Instance.ActivateForCharacterWithoutSave(data, pendingId, granted.level)
+                : null;
 
             try
             {
                 if (!saveAction())
                 {
+                    questReceipt?.Restore();
                     RollbackAcquire(data, originalCharacters, granted, state, oldPending, metadata);
                     return Result(RecruitmentCandidateResolutionCode.SaveFailed, pendingId, definition);
                 }
             }
             catch
             {
+                questReceipt?.Restore();
                 RollbackAcquire(data, originalCharacters, granted, state, oldPending, metadata);
                 throw;
             }

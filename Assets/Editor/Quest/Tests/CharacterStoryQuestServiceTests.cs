@@ -35,6 +35,14 @@ namespace QuestEditorTests
         }
 
         [Test]
+        public void MissingCatalogOrRoster_IsReportedAsInvalidWiring()
+        {
+            var host = new GameObject("quest-service-unwired-test"); created.Add(host);
+            var service = host.AddComponent<CharacterStoryQuestService>();
+            Assert.IsFalse(service.HasRequiredReferences);
+        }
+
+        [Test]
         public void MultipleObjectives_RequireAnd_AndClampAtTarget()
         {
             CharacterStoryQuestDefinition quest = Quest("Q3", "CatKnight", "", true);

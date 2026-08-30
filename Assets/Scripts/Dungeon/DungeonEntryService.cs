@@ -24,6 +24,10 @@ namespace Dungeon
         /// (식별자가 있는) 던전 정의다.</summary>
         public static event Action<DungeonDefinition> DungeonEnterRequested;
 
+        /// <summary>필드 모드가 실제로 던전 상태로 전환된 뒤에만 발행된다. 요청의 접근성 통과와 실제
+        /// 입장은 다르므로, 영구 진행도는 이 이벤트만 근거로 삼아야 한다.</summary>
+        public static event Action<DungeonDefinition> DungeonEntered;
+
         /// <summary>가장 최근에 받아들여진 요청의 던전. 검증/디버깅과 테스트용 읽기 전용 상태이며,
         /// 이 값으로 게임 로직을 분기하지 않는다.</summary>
         public static DungeonDefinition LastRequestedDungeon { get; private set; }
@@ -89,6 +93,14 @@ namespace Dungeon
             LastRequestedDungeonId = string.Empty;
             AcceptedRequestCount = 0;
             accessOverride = null;
+        }
+
+        /// <summary><see cref="Field.FieldModeManager"/>가 성공한 전환 뒤 호출하는 확정 알림. 외부 UI는
+        /// 요청 이벤트만 발행할 수 있고, 실제 입장 카운트는 이 경계로 우회할 수 없다.</summary>
+        public static void NotifyDungeonEntered(DungeonDefinition dungeon)
+        {
+            if (dungeon == null || !dungeon.IsValid) return;
+            DungeonEntered?.Invoke(dungeon);
         }
 
         internal static void SetAccessServiceForTests(DungeonAccessService service)
