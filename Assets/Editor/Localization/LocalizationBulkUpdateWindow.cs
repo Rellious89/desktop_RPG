@@ -6,16 +6,24 @@ namespace CommonEditor.Localization
     /// <summary>Tools/Localize Update 창. 비교와 반영은 LocalizationBulkUpdateService가 담당한다.</summary>
     internal sealed class LocalizationBulkUpdateWindow : EditorWindow
     {
+        private const float SelectWidth = 44f;
+        private const float TableNameWidth = 190f;
+        private const float CountWidth = 52f;
+        private const float DeletionWidth = 76f;
+        private const float ActionWidth = 104f;
+        private const float StatusMinWidth = 280f;
+
         private Vector2 scrollPosition;
         private LocalizationBulkUpdateService.ScanResult scanResult;
         private string summary = "Scan을 눌러 TableData/Localization CSV를 비교하세요.";
+        private GUIStyle clippedStatusStyle;
 
         [MenuItem(LocalizationBulkUpdateService.MenuPath)]
         private static void Open()
         {
             var window = GetWindow<LocalizationBulkUpdateWindow>();
             window.titleContent = new GUIContent("Localize Update");
-            window.minSize = new Vector2(820, 260);
+            window.minSize = new Vector2(940, 260);
             window.Show();
         }
 
@@ -79,13 +87,13 @@ namespace CommonEditor.Localization
         {
             using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
             {
-                GUILayout.Label("선택", GUILayout.Width(48));
-                GUILayout.Label("테이블명", GUILayout.MinWidth(160));
-                GUILayout.Label("신규", GUILayout.Width(50));
-                GUILayout.Label("변경", GUILayout.Width(50));
-                GUILayout.Label("삭제 감지", GUILayout.Width(75));
-                GUILayout.Label("작업", GUILayout.Width(100));
-                GUILayout.Label("상태", GUILayout.ExpandWidth(true));
+                GUILayout.Label("선택", GUILayout.Width(SelectWidth));
+                GUILayout.Label("테이블명", GUILayout.Width(TableNameWidth));
+                GUILayout.Label("신규", GUILayout.Width(CountWidth));
+                GUILayout.Label("변경", GUILayout.Width(CountWidth));
+                GUILayout.Label("삭제 감지", GUILayout.Width(DeletionWidth));
+                GUILayout.Label("작업", GUILayout.Width(ActionWidth));
+                GUILayout.Label("상태", GUILayout.MinWidth(StatusMinWidth), GUILayout.ExpandWidth(true));
             }
         }
 
@@ -95,23 +103,59 @@ namespace CommonEditor.Localization
             {
                 using (new EditorGUI.DisabledScope(!table.IsValid || table.IsNewLocalization))
                 {
-                    table.IsSelected = EditorGUILayout.Toggle(table.IsSelected, GUILayout.Width(48));
+                    table.IsSelected = EditorGUILayout.Toggle(table.IsSelected, GUILayout.Width(SelectWidth));
                 }
 
-                GUILayout.Label(table.TableName, GUILayout.MinWidth(160));
-                GUILayout.Label(table.NewKeyCount.ToString(), GUILayout.Width(50));
-                GUILayout.Label(table.ChangedCount.ToString(), GUILayout.Width(50));
-                GUILayout.Label(table.DeletionDetectedCount.ToString(), GUILayout.Width(75));
-                if (table.CanCreateCollection && GUILayout.Button("테이블 생성", GUILayout.Width(100)))
+                GUILayout.Label(table.TableName, GUILayout.Width(TableNameWidth));
+                GUILayout.Label(table.NewKeyCount.ToString(), GUILayout.Width(CountWidth));
+                GUILayout.Label(table.ChangedCount.ToString(), GUILayout.Width(CountWidth));
+                GUILayout.Label(
+                    new GUIContent(table.DeletionDetectedCount.ToString(), BuildDeletionTooltip(table)),
+                    GUILayout.Width(DeletionWidth));
+                if (table.CanCreateCollection && GUILayout.Button("테이블 생성", GUILayout.Width(ActionWidth)))
                 {
                     CreateCollection(table);
                 }
                 else if (!table.CanCreateCollection)
                 {
-                    GUILayout.Space(104);
+                    GUILayout.Space(ActionWidth);
                 }
-                GUILayout.Label(table.Status, EditorStyles.wordWrappedMiniLabel, GUILayout.ExpandWidth(true));
+                GUILayout.Label(
+                    new GUIContent(table.Status, BuildStatusTooltip(table)),
+                    GetClippedStatusStyle(),
+                    GUILayout.MinWidth(StatusMinWidth),
+                    GUILayout.ExpandWidth(true));
             }
+        }
+
+        private GUIStyle GetClippedStatusStyle()
+        {
+            if (clippedStatusStyle == null)
+            {
+                clippedStatusStyle = new GUIStyle(EditorStyles.miniLabel)
+                {
+                    clipping = TextClipping.Clip,
+                    wordWrap = false,
+                };
+            }
+
+            return clippedStatusStyle;
+        }
+
+        private static string BuildDeletionTooltip(LocalizationBulkUpdateService.TableResult table)
+        {
+            if (table == null || table.DeletionDetectedKeys.Count == 0)
+            {
+                return "CSV에 없고 String Table 에셋에만 존재하는 키 수입니다.";
+            }
+
+            return "CSV에 없는 에셋 키:\n- " + string.Join("\n- ", table.DeletionDetectedKeys);
+        }
+
+        private static string BuildStatusTooltip(LocalizationBulkUpdateService.TableResult table)
+        {
+            string deletionDetails = BuildDeletionTooltip(table);
+            return table == null ? string.Empty : table.Status + "\n\n" + deletionDetails;
         }
 
         private void Scan()

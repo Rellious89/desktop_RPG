@@ -97,6 +97,7 @@ namespace CommonEditor.Localization.Tests
             Assert.AreEqual(0, table.NewKeyCount);
             Assert.AreEqual(0, table.ChangedCount);
             Assert.AreEqual(1, table.DeletionDetectedCount);
+            CollectionAssert.AreEqual(new[] { "asset-only" }, table.DeletionDetectedKeys);
             Assert.That(table.Status, Does.Contain("삭제 감지 1"));
             Assert.IsFalse(table.IsSelected);
         }

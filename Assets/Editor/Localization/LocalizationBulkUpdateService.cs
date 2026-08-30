@@ -42,6 +42,7 @@ namespace CommonEditor.Localization
             internal int ChangedCount;
             /// <summary>CSV에서 빠진 기존 Key 수. 경고 전용이며 Merge에서 삭제하지 않는다.</summary>
             internal int DeletionDetectedCount;
+            internal readonly List<string> DeletionDetectedKeys = new List<string>();
             internal bool IsSelected;
             internal CollectionCreationPlan CreationPlan;
 
@@ -555,7 +556,10 @@ namespace CommonEditor.Localization
                 return;
             }
 
-            result.DeletionDetectedCount = sharedByKey.Keys.Count(key => !csvKeys.Contains(key));
+            result.DeletionDetectedKeys.AddRange(sharedByKey.Keys
+                .Where(key => !csvKeys.Contains(key))
+                .OrderBy(key => key, StringComparer.Ordinal));
+            result.DeletionDetectedCount = result.DeletionDetectedKeys.Count;
         }
 
         private static IList<CsvColumns> CreateColumnMappings(TableResult table)
