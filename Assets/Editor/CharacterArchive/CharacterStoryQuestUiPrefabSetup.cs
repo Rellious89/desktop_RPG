@@ -62,8 +62,8 @@ namespace CharacterArchiveEditor
                 Set(serialized, "characterInfoPage", Find(root.transform, "pn_right/CharacterInfo").gameObject);
                 Set(serialized, "questInfoPage", Find(root.transform, "pn_right/QuestInfo").gameObject);
                 Set(serialized, "swapButton", Find(root.transform, "pn_right/btn_swap").GetComponent<Button>());
-                Set(serialized, "currentProgressFill", Find(current, "CurrentProgress").GetComponent<Image>());
-                Set(serialized, "totalProgressFill", Find(root.transform, "pn_right/QuestInfo/QuestInfo/TotalProgress").GetComponent<Image>());
+                Set(serialized, "currentProgressSlider", Find(current, "CurrentProgress").GetComponent<Slider>());
+                Set(serialized, "totalProgressSlider", Find(root.transform, "pn_right/QuestInfo/QuestInfo/TotalProgress").GetComponent<Slider>());
                 Set(serialized, "currentProgressPercentText", Find(current, "CurrentProgress/lb_percent").GetComponent<TMP_Text>());
                 Set(serialized, "totalProgressPercentText", Find(root.transform, "pn_right/QuestInfo/QuestInfo/TotalProgress/lb_percent").GetComponent<TMP_Text>());
                 Set(serialized, "totalProgressText", Find(current, "sp_description (1)/lb_totalProgress").GetComponent<TMP_Text>());

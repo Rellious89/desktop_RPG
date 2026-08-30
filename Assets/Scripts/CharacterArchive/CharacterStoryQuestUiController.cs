@@ -7,6 +7,7 @@ using Quest;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Localization;
+using UnityEngine.Localization.Tables;
 using UnityEngine.UI;
 
 namespace CharacterArchive
@@ -18,8 +19,8 @@ namespace CharacterArchive
     {
         public enum RightPage { CharacterInfo, QuestInfo }
 
-        private const string QuestTableGuid = "GUID:11805744adb144cd3bb37f325635e0d9";
-        private const string UiTableGuid = "GUID:32fd067a20b754a50b20446b9c78d2ae";
+        private const string QuestTableGuid = "11805744adb144cd3bb37f325635e0d9";
+        private const string UiTableGuid = "32fd067a20b754a50b20446b9c78d2ae";
         private const int TotalProgressFormatKey = 87;
         private static readonly int[] QuestLocalizationKeys = { 1, 2, 3, 4, 10001, 10002, 10003, 10004, 100002, 100004 };
 
@@ -36,8 +37,8 @@ namespace CharacterArchive
         [SerializeField] private RightPage defaultRightPage = RightPage.CharacterInfo;
 
         [Header("Quest UI")]
-        [SerializeField] private Image currentProgressFill;
-        [SerializeField] private Image totalProgressFill;
+        [SerializeField] private Slider currentProgressSlider;
+        [SerializeField] private Slider totalProgressSlider;
         [SerializeField] private TMP_Text currentProgressPercentText;
         [SerializeField] private TMP_Text totalProgressPercentText;
         [SerializeField] private TMP_Text totalProgressText;
@@ -65,6 +66,7 @@ namespace CharacterArchive
                                              monsterCatalog != null && dungeonCatalog != null &&
                                              characterInfoPage != null && questInfoPage != null &&
                                              swapButton != null && completeButton != null &&
+                                             currentProgressSlider != null && totalProgressSlider != null &&
                                              currentProgressPercentText != null && totalProgressPercentText != null && totalProgressText != null &&
                                              questTypeLineTemplate != null && questDescriptionLineTemplate != null;
 
@@ -134,7 +136,7 @@ namespace CharacterArchive
         {
             if (subscribed) return;
             foreach (int key in QuestLocalizationKeys) AddQuestLocalization(key);
-            totalProgressFormatReference = new LocalizedTextReference(UiTableGuid, TotalProgressFormatKey.ToString());
+            totalProgressFormatReference = CreateLocalizedReference(UiTableGuid, TotalProgressFormatKey);
             AddLocalization(totalProgressFormatReference, value =>
             {
                 totalProgressFormat = IsUsableLocalizedValue(value, TotalProgressFormatKey.ToString()) ? value : null;
@@ -145,7 +147,7 @@ namespace CharacterArchive
 
         private void AddQuestLocalization(int key)
         {
-            var reference = new LocalizedTextReference(QuestTableGuid, key.ToString());
+            var reference = CreateLocalizedReference(QuestTableGuid, key);
             questTextReferences.Add(key, reference);
             AddLocalization(reference, value =>
             {
@@ -160,6 +162,13 @@ namespace CharacterArchive
             if (reference == null || !reference.HasReference || localizationHandlers.ContainsKey(reference)) return;
             localizationHandlers.Add(reference, handler);
             reference.StringChanged += handler;
+        }
+
+        // TableReference의 string 암시 변환은 "GUID:..."를 테이블 이름으로 취급한다.
+        // 런타임 동적 참조는 Guid를 명시해 Addressables의 SharedTableData GUID를 사용한다.
+        private static LocalizedTextReference CreateLocalizedReference(string tableGuid, int key)
+        {
+            return new LocalizedTextReference((TableReference)new Guid(tableGuid), key.ToString());
         }
 
         private void BindObjectiveTargetLocalization(IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives)
@@ -229,8 +238,8 @@ namespace CharacterArchive
 
             float current = CalculateCurrentProgress(objectives, snapshot);
             float total = CalculateTotalProgress(questCatalog, selected != null ? selected.CharacterId : string.Empty, snapshot, current, out int currentNumber, out int completedCount, out int totalCount);
-            if (currentProgressFill != null) currentProgressFill.fillAmount = current;
-            if (totalProgressFill != null) totalProgressFill.fillAmount = total;
+            SetSliderProgress(currentProgressSlider, current);
+            SetSliderProgress(totalProgressSlider, total);
             if (currentProgressPercentText != null) currentProgressPercentText.text = FormatProgressPercent(current);
             if (totalProgressPercentText != null) totalProgressPercentText.text = FormatProgressPercent(total);
             if (totalProgressText != null) totalProgressText.text = SafeFormat(totalProgressFormat, "{0}번 퀘스트 진행 중 ({1}/{2})", currentNumber, completedCount, totalCount);
@@ -357,7 +366,12 @@ namespace CharacterArchive
         private static bool IsUsableLocalizedValue(string value, string key) => !string.IsNullOrWhiteSpace(value) &&
             !string.Equals(value, key, StringComparison.Ordinal) && !value.StartsWith("No translation found", StringComparison.Ordinal);
 
-        public static string FormatProgressPercent(float progress) => Mathf.RoundToInt(Mathf.Clamp01(progress) * 100f) + "%";
+        public static string FormatProgressPercent(float progress) => Mathf.FloorToInt(Mathf.Clamp01(progress) * 100f + .5f) + "%";
+
+        private static void SetSliderProgress(Slider slider, float progress)
+        {
+            if (slider != null) slider.normalizedValue = Mathf.Clamp01(progress);
+        }
 
         private static int GetProgress(CharacterStoryQuestSnapshot snapshot, string objectiveId, int required)
         {

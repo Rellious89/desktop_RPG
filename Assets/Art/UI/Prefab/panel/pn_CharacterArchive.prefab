@@ -8299,8 +8299,8 @@ MonoBehaviour:
   questInfoPage: {fileID: 6819479105585582015}
   swapButton: {fileID: 5710131456832745531}
   defaultRightPage: 0
-  currentProgressFill: {fileID: 7164234519535099456}
-  totalProgressFill: {fileID: 2207632132446104437}
+  currentProgressSlider: {fileID: 3764228280986740976}
+  totalProgressSlider: {fileID: 1161704692929195364}
   currentProgressPercentText: {fileID: 4774098922227635820}
   totalProgressPercentText: {fileID: 4591078297454975610}
   totalProgressText: {fileID: 2246332465872527706}
