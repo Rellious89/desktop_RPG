@@ -7960,6 +7960,37 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &3302380484753878159
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6819479105585582015}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 59bb6604d69834da4a825e7fcf204554, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  questCatalog: {fileID: 11400000, guid: ac4ef6a93ca73405b9e6d3e23b75f32a, type: 2}
+  objectiveCatalog: {fileID: 11400000, guid: 25c0dc7582a904651aceb74e9c37cf76, type: 2}
+  monsterCatalog: {fileID: 11400000, guid: 0846229ba87f7442a8cabec60e64dd41, type: 2}
+  dungeonCatalog: {fileID: 11400000, guid: 5a3dc674fb40a445ba6d768b5775d116, type: 2}
+  characterInfoPage: {fileID: 5182944336791768952}
+  questInfoPage: {fileID: 6819479105585582015}
+  swapButton: {fileID: 5710131456832745531}
+  defaultRightPage: 0
+  currentProgressSlider: {fileID: 3764228280986740976}
+  totalProgressSlider: {fileID: 1161704692929195364}
+  currentProgressPercentText: {fileID: 4774098922227635820}
+  totalProgressPercentText: {fileID: 4591078297454975610}
+  totalProgressText: {fileID: 2958313743394940697}
+  questTypeTitle: {fileID: 3849879197243938115}
+  questDescriptionTitle: {fileID: 9086052463914602492}
+  questTypeLineTemplate: {fileID: 2687482215357816714}
+  questDescriptionLineTemplate: {fileID: 748448507804973546}
+  completeButton: {fileID: 4000634981908462201}
+  objectiveScroll: {fileID: 3012345285097281181}
 --- !u!1 &6847384618704923900
 GameObject:
   m_ObjectHideFlags: 0
@@ -8279,37 +8310,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   receiveMouseInput: 1
---- !u!114 &3302380484753878159
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6819479105585582015}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 59bb6604d69834da4a825e7fcf204554, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  questCatalog: {fileID: 11400000, guid: ac4ef6a93ca73405b9e6d3e23b75f32a, type: 2}
-  objectiveCatalog: {fileID: 11400000, guid: 25c0dc7582a904651aceb74e9c37cf76, type: 2}
-  monsterCatalog: {fileID: 11400000, guid: 0846229ba87f7442a8cabec60e64dd41, type: 2}
-  dungeonCatalog: {fileID: 11400000, guid: 5a3dc674fb40a445ba6d768b5775d116, type: 2}
-  characterInfoPage: {fileID: 5182944336791768952}
-  questInfoPage: {fileID: 6819479105585582015}
-  swapButton: {fileID: 5710131456832745531}
-  defaultRightPage: 0
-  currentProgressSlider: {fileID: 3764228280986740976}
-  totalProgressSlider: {fileID: 1161704692929195364}
-  currentProgressPercentText: {fileID: 4774098922227635820}
-  totalProgressPercentText: {fileID: 4591078297454975610}
-  totalProgressText: {fileID: 2246332465872527706}
-  questTypeTitle: {fileID: 3849879197243938115}
-  questDescriptionTitle: {fileID: 9086052463914602492}
-  questTypeLineTemplate: {fileID: 2687482215357816714}
-  questDescriptionLineTemplate: {fileID: 748448507804973546}
-  completeButton: {fileID: 4000634981908462201}
-  objectiveScroll: {fileID: 3012345285097281181}
 --- !u!1 &6919317526206799039
 GameObject:
   m_ObjectHideFlags: 0
