@@ -7979,6 +7979,7 @@ MonoBehaviour:
   characterInfoPage: {fileID: 5182944336791768952}
   questInfoPage: {fileID: 6819479105585582015}
   swapButton: {fileID: 5710131456832745531}
+  closeButton: {fileID: 308318965498581917}
   defaultRightPage: 0
   currentProgressSlider: {fileID: 3764228280986740976}
   totalProgressSlider: {fileID: 1161704692929195364}
@@ -8252,7 +8253,7 @@ MonoBehaviour:
   content: {fileID: 5231922080815455100}
   cardTemplate: {fileID: 7443924247371237418}
   detailCard: {fileID: 3268604568971306212}
-  rightPanel: {fileID: 5182944336791768952}
+  rightPanel: {fileID: 161566139831101802}
   rightCloseButton: {fileID: 3839192338662484111}
   expandRightButton: {fileID: 880774287126028152}
   allBookmarkButton: {fileID: 880025850876082173}

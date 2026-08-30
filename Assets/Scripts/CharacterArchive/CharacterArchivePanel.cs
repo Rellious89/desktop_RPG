@@ -89,7 +89,12 @@ namespace CharacterArchive
             BindButtons();
             BindCountFormat();
             BindPartySlots();
-            if (storyQuestUi != null) storyQuestUi.OpenFor(selected);
+            if (storyQuestUi != null)
+            {
+                storyQuestUi.CloseRequested -= CloseRight;
+                storyQuestUi.CloseRequested += CloseRight;
+                storyQuestUi.OpenFor(selected);
+            }
             CharacterRoster.CurrentCharacterChanged += HandleRosterChanged;
             CharacterRoster.CharacterStateChanged += HandleRosterChanged;
             RecoveryService.SlotsChanged += HandleRecoverySlotsChanged;
@@ -104,7 +109,11 @@ namespace CharacterArchive
             UnbindButtons();
             UnbindCountFormat();
             UnbindPartySlots();
-            if (storyQuestUi != null) storyQuestUi.Close();
+            if (storyQuestUi != null)
+            {
+                storyQuestUi.CloseRequested -= CloseRight;
+                storyQuestUi.Close();
+            }
             if (openInstance == this) openInstance = null;
         }
 

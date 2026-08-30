@@ -28,8 +28,17 @@ namespace CharacterArchiveEditorTests
                 var panel = root.GetComponent<CharacterArchivePanel>();
                 Assert.AreSame(controller, new SerializedObject(panel).FindProperty("storyQuestUi").objectReferenceValue);
                 Assert.IsTrue(controller.HasRequiredReferences);
+                SerializedObject panelSerialized = new SerializedObject(panel);
+                Assert.AreSame(Find(root.transform, "pn_right").gameObject,
+                    panelSerialized.FindProperty("rightPanel").objectReferenceValue,
+                    "우측 셸 전체가 닫혀야 공용 전환 버튼도 함께 숨습니다.");
+                Assert.AreSame(Find(root.transform, "pn_right/CharacterInfo/bg/top/btn_close").GetComponent<Button>(),
+                    panelSerialized.FindProperty("rightCloseButton").objectReferenceValue);
                 Transform current = Find(root.transform, "pn_right/QuestInfo/QuestInfo/Current");
                 SerializedObject controllerSerialized = new SerializedObject(controller);
+                Assert.AreSame(Find(root.transform, "pn_right/QuestInfo/bg/top/btn_close").GetComponent<Button>(),
+                    controllerSerialized.FindProperty("closeButton").objectReferenceValue,
+                    "퀘스트 페이지가 자신의 닫기 버튼을 소유해야 합니다.");
                 Assert.AreSame(current.Find("CurrentProgress").GetComponent<Slider>(),
                     controllerSerialized.FindProperty("currentProgressSlider").objectReferenceValue);
                 Assert.AreSame(Find(root.transform, "pn_right/QuestInfo/QuestInfo/TotalProgress").GetComponent<Slider>(),

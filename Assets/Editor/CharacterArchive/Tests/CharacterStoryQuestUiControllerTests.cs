@@ -203,6 +203,25 @@ namespace CharacterArchiveEditorTests
         }
 
         [Test]
+        public void QuestCloseButton_RaisesOneShellCloseRequestPerClick()
+        {
+            GameObject host = new GameObject("story-quest-close-test"); created.Add(host);
+            var controller = host.AddComponent<CharacterStoryQuestUiController>();
+            GameObject close = new GameObject("close", typeof(Button)); created.Add(close);
+            Button closeButton = close.GetComponent<Button>();
+            Set(controller, "closeButton", closeButton);
+            int requests = 0;
+            controller.CloseRequested += () => requests++;
+
+            controller.OpenFor(null);
+            closeButton.onClick.Invoke();
+            controller.OpenFor(null);
+            closeButton.onClick.Invoke();
+
+            Assert.AreEqual(2, requests, "재초기화 뒤에도 클릭당 닫기 요청은 정확히 한 번이어야 합니다.");
+        }
+
+        [Test]
         public void TargetDisplay_UsesAnyTargetOrOrderedSafeIdFallbacks()
         {
             GameObject host = new GameObject("story-quest-target-test"); created.Add(host);

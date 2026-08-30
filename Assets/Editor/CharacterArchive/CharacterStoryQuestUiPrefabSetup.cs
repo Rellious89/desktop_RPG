@@ -62,6 +62,7 @@ namespace CharacterArchiveEditor
                 Set(serialized, "characterInfoPage", Find(root.transform, "pn_right/CharacterInfo").gameObject);
                 Set(serialized, "questInfoPage", Find(root.transform, "pn_right/QuestInfo").gameObject);
                 Set(serialized, "swapButton", Find(root.transform, "pn_right/btn_swap").GetComponent<Button>());
+                Set(serialized, "closeButton", Find(root.transform, "pn_right/QuestInfo/bg/top/btn_close").GetComponent<Button>());
                 Set(serialized, "currentProgressSlider", Find(current, "CurrentProgress").GetComponent<Slider>());
                 Set(serialized, "totalProgressSlider", Find(root.transform, "pn_right/QuestInfo/QuestInfo/TotalProgress").GetComponent<Slider>());
                 Set(serialized, "currentProgressPercentText", Find(current, "CurrentProgress/lb_percent").GetComponent<TMP_Text>());
@@ -84,6 +85,8 @@ namespace CharacterArchiveEditor
 
                 SerializedObject panelSerialized = new SerializedObject(panel);
                 Set(panelSerialized, "storyQuestUi", controller);
+                Set(panelSerialized, "rightPanel", Find(root.transform, "pn_right").gameObject);
+                Set(panelSerialized, "rightCloseButton", Find(root.transform, "pn_right/CharacterInfo/bg/top/btn_close").GetComponent<Button>());
                 panelSerialized.ApplyModifiedPropertiesWithoutUndo();
                 PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
             }

@@ -34,6 +34,7 @@ namespace CharacterArchive
         [SerializeField] private GameObject characterInfoPage;
         [SerializeField] private GameObject questInfoPage;
         [SerializeField] private Button swapButton;
+        [SerializeField] private Button closeButton;
         [SerializeField] private RightPage defaultRightPage = RightPage.CharacterInfo;
 
         [Header("Quest UI")]
@@ -62,10 +63,12 @@ namespace CharacterArchive
         private bool completionRequested;
         private bool subscribed;
 
+        public event Action CloseRequested;
+
         public bool HasRequiredReferences => questCatalog != null && objectiveCatalog != null &&
                                              monsterCatalog != null && dungeonCatalog != null &&
                                              characterInfoPage != null && questInfoPage != null &&
-                                             swapButton != null && completeButton != null &&
+                                             swapButton != null && closeButton != null && completeButton != null &&
                                              currentProgressSlider != null && totalProgressSlider != null &&
                                              currentProgressPercentText != null && totalProgressPercentText != null && totalProgressText != null &&
                                              questTypeLineTemplate != null && questDescriptionLineTemplate != null;
@@ -123,12 +126,14 @@ namespace CharacterArchive
         private void BindButtons()
         {
             if (swapButton != null) { swapButton.onClick.RemoveListener(TogglePage); swapButton.onClick.AddListener(TogglePage); }
+            if (closeButton != null) { closeButton.onClick.RemoveListener(RequestClose); closeButton.onClick.AddListener(RequestClose); }
             if (completeButton != null) { completeButton.onClick.RemoveListener(ConfirmComplete); completeButton.onClick.AddListener(ConfirmComplete); }
         }
 
         private void UnbindButtons()
         {
             if (swapButton != null) swapButton.onClick.RemoveListener(TogglePage);
+            if (closeButton != null) closeButton.onClick.RemoveListener(RequestClose);
             if (completeButton != null) completeButton.onClick.RemoveListener(ConfirmComplete);
         }
 
@@ -204,6 +209,8 @@ namespace CharacterArchive
         private void HandleLocaleChanged(string _) => Refresh();
 
         private void TogglePage() => ShowPage(questInfoPage != null && questInfoPage.activeSelf ? RightPage.CharacterInfo : RightPage.QuestInfo);
+
+        private void RequestClose() => CloseRequested?.Invoke();
 
         private void ShowPage(RightPage page)
         {
