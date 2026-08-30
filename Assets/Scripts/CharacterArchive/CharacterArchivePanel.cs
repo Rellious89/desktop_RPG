@@ -41,6 +41,8 @@ namespace CharacterArchive
         [SerializeField] private LocalizedTextReference recoveryLeaveBlockedToast;
         [SerializeField] private LocalizedTextReference partyJoinToast;
         [SerializeField] private LocalizedTextReference activeCharacterBlockedToast;
+        [Header("Story Quest UI (Inspector에서만 연결)")]
+        [SerializeField] private CharacterStoryQuestUiController storyQuestUi;
 
         private readonly List<CharacterArchiveCardView> cards = new List<CharacterArchiveCardView>();
         private readonly List<PartySlotView> partySlots = new List<PartySlotView>();
@@ -87,6 +89,7 @@ namespace CharacterArchive
             BindButtons();
             BindCountFormat();
             BindPartySlots();
+            if (storyQuestUi != null) storyQuestUi.OpenFor(selected);
             CharacterRoster.CurrentCharacterChanged += HandleRosterChanged;
             CharacterRoster.CharacterStateChanged += HandleRosterChanged;
             RecoveryService.SlotsChanged += HandleRecoverySlotsChanged;
@@ -101,6 +104,7 @@ namespace CharacterArchive
             UnbindButtons();
             UnbindCountFormat();
             UnbindPartySlots();
+            if (storyQuestUi != null) storyQuestUi.Close();
             if (openInstance == this) openInstance = null;
         }
 
@@ -129,6 +133,7 @@ namespace CharacterArchive
                 SetActive(detailCard.gameObject, selected != null && rightPanelOpen);
                 if (selected != null) detailCard.Bind(selected, data, current, false, null, false);
             }
+            if (storyQuestUi != null && selected != null && rightPanelOpen) storyQuestUi.BindCharacter(selected);
             RefreshBookmarks();
             RefreshCount(owned.OwnedCount, owned.AllCharacters.Count);
             RefreshPartySlots(data, current);
@@ -169,8 +174,8 @@ namespace CharacterArchive
         private void ShowAll() { if (!ownedOnly) return; ownedOnly = false; RefreshContents(); }
         private void ShowOwned() { if (ownedOnly) return; ownedOnly = true; RefreshContents(); }
         private void CloseRight() { rightPanelOpen = false; RefreshContents(); }
-        private void OpenRight() { if (selected == null) return; rightPanelOpen = true; RefreshContents(); }
-        private void SelectCard(CharacterArchiveCardView card) { selected = card != null ? card.Definition : null; rightPanelOpen = selected != null; RefreshContents(); }
+        private void OpenRight() { if (selected == null) return; rightPanelOpen = true; if (storyQuestUi != null) storyQuestUi.OpenFor(selected); RefreshContents(); }
+        private void SelectCard(CharacterArchiveCardView card) { selected = card != null ? card.Definition : null; rightPanelOpen = selected != null; if (storyQuestUi != null) storyQuestUi.OpenFor(selected); RefreshContents(); }
         private void HandleRosterChanged(CharacterDefinition _) => RefreshContents();
         private void HandleRecoverySlotsChanged() => RefreshContents();
 
