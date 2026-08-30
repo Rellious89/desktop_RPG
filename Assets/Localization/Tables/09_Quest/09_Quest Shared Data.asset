@@ -47,6 +47,14 @@ MonoBehaviour:
     m_Key: 10004
     m_Metadata:
       m_Items: []
+  - m_Id: 200826663460864
+    m_Key: 100002
+    m_Metadata:
+      m_Items: []
+  - m_Id: 200826671849472
+    m_Key: 100004
+    m_Metadata:
+      m_Items: []
   m_Metadata:
     m_Items: []
   m_KeyGenerator:
