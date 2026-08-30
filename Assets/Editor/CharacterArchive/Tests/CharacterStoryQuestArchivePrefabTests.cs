@@ -29,6 +29,11 @@ namespace CharacterArchiveEditorTests
                 Assert.AreSame(controller, new SerializedObject(panel).FindProperty("storyQuestUi").objectReferenceValue);
                 Assert.IsTrue(controller.HasRequiredReferences);
                 Transform current = Find(root.transform, "pn_right/QuestInfo/QuestInfo/Current");
+                SerializedObject controllerSerialized = new SerializedObject(controller);
+                Assert.AreSame(current.Find("CurrentProgress").GetComponent<Slider>(),
+                    controllerSerialized.FindProperty("currentProgressSlider").objectReferenceValue);
+                Assert.AreSame(Find(root.transform, "pn_right/QuestInfo/QuestInfo/TotalProgress").GetComponent<Slider>(),
+                    controllerSerialized.FindProperty("totalProgressSlider").objectReferenceValue);
                 Transform content = Find(current, "ObjectiveScroll/Viewport/Content");
                 ScrollRect scroll = current.Find("ObjectiveScroll").GetComponent<ScrollRect>();
                 Assert.IsTrue(scroll.vertical); Assert.IsFalse(scroll.horizontal);
@@ -39,8 +44,10 @@ namespace CharacterArchiveEditorTests
                 Assert.NotNull(fitter); Assert.AreEqual(ContentSizeFitter.FitMode.PreferredSize, fitter.verticalFit);
                 Assert.AreSame(content, Find(content, "QuestType").parent);
                 Assert.AreSame(content, Find(content, "QuestDesctiption").parent);
-                Assert.IsFalse(Find(root.transform, "pn_right/QuestInfo/QuestInfo/Current/sp_description (1)/lb_totalProgress")
-                    .GetComponent<LocalizedTMPText>().enabled, "동적 총 진행 문구는 컨트롤러가 단독 소유해야 합니다.");
+                LocalizedTMPText totalProgressLocalizer = Find(root.transform, "pn_right/QuestInfo/QuestInfo/Current/sp_description (1)/lb_totalProgress")
+                    .GetComponent<LocalizedTMPText>();
+                Assert.IsTrue(totalProgressLocalizer == null || !totalProgressLocalizer.enabled,
+                    "동적 총 진행 문구는 컨트롤러가 단독 소유해야 합니다.");
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
         }

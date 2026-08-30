@@ -1,22 +1,28 @@
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using CharacterArchive;
+using Common;
 using Dungeon;
 using NUnit.Framework;
 using Quest;
+using UnityEditor;
 using UnityEngine;
+using UnityEngine.Localization.Tables;
 using UnityEngine.UI;
 
 namespace CharacterArchiveEditorTests
 {
     public sealed class CharacterStoryQuestUiControllerTests
     {
-        private readonly List<Object> created = new List<Object>();
+        private const string QuestLocaleTablePath = "Assets/Localization/Tables/09_Quest/09_Quest_ko-KR.asset";
+        private const string UiLocaleTablePath = "Assets/Localization/Tables/01_UI/01_UI_ko-KR.asset";
+        private readonly List<UnityEngine.Object> created = new List<UnityEngine.Object>();
 
         [TearDown]
         public void TearDown()
         {
-            foreach (Object item in created) Object.DestroyImmediate(item);
+            foreach (UnityEngine.Object item in created) UnityEngine.Object.DestroyImmediate(item);
             created.Clear();
         }
 
@@ -78,6 +84,69 @@ namespace CharacterArchiveEditorTests
         public void ProgressPercent_IsClampedAndRenderedAsAnInteger(float progress, string expected)
         {
             Assert.AreEqual(expected, CharacterStoryQuestUiController.FormatProgressPercent(progress));
+        }
+
+        [Test]
+        public void RuntimeQuestReferences_UseGuidTableReferences_NotGuidNamedTables()
+        {
+            LocalizedTextReference quest = CreateLocalizedReference("11805744adb144cd3bb37f325635e0d9", 10002);
+            LocalizedTextReference ui = CreateLocalizedReference("32fd067a20b754a50b20446b9c78d2ae", 87);
+
+            Assert.AreEqual(TableReference.Type.Guid, quest.TableReference.ReferenceType);
+            Assert.AreEqual(new Guid("11805744adb144cd3bb37f325635e0d9"), quest.TableReference.TableCollectionNameGuid);
+            Assert.AreEqual("10002", quest.TableEntryReference.Key);
+            Assert.AreEqual(TableReference.Type.Guid, ui.TableReference.ReferenceType);
+            Assert.AreEqual(new Guid("32fd067a20b754a50b20446b9c78d2ae"), ui.TableReference.TableCollectionNameGuid);
+            Assert.AreEqual("87", ui.TableEntryReference.Key);
+        }
+
+        [Test]
+        public void ConfiguredLocale_QuestAndTotalProgressFormatsResolveAndApplyArguments()
+        {
+            StringTable quest = AssetDatabase.LoadAssetAtPath<StringTable>(QuestLocaleTablePath);
+            StringTable ui = AssetDatabase.LoadAssetAtPath<StringTable>(UiLocaleTablePath);
+            Assert.NotNull(quest);
+            Assert.NotNull(ui);
+
+            Assert.IsNotEmpty(quest.GetEntry("2").Value);
+            Assert.AreEqual("대상 3마리 처치 (1/3)", string.Format(quest.GetEntry("10002").Value, "대상", 3, 1, 3));
+            Assert.IsNotEmpty(quest.GetEntry("4").Value);
+            Assert.AreEqual("던전 2회 입장 (1/2)", string.Format(quest.GetEntry("10004").Value, "던전", 2, 1, 2));
+            Assert.AreEqual("2번 퀘스트 진행 중 (1/3)", string.Format(ui.GetEntry("87").Value, 2, 1, 3));
+        }
+
+        [TestCase(0f)]
+        [TestCase(.5f)]
+        [TestCase(1f)]
+        public void ProgressSliders_ReceiveClampedNormalizedValues(float value)
+        {
+            GameObject currentObject = new GameObject("current", typeof(Slider)); created.Add(currentObject);
+            GameObject totalObject = new GameObject("total", typeof(Slider)); created.Add(totalObject);
+            Slider current = currentObject.GetComponent<Slider>();
+            Slider total = totalObject.GetComponent<Slider>();
+
+            SetSliderProgress(current, value);
+            SetSliderProgress(total, value);
+
+            Assert.AreEqual(value, current.normalizedValue);
+            Assert.AreEqual(value, total.normalizedValue);
+        }
+
+        [Test]
+        public void CloseAndReopen_ReusesOneSetOfLocaleSubscriptions()
+        {
+            GameObject host = new GameObject("story-quest-localization-lifecycle"); created.Add(host);
+            var controller = host.AddComponent<CharacterStoryQuestUiController>();
+            controller.OpenFor(null);
+            Assert.AreEqual(11, LocalizationSubscriptionCount(controller));
+
+            controller.Close();
+            Assert.AreEqual(0, LocalizationSubscriptionCount(controller));
+
+            controller.OpenFor(null);
+            Assert.AreEqual(11, LocalizationSubscriptionCount(controller));
+            controller.OpenFor(null);
+            Assert.AreEqual(11, LocalizationSubscriptionCount(controller));
         }
 
         [Test]
@@ -177,6 +246,18 @@ namespace CharacterArchiveEditorTests
         private static string TargetName(CharacterStoryQuestUiController controller, CharacterStoryQuestObjectiveDefinition objective, bool monster) =>
             (string)typeof(CharacterStoryQuestUiController).GetMethod("TargetName", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(controller, new object[] { objective, monster });
+
+        private static LocalizedTextReference CreateLocalizedReference(string tableGuid, int key) =>
+            (LocalizedTextReference)typeof(CharacterStoryQuestUiController).GetMethod("CreateLocalizedReference", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { tableGuid, key });
+
+        private static void SetSliderProgress(Slider slider, float value) =>
+            typeof(CharacterStoryQuestUiController).GetMethod("SetSliderProgress", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { slider, value });
+
+        private static int LocalizationSubscriptionCount(CharacterStoryQuestUiController controller) =>
+            ((System.Collections.IDictionary)typeof(CharacterStoryQuestUiController).GetField("localizationHandlers", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(controller)).Count;
 
         private T Create<T>() where T : ScriptableObject { T value = ScriptableObject.CreateInstance<T>(); created.Add(value); return value; }
         private static void Set(object target, string name, object value) => target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).SetValue(target, value);
