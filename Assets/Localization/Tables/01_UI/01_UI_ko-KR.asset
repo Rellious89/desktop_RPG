@@ -401,6 +401,10 @@ MonoBehaviour:
     m_Localized: "\uD018\uC2A4\uD2B8 \uC815\uBCF4"
     m_Metadata:
       m_Items: []
+  - m_Id: 11836850380464128
+    m_Localized: "\uD018\uC2A4\uD2B8 \uC644\uB8CC"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

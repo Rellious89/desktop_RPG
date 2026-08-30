@@ -31,15 +31,15 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 22136479746
-    m_Localized: "\uCE90\uB9AD\uD130 \uB808\uBCA8 {0} \uB2EC\uC131"
+    m_Localized: "\uCE90\uB9AD\uD130 \uB808\uBCA8 {0} \uB2EC\uC131 ({1}/{2})"
     m_Metadata:
       m_Items: []
   - m_Id: 22136479747
-    m_Localized: "\uBAAC\uC2A4\uD130 {0}\uB9C8\uB9AC \uCC98\uCE58"
+    m_Localized: "{0} {1}\uB9C8\uB9AC \uCC98\uCE58 ({2}/{3})"
     m_Metadata:
       m_Items: []
   - m_Id: 22136479748
-    m_Localized: "\uD589\uB3D9\uB825 {0} \uC18C\uBAA8"
+    m_Localized: "\uD589\uB3D9\uB825 {0} \uC18C\uBAA8 ({1}/{2})"
     m_Metadata:
       m_Items: []
   - m_Id: 184712143298560
@@ -47,7 +47,7 @@ MonoBehaviour:
     m_Metadata:
       m_Items: []
   - m_Id: 184712143298561
-    m_Localized: "\uB358\uC804 {0}\uD68C \uC785\uC7A5"
+    m_Localized: "{0} {1}\uD68C \uC785\uC7A5 ({2}/{3})"
     m_Metadata:
       m_Items: []
   references:
