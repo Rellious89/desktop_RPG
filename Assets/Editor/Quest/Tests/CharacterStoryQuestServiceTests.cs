@@ -65,6 +65,81 @@ namespace QuestEditorTests
             Assert.AreEqual(50, state.objectiveProgress.Find(p => p.objectiveId == "O3B").progress);
         }
 
+        [Test]
+        public void ReadyNotification_IsPublishedOnceOnlyAfterCallerConfirmsSave()
+        {
+            CharacterStoryQuestDefinition quest = Quest("Q1", "CatKnight", "", true);
+            CharacterStoryQuestObjectiveDefinition defeats = Objective(
+                "O1", "Q1", CharacterStoryQuestConditionType.MonsterDefeatCount, 2);
+            CharacterStoryQuestService service = Service(new[] { quest }, new[] { defeats });
+            var data = new SaveData
+            {
+                characterStoryQuests = new List<CharacterStoryQuestSaveState>
+                {
+                    new CharacterStoryQuestSaveState { characterId = "CatKnight", activeQuestId = "Q1" },
+                },
+            };
+
+            int notifications = 0;
+            string notifiedCharacterId = null;
+            System.Action<string> handler = id => { notifications++; notifiedCharacterId = id; };
+            CharacterStoryQuestService.QuestBecameReadyToComplete += handler;
+            try
+            {
+                CharacterStoryQuestMutationReceipt first = service.ApplyDefeatWithoutSave(
+                    data, "CatKnight", "Monster_1", 0);
+                Assert.IsFalse(service.NotifyReadyAfterExternalSave(first));
+                Assert.AreEqual(0, notifications, "목표 중간 진행에는 알림이 없어야 합니다.");
+
+                CharacterStoryQuestMutationReceipt completed = service.ApplyDefeatWithoutSave(
+                    data, "CatKnight", "Monster_1", 0);
+                Assert.AreEqual(0, notifications, "저장 성공 확정 전에는 알림을 발행하지 않습니다.");
+                Assert.IsTrue(service.NotifyReadyAfterExternalSave(completed));
+                Assert.AreEqual(1, notifications);
+                Assert.AreEqual("CatKnight", notifiedCharacterId);
+                Assert.IsFalse(service.NotifyReadyAfterExternalSave(completed), "같은 저장 영수증은 중복 알림을 만들지 않습니다.");
+                Assert.AreEqual(1, notifications);
+            }
+            finally
+            {
+                CharacterStoryQuestService.QuestBecameReadyToComplete -= handler;
+            }
+        }
+
+        [Test]
+        public void RolledBackReadyMutation_DoesNotPublishNotification()
+        {
+            CharacterStoryQuestDefinition quest = Quest("Q1", "CatKnight", "", true);
+            CharacterStoryQuestObjectiveDefinition defeats = Objective(
+                "O1", "Q1", CharacterStoryQuestConditionType.MonsterDefeatCount, 1);
+            CharacterStoryQuestService service = Service(new[] { quest }, new[] { defeats });
+            var data = new SaveData
+            {
+                characterStoryQuests = new List<CharacterStoryQuestSaveState>
+                {
+                    new CharacterStoryQuestSaveState { characterId = "CatKnight", activeQuestId = "Q1" },
+                },
+            };
+
+            int notifications = 0;
+            System.Action<string> handler = _ => notifications++;
+            CharacterStoryQuestService.QuestBecameReadyToComplete += handler;
+            try
+            {
+                CharacterStoryQuestMutationReceipt receipt = service.ApplyDefeatWithoutSave(
+                    data, "CatKnight", "Monster_1", 0);
+                service.Rollback(receipt);
+
+                Assert.IsFalse(service.NotifyReadyAfterExternalSave(receipt));
+                Assert.AreEqual(0, notifications);
+                Assert.IsFalse(data.characterStoryQuests[0].readyToComplete);
+            }
+            finally
+            {
+                CharacterStoryQuestService.QuestBecameReadyToComplete -= handler;
+            }
+        }
+
         private CharacterStoryQuestService Service(
             CharacterStoryQuestDefinition[] quests, CharacterStoryQuestObjectiveDefinition[] objectives)
         {

@@ -143,6 +143,7 @@ namespace Recruitment
                 throw;
             }
 
+            CharacterStoryQuestService.Instance?.NotifyReadyAfterExternalSave(questReceipt);
             return Result(RecruitmentCandidateResolutionCode.Acquired, pendingId, definition);
         }
 

@@ -17,6 +17,7 @@ namespace Quest
         [SerializeField] private CharacterRoster roster;
 
         public static CharacterStoryQuestService Instance { get; private set; }
+        public static event Action<string> QuestBecameReadyToComplete;
 
         /// <summary>씬 wiring 검사와 부트스트랩 실패 차단에 쓰는 최소 구성 계약.</summary>
         public bool HasRequiredReferences => questCatalog != null && objectiveCatalog != null && roster != null;
@@ -63,7 +64,11 @@ namespace Quest
             if (!SaveSystem.TryGetLoadedData(out SaveData data)) return false;
             CharacterStoryQuestMutationReceipt receipt = Capture(data, characterId);
             if (!ConfirmWithoutSave(data, characterId)) return false;
-            if (SaveSystem.Save()) return true;
+            if (SaveSystem.Save())
+            {
+                NotifyReadyAfterExternalSave(receipt);
+                return true;
+            }
             Rollback(receipt);
             return false;
         }
@@ -109,6 +114,18 @@ namespace Quest
 
         public void Rollback(CharacterStoryQuestMutationReceipt receipt) => receipt?.Restore();
 
+        /// <summary>호출자가 소유한 저장 트랜잭션이 성공한 뒤 완료 가능 전환을 확정한다. 동일 영수증은
+        /// 한 번만 소비되며, 한 트랜잭션에서 여러 캐릭터가 동시에 달성해도 공용 토스트는 한 번만
+        /// 표시한다.</summary>
+        public bool NotifyReadyAfterExternalSave(CharacterStoryQuestMutationReceipt receipt)
+        {
+            if (receipt == null || !receipt.TryConsumeReadyTransition(out string characterId)) return false;
+
+            QuestBecameReadyToComplete?.Invoke(characterId);
+            ShowReadyToast();
+            return true;
+        }
+
         public bool EnsureRootsForOwned(SaveData data)
         {
             if (data == null || data.characters == null) return false;
@@ -125,6 +142,7 @@ namespace Quest
             CharacterStoryQuestMutationReceipt receipt = ApplyDungeonEntryWithoutSave(data, dungeon.DungeonId, party);
             if (!receipt.Changed) return;
             if (!SaveSystem.Save()) Rollback(receipt);
+            else NotifyReadyAfterExternalSave(receipt);
         }
 
         private void HandleCharacterChanged(CharacterDefinition definition)
@@ -136,7 +154,29 @@ namespace Quest
             bool changed = EnsureRootWithoutSave(data, definition.CharacterId, character.level) |
                            EvaluateLevelWithoutSave(data, definition.CharacterId, character.level);
             receipt.Changed = changed;
-            if (changed && !SaveSystem.Save()) Rollback(receipt);
+            if (!changed) return;
+            if (!SaveSystem.Save()) Rollback(receipt);
+            else NotifyReadyAfterExternalSave(receipt);
+        }
+
+        private static void ShowReadyToast()
+        {
+            if (ToastManager.Instance == null) return;
+            try
+            {
+                var text = new LocalizedTextReference { TableReference = "01_UI", TableEntryReference = "92" };
+                string localized = text.GetLocalizedString();
+                if (!string.IsNullOrEmpty(localized) &&
+                    !localized.StartsWith("No translation found", StringComparison.Ordinal))
+                {
+                    ToastManager.Instance.Show(localized);
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[CharacterStoryQuestService] 완료 가능 토스트를 표시하지 못했습니다: " +
+                                 exception.Message);
+            }
         }
 
         private bool EnsureRootWithoutSave(SaveData data, string characterId, int level)
@@ -259,9 +299,28 @@ namespace Quest
     public sealed class CharacterStoryQuestMutationReceipt
     {
         private readonly SaveData data; private readonly Dictionary<string, CharacterStoryQuestSaveState> before = new Dictionary<string, CharacterStoryQuestSaveState>(StringComparer.Ordinal);
+        private bool readyTransitionConsumed;
         internal bool Changed;
         internal CharacterStoryQuestMutationReceipt(SaveData data) { this.data = data; }
         internal void Capture(string id, CharacterStoryQuestSaveState state) { if (!before.ContainsKey(id)) before[id] = Clone(state); }
+        internal bool TryConsumeReadyTransition(out string characterId)
+        {
+            characterId = null;
+            if (readyTransitionConsumed) return false;
+            readyTransitionConsumed = true;
+
+            foreach (KeyValuePair<string, CharacterStoryQuestSaveState> pair in before)
+            {
+                CharacterStoryQuestSaveState current = FindCurrent(pair.Key);
+                if (current == null || !current.readyToComplete) continue;
+                CharacterStoryQuestSaveState previous = pair.Value;
+                if (previous != null && previous.readyToComplete &&
+                    string.Equals(previous.activeQuestId, current.activeQuestId, StringComparison.Ordinal)) continue;
+                characterId = pair.Key;
+                return true;
+            }
+            return false;
+        }
         public void Restore()
         {
             if (data == null) return;
@@ -272,6 +331,13 @@ namespace Quest
                 if (pair.Value == null) { if (current != null) data.characterStoryQuests.Remove(current); }
                 else if (current != null) Copy(pair.Value, current); else data.characterStoryQuests.Add(Clone(pair.Value));
             }
+        }
+        private CharacterStoryQuestSaveState FindCurrent(string characterId)
+        {
+            if (data?.characterStoryQuests == null) return null;
+            foreach (CharacterStoryQuestSaveState state in data.characterStoryQuests)
+                if (state != null && string.Equals(state.characterId, characterId, StringComparison.Ordinal)) return state;
+            return null;
         }
         private static CharacterStoryQuestSaveState Clone(CharacterStoryQuestSaveState state)
         {

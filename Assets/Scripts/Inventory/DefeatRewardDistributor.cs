@@ -264,6 +264,7 @@ namespace Inventory
                 inventory.NotifyDefeatRewardsAfterExternalSave(inventoryReceipt);
                 progress.NotifyDefeatAfterExternalSave(progressReceipt);
                 roster.NotifyDefeatStaminaAfterExternalSave(staminaReceipt);
+                questService?.NotifyReadyAfterExternalSave(questReceipt);
                 if (!inventoryReceipt.Result.IsEmpty) ShowRewardToast(inventoryReceipt.Result);
             }
             catch (System.Exception exception)

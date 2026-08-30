@@ -66,7 +66,9 @@ namespace CharacterArchiveEditor
                 Set(serialized, "totalProgressSlider", Find(root.transform, "pn_right/QuestInfo/QuestInfo/TotalProgress").GetComponent<Slider>());
                 Set(serialized, "currentProgressPercentText", Find(current, "CurrentProgress/lb_percent").GetComponent<TMP_Text>());
                 Set(serialized, "totalProgressPercentText", Find(root.transform, "pn_right/QuestInfo/QuestInfo/TotalProgress/lb_percent").GetComponent<TMP_Text>());
-                Set(serialized, "totalProgressText", Find(current, "sp_description (1)/lb_totalProgress").GetComponent<TMP_Text>());
+                Transform totalProgressDescription = Find(root.transform,
+                    "pn_right/QuestInfo/QuestInfo/TotalProgress/bottomDeco/sp_description/lb_totalProgress");
+                Set(serialized, "totalProgressText", totalProgressDescription.GetComponent<TMP_Text>());
                 Set(serialized, "questTypeTitle", Find(type, "lb_title").GetComponent<TMP_Text>());
                 Set(serialized, "questDescriptionTitle", Find(description, "lb_title").GetComponent<TMP_Text>());
                 Set(serialized, "questTypeLineTemplate", typeTemplate);
@@ -77,7 +79,7 @@ namespace CharacterArchiveEditor
 
                 // lb_totalProgress는 동적 인자가 필요한 문구다. 정적 LocalizedTMPText가
                 // 비동기 콜백에서 컨트롤러의 조립 결과를 덮지 않도록 소유권을 컨트롤러로 통일한다.
-                LocalizedTMPText totalProgressLocalizer = Find(current, "sp_description (1)/lb_totalProgress").GetComponent<LocalizedTMPText>();
+                LocalizedTMPText totalProgressLocalizer = totalProgressDescription.GetComponent<LocalizedTMPText>();
                 if (totalProgressLocalizer != null) totalProgressLocalizer.enabled = false;
 
                 SerializedObject panelSerialized = new SerializedObject(panel);
