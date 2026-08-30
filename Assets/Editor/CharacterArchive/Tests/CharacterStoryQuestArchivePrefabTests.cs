@@ -1,4 +1,5 @@
 using CharacterArchive;
+using Common;
 using NUnit.Framework;
 using TMPro;
 using UnityEditor;
@@ -20,8 +21,12 @@ namespace CharacterArchiveEditorTests
             GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
             try
             {
-                var controller = root.GetComponent<CharacterStoryQuestUiController>();
+                Transform questInfo = Find(root.transform, "pn_right/QuestInfo");
+                var controller = questInfo.GetComponent<CharacterStoryQuestUiController>();
                 Assert.NotNull(controller);
+                Assert.IsNull(root.GetComponent<CharacterStoryQuestUiController>());
+                var panel = root.GetComponent<CharacterArchivePanel>();
+                Assert.AreSame(controller, new SerializedObject(panel).FindProperty("storyQuestUi").objectReferenceValue);
                 Assert.IsTrue(controller.HasRequiredReferences);
                 Transform current = Find(root.transform, "pn_right/QuestInfo/QuestInfo/Current");
                 Transform content = Find(current, "ObjectiveScroll/Viewport/Content");
@@ -34,6 +39,8 @@ namespace CharacterArchiveEditorTests
                 Assert.NotNull(fitter); Assert.AreEqual(ContentSizeFitter.FitMode.PreferredSize, fitter.verticalFit);
                 Assert.AreSame(content, Find(content, "QuestType").parent);
                 Assert.AreSame(content, Find(content, "QuestDesctiption").parent);
+                Assert.IsFalse(Find(root.transform, "pn_right/QuestInfo/QuestInfo/Current/sp_description (1)/lb_totalProgress")
+                    .GetComponent<LocalizedTMPText>().enabled, "동적 총 진행 문구는 컨트롤러가 단독 소유해야 합니다.");
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
         }
@@ -62,6 +69,7 @@ namespace CharacterArchiveEditorTests
             CharacterStoryQuestUiController[] controllers = Object.FindObjectsOfType<CharacterStoryQuestUiController>(true);
             Assert.AreEqual(1, controllers.Length, $"{scene.name}에 연결된 CharacterStoryQuestUiController가 하나 필요합니다.");
             Assert.IsTrue(controllers[0].HasRequiredReferences);
+            Assert.AreEqual("QuestInfo", controllers[0].gameObject.name);
         }
 
         private static Transform Find(Transform root, string path)

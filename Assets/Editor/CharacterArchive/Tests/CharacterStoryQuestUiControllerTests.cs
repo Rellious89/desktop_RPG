@@ -5,6 +5,7 @@ using Dungeon;
 using NUnit.Framework;
 using Quest;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace CharacterArchiveEditorTests
 {
@@ -69,6 +70,16 @@ namespace CharacterArchiveEditorTests
             Assert.AreEqual(1f, result);
         }
 
+        [TestCase(0f, "0%")]
+        [TestCase(.505f, "51%")]
+        [TestCase(1f, "100%")]
+        [TestCase(2f, "100%")]
+        [TestCase(-1f, "0%")]
+        public void ProgressPercent_IsClampedAndRenderedAsAnInteger(float progress, string expected)
+        {
+            Assert.AreEqual(expected, CharacterStoryQuestUiController.FormatProgressPercent(progress));
+        }
+
         [Test]
         public void OpenFor_AlwaysRestoresTheInspectorConfiguredDefaultPage()
         {
@@ -86,6 +97,31 @@ namespace CharacterArchiveEditorTests
             characterPage.SetActive(true); questPage.SetActive(false);
             controller.OpenFor(null);
             Assert.IsFalse(characterPage.activeSelf);
+            Assert.IsTrue(questPage.activeSelf);
+        }
+
+        [Test]
+        public void QuestInfoPageToggle_RemainsBoundAfterTheControllerPageIsHidden()
+        {
+            GameObject characterPage = new GameObject("character-page"); created.Add(characterPage);
+            GameObject questPage = new GameObject("quest-page"); created.Add(questPage);
+            var controller = questPage.AddComponent<CharacterStoryQuestUiController>();
+            GameObject swap = new GameObject("swap", typeof(Button)); created.Add(swap);
+            Button swapButton = swap.GetComponent<Button>();
+            Set(controller, "characterInfoPage", characterPage);
+            Set(controller, "questInfoPage", questPage);
+            Set(controller, "swapButton", swapButton);
+
+            controller.OpenFor(null);
+            Assert.IsTrue(characterPage.activeSelf);
+            Assert.IsFalse(questPage.activeSelf);
+
+            swapButton.onClick.Invoke();
+            Assert.IsTrue(questPage.activeSelf);
+            swapButton.onClick.Invoke();
+            Assert.IsTrue(characterPage.activeSelf);
+            Assert.IsFalse(questPage.activeSelf);
+            swapButton.onClick.Invoke();
             Assert.IsTrue(questPage.activeSelf);
         }
 

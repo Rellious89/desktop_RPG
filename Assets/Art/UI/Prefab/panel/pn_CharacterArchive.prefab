@@ -406,7 +406,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 410970868599196009}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ac2fe041186f04abb8c0c248afb8f108, type: 3}
   m_Name: 
@@ -7893,6 +7893,7 @@ GameObject:
   - component: {fileID: 2638183439187588562}
   - component: {fileID: 8842978040421561395}
   - component: {fileID: 3898794873219012851}
+  - component: {fileID: 3302380484753878159}
   m_Layer: 5
   m_Name: QuestInfo
   m_TagString: Untagged
@@ -8132,7 +8133,6 @@ GameObject:
   - component: {fileID: 4731972856120701102}
   - component: {fileID: 6525342036412562666}
   - component: {fileID: 6787321916581694319}
-  - component: {fileID: 3302380484753878159}
   m_Layer: 5
   m_Name: pn_CharacterArchive
   m_TagString: Untagged
@@ -8285,7 +8285,7 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6850486066911535684}
+  m_GameObject: {fileID: 6819479105585582015}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 59bb6604d69834da4a825e7fcf204554, type: 3}
@@ -8301,6 +8301,8 @@ MonoBehaviour:
   defaultRightPage: 0
   currentProgressFill: {fileID: 7164234519535099456}
   totalProgressFill: {fileID: 2207632132446104437}
+  currentProgressPercentText: {fileID: 4774098922227635820}
+  totalProgressPercentText: {fileID: 4591078297454975610}
   totalProgressText: {fileID: 2246332465872527706}
   questTypeTitle: {fileID: 3849879197243938115}
   questDescriptionTitle: {fileID: 9086052463914602492}

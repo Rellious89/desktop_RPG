@@ -1,4 +1,5 @@
 using CharacterArchive;
+using Common;
 using Dungeon;
 using Quest;
 using TMPro;
@@ -21,6 +22,7 @@ namespace CharacterArchiveEditor
             {
                 CharacterArchivePanel panel = root.GetComponent<CharacterArchivePanel>();
                 if (panel == null) throw new System.InvalidOperationException("CharacterArchivePanel을 찾을 수 없습니다.");
+                Transform questInfo = Find(root.transform, "pn_right/QuestInfo");
                 Transform current = Find(root.transform, "pn_right/QuestInfo/QuestInfo/Current");
                 Transform scroll = current.Find("ObjectiveScroll");
                 Transform type;
@@ -46,8 +48,12 @@ namespace CharacterArchiveEditor
                 typeTemplate.gameObject.SetActive(false); descriptionTemplate.gameObject.SetActive(false);
                 DisableTextRaycasts(type); DisableTextRaycasts(description);
 
-                var controller = root.GetComponent<CharacterStoryQuestUiController>();
-                if (controller == null) controller = root.AddComponent<CharacterStoryQuestUiController>();
+                // QuestInfo가 퀘스트 전용 Inspector 참조와 수명을 소유한다. 루트에 남아 있던
+                // 초기 13C 컴포넌트는 제거해 프리팹/씬 인스턴스가 중복되지 않게 한다.
+                CharacterStoryQuestUiController rootController = root.GetComponent<CharacterStoryQuestUiController>();
+                if (rootController != null) Object.DestroyImmediate(rootController);
+                var controller = questInfo.GetComponent<CharacterStoryQuestUiController>();
+                if (controller == null) controller = questInfo.gameObject.AddComponent<CharacterStoryQuestUiController>();
                 SerializedObject serialized = new SerializedObject(controller);
                 Set(serialized, "questCatalog", AssetDatabase.LoadAssetAtPath<CharacterStoryQuestCatalog>("Assets/Generated/TableData/CharacterStoryQuest/CharacterStoryQuestCatalog.asset"));
                 Set(serialized, "objectiveCatalog", AssetDatabase.LoadAssetAtPath<CharacterStoryQuestObjectiveCatalog>("Assets/Generated/TableData/CharacterStoryQuestObjective/CharacterStoryQuestObjectiveCatalog.asset"));
@@ -58,6 +64,8 @@ namespace CharacterArchiveEditor
                 Set(serialized, "swapButton", Find(root.transform, "pn_right/btn_swap").GetComponent<Button>());
                 Set(serialized, "currentProgressFill", Find(current, "CurrentProgress").GetComponent<Image>());
                 Set(serialized, "totalProgressFill", Find(root.transform, "pn_right/QuestInfo/QuestInfo/TotalProgress").GetComponent<Image>());
+                Set(serialized, "currentProgressPercentText", Find(current, "CurrentProgress/lb_percent").GetComponent<TMP_Text>());
+                Set(serialized, "totalProgressPercentText", Find(root.transform, "pn_right/QuestInfo/QuestInfo/TotalProgress/lb_percent").GetComponent<TMP_Text>());
                 Set(serialized, "totalProgressText", Find(current, "sp_description (1)/lb_totalProgress").GetComponent<TMP_Text>());
                 Set(serialized, "questTypeTitle", Find(type, "lb_title").GetComponent<TMP_Text>());
                 Set(serialized, "questDescriptionTitle", Find(description, "lb_title").GetComponent<TMP_Text>());
@@ -66,6 +74,11 @@ namespace CharacterArchiveEditor
                 Set(serialized, "completeButton", Find(root.transform, "pn_right/QuestInfo/QuestInfo/btn_QuestComplete").GetComponent<Button>());
                 Set(serialized, "objectiveScroll", scroll.GetComponent<ScrollRect>());
                 serialized.ApplyModifiedPropertiesWithoutUndo();
+
+                // lb_totalProgress는 동적 인자가 필요한 문구다. 정적 LocalizedTMPText가
+                // 비동기 콜백에서 컨트롤러의 조립 결과를 덮지 않도록 소유권을 컨트롤러로 통일한다.
+                LocalizedTMPText totalProgressLocalizer = Find(current, "sp_description (1)/lb_totalProgress").GetComponent<LocalizedTMPText>();
+                if (totalProgressLocalizer != null) totalProgressLocalizer.enabled = false;
 
                 SerializedObject panelSerialized = new SerializedObject(panel);
                 Set(panelSerialized, "storyQuestUi", controller);

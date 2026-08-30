@@ -6,6 +6,7 @@ using Dungeon;
 using Quest;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Localization;
 using UnityEngine.UI;
 
 namespace CharacterArchive
@@ -19,6 +20,8 @@ namespace CharacterArchive
 
         private const string QuestTableGuid = "GUID:11805744adb144cd3bb37f325635e0d9";
         private const string UiTableGuid = "GUID:32fd067a20b754a50b20446b9c78d2ae";
+        private const int TotalProgressFormatKey = 87;
+        private static readonly int[] QuestLocalizationKeys = { 1, 2, 3, 4, 10001, 10002, 10003, 10004, 100002, 100004 };
 
         [Header("Catalogs (Inspector에서만 연결)")]
         [SerializeField] private CharacterStoryQuestCatalog questCatalog;
@@ -35,6 +38,8 @@ namespace CharacterArchive
         [Header("Quest UI")]
         [SerializeField] private Image currentProgressFill;
         [SerializeField] private Image totalProgressFill;
+        [SerializeField] private TMP_Text currentProgressPercentText;
+        [SerializeField] private TMP_Text totalProgressPercentText;
         [SerializeField] private TMP_Text totalProgressText;
         [SerializeField] private TMP_Text questTypeTitle;
         [SerializeField] private TMP_Text questDescriptionTitle;
@@ -45,7 +50,13 @@ namespace CharacterArchive
 
         private readonly List<TMP_Text> typeLines = new List<TMP_Text>();
         private readonly List<TMP_Text> descriptionLines = new List<TMP_Text>();
-        private readonly List<LocalizedTextReference> localizationReferences = new List<LocalizedTextReference>();
+        // 퀘스트 표 문구는 이 컨트롤러의 수명 동안 하나의 참조만 유지한다. Refresh마다 새
+        // LocalizedString을 동기 조회하면 테이블 로드 전에는 Entry key가 화면에 보일 수 있다.
+        private readonly Dictionary<int, LocalizedTextReference> questTextReferences = new Dictionary<int, LocalizedTextReference>();
+        private readonly Dictionary<int, string> localizedQuestTexts = new Dictionary<int, string>();
+        private readonly Dictionary<LocalizedTextReference, LocalizedString.ChangeHandler> localizationHandlers = new Dictionary<LocalizedTextReference, LocalizedString.ChangeHandler>();
+        private LocalizedTextReference totalProgressFormatReference;
+        private string totalProgressFormat;
         private CharacterDefinition selected;
         private bool completionRequested;
         private bool subscribed;
@@ -54,10 +65,12 @@ namespace CharacterArchive
                                              monsterCatalog != null && dungeonCatalog != null &&
                                              characterInfoPage != null && questInfoPage != null &&
                                              swapButton != null && completeButton != null &&
+                                             currentProgressPercentText != null && totalProgressPercentText != null && totalProgressText != null &&
                                              questTypeLineTemplate != null && questDescriptionLineTemplate != null;
 
         public void OpenFor(CharacterDefinition definition)
         {
+            EnsureInitialized();
             selected = definition;
             completionRequested = false;
             ShowPage(defaultRightPage);
@@ -66,6 +79,7 @@ namespace CharacterArchive
 
         public void BindCharacter(CharacterDefinition definition)
         {
+            EnsureInitialized();
             selected = definition;
             completionRequested = false;
             Refresh();
@@ -76,15 +90,29 @@ namespace CharacterArchive
             selected = null;
             completionRequested = false;
             ClearLines(typeLines); ClearLines(descriptionLines);
+            TearDown();
         }
 
         private void OnEnable()
         {
-            BindButtons();
-            SubscribeLocalization();
+            EnsureInitialized();
         }
 
-        private void OnDisable()
+        private void OnDestroy()
+        {
+            TearDown();
+        }
+
+        // QuestInfo 자체가 비활성 페이지이므로, OnDisable은 페이지 전환마다 호출된다. 이때
+        // btn_swap/로컬라이즈 구독을 끊으면 CharacterInfo에서 다시 QuestInfo로 갈 수 없다.
+        private void EnsureInitialized()
+        {
+            BindButtons();
+            SubscribeLocalization();
+            DisableDynamicLocalizer(totalProgressText);
+        }
+
+        private void TearDown()
         {
             UnbindButtons();
             UnsubscribeLocalization();
@@ -105,22 +133,63 @@ namespace CharacterArchive
         private void SubscribeLocalization()
         {
             if (subscribed) return;
-            foreach (string key in new[] { "1", "2", "3", "4", "10001", "10002", "10003", "10004", "100002", "100004" })
-                AddLocalization(new LocalizedTextReference(QuestTableGuid, key));
-            AddLocalization(new LocalizedTextReference(UiTableGuid, "87"));
+            foreach (int key in QuestLocalizationKeys) AddQuestLocalization(key);
+            totalProgressFormatReference = new LocalizedTextReference(UiTableGuid, TotalProgressFormatKey.ToString());
+            AddLocalization(totalProgressFormatReference, value =>
+            {
+                totalProgressFormat = IsUsableLocalizedValue(value, TotalProgressFormatKey.ToString()) ? value : null;
+                Refresh();
+            });
             subscribed = true;
         }
 
-        private void AddLocalization(LocalizedTextReference reference)
+        private void AddQuestLocalization(int key)
         {
-            localizationReferences.Add(reference);
-            reference.StringChanged += HandleLocaleChanged;
+            var reference = new LocalizedTextReference(QuestTableGuid, key.ToString());
+            questTextReferences.Add(key, reference);
+            AddLocalization(reference, value =>
+            {
+                if (IsUsableLocalizedValue(value, key.ToString())) localizedQuestTexts[key] = value;
+                else localizedQuestTexts.Remove(key);
+                Refresh();
+            });
+        }
+
+        private void AddLocalization(LocalizedTextReference reference, LocalizedString.ChangeHandler handler)
+        {
+            if (reference == null || !reference.HasReference || localizationHandlers.ContainsKey(reference)) return;
+            localizationHandlers.Add(reference, handler);
+            reference.StringChanged += handler;
+        }
+
+        private void BindObjectiveTargetLocalization(IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives)
+        {
+            if (objectives == null) return;
+            for (int i = 0; i < objectives.Count; i++)
+            {
+                CharacterStoryQuestObjectiveDefinition objective = objectives[i];
+                if (objective == null || objective.TargetIds == null) continue;
+                bool monster = objective.ConditionType == CharacterStoryQuestConditionType.MonsterDefeatCount;
+                bool dungeon = objective.ConditionType == CharacterStoryQuestConditionType.DungeonEnterCount;
+                if (!monster && !dungeon) continue;
+                foreach (string id in objective.TargetIds)
+                {
+                    LocalizedTextReference reference = monster ? MonsterLocalizedName(id) : DungeonLocalizedName(id);
+                    AddLocalization(reference, HandleLocaleChanged);
+                }
+            }
         }
 
         private void UnsubscribeLocalization()
         {
-            foreach (LocalizedTextReference reference in localizationReferences) reference.StringChanged -= HandleLocaleChanged;
-            localizationReferences.Clear(); subscribed = false;
+            foreach (KeyValuePair<LocalizedTextReference, LocalizedString.ChangeHandler> pair in localizationHandlers)
+                pair.Key.StringChanged -= pair.Value;
+            localizationHandlers.Clear();
+            questTextReferences.Clear();
+            localizedQuestTexts.Clear();
+            totalProgressFormatReference = null;
+            totalProgressFormat = null;
+            subscribed = false;
         }
 
         private void HandleLocaleChanged(string _) => Refresh();
@@ -162,9 +231,12 @@ namespace CharacterArchive
             float total = CalculateTotalProgress(questCatalog, selected != null ? selected.CharacterId : string.Empty, snapshot, current, out int currentNumber, out int completedCount, out int totalCount);
             if (currentProgressFill != null) currentProgressFill.fillAmount = current;
             if (totalProgressFill != null) totalProgressFill.fillAmount = total;
-            if (totalProgressText != null) totalProgressText.text = SafeFormat(Ui(87), "{0}번 퀘스트 진행 중 ({1}/{2})", currentNumber, completedCount, totalCount);
+            if (currentProgressPercentText != null) currentProgressPercentText.text = FormatProgressPercent(current);
+            if (totalProgressPercentText != null) totalProgressPercentText.text = FormatProgressPercent(total);
+            if (totalProgressText != null) totalProgressText.text = SafeFormat(totalProgressFormat, "{0}번 퀘스트 진행 중 ({1}/{2})", currentNumber, completedCount, totalCount);
 
             ClearLines(typeLines); ClearLines(descriptionLines);
+            BindObjectiveTargetLocalization(objectives);
             for (int i = 0; i < objectives.Count; i++)
             {
                 CharacterStoryQuestObjectiveDefinition objective = objectives[i];
@@ -225,10 +297,10 @@ namespace CharacterArchive
         {
             switch (type)
             {
-                case CharacterStoryQuestConditionType.CharacterLevelAtLeast: return Quest(1);
-                case CharacterStoryQuestConditionType.MonsterDefeatCount: return Quest(2);
-                case CharacterStoryQuestConditionType.StaminaSpent: return Quest(3);
-                case CharacterStoryQuestConditionType.DungeonEnterCount: return Quest(4);
+                case CharacterStoryQuestConditionType.CharacterLevelAtLeast: return TextOrFallback(Quest(1), "Level");
+                case CharacterStoryQuestConditionType.MonsterDefeatCount: return TextOrFallback(Quest(2), "Defeat");
+                case CharacterStoryQuestConditionType.StaminaSpent: return TextOrFallback(Quest(3), "Stamina");
+                case CharacterStoryQuestConditionType.DungeonEnterCount: return TextOrFallback(Quest(4), "Dungeon");
                 default: return string.Empty;
             }
         }
@@ -236,7 +308,7 @@ namespace CharacterArchive
         private string TargetName(CharacterStoryQuestObjectiveDefinition objective, bool monster)
         {
             IReadOnlyList<string> ids = objective.TargetIds;
-            if (ids == null || ids.Count == 0) return Quest(monster ? 100002 : 100004);
+            if (ids == null || ids.Count == 0) return TextOrFallback(Quest(monster ? 100002 : 100004), monster ? "Any monster" : "Any dungeon");
             var names = new List<string>();
             for (int i = 0; i < ids.Count; i++) names.Add(monster ? MonsterName(ids[i]) : DungeonName(ids[i]));
             return string.Join(", ", names);
@@ -248,6 +320,12 @@ namespace CharacterArchive
             return SafeLocalized(definition != null ? definition.LocalizedName : null, id);
         }
 
+        private LocalizedTextReference MonsterLocalizedName(string id)
+        {
+            MonsterDefinition definition = monsterCatalog != null ? monsterCatalog.Find(id) : null;
+            return definition != null ? definition.LocalizedName : null;
+        }
+
         private string DungeonName(string id)
         {
             DungeonDefinition definition = null;
@@ -255,6 +333,15 @@ namespace CharacterArchive
                 foreach (DungeonDefinition candidate in dungeonCatalog.Dungeons)
                     if (candidate != null && string.Equals(candidate.DungeonId, id, StringComparison.Ordinal)) { definition = candidate; break; }
             return SafeLocalized(definition != null ? definition.DungeonName : null, id);
+        }
+
+        private LocalizedTextReference DungeonLocalizedName(string id)
+        {
+            DungeonDefinition definition = null;
+            if (dungeonCatalog != null)
+                foreach (DungeonDefinition candidate in dungeonCatalog.Dungeons)
+                    if (candidate != null && string.Equals(candidate.DungeonId, id, StringComparison.Ordinal)) { definition = candidate; break; }
+            return definition != null ? definition.DungeonName : null;
         }
 
         private static string SafeLocalized(LocalizedTextReference reference, string fallback)
@@ -265,8 +352,12 @@ namespace CharacterArchive
         }
 
         private static string SafeId(string id) => string.IsNullOrWhiteSpace(id) ? "-" : id;
-        private string Quest(int key) => SafeLocalized(new LocalizedTextReference(QuestTableGuid, key.ToString()), key.ToString());
-        private string Ui(int key) => SafeLocalized(new LocalizedTextReference(UiTableGuid, key.ToString()), "{0}번 퀘스트 진행 중 ({1}/{2})");
+        private string Quest(int key) => localizedQuestTexts.TryGetValue(key, out string value) ? value : null;
+        private static string TextOrFallback(string value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value;
+        private static bool IsUsableLocalizedValue(string value, string key) => !string.IsNullOrWhiteSpace(value) &&
+            !string.Equals(value, key, StringComparison.Ordinal) && !value.StartsWith("No translation found", StringComparison.Ordinal);
+
+        public static string FormatProgressPercent(float progress) => Mathf.RoundToInt(Mathf.Clamp01(progress) * 100f) + "%";
 
         private static int GetProgress(CharacterStoryQuestSnapshot snapshot, string objectiveId, int required)
         {
@@ -313,6 +404,11 @@ namespace CharacterArchive
         {
             try { return string.Format(string.IsNullOrEmpty(format) ? fallback : format, arguments); }
             catch (FormatException) { return string.Format(fallback, arguments); }
+        }
+
+        private static void DisableDynamicLocalizer(TMP_Text target)
+        {
+            if (target != null && target.TryGetComponent(out LocalizedTMPText localizer)) localizer.enabled = false;
         }
 
         private static void SetActive(GameObject target, bool value) { if (target != null && target.activeSelf != value) target.SetActive(value); }
