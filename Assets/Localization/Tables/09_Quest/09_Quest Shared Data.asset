@@ -27,6 +27,10 @@ MonoBehaviour:
     m_Key: 3
     m_Metadata:
       m_Items: []
+  - m_Id: 184712143298560
+    m_Key: 4
+    m_Metadata:
+      m_Items: []
   - m_Id: 22136479746
     m_Key: 10001
     m_Metadata:
@@ -37,6 +41,10 @@ MonoBehaviour:
       m_Items: []
   - m_Id: 22136479748
     m_Key: 10003
+    m_Metadata:
+      m_Items: []
+  - m_Id: 184712143298561
+    m_Key: 10004
     m_Metadata:
       m_Items: []
   m_Metadata:

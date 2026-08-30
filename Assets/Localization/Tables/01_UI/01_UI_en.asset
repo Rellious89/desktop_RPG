@@ -376,6 +376,34 @@ MonoBehaviour:
     m_Localized: "\uD68D\uB4DD\uD560 \uC218 \uC788\uB294 \uC6A9\uBCD1\uC774 \uC5C6\uC2B5\uB2C8\uB2E4."
     m_Metadata:
       m_Items: []
+  - m_Id: 11829341007634432
+    m_Localized: "\uC11C\uC0AC \uD018\uC2A4\uD2B8"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11829341020217344
+    m_Localized: Current Progress
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11829341020217345
+    m_Localized: Total Progress
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11829341020217346
+    m_Localized: "{0}\uBC88 \uD018\uC2A4\uD2B8 \uC9C4\uD589 \uC911 ({1}/{2})"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11829341020217347
+    m_Localized: "\uD018\uC2A4\uD2B8 \uBAA9\uD45C"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11829341020217348
+    m_Localized: "\uD018\uC2A4\uD2B8 \uB0B4\uC6A9"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 11833244730253312
+    m_Localized: "\uD018\uC2A4\uD2B8 \uC815\uBCF4"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
