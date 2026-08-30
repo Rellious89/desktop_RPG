@@ -642,8 +642,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 5.5}
-  m_SizeDelta: {x: 0, y: -11}
+  m_AnchoredPosition: {x: 0, y: -9.5}
+  m_SizeDelta: {x: 0, y: -41}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &3012345285097281181
 MonoBehaviour:
@@ -655,8 +655,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1aa08ab6e0800fa44ae55d278d1423e3, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Content: {fileID: 7907764926595990863}
   m_Horizontal: 0
   m_Vertical: 1
@@ -1294,8 +1294,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3312d7739989d2b4e91e6319e9a96d76, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Padding: {x: 0, y: 0, z: 0, w: 0}
   m_Softness: {x: 0, y: 0}
 --- !u!1 &1432953542823085629
@@ -5372,8 +5372,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 59f8146938fff824cb5fd77236b75775, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_Padding:
     m_Left: 0
     m_Right: 0
@@ -5398,8 +5398,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3245ec927659c4140ac4f8d17403cc18, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   m_HorizontalFit: 0
   m_VerticalFit: 2
 --- !u!1 &4089132135128926730
@@ -8289,8 +8289,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 59bb6604d69834da4a825e7fcf204554, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   questCatalog: {fileID: 11400000, guid: ac4ef6a93ca73405b9e6d3e23b75f32a, type: 2}
   objectiveCatalog: {fileID: 11400000, guid: 25c0dc7582a904651aceb74e9c37cf76, type: 2}
   monsterCatalog: {fileID: 11400000, guid: 0846229ba87f7442a8cabec60e64dd41, type: 2}
@@ -8299,8 +8299,8 @@ MonoBehaviour:
   questInfoPage: {fileID: 6819479105585582015}
   swapButton: {fileID: 5710131456832745531}
   defaultRightPage: 0
-  currentProgressFill: {fileID: 0}
-  totalProgressFill: {fileID: 0}
+  currentProgressFill: {fileID: 7164234519535099456}
+  totalProgressFill: {fileID: 2207632132446104437}
   totalProgressText: {fileID: 2246332465872527706}
   questTypeTitle: {fileID: 3849879197243938115}
   questDescriptionTitle: {fileID: 9086052463914602492}
