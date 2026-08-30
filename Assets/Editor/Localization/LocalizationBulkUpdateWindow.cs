@@ -15,7 +15,7 @@ namespace CommonEditor.Localization
         {
             var window = GetWindow<LocalizationBulkUpdateWindow>();
             window.titleContent = new GUIContent("Localize Update");
-            window.minSize = new Vector2(720, 260);
+            window.minSize = new Vector2(820, 260);
             window.Show();
         }
 
@@ -84,15 +84,16 @@ namespace CommonEditor.Localization
                 GUILayout.Label("신규", GUILayout.Width(50));
                 GUILayout.Label("변경", GUILayout.Width(50));
                 GUILayout.Label("삭제 감지", GUILayout.Width(75));
+                GUILayout.Label("작업", GUILayout.Width(100));
                 GUILayout.Label("상태", GUILayout.ExpandWidth(true));
             }
         }
 
-        private static void DrawRow(LocalizationBulkUpdateService.TableResult table)
+        private void DrawRow(LocalizationBulkUpdateService.TableResult table)
         {
             using (new EditorGUILayout.HorizontalScope())
             {
-                using (new EditorGUI.DisabledScope(!table.IsValid))
+                using (new EditorGUI.DisabledScope(!table.IsValid || table.IsNewLocalization))
                 {
                     table.IsSelected = EditorGUILayout.Toggle(table.IsSelected, GUILayout.Width(48));
                 }
@@ -101,6 +102,14 @@ namespace CommonEditor.Localization
                 GUILayout.Label(table.NewKeyCount.ToString(), GUILayout.Width(50));
                 GUILayout.Label(table.ChangedCount.ToString(), GUILayout.Width(50));
                 GUILayout.Label(table.DeletionDetectedCount.ToString(), GUILayout.Width(75));
+                if (table.CanCreateCollection && GUILayout.Button("테이블 생성", GUILayout.Width(100)))
+                {
+                    CreateCollection(table);
+                }
+                else if (!table.CanCreateCollection)
+                {
+                    GUILayout.Space(104);
+                }
                 GUILayout.Label(table.Status, EditorStyles.wordWrappedMiniLabel, GUILayout.ExpandWidth(true));
             }
         }
@@ -128,6 +137,39 @@ namespace CommonEditor.Localization
             var update = LocalizationBulkUpdateService.UpdateSelected(scanResult.Tables);
             summary = update.Summary;
             if (update.Succeeded)
+            {
+                Debug.Log($"[Localize Update] {summary}");
+                Scan();
+            }
+            else
+            {
+                Debug.LogWarning($"[Localize Update] {summary}");
+            }
+        }
+
+        private void CreateCollection(LocalizationBulkUpdateService.TableResult table)
+        {
+            LocalizationBulkUpdateService.CollectionCreationPlan plan = LocalizationBulkUpdateService.GetCollectionCreationPlan(table);
+            if (!plan.CanCreate)
+            {
+                summary = $"'{table.TableName}' 생성 차단: {plan.Status}";
+                Debug.LogWarning($"[Localize Update] {summary}");
+                return;
+            }
+
+            if (!EditorUtility.DisplayDialog(
+                    "String Table Collection 생성",
+                    $"테이블: {plan.TableName}\n생성 경로: {plan.AssetDirectory}\n\nCSV 내용은 지금 Import되지 않습니다.",
+                    "테이블 생성",
+                    "취소"))
+            {
+                summary = "테이블 생성을 취소했습니다.";
+                return;
+            }
+
+            LocalizationBulkUpdateService.CollectionCreationResult creation = LocalizationBulkUpdateService.CreateCollection(table);
+            summary = creation.Summary;
+            if (creation.Succeeded)
             {
                 Debug.Log($"[Localize Update] {summary}");
                 Scan();

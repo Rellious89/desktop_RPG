@@ -43,13 +43,28 @@ namespace CommonEditor.Localization
             /// <summary>CSV에서 빠진 기존 Key 수. 경고 전용이며 Merge에서 삭제하지 않는다.</summary>
             internal int DeletionDetectedCount;
             internal bool IsSelected;
+            internal CollectionCreationPlan CreationPlan;
 
             internal bool IsValid => Errors.Count == 0;
             internal bool HasChanges => NewKeyCount > 0 || ChangedCount > 0;
+            internal bool IsNewLocalization => Collection == null;
+            internal bool CanCreateCollection => IsNewLocalization && IsValid && CreationPlan != null && CreationPlan.CanCreate;
             internal string Status
             {
                 get
                 {
+                    if (IsNewLocalization)
+                    {
+                        if (!IsValid)
+                        {
+                            return "신규 로컬라이즈: CSV 오류 · " + string.Join("\n", Errors);
+                        }
+
+                        return CanCreateCollection
+                            ? "신규 로컬라이즈: Collection 없음"
+                            : "신규 로컬라이즈: 생성 차단 · " + CreationPlan.Status;
+                    }
+
                     if (!IsValid)
                     {
                         return string.Join("\n", Errors);
@@ -78,8 +93,27 @@ namespace CommonEditor.Localization
             internal string Summary;
         }
 
+        /// <summary>새 Collection 생성 전에 검사한 경로/locale/충돌 정보. UI 없이도 판정할 수 있다.</summary>
+        internal sealed class CollectionCreationPlan
+        {
+            internal string TableName;
+            internal string AssetDirectory;
+            internal readonly List<Locale> Locales = new List<Locale>();
+            internal readonly List<string> Errors = new List<string>();
+
+            internal bool CanCreate => Errors.Count == 0;
+            internal string Status => CanCreate ? "생성 가능" : string.Join("\n", Errors);
+        }
+
+        internal sealed class CollectionCreationResult
+        {
+            internal bool Succeeded;
+            internal string Summary;
+        }
+
         internal static string ProjectRootPath => Directory.GetParent(UnityEngine.Application.dataPath).FullName;
         internal static string DefaultCsvDirectory => Path.Combine(ProjectRootPath, "TableData", "Localization");
+        internal const string CollectionsRootAssetPath = "Assets/Localization/Tables";
 
         internal static ScanResult Scan() => ScanDirectory(DefaultCsvDirectory, ResolveCollection);
 
@@ -117,12 +151,114 @@ namespace CommonEditor.Localization
                 table != null && table.IsSelected && table.IsValid && table.DeletionDetectedCount > 0);
         }
 
+        internal static CollectionCreationPlan GetCollectionCreationPlan(TableResult table)
+        {
+            var plan = new CollectionCreationPlan
+            {
+                TableName = table?.TableName,
+                AssetDirectory = string.IsNullOrEmpty(table?.TableName)
+                    ? CollectionsRootAssetPath
+                    : CollectionsRootAssetPath + "/" + table.TableName,
+            };
+
+            if (table == null)
+            {
+                plan.Errors.Add("생성할 테이블 정보가 없습니다.");
+                return plan;
+            }
+
+            if (!table.IsNewLocalization)
+            {
+                plan.Errors.Add("동일 이름의 StringTableCollection이 이미 존재합니다.");
+            }
+
+            if (!table.IsValid)
+            {
+                plan.Errors.Add("CSV 검증 오류가 있어 생성할 수 없습니다.");
+            }
+
+            ValidateNewCollectionNameAndPath(plan);
+            ValidateCreationLocales(table, plan);
+            return plan;
+        }
+
+        /// <summary>
+        /// 생성만 수행한다. CSV Import는 하지 않으며, 생성 직후 사용자가 별도로 Update Selected를 눌러야 한다.
+        /// </summary>
+        internal static CollectionCreationResult CreateCollection(TableResult scannedTable)
+        {
+            if (scannedTable == null)
+            {
+                return new CollectionCreationResult { Summary = "생성할 테이블 정보가 없습니다." };
+            }
+
+            // 생성 직전에도 CSV/Collection 상태를 다시 읽어 stale 또는 중복 생성으로 인한 부분 생성을 막는다.
+            TableResult current = ScanFile(scannedTable.CsvPath, scannedTable.TableName, ResolveCollection(scannedTable.TableName));
+            if (!string.Equals(scannedTable.FileHash, current.FileHash, StringComparison.Ordinal))
+            {
+                return new CollectionCreationResult { Summary = "CSV가 Scan 뒤 변경되었습니다. Scan을 다시 실행하세요." };
+            }
+
+            current.CreationPlan = GetCollectionCreationPlan(current);
+            if (!current.CanCreateCollection)
+            {
+                return new CollectionCreationResult { Summary = $"'{current.TableName}' 생성 차단: {current.CreationPlan.Status}" };
+            }
+
+            string absoluteDirectory = ToAbsoluteProjectPath(current.CreationPlan.AssetDirectory);
+            bool directoryExistedBefore = Directory.Exists(absoluteDirectory);
+            if (directoryExistedBefore)
+            {
+                // Plan 검사와 실제 생성 사이의 경합도 덮어쓰지 않는다.
+                return new CollectionCreationResult { Summary = $"'{current.TableName}' 생성 차단: 대상 폴더가 이미 존재합니다." };
+            }
+
+            try
+            {
+                StringTableCollection created = LocalizationEditorSettings.CreateStringTableCollection(
+                    current.TableName,
+                    current.CreationPlan.AssetDirectory,
+                    current.CreationPlan.Locales);
+                if (created == null)
+                {
+                    throw new InvalidOperationException("Unity Localization이 StringTableCollection을 만들지 못했습니다.");
+                }
+
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                return new CollectionCreationResult
+                {
+                    Succeeded = true,
+                    Summary = $"신규 로컬라이즈 생성 완료: '{current.TableName}' ({current.CreationPlan.AssetDirectory})",
+                };
+            }
+            catch (Exception exception)
+            {
+                // 생성 전 해당 폴더가 없었으므로, 이 호출이 만든 부분 자산만 안전하게 정리한다.
+                if (!directoryExistedBefore && AssetDatabase.IsValidFolder(current.CreationPlan.AssetDirectory))
+                {
+                    AssetDatabase.DeleteAsset(current.CreationPlan.AssetDirectory);
+                    AssetDatabase.Refresh();
+                }
+
+                return new CollectionCreationResult
+                {
+                    Summary = $"'{current.TableName}' 생성 실패: {exception.Message}",
+                };
+            }
+        }
+
         internal static UpdateResult UpdateSelected(IList<TableResult> scannedTables)
         {
             var selected = scannedTables?.Where(table => table != null && table.IsSelected).ToList() ?? new List<TableResult>();
             if (selected.Count == 0)
             {
                 return new UpdateResult { Summary = "선택된 테이블이 없습니다." };
+            }
+
+            if (selected.Any(table => table.IsNewLocalization))
+            {
+                return new UpdateResult { Summary = "신규 로컬라이즈 항목은 먼저 테이블 생성 후 다시 Scan하세요." };
             }
 
             // 모든 선택 테이블을 먼저 다시 비교한다. 하나라도 stale/invalid이면 절대 일부 적용하지 않는다.
@@ -188,7 +324,17 @@ namespace CommonEditor.Localization
 
             if (collection == null)
             {
-                result.Errors.Add("동일한 이름의 StringTableCollection이 없습니다.");
+                // Collection이 없어도 CSV 자체를 먼저 검증해야 안전하게 생성 후보로 제시할 수 있다.
+                if (TryReadCsv(csvPath, result, out List<string[]> missingCollectionRecords))
+                {
+                    ValidateAndReadRows(missingCollectionRecords, result);
+                    if (result.IsValid)
+                    {
+                        result.NewKeyCount = result.Rows.Count;
+                    }
+                }
+
+                result.CreationPlan = GetCollectionCreationPlan(result);
                 return result;
             }
 
@@ -443,6 +589,81 @@ namespace CommonEditor.Localization
                 && previous.NewKeyCount == current.NewKeyCount
                 && previous.ChangedCount == current.ChangedCount
                 && previous.DeletionDetectedCount == current.DeletionDetectedCount;
+        }
+
+        private static void ValidateNewCollectionNameAndPath(CollectionCreationPlan plan)
+        {
+            string tableName = plan.TableName;
+            if (string.IsNullOrWhiteSpace(tableName))
+            {
+                plan.Errors.Add("테이블명이 비어 있습니다.");
+                return;
+            }
+
+            if (tableName != tableName.Trim())
+            {
+                plan.Errors.Add("테이블명에 앞뒤 공백을 사용할 수 없습니다.");
+            }
+
+            if (tableName.Contains("..")
+                || tableName.IndexOfAny(new[] { '/', '\\', ':', '*', '?', '\"', '<', '>', '|' }) >= 0
+                || tableName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+                || !string.Equals(Path.GetFileName(tableName), tableName, StringComparison.Ordinal))
+            {
+                plan.Errors.Add("테이블명에 경로 이탈 또는 파일명으로 사용할 수 없는 문자가 있습니다.");
+            }
+
+            if (tableName.Contains('[') && tableName.Contains(']'))
+            {
+                plan.Errors.Add("테이블명에 '['와 ']'를 함께 사용할 수 없습니다.");
+            }
+
+            if (!AssetDatabase.IsValidFolder(CollectionsRootAssetPath))
+            {
+                plan.Errors.Add($"Collection 루트 폴더가 없습니다: {CollectionsRootAssetPath}");
+                return;
+            }
+
+            if (AssetDatabase.IsValidFolder(plan.AssetDirectory) || Directory.Exists(ToAbsoluteProjectPath(plan.AssetDirectory)))
+            {
+                plan.Errors.Add("대상 폴더가 이미 존재합니다. 덮어쓰기 또는 부분 자산 보정은 하지 않습니다.");
+            }
+
+            if (LocalizationEditorSettings.GetStringTableCollection(tableName) != null)
+            {
+                plan.Errors.Add("동일 이름의 StringTableCollection이 이미 존재합니다.");
+            }
+        }
+
+        private static void ValidateCreationLocales(TableResult table, CollectionCreationPlan plan)
+        {
+            var locales = LocalizationEditorSettings.GetLocales();
+            if (locales == null || locales.Count == 0)
+            {
+                plan.Errors.Add("현재 프로젝트 Locale이 없습니다.");
+                return;
+            }
+
+            foreach (Locale locale in locales)
+            {
+                if (locale == null || !table.LocaleHeaders.ContainsKey(locale.Identifier.Code))
+                {
+                    plan.Errors.Add("현재 프로젝트 Locale과 CSV locale 열이 일치하지 않습니다.");
+                    return;
+                }
+
+                plan.Locales.Add(locale);
+            }
+
+            if (plan.Locales.Count != table.LocaleHeaders.Count)
+            {
+                plan.Errors.Add("CSV locale 열과 현재 프로젝트 Locale 수가 일치하지 않습니다.");
+            }
+        }
+
+        private static string ToAbsoluteProjectPath(string assetPath)
+        {
+            return Path.Combine(ProjectRootPath, assetPath.Replace('/', Path.DirectorySeparatorChar));
         }
 
         private static string GetDefaultMappedLocaleCode(string header)

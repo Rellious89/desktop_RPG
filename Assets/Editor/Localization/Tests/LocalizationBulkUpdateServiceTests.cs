@@ -24,6 +24,7 @@ namespace CommonEditor.Localization.Tests
         private string csvPath;
         private StringTableCollection collection;
         private SharedTableData.SharedTableEntry existing;
+        private readonly List<string> creationAssetFolders = new List<string>();
 
         [SetUp]
         public void SetUp()
@@ -64,6 +65,14 @@ namespace CommonEditor.Localization.Tests
         [TearDown]
         public void TearDown()
         {
+            foreach (string folder in creationAssetFolders)
+            {
+                if (AssetDatabase.IsValidFolder(folder))
+                {
+                    AssetDatabase.DeleteAsset(folder);
+                }
+            }
+
             if (!string.IsNullOrEmpty(assetFolder))
             {
                 AssetDatabase.DeleteAsset(assetFolder);
@@ -128,6 +137,99 @@ namespace CommonEditor.Localization.Tests
         }
 
         [Test]
+        public void Scan_MissingCollection_IsNewLocalizationAndCanCreate()
+        {
+            string newName = NewCreationName();
+            WriteNewCollectionCsv(newName, "first,,First,첫번째", "second,,Second,두번째");
+
+            var table = ScanByName(newName);
+
+            Assert.IsTrue(table.IsNewLocalization);
+            Assert.IsTrue(table.IsValid, table.Status);
+            Assert.IsTrue(table.CanCreateCollection, table.Status);
+            Assert.AreEqual(2, table.NewKeyCount);
+            Assert.That(table.Status, Does.Contain("신규 로컬라이즈: Collection 없음"));
+        }
+
+        [Test]
+        public void UpdateSelected_BlocksNewLocalizationUntilCollectionIsCreated()
+        {
+            string newName = NewCreationName();
+            WriteNewCollectionCsv(newName, "first,,First,첫번째");
+            var table = ScanByName(newName);
+            table.IsSelected = true;
+
+            var update = LocalizationBulkUpdateService.UpdateSelected(new[] { table });
+
+            Assert.IsFalse(update.Succeeded);
+            Assert.That(update.Summary, Does.Contain("테이블 생성"));
+        }
+
+        [Test]
+        public void CreateCollection_UsesOfficialAssetsAndDoesNotImportCsv()
+        {
+            string newName = NewCreationName();
+            string folder = LocalizationBulkUpdateService.CollectionsRootAssetPath + "/" + newName;
+            creationAssetFolders.Add(folder);
+            WriteNewCollectionCsv(newName, "first,,First,첫번째", "second,,Second,두번째");
+            var missing = ScanByName(newName);
+
+            var creation = LocalizationBulkUpdateService.CreateCollection(missing);
+
+            Assert.IsTrue(creation.Succeeded, creation.Summary);
+            var created = LocalizationEditorSettings.GetStringTableCollection(newName);
+            Assert.IsNotNull(created);
+            Assert.AreEqual(newName, created.TableCollectionName);
+            Assert.IsNotNull(created.SharedData);
+            Assert.IsNotNull(created.GetTable(new LocaleIdentifier("en")) as StringTable);
+            Assert.IsNotNull(created.GetTable(new LocaleIdentifier("ko-KR")) as StringTable);
+            Assert.IsTrue(AssetDatabase.LoadAssetAtPath<StringTableCollection>(folder + "/" + newName + ".asset") != null);
+            Assert.IsTrue(AssetDatabase.LoadAssetAtPath<SharedTableData>(folder + "/" + newName + " Shared Data.asset") != null);
+            Assert.AreEqual(0, created.SharedData.Entries.Count, "생성만으로 CSV Key를 Import하면 안 됩니다.");
+
+            var afterCreation = ScanByName(newName);
+            Assert.IsFalse(afterCreation.IsNewLocalization);
+            Assert.AreEqual(2, afterCreation.NewKeyCount, "재스캔은 CSV의 모든 Key를 신규로 보여야 합니다.");
+            Assert.AreEqual(0, afterCreation.ChangedCount);
+            Assert.IsNotNull(collection.SharedData.GetEntry("existing"), "기존 임시 Collection은 생성으로 변경되면 안 됩니다.");
+        }
+
+        [Test]
+        public void CreateCollection_BlocksConflictInvalidCsvAndInvalidNameWithoutChanges()
+        {
+            string conflictName = NewCreationName();
+            string conflictFolder = LocalizationBulkUpdateService.CollectionsRootAssetPath + "/" + conflictName;
+            Assert.IsFalse(string.IsNullOrEmpty(AssetDatabase.CreateFolder(
+                LocalizationBulkUpdateService.CollectionsRootAssetPath,
+                conflictName)));
+            creationAssetFolders.Add(conflictFolder);
+            WriteNewCollectionCsv(conflictName, "first,,First,첫번째");
+
+            var conflict = ScanByName(conflictName);
+            Assert.IsFalse(conflict.CanCreateCollection);
+            Assert.That(conflict.CreationPlan.Status, Does.Contain("대상 폴더"));
+
+            string invalidCsvName = NewCreationName();
+            WriteCsvWithHeader(invalidCsvName, "Key,Key,English(en)", "first,first,First");
+            var invalidCsv = ScanByName(invalidCsvName);
+            Assert.IsTrue(invalidCsv.IsNewLocalization);
+            Assert.IsFalse(invalidCsv.IsValid);
+            Assert.IsFalse(invalidCsv.CanCreateCollection);
+
+            string invalidName = "new[invalid]" + Guid.NewGuid().ToString("N");
+            WriteNewCollectionCsv(invalidName, "first,,First,첫번째");
+            var invalidTableName = ScanByName(invalidName);
+            Assert.IsTrue(invalidTableName.IsValid);
+            Assert.IsFalse(invalidTableName.CanCreateCollection);
+            Assert.That(invalidTableName.CreationPlan.Status, Does.Contain("'['와 ']'"));
+
+            WriteCsv($"existing,{existing.Id},old english,기존 한국어");
+            Assert.IsFalse(LocalizationBulkUpdateService.GetCollectionCreationPlan(ScanSingle()).CanCreate,
+                "기존 Collection은 생성 후보가 될 수 없습니다.");
+            Assert.IsNotNull(collection.SharedData.GetEntry("existing"));
+        }
+
+        [Test]
         public void UpdateSelected_MergesNewAndChangedValues_PreservesIdsGuidsAndMissingKeys()
         {
             string collectionGuidBefore = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(collection));
@@ -162,7 +264,7 @@ namespace CommonEditor.Localization.Tests
         }
 
         [Test]
-        public void Scan_InvalidDuplicateHeaderUnsupportedLocaleAndMissingCollection_AreBlocked()
+        public void Scan_InvalidDuplicateHeaderAndUnsupportedLocaleAreBlocked_WhileMissingCollectionIsCreationCandidate()
         {
             WriteCsv("duplicate,,A,가", "duplicate,,B,나");
             string badHeaderPath = Path.Combine(csvFolder, "bad-header.csv");
@@ -179,7 +281,9 @@ namespace CommonEditor.Localization.Tests
             Assert.IsFalse(scan.Tables.Single(table => table.TableName == collectionName).IsValid, "중복 Key는 적용을 막아야 합니다.");
             Assert.IsFalse(scan.Tables.Single(table => table.TableName == "bad-header").IsValid, "잘못된 헤더는 적용을 막아야 합니다.");
             Assert.IsFalse(scan.Tables.Single(table => table.TableName == "unsupported-locale").IsValid, "지원하지 않는 locale 열은 적용을 막아야 합니다.");
-            Assert.IsFalse(scan.Tables.Single(table => table.TableName == "missing-collection").IsValid, "Collection 부재는 적용을 막아야 합니다.");
+            var missingCollection = scan.Tables.Single(table => table.TableName == "missing-collection");
+            Assert.IsTrue(missingCollection.IsValid, missingCollection.Status);
+            Assert.IsTrue(missingCollection.IsNewLocalization, "Collection 부재는 신규 로컬라이즈 생성 후보여야 합니다.");
         }
 
         [Test]
@@ -245,6 +349,14 @@ namespace CommonEditor.Localization.Tests
             return scan.Tables.Single(table => table.TableName == collectionName);
         }
 
+        private LocalizationBulkUpdateService.TableResult ScanByName(string tableName)
+        {
+            var scan = LocalizationBulkUpdateService.ScanDirectory(
+                csvFolder,
+                name => name == collectionName ? collection : LocalizationEditorSettings.GetStringTableCollection(name));
+            return scan.Tables.Single(table => table.TableName == tableName);
+        }
+
         private StringTable GetTable(string localeCode)
         {
             return collection.GetTable(new LocaleIdentifier(localeCode)) as StringTable;
@@ -253,6 +365,21 @@ namespace CommonEditor.Localization.Tests
         private void WriteCsv(params string[] rows)
         {
             File.WriteAllText(csvPath, Header + "\n" + string.Join("\n", rows));
+        }
+
+        private void WriteNewCollectionCsv(string tableName, params string[] rows)
+        {
+            File.WriteAllText(Path.Combine(csvFolder, tableName + ".csv"), Header + "\n" + string.Join("\n", rows));
+        }
+
+        private void WriteCsvWithHeader(string tableName, string header, params string[] rows)
+        {
+            File.WriteAllText(Path.Combine(csvFolder, tableName + ".csv"), header + "\n" + string.Join("\n", rows));
+        }
+
+        private static string NewCreationName()
+        {
+            return "__LocalizationBulkUpdateCreateTest_" + Guid.NewGuid().ToString("N");
         }
     }
 }
