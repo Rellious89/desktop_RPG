@@ -40,23 +40,31 @@ namespace CharacterArchiveEditorTests
         }
 
         [Test]
-        public void TotalProgress_UsesCompletedPlusOnlyTheActiveQuestProgress()
+        public void TotalProgress_UsesOnlyConfirmedCompletions()
         {
             CharacterStoryQuestCatalog catalog = Create<CharacterStoryQuestCatalog>();
             Set(catalog, "quests", new List<CharacterStoryQuestDefinition>
             {
                 Quest("Q1", 10), Quest("Q2", 20), Quest("Q3", 30)
             });
-            var snapshot = new CharacterStoryQuestSnapshot("CatKnight", "Q2", false, false,
-                new List<string> { "Q1", "Unknown" }, new Dictionary<string, int>());
+            var firstHalfComplete = new CharacterStoryQuestSnapshot("CatKnight", "Q1", false, false,
+                new List<string>(), new Dictionary<string, int> { { "A", 5 } });
+            var firstReadyButUnconfirmed = new CharacterStoryQuestSnapshot("CatKnight", "Q1", true, false,
+                new List<string>(), new Dictionary<string, int> { { "A", 10 } });
+            var firstConfirmed = new CharacterStoryQuestSnapshot("CatKnight", "Q2", false, false,
+                new List<string> { "Q1" }, new Dictionary<string, int>());
+            var secondPartiallyComplete = new CharacterStoryQuestSnapshot("CatKnight", "Q2", false, false,
+                new List<string> { "Q1" }, new Dictionary<string, int> { { "B", 5 } });
+            var allConfirmed = new CharacterStoryQuestSnapshot("CatKnight", string.Empty, false, true,
+                new List<string> { "Q1", "Q2", "Q3" }, new Dictionary<string, int>());
 
-            float result = CharacterStoryQuestUiController.CalculateTotalProgress(catalog, "CatKnight", snapshot, .5f,
-                out int currentNumber, out int completed, out int total);
-
-            Assert.AreEqual(2, currentNumber);
-            Assert.AreEqual(1, completed);
-            Assert.AreEqual(3, total);
-            Assert.AreEqual(.5f, result);
+            CharacterStoryQuestObjectiveDefinition currentObjective = Objective("A", 10);
+            Assert.AreEqual(.5f, CharacterStoryQuestUiController.CalculateCurrentProgress(new[] { currentObjective }, firstHalfComplete));
+            AssertTotal(catalog, firstHalfComplete, 1, 0, 3, 0f);
+            AssertTotal(catalog, firstReadyButUnconfirmed, 1, 0, 3, 0f);
+            AssertTotal(catalog, firstConfirmed, 2, 1, 3, 1f / 3f);
+            AssertTotal(catalog, secondPartiallyComplete, 2, 1, 3, 1f / 3f);
+            AssertTotal(catalog, allConfirmed, 0, 3, 3, 1f);
         }
 
         [Test]
@@ -67,7 +75,7 @@ namespace CharacterArchiveEditorTests
             var snapshot = new CharacterStoryQuestSnapshot("CatKnight", string.Empty, false, true,
                 new List<string> { "Q1", "Q2", "Unknown" }, new Dictionary<string, int>());
 
-            float result = CharacterStoryQuestUiController.CalculateTotalProgress(catalog, "CatKnight", snapshot, 1f,
+            float result = CharacterStoryQuestUiController.CalculateTotalProgress(catalog, "CatKnight", snapshot,
                 out int currentNumber, out int completed, out int total);
 
             Assert.AreEqual(0, currentNumber);
@@ -258,6 +266,17 @@ namespace CharacterArchiveEditorTests
         private static int LocalizationSubscriptionCount(CharacterStoryQuestUiController controller) =>
             ((System.Collections.IDictionary)typeof(CharacterStoryQuestUiController).GetField("localizationHandlers", BindingFlags.Instance | BindingFlags.NonPublic)
                 .GetValue(controller)).Count;
+
+        private static void AssertTotal(CharacterStoryQuestCatalog catalog, CharacterStoryQuestSnapshot snapshot,
+            int expectedCurrentNumber, int expectedCompleted, int expectedTotal, float expectedProgress)
+        {
+            float progress = CharacterStoryQuestUiController.CalculateTotalProgress(catalog, "CatKnight", snapshot,
+                out int currentNumber, out int completed, out int total);
+            Assert.AreEqual(expectedCurrentNumber, currentNumber);
+            Assert.AreEqual(expectedCompleted, completed);
+            Assert.AreEqual(expectedTotal, total);
+            Assert.AreEqual(expectedProgress, progress);
+        }
 
         private T Create<T>() where T : ScriptableObject { T value = ScriptableObject.CreateInstance<T>(); created.Add(value); return value; }
         private static void Set(object target, string name, object value) => target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).SetValue(target, value);

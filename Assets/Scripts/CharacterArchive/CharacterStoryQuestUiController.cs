@@ -237,7 +237,7 @@ namespace CharacterArchive
             List<CharacterStoryQuestObjectiveDefinition> objectives = active != null ? EnabledObjectives(active.QuestId) : new List<CharacterStoryQuestObjectiveDefinition>();
 
             float current = CalculateCurrentProgress(objectives, snapshot);
-            float total = CalculateTotalProgress(questCatalog, selected != null ? selected.CharacterId : string.Empty, snapshot, current, out int currentNumber, out int completedCount, out int totalCount);
+            float total = CalculateTotalProgress(questCatalog, selected != null ? selected.CharacterId : string.Empty, snapshot, out int currentNumber, out int completedCount, out int totalCount);
             SetSliderProgress(currentProgressSlider, current);
             SetSliderProgress(totalProgressSlider, total);
             if (currentProgressPercentText != null) currentProgressPercentText.text = FormatProgressPercent(current);
@@ -393,7 +393,7 @@ namespace CharacterArchive
         }
 
         public static float CalculateTotalProgress(CharacterStoryQuestCatalog catalog, string characterId, CharacterStoryQuestSnapshot snapshot,
-            float currentProgress, out int currentNumber, out int completedCount, out int totalCount)
+            out int currentNumber, out int completedCount, out int totalCount)
         {
             currentNumber = 0; completedCount = 0; totalCount = 0;
             if (catalog == null || string.IsNullOrEmpty(characterId)) return 0f;
@@ -410,8 +410,7 @@ namespace CharacterArchive
                 if (snapshot != null && string.Equals(quest.QuestId, snapshot.ActiveQuestId, StringComparison.Ordinal)) currentNumber = enabled.IndexOf(quest) + 1;
             }
             completedCount = Mathf.Clamp(completedCount, 0, totalCount);
-            currentProgress = currentNumber > 0 ? Mathf.Clamp01(currentProgress) : 0f;
-            return Mathf.Clamp01((completedCount + currentProgress) / totalCount);
+            return (float)completedCount / totalCount;
         }
 
         private static string SafeFormat(string format, string fallback, params object[] arguments)
