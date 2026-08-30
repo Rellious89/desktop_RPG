@@ -87,8 +87,44 @@ namespace CommonEditor.Localization.Tests
             Assert.IsTrue(table.IsValid, table.Status);
             Assert.AreEqual(0, table.NewKeyCount);
             Assert.AreEqual(0, table.ChangedCount);
-            Assert.AreEqual(1, table.AssetOnlyCount);
+            Assert.AreEqual(1, table.DeletionDetectedCount);
+            Assert.That(table.Status, Does.Contain("삭제 감지 1"));
             Assert.IsFalse(table.IsSelected);
+        }
+
+        [Test]
+        public void Scan_KoreanOnlyChange_CountsOneChangedKey()
+        {
+            WriteCsv($"existing,{existing.Id},old english,바뀐 한국어");
+
+            var table = ScanSingle();
+
+            Assert.AreEqual(1, table.ChangedCount);
+        }
+
+        [Test]
+        public void Scan_BothLocalesOfOneKeyChanged_CountsOneChangedKey()
+        {
+            WriteCsv($"existing,{existing.Id},changed english,바뀐 한국어");
+
+            var table = ScanSingle();
+
+            Assert.AreEqual(1, table.ChangedCount);
+        }
+
+        [Test]
+        public void Scan_TwoDifferentChangedKeys_CountsTwoChangedKeys()
+        {
+            var second = collection.SharedData.AddKey("second");
+            GetTable("en").AddEntry(second.Id, "second old english");
+            GetTable("ko-KR").AddEntry(second.Id, "두번째 기존 한국어");
+            WriteCsv(
+                $"existing,{existing.Id},changed english,기존 한국어",
+                $"second,{second.Id},second old english,두번째 변경 한국어");
+
+            var table = ScanSingle();
+
+            Assert.AreEqual(2, table.ChangedCount);
         }
 
         [Test]
@@ -104,7 +140,7 @@ namespace CommonEditor.Localization.Tests
             Assert.IsTrue(table.IsValid, table.Status);
             Assert.AreEqual(1, table.NewKeyCount);
             Assert.AreEqual(1, table.ChangedCount);
-            Assert.AreEqual(1, table.AssetOnlyCount);
+            Assert.AreEqual(1, table.DeletionDetectedCount);
             Assert.IsTrue(table.IsSelected);
 
             var update = LocalizationBulkUpdateService.UpdateSelected(new[] { table });
@@ -157,6 +193,34 @@ namespace CommonEditor.Localization.Tests
 
             Assert.IsFalse(update.Succeeded);
             Assert.AreEqual("old english", GetTable("en").GetEntry(existing.Id).LocalizedValue);
+        }
+
+        [Test]
+        public void ShouldWarnForDeletion_UsesOnlySelectedValidTables()
+        {
+            var selectedDeletion = new LocalizationBulkUpdateService.TableResult
+            {
+                IsSelected = true,
+                DeletionDetectedCount = 1,
+            };
+            var uncheckedDeletion = new LocalizationBulkUpdateService.TableResult
+            {
+                IsSelected = false,
+                DeletionDetectedCount = 3,
+            };
+            var invalidDeletion = new LocalizationBulkUpdateService.TableResult
+            {
+                IsSelected = true,
+                DeletionDetectedCount = 2,
+            };
+            invalidDeletion.Errors.Add("validation error");
+
+            Assert.IsTrue(LocalizationBulkUpdateService.ShouldWarnForDeletion(new[] { selectedDeletion, uncheckedDeletion }));
+            Assert.IsFalse(LocalizationBulkUpdateService.ShouldWarnForDeletion(new[] { uncheckedDeletion, invalidDeletion }));
+            Assert.IsFalse(LocalizationBulkUpdateService.ShouldWarnForDeletion(new[]
+            {
+                new LocalizationBulkUpdateService.TableResult { IsSelected = true, DeletionDetectedCount = 0 },
+            }));
         }
 
         [Test]

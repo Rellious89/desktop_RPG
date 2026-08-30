@@ -40,14 +40,27 @@ namespace CommonEditor.Localization
             internal readonly List<string> Errors = new List<string>();
             internal int NewKeyCount;
             internal int ChangedCount;
-            internal int AssetOnlyCount;
+            /// <summary>CSV에서 빠진 기존 Key 수. 경고 전용이며 Merge에서 삭제하지 않는다.</summary>
+            internal int DeletionDetectedCount;
             internal bool IsSelected;
 
             internal bool IsValid => Errors.Count == 0;
             internal bool HasChanges => NewKeyCount > 0 || ChangedCount > 0;
-            internal string Status => IsValid
-                ? (HasChanges ? "적용 가능" : "변경 없음")
-                : string.Join("\n", Errors);
+            internal string Status
+            {
+                get
+                {
+                    if (!IsValid)
+                    {
+                        return string.Join("\n", Errors);
+                    }
+
+                    string updateStatus = HasChanges ? "적용 가능" : "변경 없음";
+                    return DeletionDetectedCount > 0
+                        ? $"{updateStatus} · 삭제 감지 {DeletionDetectedCount}"
+                        : updateStatus;
+                }
+            }
         }
 
         internal sealed class CsvRow
@@ -89,8 +102,19 @@ namespace CommonEditor.Localization
 
             int validCount = result.Tables.Count(table => table.IsValid);
             int changedCount = result.Tables.Count(table => table.IsValid && table.HasChanges);
-            result.Summary = $"스캔 완료: {result.Tables.Count}개 테이블, 적용 가능 {changedCount}개, 오류 {result.Tables.Count - validCount}개";
+            int deletionDetectedCount = result.Tables.Sum(table => table.DeletionDetectedCount);
+            result.Summary = $"스캔 완료: {result.Tables.Count}개 테이블, 적용 가능 {changedCount}개, 삭제 감지 {deletionDetectedCount}개, 오류 {result.Tables.Count - validCount}개";
             return result;
+        }
+
+        /// <summary>
+        /// 삭제 감지는 선택되어 실제 update 후보가 된 유효 테이블만 대상으로 한다.
+        /// Window 밖에서도 검증할 수 있도록 Unity UI 호출 없이 유지한다.
+        /// </summary>
+        internal static bool ShouldWarnForDeletion(IEnumerable<TableResult> tables)
+        {
+            return tables != null && tables.Any(table =>
+                table != null && table.IsSelected && table.IsValid && table.DeletionDetectedCount > 0);
         }
 
         internal static UpdateResult UpdateSelected(IList<TableResult> scannedTables)
@@ -385,7 +409,7 @@ namespace CommonEditor.Localization
                 return;
             }
 
-            result.AssetOnlyCount = sharedByKey.Keys.Count(key => !csvKeys.Contains(key));
+            result.DeletionDetectedCount = sharedByKey.Keys.Count(key => !csvKeys.Contains(key));
         }
 
         private static IList<CsvColumns> CreateColumnMappings(TableResult table)
@@ -418,7 +442,7 @@ namespace CommonEditor.Localization
                 && string.Equals(previous.FileHash, current.FileHash, StringComparison.Ordinal)
                 && previous.NewKeyCount == current.NewKeyCount
                 && previous.ChangedCount == current.ChangedCount
-                && previous.AssetOnlyCount == current.AssetOnlyCount;
+                && previous.DeletionDetectedCount == current.DeletionDetectedCount;
         }
 
         private static string GetDefaultMappedLocaleCode(string header)

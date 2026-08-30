@@ -83,7 +83,7 @@ namespace CommonEditor.Localization
                 GUILayout.Label("테이블명", GUILayout.MinWidth(160));
                 GUILayout.Label("신규", GUILayout.Width(50));
                 GUILayout.Label("변경", GUILayout.Width(50));
-                GUILayout.Label("에셋 전용", GUILayout.Width(75));
+                GUILayout.Label("삭제 감지", GUILayout.Width(75));
                 GUILayout.Label("상태", GUILayout.ExpandWidth(true));
             }
         }
@@ -100,7 +100,7 @@ namespace CommonEditor.Localization
                 GUILayout.Label(table.TableName, GUILayout.MinWidth(160));
                 GUILayout.Label(table.NewKeyCount.ToString(), GUILayout.Width(50));
                 GUILayout.Label(table.ChangedCount.ToString(), GUILayout.Width(50));
-                GUILayout.Label(table.AssetOnlyCount.ToString(), GUILayout.Width(75));
+                GUILayout.Label(table.DeletionDetectedCount.ToString(), GUILayout.Width(75));
                 GUILayout.Label(table.Status, EditorStyles.wordWrappedMiniLabel, GUILayout.ExpandWidth(true));
             }
         }
@@ -114,6 +114,17 @@ namespace CommonEditor.Localization
 
         private void UpdateSelected()
         {
+            if (LocalizationBulkUpdateService.ShouldWarnForDeletion(scanResult.Tables)
+                && !EditorUtility.DisplayDialog(
+                    "삭제 감지 경고",
+                    "이전 항목에서 삭제된 텍스트 키가 존재합니다. 테이블 확인을 요망합니다.",
+                    "계속 업데이트",
+                    "취소"))
+            {
+                summary = "삭제 감지 경고에서 업데이트를 취소했습니다.";
+                return;
+            }
+
             var update = LocalizationBulkUpdateService.UpdateSelected(scanResult.Tables);
             summary = update.Summary;
             if (update.Succeeded)
