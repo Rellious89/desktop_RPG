@@ -1,1 +1,2 @@
 skill_id,name_category,name_key,$skill_name,description_category,description_key,$skill_description,icon_key,skill_type,behavior_key,cooldown_seconds,motion_key,display_order,enabled,memo
+catknight_skill_01,10,1,고양이어택,10,10001,날카로운 발톱과 함께 공격한다.,,active_attack,attack_motion,10,CatKnight_Skill_01,10,1,
