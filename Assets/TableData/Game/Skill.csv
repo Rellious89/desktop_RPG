@@ -1,1 +1,1 @@
-skill_id,name_category,name_key,$skill_name,description_category,description_key,$skill_description,icon_key,skill_type,behavior_key,display_order,enabled,memo
+skill_id,name_category,name_key,$skill_name,description_category,description_key,$skill_description,icon_key,skill_type,behavior_key,cooldown_seconds,motion_key,display_order,enabled,memo

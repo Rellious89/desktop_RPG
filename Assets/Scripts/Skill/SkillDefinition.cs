@@ -1,4 +1,5 @@
 using Common;
+using Character;
 using UnityEngine;
 
 namespace Skill
@@ -8,14 +9,10 @@ namespace Skill
     /// 분류 키, 동작 키, 목록 순서). <see cref="Inventory.ItemDefinition"/> /
     /// <see cref="Inventory.CurrencyDefinition"/>과 같은 역할 분담이다.
     ///
-    /// <b>여기에 동작은 없다.</b> 데미지 계산, 쿨다운, 사거리, 발동 조건, 연출 같은 값은 하나도 넣지
-    /// 않았고 <see cref="BehaviorKey"/>를 실제 동작으로 바꾸는 코드도 없다 - 이번 단계의 범위는
-    /// "스킬 표가 존재하고 검증되며 에셋으로 만들어진다"까지다. 쓰이지 않는 필드를 미리 만들어 두면
-    /// 나중에 어떤 값이 실제로 쓰이는 값인지 구분할 수 없게 된다.
-    ///
-    /// <b><see cref="BehaviorKey"/>는 그저 문자열이다.</b> 나중에 이 키를 보고 동작을 고르는 곳이
-    /// 생기더라도, 그 해석기는 이 에셋 바깥에 있어야 한다 - 정의가 스스로 동작을 들고 있으면
-    /// 데이터와 규칙이 한 덩어리가 되어 표만 고쳐서는 확인할 수 없는 상태가 된다.
+    /// 실행 데이터 중 지금 확정된 것은 cooldown과 공격 모션 참조뿐이다. <see cref="BehaviorKey"/>는
+    /// 여전히 분류 문자열이고, 자동 발동·피해 계산·선택 규칙은 아직 여기 두지 않는다. 다만
+    /// <c>attack_motion</c>은 생성 단계에서 이미 <see cref="AttackMotionDefinition"/>을 해석해 직접
+    /// 넣으므로 런타임이 문자열로 프로젝트를 다시 탐색하지 않는다.
     ///
     /// <b>Skill Id는 절대 다른 값으로 대체하지 않는다.</b> 비어 있으면 빈 문자열이며 에셋 파일
     /// 이름도 표시 이름도 대신 쓰지 않는다(<see cref="Inventory.CurrencyDefinition"/>과 같은 규칙).
@@ -50,6 +47,13 @@ namespace Skill
                  "값을 해석하는 코드가 없다</b>.")]
         [SerializeField] private string behaviorKey;
 
+        [Header("Execution")]
+        [Tooltip("다시 자동 발동할 수 있을 때까지의 시간(초). Skill.csv 검증은 유한한 0 이상만 허용하고, attack_motion은 0보다 커야 한다.")]
+        [SerializeField] private float cooldownSeconds;
+
+        [Tooltip("attack_motion 스킬이 재생할 기존 공격 모션. Skill.csv의 motion_key를 Rebuild 시 정확한 에셋명으로 해석해 넣는다.")]
+        [SerializeField] private AttackMotionDefinition attackMotion;
+
         [Header("Ordering")]
         [Tooltip("스킬을 정렬할 때 쓰는 순서 값. 작을수록 앞이다 - 이 값 자체가 목록을 만들지는 " +
                  "않으며, 목록의 순서는 SkillCatalog의 작성 순서가 결정한다.")]
@@ -83,8 +87,14 @@ namespace Skill
         public string SkillType => skillType ?? string.Empty;
 
         /// <summary>동작 키. 지정하지 않았으면 빈 문자열이며, <b>적힌 그대로</b> 돌려준다.
-        /// 이 값을 동작으로 바꾸는 코드는 아직 어디에도 없다.</summary>
+        /// 이 값을 동작으로 바꾸는 선택/실행 코드는 아직 여기 없다.</summary>
         public string BehaviorKey => behaviorKey ?? string.Empty;
+
+        /// <summary>다음 자동 발동까지 기다릴 시간(초). 생성 데이터는 유한한 0 이상으로 검증된다.</summary>
+        public float CooldownSeconds => cooldownSeconds;
+
+        /// <summary>해석된 공격 모션 참조. 런타임에서 motion_key 문자열을 다시 찾지 않는다.</summary>
+        public AttackMotionDefinition AttackMotion => attackMotion;
 
         /// <summary>정렬용 순서 값. 작을수록 앞이며, 지정하지 않으면 0이다.</summary>
         public int DisplayOrder => displayOrder;

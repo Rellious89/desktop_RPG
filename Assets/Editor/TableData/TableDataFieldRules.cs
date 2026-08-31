@@ -343,6 +343,31 @@ namespace TableDataEditor
         }
 
         /// <summary>
+        /// 유한한 단정밀도 실수 칸. 생성 에셋과 런타임이 <see cref="float"/>로 값을 보관하므로
+        /// double로는 유한하지만 float로 변환하면 Infinity가 되는 값도 여기서 거부한다.
+        /// </summary>
+        public static bool TryReadFiniteFloatAtLeast(
+            string file, int line, string column, string raw, float minimum,
+            TableDataDiagnosticLog log, out float value)
+        {
+            if (!float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out value) ||
+                float.IsNaN(value) || float.IsInfinity(value))
+            {
+                log.Error(file, line, column, raw ?? string.Empty,
+                    "유한한 실수가 아닙니다 - InvariantCulture 실수만 허용하며 빈 값, NaN, Infinity는 쓸 수 없습니다.");
+                value = 0f;
+                return false;
+            }
+
+            if (value >= minimum) return true;
+
+            log.Error(file, line, column, raw ?? string.Empty,
+                $"{minimum.ToString(CultureInfo.InvariantCulture)} 이상이어야 합니다 - 값을 자동으로 올려 통과시키지 않습니다.");
+            value = 0f;
+            return false;
+        }
+
+        /// <summary>
         /// 비어 있어도 되는 정수 칸. <b>빈 칸과 값이 있는 칸은 서로 다른 상태</b>라, 빈 칸을 0으로
         /// 바꿔 읽지 않고 <paramref name="hasValue"/>로 구분해 돌려준다 - "아직 정하지 않았다"가
         /// 데이터에서 사라지지 않게 하기 위함이다. 값이 있으면 하한 검사까지 한다.

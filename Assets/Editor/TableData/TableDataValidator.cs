@@ -1301,10 +1301,76 @@ namespace TableDataEditor
                     row.BehaviorKey = behaviorKey;
                 }
 
+                if (TableDataFieldRules.TryReadFiniteFloatAtLeast(
+                        file, line, TableDataColumns.CooldownSeconds,
+                        table.Get(record, TableDataColumns.CooldownSeconds), 0f, log, out float cooldownSeconds))
+                {
+                    row.CooldownSeconds = cooldownSeconds;
+                }
+
+                ReadSkillAttackMotion(table, record, file, line, assets, row, log);
+
                 if (!idOk) continue;
 
                 snapshot.Skills.Add(row);
                 snapshot.SkillsById[row.Id] = row;
+            }
+        }
+
+        /// <summary>
+        /// 공격 모션 실행 데이터. <c>attack_motion</c>은 유효한 모션 참조와 양수 cooldown을 반드시
+        /// 가져야 하며, 다른 behavior도 motion_key를 적었다면 같은 엄격한 이름/프레임 검사를 받는다.
+        /// 검증이 끝난 참조는 행에 보관되어 Rebuild가 그대로 생성 에셋에 기록한다.
+        /// </summary>
+        private static void ReadSkillAttackMotion(
+            CsvTable table, CsvRecord record, string file, int line,
+            TableDataAssetIndex assets, SkillRow row, TableDataDiagnosticLog log)
+        {
+            string key = table.Get(record, TableDataColumns.MotionKey) ?? string.Empty;
+            row.MotionKey = key;
+            bool attackMotionBehavior = string.Equals(row.BehaviorKey, "attack_motion", StringComparison.Ordinal);
+
+            if (attackMotionBehavior && row.CooldownSeconds <= 0f)
+            {
+                log.Error(file, line, TableDataColumns.CooldownSeconds,
+                    table.Get(record, TableDataColumns.CooldownSeconds),
+                    "behavior_key=attack_motion이면 cooldown_seconds는 0보다 커야 합니다.");
+            }
+
+            if (key.Length == 0)
+            {
+                if (attackMotionBehavior)
+                {
+                    log.Error(file, line, TableDataColumns.MotionKey, key,
+                        "behavior_key=attack_motion이면 motion_key는 필수이며 AttackMotionDefinition 에셋명과 정확히 같아야 합니다.");
+                }
+
+                return;
+            }
+
+            AssetLookupResult result = assets.FindAttackMotion(key, out AttackMotionDefinition motion, out int count);
+            switch (result)
+            {
+                case AssetLookupResult.Found:
+                    if (motion.Frames.Length == 0)
+                    {
+                        log.Error(file, line, TableDataColumns.MotionKey, key,
+                            $"'{key}'에는 재생할 프레임이 하나도 없습니다 - motion_key는 프레임이 있는 AttackMotionDefinition만 가리킬 수 있습니다.");
+                        return;
+                    }
+
+                    row.AttackMotion = motion;
+                    return;
+
+                case AssetLookupResult.Ambiguous:
+                    log.Error(file, line, TableDataColumns.MotionKey, key,
+                        $"'{key}' 이름의 AttackMotionDefinition을 {count}개 찾았습니다 - 정확히 하나여야 하며 임의로 고르지 않습니다.");
+                    return;
+
+                default:
+                    log.Error(file, line, TableDataColumns.MotionKey, key,
+                        $"'{key}' 이름과 정확히 일치하는 AttackMotionDefinition을 찾지 못했습니다 - 대소문자와 공백을 포함해 에셋명을 정확히 적으세요.");
+                    return;
             }
         }
 

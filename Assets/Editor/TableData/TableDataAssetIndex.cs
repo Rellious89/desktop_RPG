@@ -42,6 +42,9 @@ namespace TableDataEditor
         private readonly Dictionary<string, List<CharacterMotionProfile>> characterMotionProfiles =
             new Dictionary<string, List<CharacterMotionProfile>>(StringComparer.Ordinal);
 
+        private readonly Dictionary<string, List<AttackMotionDefinition>> attackMotions =
+            new Dictionary<string, List<AttackMotionDefinition>>(StringComparer.Ordinal);
+
         private readonly Dictionary<string, List<ItemDefinition>> manualItemsById =
             new Dictionary<string, List<ItemDefinition>>(StringComparer.Ordinal);
 
@@ -70,6 +73,7 @@ namespace TableDataEditor
 
         private bool motionProfilesBuilt;
         private bool characterMotionProfilesBuilt;
+        private bool attackMotionsBuilt;
         private bool manualItemsBuilt;
         private bool spriteNamesBuilt;
         private bool itemIconNamesBuilt;
@@ -126,6 +130,34 @@ namespace TableDataEditor
                 if (asset == null) continue;
 
                 Append(characterMotionProfiles, asset.name, asset);
+            }
+        }
+
+        // ---- AttackMotionDefinition ----
+
+        /// <summary>
+        /// <c>motion_key</c>가 가리키는 공격 모션을 에셋 이름 <b>완전 일치</b>로 찾는다. 결과 개수를
+        /// 함께 돌려 0개와 중복을 호출자가 명확히 오류로 보고하게 한다.
+        /// </summary>
+        public AssetLookupResult FindAttackMotion(
+            string assetName, out AttackMotionDefinition motion, out int count)
+        {
+            EnsureAttackMotions();
+            return Resolve(attackMotions, assetName, out motion, out count);
+        }
+
+        private void EnsureAttackMotions()
+        {
+            if (attackMotionsBuilt) return;
+            attackMotionsBuilt = true;
+
+            foreach (string guid in AssetDatabase.FindAssets("t:AttackMotionDefinition"))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                var asset = AssetDatabase.LoadAssetAtPath<AttackMotionDefinition>(path);
+                if (asset == null) continue;
+
+                Append(attackMotions, asset.name, asset);
             }
         }
 

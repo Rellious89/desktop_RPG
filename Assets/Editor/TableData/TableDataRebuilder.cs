@@ -1703,8 +1703,8 @@ namespace TableDataEditor
         }
 
         /// <summary>
-        /// 스킬 한 종. 분류 키와 동작 키는 <b>문자열 그대로</b> 적는다 - 그 값을 무엇으로 바꾸는
-        /// 해석기는 이 단계에 없고, 여기서 참조로 만들면 "키를 따라가면 동작이 있다"는 경로가 생긴다.
+        /// 스킬 한 종. behavior_key는 문자열 그대로 보존하고, motion_key는 검증 때 해석해 둔 참조만
+        /// 기록한다. 그러므로 런타임에서 문자열로 AttackMotionDefinition을 재탐색할 필요가 없다.
         /// 설명 참조는 지정이 없으면 <b>비운다</b>(예전 값이 남으면 지운 설명이 계속 나온다).
         /// </summary>
         private static void WriteSkill(SkillDefinition asset, SkillRow row)
@@ -1714,6 +1714,8 @@ namespace TableDataEditor
             serialized.FindProperty("icon").objectReferenceValue = row.Icon;
             serialized.FindProperty("skillType").stringValue = row.SkillType;
             serialized.FindProperty("behaviorKey").stringValue = row.BehaviorKey;
+            serialized.FindProperty("cooldownSeconds").floatValue = row.CooldownSeconds;
+            serialized.FindProperty("attackMotion").objectReferenceValue = row.AttackMotion;
             serialized.FindProperty("displayOrder").intValue = row.DisplayOrder;
             ApplyLocalizedName(serialized.FindProperty("localizedName"), row.Name);
             ApplyLocalizedName(serialized.FindProperty("localizedDescription"), row.Description);
@@ -1939,10 +1941,16 @@ namespace TableDataEditor
                 "기본 체력은 정수 칸이어야 합니다.");
 
             ok &= VerifyFields<SkillDefinition>(log, "skillId", "localizedName", "localizedDescription", "icon",
-                "skillType", "behaviorKey", "displayOrder");
+                "skillType", "behaviorKey", "cooldownSeconds", "attackMotion", "displayOrder");
             ok &= VerifyPropertyType<SkillDefinition>(
                 log, "behaviorKey", SerializedPropertyType.String,
-                "동작 키는 문자열 칸이어야 합니다 - 참조 칸이 되면 표만 보고 동작을 정할 수 없게 됩니다.");
+                "동작 키는 문자열 칸이어야 합니다.");
+            ok &= VerifyPropertyType<SkillDefinition>(
+                log, "cooldownSeconds", SerializedPropertyType.Float,
+                "쿨다운은 실수 칸이어야 합니다.");
+            ok &= VerifyPropertyType<SkillDefinition>(
+                log, "attackMotion", SerializedPropertyType.ObjectReference,
+                $"공격 모션 칸은 {nameof(AttackMotionDefinition)} 참조여야 합니다.");
 
             ok &= VerifyFields<CharacterSkillDefinition>(log, "characterId", "skillId", RelationCharacterField,
                 RelationSkillField, "requiredCharacterLevel", "displayOrder");

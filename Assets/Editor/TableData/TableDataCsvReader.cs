@@ -188,11 +188,13 @@ namespace TableDataEditor
         public const string DescriptionKey = "description_key";
         public const string SkillType = "skill_type";
         public const string BehaviorKey = "behavior_key";
+        public const string CooldownSeconds = "cooldown_seconds";
+        public const string MotionKey = "motion_key";
 
         public static readonly string[] Skill =
         {
             SkillId, NameCategory, NameKey, DescriptionCategory, DescriptionKey, IconKey,
-            SkillType, BehaviorKey, DisplayOrder, Enabled, Memo,
+            SkillType, BehaviorKey, CooldownSeconds, MotionKey, DisplayOrder, Enabled, Memo,
         };
 
         // CharacterSkill.csv

@@ -216,8 +216,9 @@ namespace TableDataEditor
     }
 
     /// <summary>
-    /// Skill.csv 한 행. <b>동작에 관한 값은 하나도 없다</b> - 분류 키와 동작 키는 문자열일 뿐이고,
-    /// 그것을 실제 동작으로 바꾸는 코드는 이 단계에 존재하지 않는다.
+    /// Skill.csv 한 행. 동작 분류는 문자열로 보존하되, <c>attack_motion</c> 스킬은 검증 단계에서
+    /// 해석한 <see cref="AttackMotionDefinition"/> 참조를 함께 가진다. 생성기는 이 스냅샷만 쓰므로
+    /// 런타임이 다시 이름으로 에셋을 탐색할 경로가 없다.
     /// </summary>
     public sealed class SkillRow
     {
@@ -235,6 +236,16 @@ namespace TableDataEditor
 
         /// <summary>동작 키. 비어 있을 수 있고, 값이 있으면 소문자 키 형식을 만족한다.</summary>
         public string BehaviorKey = string.Empty;
+
+        /// <summary>발동 뒤 다시 쓸 수 있을 때까지의 시간(초). 유한한 0 이상 값만 들어온다.</summary>
+        public float CooldownSeconds;
+
+        /// <summary>CSV에 적힌 공격 모션 에셋명. <c>attack_motion</c>에서는 필수다.</summary>
+        public string MotionKey = string.Empty;
+
+        /// <summary><see cref="MotionKey"/>를 정확한 에셋명으로 해석한 결과. 찾기 실패/중복/빈 프레임은
+        /// 검증 오류이므로 정상 스냅샷에서는 <c>attack_motion</c>에 대해 null이 될 수 없다.</summary>
+        public AttackMotionDefinition AttackMotion;
 
         public int DisplayOrder;
         public bool Enabled;

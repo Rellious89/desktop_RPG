@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Character;
 using NUnit.Framework;
+using Skill;
 using UnityEngine;
 
 namespace TableDataEditor.Tests
@@ -24,6 +26,9 @@ namespace TableDataEditor.Tests
         private static readonly MethodInfo ValidateSkillsMethod =
             typeof(TableDataValidator).GetMethod("ValidateSkills", BindingFlags.NonPublic | BindingFlags.Static);
 
+        private static readonly MethodInfo WriteSkillMethod =
+            typeof(TableDataRebuilder).GetMethod("WriteSkill", BindingFlags.NonPublic | BindingFlags.Static);
+
         private static TableDataValidationResult liveResult;
 
         private readonly List<UnityEngine.Object> created = new List<UnityEngine.Object>();
@@ -33,6 +38,8 @@ namespace TableDataEditor.Tests
         {
             Assert.IsNotNull(ValidateSkillsMethod,
                 "TableDataValidator.ValidateSkills를 찾지 못했습니다 - 이름이 바뀌었다면 이 시험도 함께 고치세요.");
+            Assert.IsNotNull(WriteSkillMethod,
+                "TableDataRebuilder.WriteSkill을 찾지 못했습니다 - 생성 데이터 시험도 함께 고치세요.");
         }
 
         [TearDown]
@@ -55,7 +62,8 @@ namespace TableDataEditor.Tests
                 new[]
                 {
                     "skill_id", "name_category", "name_key", "description_category", "description_key",
-                    "icon_key", "skill_type", "behavior_key", "display_order", "enabled", "memo",
+                    "icon_key", "skill_type", "behavior_key", "cooldown_seconds", "motion_key",
+                    "display_order", "enabled", "memo",
                 },
                 TableDataColumns.Skill,
                 "Skill.csv의 필수 컬럼과 순서가 약속과 달라졌습니다.");
@@ -156,6 +164,8 @@ namespace TableDataEditor.Tests
             Assert.IsTrue(row.Name.Resolved);
             Assert.AreEqual("attack", row.SkillType);
             Assert.AreEqual("projectile_single", row.BehaviorKey);
+            Assert.AreEqual(0f, row.CooldownSeconds);
+            Assert.IsNull(row.AttackMotion);
         }
 
         [Test]
@@ -306,6 +316,76 @@ namespace TableDataEditor.Tests
             Assert.IsTrue(TableDataFieldRules.IsValidLowercaseKey("projectile_single"));
         }
 
+        // ---- 실행 데이터 ----
+
+        [Test]
+        public void AttackMotionRow_ResolvesCooldownAndMotionReference_AndWritesTheGeneratedDefinition()
+        {
+            AttackMotionDefinition motion = NewAttackMotion("CatKnight_Attack", hasFrame: true);
+            TableDataSnapshot snapshot = Validate(
+                AttackMotionIndex("CatKnight_Attack", motion), out TableDataDiagnosticLog log,
+                Row("fire_bolt", behaviorKey: "attack_motion", cooldownSeconds: "1.25",
+                    motionKey: "CatKnight_Attack"));
+
+            Assert.AreEqual(0, log.ErrorCount, Describe(log));
+            SkillRow row = snapshot.Skills[0];
+            Assert.AreEqual(1.25f, row.CooldownSeconds);
+            Assert.AreSame(motion, row.AttackMotion);
+
+            var definition = ScriptableObject.CreateInstance<SkillDefinition>();
+            created.Add(definition);
+            WriteSkillMethod.Invoke(null, new object[] { definition, row });
+
+            Assert.AreEqual(1.25f, definition.CooldownSeconds);
+            Assert.AreSame(motion, definition.AttackMotion,
+                "생성 에셋은 문자열 키가 아니라 검증된 AttackMotionDefinition 참조를 가져야 합니다.");
+        }
+
+        [TestCase("0")]
+        [TestCase("-0.1")]
+        [TestCase("NaN")]
+        [TestCase("Infinity")]
+        public void AttackMotionCooldown_MustBeFiniteAndStrictlyPositive(string cooldown)
+        {
+            AttackMotionDefinition motion = NewAttackMotion("CatKnight_Attack", hasFrame: true);
+            Validate(AttackMotionIndex("CatKnight_Attack", motion), out TableDataDiagnosticLog log,
+                Row("fire_bolt", behaviorKey: "attack_motion", cooldownSeconds: cooldown,
+                    motionKey: "CatKnight_Attack"));
+
+            Assert.GreaterOrEqual(CountErrors(log, TableDataColumns.CooldownSeconds), 1, Describe(log));
+        }
+
+        [Test]
+        public void AttackMotionBehavior_RequiresMotionKey()
+        {
+            Validate(out TableDataDiagnosticLog log,
+                Row("fire_bolt", behaviorKey: "attack_motion", cooldownSeconds: "1", motionKey: ""));
+
+            Assert.AreEqual(1, CountErrors(log, TableDataColumns.MotionKey), Describe(log));
+        }
+
+        [Test]
+        public void MotionKey_MustResolveExactlyOneMotionWithAtLeastOneFrame()
+        {
+            Validate(AttackMotionIndex("CatKnight_Attack"), out TableDataDiagnosticLog missing,
+                Row("fire_bolt", behaviorKey: "attack_motion", cooldownSeconds: "1",
+                    motionKey: "CatKnight_Attack"));
+            Assert.AreEqual(1, CountErrors(missing, TableDataColumns.MotionKey), Describe(missing));
+
+            AttackMotionDefinition first = NewAttackMotion("CatKnight_Attack", hasFrame: true);
+            AttackMotionDefinition second = NewAttackMotion("CatKnight_Attack", hasFrame: true);
+            Validate(AttackMotionIndex("CatKnight_Attack", first, second), out TableDataDiagnosticLog duplicate,
+                Row("fire_bolt", behaviorKey: "attack_motion", cooldownSeconds: "1",
+                    motionKey: "CatKnight_Attack"));
+            Assert.AreEqual(1, CountErrors(duplicate, TableDataColumns.MotionKey), Describe(duplicate));
+
+            AttackMotionDefinition noFrames = NewAttackMotion("CatKnight_EmptyAttack", hasFrame: false);
+            Validate(AttackMotionIndex("CatKnight_EmptyAttack", noFrames), out TableDataDiagnosticLog empty,
+                Row("fire_bolt", behaviorKey: "attack_motion", cooldownSeconds: "1",
+                    motionKey: "CatKnight_EmptyAttack"));
+            Assert.AreEqual(1, CountErrors(empty, TableDataColumns.MotionKey), Describe(empty));
+        }
+
         // ---- 순서와 활성 ----
 
         [Test]
@@ -401,14 +481,35 @@ namespace TableDataEditor.Tests
             string iconKey = "",
             string skillType = "",
             string behaviorKey = "",
+            string cooldownSeconds = "0",
+            string motionKey = "",
             string displayOrder = "10",
             string enabled = "1")
         {
             return new[]
             {
                 id, category, key, descriptionCategory, descriptionKey, iconKey, skillType, behaviorKey,
-                displayOrder, enabled, string.Empty,
+                cooldownSeconds, motionKey, displayOrder, enabled, string.Empty,
             };
+        }
+
+        /// <summary>AttackMotionDefinition 조회 결과를 메모리 인덱스에 심는다. 프로젝트 에셋은 만들지 않는다.</summary>
+        private static TableDataAssetIndex AttackMotionIndex(string name, params AttackMotionDefinition[] motions)
+        {
+            var assets = new TableDataAssetIndex();
+            Type type = typeof(TableDataAssetIndex);
+            const BindingFlags Instance = BindingFlags.NonPublic | BindingFlags.Instance;
+
+            FieldInfo builtField = type.GetField("attackMotionsBuilt", Instance);
+            FieldInfo cacheField = type.GetField("attackMotions", Instance);
+
+            Assert.IsNotNull(builtField, "TableDataAssetIndex.attackMotionsBuilt를 찾지 못했습니다.");
+            Assert.IsNotNull(cacheField, "TableDataAssetIndex.attackMotions를 찾지 못했습니다.");
+
+            builtField.SetValue(assets, true);
+            ((Dictionary<string, List<AttackMotionDefinition>>)cacheField.GetValue(assets))[name] =
+                new List<AttackMotionDefinition>(motions);
+            return assets;
         }
 
         /// <summary>Sprite 조회 결과를 심어 둔 인덱스. 디스크에는 아무것도 만들지 않는다.</summary>
@@ -438,6 +539,19 @@ namespace TableDataEditor.Tests
             Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), new Vector2(0.5f, 0.5f));
             created.Add(sprite);
             return sprite;
+        }
+
+        private AttackMotionDefinition NewAttackMotion(string name, bool hasFrame)
+        {
+            var motion = ScriptableObject.CreateInstance<AttackMotionDefinition>();
+            motion.name = name;
+            created.Add(motion);
+
+            FieldInfo frames = typeof(AttackMotionDefinition).GetField(
+                "frames", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(frames, "AttackMotionDefinition.frames를 찾지 못했습니다.");
+            frames.SetValue(motion, hasFrame ? new[] { NewSprite() } : Array.Empty<Sprite>());
+            return motion;
         }
 
         private static int CountErrors(TableDataDiagnosticLog log, string column)
