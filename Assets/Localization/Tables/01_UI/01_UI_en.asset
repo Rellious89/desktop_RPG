@@ -416,6 +416,10 @@ MonoBehaviour:
     m_Localized: "\uC9C4\uD589\uC911"
     m_Metadata:
       m_Items: []
+  - m_Id: 12158553816031232
+    m_Localized: Quest Reward
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
