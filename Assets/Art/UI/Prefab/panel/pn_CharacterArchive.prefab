@@ -1460,7 +1460,6 @@ GameObject:
   - component: {fileID: 1539062435394014593}
   - component: {fileID: 7512292319138991772}
   - component: {fileID: 3527886453458985811}
-  - component: {fileID: 5928138335443850898}
   m_Layer: 5
   m_Name: lb_QuestComplete
   m_TagString: Untagged
@@ -1584,31 +1583,6 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
---- !u!114 &5928138335443850898
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1612673777158798240}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ac2fe041186f04abb8c0c248afb8f108, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  target: {fileID: 3527886453458985811}
-  text:
-    m_TableReference:
-      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
-    m_TableEntryReference:
-      m_KeyId: 11836850380464128
-      m_Key: 
-    m_FallbackState: 0
-    m_WaitForCompletion: 0
-    m_LocalVariables: []
-  references:
-    version: 2
-    RefIds: []
 --- !u!1 &1667758463687502037
 GameObject:
   m_ObjectHideFlags: 0
