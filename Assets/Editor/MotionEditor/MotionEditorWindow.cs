@@ -5,9 +5,14 @@ using System.Reflection;
 using Character;
 using Common;
 using Enemy;
+using Skill;
+using TableDataEditor;
 using UnityEditor;
+using UnityEditor.Localization;
 using UnityEditorInternal;
 using UnityEngine;
+using UnityEngine.Localization;
+using UnityEngine.Localization.Tables;
 using UnityEngine.SceneManagement;
 using UnityEditor.SceneManagement;
 
@@ -54,7 +59,7 @@ namespace CharacterEditor
 
         /// <summary>누적 입력 시뮬레이션의 상태. 런타임 AttackPhase(None/Charging/Recovery)와 1:1 대응한다.</summary>
         private enum ChargeSimPhase { Idle, Charging, Recovery }
-        private enum Workspace { Overview, Idle, IdleEvents, Attack, Movement, Hit, Defeat }
+        private enum Workspace { Overview, Idle, IdleEvents, Attack, Skills, Movement, Hit, Defeat }
         private enum PreviewMotionKind { Idle, IdleEvent, Attack, Hit, Defeat }
         private enum HistoryAction { None, Undo, Redo }
 
@@ -125,6 +130,7 @@ namespace CharacterEditor
         private readonly List<Sprite> rawIdlePreviewFrames = new List<Sprite>();
         private readonly Dictionary<int, ProfileSnapshot> savedProfileSnapshots = new Dictionary<int, ProfileSnapshot>();
         private readonly Dictionary<int, AttackSnapshot> savedAttackSnapshots = new Dictionary<int, AttackSnapshot>();
+        private readonly Dictionary<int, string> characterIdsByMotionProfile = new Dictionary<int, string>();
         private ActorKind actorKind;
         private Workspace workspace = Workspace.Overview;
         private int selectedResourceIndex = -1;
@@ -132,6 +138,10 @@ namespace CharacterEditor
         private int selectedPreviewTargetIndex;
         private int selectedOpponentMotionIndex;
         private int activeTier = 1;
+        private CharacterSkillDefinition selectedSkillRelation;
+        private AttackMotionDefinition selectedUnlinkedSkillMotion;
+        private string lastCreatedSkillMotionKey;
+        private string plannedSkillId = string.Empty;
 
         /// <summary>오버레이 Drop Zone의 동작. 기본은 Replace(드롭한 스프라이트로 배열 통째 교체)이고,
         /// 켜면 기존 배열 뒤에 덧붙인다.</summary>
@@ -203,9 +213,15 @@ namespace CharacterEditor
         private GUIStyle damageNumberPreviewStyle;
         private GUIStyle toolbarStatusStyle;
 
+        private CharacterSkillCatalog characterSkillCatalog;
+
         private ResourceEntry SelectedResource => selectedResourceIndex >= 0 && selectedResourceIndex < resources.Count
             ? resources[selectedResourceIndex]
             : null;
+
+        /// <summary>Attack과 Skills는 같은 AttackMotionDefinition 편집/프리뷰 경로를 쓴다. 이 한 곳으로
+        /// 묶어 두면 Skills를 추가하면서 Cue·오버레이·입력 방식 같은 기존 Attack 기능의 분기가 빠지지 않는다.</summary>
+        private bool IsAttackEditingWorkspace => workspace == Workspace.Attack || workspace == Workspace.Skills;
 
         /// <summary>캐릭터/몬스터 프로필 하나가 아니라 프로젝트 전체가 공유하는 단일 배치 에셋이다 -
         /// 없으면(최초 실행 등) 자동으로 만들어서 항상 non-null을 보장한다.</summary>
@@ -847,6 +863,10 @@ namespace CharacterEditor
             workspace = Workspace.Overview;
             selectedResourceIndex = -1;
             selectedIdleEventIndex = -1;
+            selectedSkillRelation = null;
+            selectedUnlinkedSkillMotion = null;
+            lastCreatedSkillMotionKey = null;
+            plannedSkillId = string.Empty;
             SelectAttack(null);
             ScanArtFolders();
         }
@@ -854,6 +874,7 @@ namespace CharacterEditor
         private void ScanArtFolders()
         {
             string selectedPath = SelectedResource != null ? SelectedResource.FolderPath : null;
+            characterIdsByMotionProfile.Clear();
             resources.Clear();
             if (actorKind == ActorKind.Character)
             {
@@ -953,6 +974,10 @@ namespace CharacterEditor
             previewFrameIndex = 0;
             targetDropdownOpen = false;
             selectedIdleEventIndex = -1;
+            selectedSkillRelation = null;
+            selectedUnlinkedSkillMotion = null;
+            lastCreatedSkillMotionKey = null;
+            plannedSkillId = string.Empty;
             SelectAttack(null);
 
             if (index < 0 || index >= resources.Count)
@@ -1042,6 +1067,8 @@ namespace CharacterEditor
             if (workspace == Workspace.IdleEvents) DrawIdleEventButtons();
             DrawWorkspaceButton(Workspace.Attack, "Attacks");
             if (workspace == Workspace.Attack) DrawAttackButtons(entry.CharacterProfile);
+            DrawWorkspaceButton(Workspace.Skills, "Skills");
+            if (workspace == Workspace.Skills) DrawSkillButtons(entry);
             DrawWorkspaceButton(Workspace.Movement, "Movement");
         }
 
@@ -1065,10 +1092,16 @@ namespace CharacterEditor
                 if (target == Workspace.IdleEvents) selectedIdleEventIndex = 0;
                 if (target == Workspace.Attack && SelectedResource?.CharacterProfile != null)
                 {
+                    selectedSkillRelation = null;
                     SelectTier(1);
+                }
+                else if (target == Workspace.Skills)
+                {
+                    SelectDefaultSkillRelation();
                 }
                 else if (target != Workspace.Attack)
                 {
+                    selectedSkillRelation = null;
                     SelectAttack(null);
                 }
                 RebuildFrameList();
@@ -1166,6 +1199,190 @@ namespace CharacterEditor
             }
 
             if (GUILayout.Button("+ New Attack")) CreateAttackAsset(activeTier);
+        }
+
+        /// <summary>선택한 캐릭터에 표로 연결된 스킬만 보여 준다. CharacterSkillCatalog의 작성 순서에
+        /// 기대지 않고 관계의 display_order → skill_id → pair id(모두 Ordinal)로 다시 정렬해서, 생성
+        /// 에셋 배열 순서가 바뀌어도 Motion Editor의 저작 순서가 안정적으로 유지된다.</summary>
+        private void DrawSkillButtons(ResourceEntry entry)
+        {
+            string characterId = FindCharacterId(entry);
+            if (string.IsNullOrWhiteSpace(characterId))
+            {
+                EditorGUILayout.HelpBox("선택한 Motion Profile에 연결된 CharacterDefinition을 찾지 못했습니다. " +
+                                        "Skills는 CharacterSkill.csv의 character_id를 기준으로 하므로, 먼저 캐릭터 정의의 Motion Profile 연결을 확인하세요.",
+                    MessageType.Warning);
+                return;
+            }
+
+            List<CharacterSkillDefinition> relations = GetOrderedSkillRelations(characterId);
+            if (relations.Count == 0)
+            {
+                EditorGUILayout.HelpBox($"'{characterId}'에 연결된 CharacterSkill 항목이 없습니다. " +
+                                        "빈 Skill.csv / CharacterSkill.csv는 정상 상태이며 다른 Motion Editor 작업공간은 계속 사용할 수 있습니다.",
+                    MessageType.Info);
+                DrawPlannedSkillMotionCreation(entry, characterId);
+                return;
+            }
+
+            EditorGUI.indentLevel++;
+            for (int i = 0; i < relations.Count; i++)
+            {
+                CharacterSkillDefinition relation = relations[i];
+                SkillDefinition skill = relation.Skill;
+                string name = GetSkillDisplayName(skill, relation.SkillId);
+                bool selected = relation == selectedSkillRelation;
+                Color old = GUI.backgroundColor;
+                if (selected) GUI.backgroundColor = new Color(0.35f, 0.72f, 1f);
+                if (GUILayout.Toggle(selected, $"{name}  ({relation.SkillId})", EditorStyles.miniButton) && !selected)
+                {
+                    SelectSkillRelation(relation);
+                }
+                GUI.backgroundColor = old;
+
+                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                {
+                    EditorGUILayout.LabelField($"Required Level: {relation.RequiredCharacterLevel}    Display Order: {relation.DisplayOrder}", EditorStyles.miniLabel);
+                    if (skill == null)
+                    {
+                        EditorGUILayout.LabelField("SkillDefinition: missing (CSV/Rebuild 연결 확인 필요)", EditorStyles.miniLabel);
+                        EditorGUILayout.LabelField("motion_key: unavailable    Motion reference: missing", EditorStyles.miniLabel);
+                    }
+                    else
+                    {
+                        string motionKey = skill.AttackMotion != null ? skill.AttackMotion.name : "(not resolved)";
+                        string connection = skill.AttackMotion != null ? "connected" : "missing";
+                        EditorGUILayout.LabelField($"Cooldown: {skill.CooldownSeconds:0.###} s", EditorStyles.miniLabel);
+                        EditorGUILayout.LabelField($"motion_key: {motionKey}    Motion reference: {connection}", EditorStyles.miniLabel);
+                    }
+                }
+            }
+            EditorGUI.indentLevel--;
+        }
+
+        /// <summary>아직 CSV 행이 하나도 없는 프로젝트도 Skills 화면에서 첫 제작을 시작할 수 있게 한다.
+        /// 이 입력은 CSV를 만들거나 수정하지 않으며, 에셋 이름과 이후 복사할 motion_key 제안에만 쓴다.</summary>
+        private void DrawPlannedSkillMotionCreation(ResourceEntry entry, string characterId)
+        {
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField("Plan First Skill Motion", EditorStyles.boldLabel);
+            plannedSkillId = EditorGUILayout.TextField("Planned skill_id", plannedSkillId);
+            if (string.IsNullOrWhiteSpace(plannedSkillId))
+            {
+                EditorGUILayout.HelpBox("Skill.csv에 넣을 예정인 skill_id를 입력하면, CSV를 건드리지 않고 첫 AttackMotionDefinition을 만들 수 있습니다.",
+                    MessageType.None);
+                return;
+            }
+
+            string suggestedKey = BuildSkillMotionName(characterId, plannedSkillId);
+            DrawCopyableText("Suggested motion_key", suggestedKey);
+            if (GUILayout.Button("Create Planned Skill Motion Asset", GUILayout.Height(28f)))
+                CreateSkillMotionAsset(entry, suggestedKey);
+        }
+
+        private CharacterSkillCatalog GetCharacterSkillCatalog()
+        {
+            if (characterSkillCatalog == null)
+            {
+                characterSkillCatalog = AssetDatabase.LoadAssetAtPath<CharacterSkillCatalog>(
+                    TableDataPaths.CharacterSkillCatalogAssetPath);
+            }
+            return characterSkillCatalog;
+        }
+
+        private string FindCharacterId(ResourceEntry entry)
+        {
+            if (entry?.CharacterProfile == null) return string.Empty;
+            int profileId = entry.CharacterProfile.GetInstanceID();
+            if (characterIdsByMotionProfile.TryGetValue(profileId, out string cached)) return cached;
+
+            string resolvedId = null;
+            string[] guids = AssetDatabase.FindAssets("t:CharacterDefinition");
+            for (int i = 0; i < guids.Length; i++)
+            {
+                CharacterDefinition definition = AssetDatabase.LoadAssetAtPath<CharacterDefinition>(AssetDatabase.GUIDToAssetPath(guids[i]));
+                if (definition == null || definition.MotionProfile != entry.CharacterProfile) continue;
+                string candidate = definition.CharacterId;
+                if (string.IsNullOrWhiteSpace(candidate)) continue;
+                if (resolvedId == null || string.Compare(candidate, resolvedId, StringComparison.Ordinal) < 0) resolvedId = candidate;
+            }
+
+            characterIdsByMotionProfile[profileId] = resolvedId ?? string.Empty;
+            return resolvedId ?? string.Empty;
+        }
+
+        private List<CharacterSkillDefinition> GetOrderedSkillRelations(string characterId)
+        {
+            CharacterSkillCatalog catalog = GetCharacterSkillCatalog();
+            return OrderSkillRelations(catalog != null ? catalog.Relations : null, characterId);
+        }
+
+        internal static List<CharacterSkillDefinition> OrderSkillRelations(
+            IReadOnlyList<CharacterSkillDefinition> relations, string characterId)
+        {
+            var ordered = new List<CharacterSkillDefinition>();
+            if (relations == null || string.IsNullOrWhiteSpace(characterId)) return ordered;
+
+            for (int i = 0; i < relations.Count; i++)
+            {
+                CharacterSkillDefinition relation = relations[i];
+                if (relation != null && relation.IsValid && string.Equals(relation.CharacterId, characterId, StringComparison.Ordinal))
+                    ordered.Add(relation);
+            }
+
+            ordered.Sort((left, right) =>
+            {
+                int displayOrder = left.DisplayOrder.CompareTo(right.DisplayOrder);
+                if (displayOrder != 0) return displayOrder;
+                int skillId = string.Compare(left.SkillId, right.SkillId, StringComparison.Ordinal);
+                return skillId != 0 ? skillId : string.Compare(left.PairId, right.PairId, StringComparison.Ordinal);
+            });
+            return ordered;
+        }
+
+        private void SelectDefaultSkillRelation()
+        {
+            ResourceEntry entry = SelectedResource;
+            string characterId = FindCharacterId(entry);
+            List<CharacterSkillDefinition> relations = GetOrderedSkillRelations(characterId);
+            if (selectedSkillRelation != null && relations.Contains(selectedSkillRelation))
+            {
+                SelectSkillRelation(selectedSkillRelation);
+                return;
+            }
+            SelectSkillRelation(relations.Count > 0 ? relations[0] : null);
+        }
+
+        private void SelectSkillRelation(CharacterSkillDefinition relation)
+        {
+            selectedSkillRelation = relation;
+            selectedUnlinkedSkillMotion = null;
+            SelectAttack(relation?.Skill != null ? relation.Skill.AttackMotion : null);
+            SelectDefaultOpponentMotion();
+            RestartPreview();
+        }
+
+        /// <summary>Motion Editor는 에디터 로케일의 선택/초기화를 건드리지 않는다. ko-KR StringTable을
+        /// 에셋에서 직접 읽고, 참조·테이블·엔트리·값 중 하나라도 없으면 skill_id를 표시한다.</summary>
+        private static string GetSkillDisplayName(SkillDefinition skill, string fallbackId)
+        {
+            if (skill == null) return string.IsNullOrWhiteSpace(fallbackId) ? "(missing skill)" : fallbackId;
+            LocalizedTextReference reference = skill.LocalizedName;
+            if (reference != null && reference.HasReference)
+            {
+                StringTableCollection collection = LocalizationEditorSettings.GetStringTableCollection(reference.TableReference);
+                StringTable table = collection != null
+                    ? collection.GetTable(new LocaleIdentifier("ko-KR")) as StringTable
+                    : null;
+                StringTableEntry entry = table != null ? table.GetEntryFromReference(reference.TableEntryReference) : null;
+                if (entry != null && !string.IsNullOrWhiteSpace(entry.Value)) return entry.Value;
+            }
+            return string.IsNullOrWhiteSpace(fallbackId) ? skill.name : fallbackId;
+        }
+
+        internal static string BuildSkillMotionName(string characterId, string skillId)
+        {
+            return (characterId ?? string.Empty) + "_Skill_" + (skillId ?? string.Empty);
         }
 
         private void SelectTier(int tier)
@@ -1498,11 +1715,185 @@ namespace CharacterEditor
                 case Workspace.Attack:
                     DrawAttackEditor();
                     break;
+                case Workspace.Skills:
+                    DrawSkillEditor(entry);
+                    break;
                 case Workspace.Movement:
                     DrawMovementWorkspace();
                     break;
             }
             if (activeProfileObject.ApplyModifiedProperties()) EditorUtility.SetDirty(entry.CharacterProfile);
+        }
+
+        /// <summary>스킬 자체의 Generated Definition을 수정하지 않고, 거기에 이미 연결된 AttackMotionDefinition을
+        /// 기존 Attack Editor로 넘긴다. 참조가 없는 경우에는 모션 에셋만 만들고 정확한 motion_key를 안내해
+        /// 다음 CSV Rebuild가 공식적으로 연결하게 한다.</summary>
+        private void DrawSkillEditor(ResourceEntry entry)
+        {
+            CharacterSkillDefinition relation = selectedSkillRelation;
+            if (relation == null)
+            {
+                if (selectedUnlinkedSkillMotion != null && selectedAttack == selectedUnlinkedSkillMotion)
+                {
+                    EditorGUILayout.LabelField("Planned Skill Motion", EditorStyles.boldLabel);
+                    DrawCopyableText("motion_key", selectedUnlinkedSkillMotion.name);
+                    EditorGUILayout.HelpBox("이 모션은 아직 CSV 관계에 연결되지 않았습니다. 제작 후 Skill.csv와 CharacterSkill.csv 행을 추가하고 " +
+                                            "Table Data Rebuild를 실행하세요. Generated 에셋은 직접 수정하지 않습니다.", MessageType.Info);
+                    DrawAttackEditor();
+                    return;
+                }
+                EditorGUILayout.HelpBox("왼쪽 Skills 목록에서 스킬을 선택하세요.", MessageType.Info);
+                return;
+            }
+
+            SkillDefinition skill = relation.Skill;
+            EditorGUILayout.LabelField("Skill Motion", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Skill Id", relation.SkillId);
+            EditorGUILayout.LabelField("Name", GetSkillDisplayName(skill, relation.SkillId));
+            EditorGUILayout.LabelField("Required Level", relation.RequiredCharacterLevel.ToString());
+            EditorGUILayout.LabelField("Display Order", relation.DisplayOrder.ToString());
+
+            if (skill == null)
+            {
+                EditorGUILayout.HelpBox("이 CharacterSkillDefinition이 SkillDefinition을 찾지 못했습니다. " +
+                                        "CSV와 Rebuild 결과를 확인한 뒤 다시 선택하세요.", MessageType.Error);
+                return;
+            }
+
+            EditorGUILayout.LabelField("Cooldown", skill.CooldownSeconds.ToString("0.###") + " s");
+            string suggestedKey = BuildSkillMotionName(FindCharacterId(entry), relation.SkillId);
+            AttackMotionDefinition editingMotion = skill.AttackMotion != null
+                ? skill.AttackMotion
+                : selectedAttack != null && string.Equals(selectedAttack.name, lastCreatedSkillMotionKey, StringComparison.Ordinal)
+                    ? selectedAttack
+                    : null;
+            string motionKey = skill.AttackMotion != null ? skill.AttackMotion.name
+                : editingMotion != null ? editingMotion.name : "(not resolved)";
+            DrawCopyableText("motion_key", motionKey);
+            EditorGUILayout.ObjectField("Motion Reference", skill.AttackMotion, typeof(AttackMotionDefinition), false);
+
+            if (skill.AttackMotion == null)
+            {
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.HelpBox("연결된 AttackMotionDefinition이 없습니다. 아래에서 새 모션 에셋을 만들 수 있습니다. " +
+                                        "Generated SkillDefinition을 직접 바꾸지 않습니다. 생성 후 표시되는 정확한 키를 Skill.csv의 motion_key에 넣고 " +
+                                        "Table Data Rebuild를 실행하면 13A의 직접 참조 계약으로 연결됩니다.", MessageType.Warning);
+                DrawCopyableText("Suggested motion_key", suggestedKey);
+                if (GUILayout.Button("Create Skill Motion Asset", GUILayout.Height(28f))) CreateSkillMotionAsset(entry, suggestedKey);
+                if (!string.IsNullOrWhiteSpace(lastCreatedSkillMotionKey))
+                {
+                    EditorGUILayout.HelpBox("Created motion_key (copy exactly): " + lastCreatedSkillMotionKey +
+                                            "\nNext: put this value in Skill.csv > motion_key, then run Table Data Rebuild.", MessageType.Info);
+                }
+                if (editingMotion == null) return;
+                EditorGUILayout.Space(8f);
+                EditorGUILayout.HelpBox("현재 편집 중인 새 모션은 아직 Generated SkillDefinition에 연결되지 않았습니다. " +
+                                        "아래 Attack 편집기로 제작한 뒤 위 motion_key를 CSV에 넣어 Rebuild하세요.", MessageType.Info);
+            }
+
+            EditorGUILayout.Space(8f);
+            EditorGUILayout.HelpBox("이 모션은 기존 Attack 편집기와 동일합니다. 프레임, FPS, Cast/Hit cue, 사운드, 이펙트, " +
+                                    "오버레이, 발사체, 입력 방식과 프리뷰가 모두 같은 AttackMotionDefinition을 사용합니다.", MessageType.Info);
+            DrawAttackEditor();
+        }
+
+        /// <summary>표시값을 에셋에 쓰지 않으면서도 사용자가 정확한 motion_key를 복사할 수 있게 한다.</summary>
+        private static void DrawCopyableText(string label, string value)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.PrefixLabel(label);
+                Rect rect = GUILayoutUtility.GetRect(new GUIContent(value ?? string.Empty), EditorStyles.textField, GUILayout.ExpandWidth(true));
+                EditorGUI.SelectableLabel(rect, value ?? string.Empty, EditorStyles.textField);
+            }
+        }
+
+        private void CreateSkillMotionAsset(ResourceEntry entry, string suggestedKey)
+        {
+            if (entry?.CharacterProfile == null || string.IsNullOrWhiteSpace(suggestedKey)) return;
+            EnsureAssetFolder(entry.DataFolderPath);
+
+            string defaultPath = entry.DataFolderPath + "/" + suggestedKey + ".asset";
+            List<AttackMotionDefinition> sameNamedMotions = FindAttackMotionsByName(suggestedKey);
+            if (sameNamedMotions.Count == 1)
+            {
+                AttackMotionDefinition existingMotion = sameNamedMotions[0];
+                int choice = EditorUtility.DisplayDialogComplex("Skill Motion Name Already Exists",
+                    $"'{suggestedKey}' 이름의 AttackMotionDefinition이 이미 있습니다. 기존 에셋은 덮어쓰지 않습니다.",
+                    "Select Existing", "Cancel", "Choose New Name");
+                if (choice == 0)
+                {
+                    lastCreatedSkillMotionKey = existingMotion.name;
+                    selectedUnlinkedSkillMotion = existingMotion;
+                    SelectAttack(existingMotion);
+                }
+                else if (choice == 2)
+                {
+                    PromptAndCreateSkillMotion(entry, suggestedKey);
+                }
+                return;
+            }
+
+            if (sameNamedMotions.Count > 1)
+            {
+                EditorUtility.DisplayDialog("Skill Motion Name Is Ambiguous",
+                    $"'{suggestedKey}' 이름의 AttackMotionDefinition이 {sameNamedMotions.Count}개 있습니다. " +
+                    "motion_key는 프로젝트 전체에서 하나만 가리켜야 하므로 기존 항목을 선택하거나 연결할 수 없습니다. 다른 이름을 선택하세요.", "OK");
+                PromptAndCreateSkillMotion(entry, suggestedKey);
+                return;
+            }
+
+            UnityEngine.Object existingAtPath = AssetDatabase.LoadMainAssetAtPath(defaultPath);
+            if (existingAtPath != null)
+            {
+                EditorUtility.DisplayDialog("Skill Motion Name Already Exists",
+                    $"'{suggestedKey}' 경로에 {existingAtPath.GetType().Name} 에셋이 이미 있습니다. 덮어쓰지 않았습니다. 다른 이름을 선택하세요.", "OK");
+                PromptAndCreateSkillMotion(entry, suggestedKey);
+                return;
+            }
+
+            PromptAndCreateSkillMotion(entry, suggestedKey);
+        }
+
+        private void PromptAndCreateSkillMotion(ResourceEntry entry, string suggestedKey)
+        {
+            string path = EditorUtility.SaveFilePanelInProject("Create Skill Motion", suggestedKey, "asset",
+                "생성할 AttackMotionDefinition의 이름을 지정하세요. 이 이름이 Skill.csv의 exact motion_key가 됩니다.", entry.DataFolderPath);
+            if (string.IsNullOrWhiteSpace(path)) return;
+
+            string motionKey = Path.GetFileNameWithoutExtension(path);
+            UnityEngine.Object existing = AssetDatabase.LoadMainAssetAtPath(path);
+            List<AttackMotionDefinition> sameNamedMotions = FindAttackMotionsByName(motionKey);
+            if (existing != null || sameNamedMotions.Count > 0)
+            {
+                EditorUtility.DisplayDialog("Skill Motion Not Created",
+                    $"'{motionKey}' 이름의 에셋 또는 AttackMotionDefinition이 이미 있습니다. " +
+                    "motion_key 충돌을 막기 위해 덮어쓰지 않았습니다. 다른 이름을 선택하세요.", "OK");
+                return;
+            }
+
+            var motion = CreateInstance<AttackMotionDefinition>();
+            AssetDatabase.CreateAsset(motion, path);
+            AssetDatabase.SaveAssets();
+            lastCreatedSkillMotionKey = motion.name;
+            selectedUnlinkedSkillMotion = motion;
+            SelectAttack(motion);
+            EditorGUIUtility.PingObject(motion);
+        }
+
+        /// <summary>13A motion_key는 프로젝트 전체의 AttackMotionDefinition 에셋명과 Ordinal 완전 일치해야
+        /// 한다. 같은 이름이 다른 폴더에 있어도 Rebuild에서 모호해지므로 생성 전에 전체를 검사한다.</summary>
+        private static List<AttackMotionDefinition> FindAttackMotionsByName(string motionKey)
+        {
+            var matches = new List<AttackMotionDefinition>();
+            if (string.IsNullOrWhiteSpace(motionKey)) return matches;
+            string[] guids = AssetDatabase.FindAssets("t:AttackMotionDefinition");
+            for (int i = 0; i < guids.Length; i++)
+            {
+                AttackMotionDefinition candidate = AssetDatabase.LoadAssetAtPath<AttackMotionDefinition>(AssetDatabase.GUIDToAssetPath(guids[i]));
+                if (candidate != null && string.Equals(candidate.name, motionKey, StringComparison.Ordinal)) matches.Add(candidate);
+            }
+            return matches;
         }
 
         /// <summary>이 캐릭터의 위치 연출 두 가지를 한 화면에서 편집한다. 둘 다 런타임에서는 같은
@@ -2575,7 +2966,7 @@ namespace CharacterEditor
         private PreviewMotion GetMainPreviewMotion()
         {
             if (SelectedResource == null) return null;
-            if (workspace == Workspace.Attack && selectedAttack != null) return CreateAttackMotion(selectedAttack);
+            if (IsAttackEditingWorkspace && selectedAttack != null) return CreateAttackMotion(selectedAttack);
 
             SerializedProperty clip = GetActiveClip();
             if (clip != null)
@@ -2737,7 +3128,7 @@ namespace CharacterEditor
         private void SelectDefaultOpponentMotion()
         {
             List<PreviewMotion> motions = BuildPreviewMotions(GetSelectedPreviewTarget());
-            PreviewMotionKind desired = actorKind == ActorKind.Character && workspace == Workspace.Attack
+            PreviewMotionKind desired = actorKind == ActorKind.Character && IsAttackEditingWorkspace
                 ? PreviewMotionKind.Hit
                 : actorKind == ActorKind.Monster && workspace == Workspace.Hit
                     ? PreviewMotionKind.Attack
@@ -2751,7 +3142,7 @@ namespace CharacterEditor
             var visible = new List<PreviewMotion>();
             foreach (PreviewMotion motion in motions)
             {
-                bool attackHitPair = actorKind == ActorKind.Character && workspace == Workspace.Attack
+                bool attackHitPair = actorKind == ActorKind.Character && IsAttackEditingWorkspace
                     || actorKind == ActorKind.Monster && workspace == Workspace.Hit;
                 bool relevant;
                 if (attackHitPair)
@@ -2799,7 +3190,7 @@ namespace CharacterEditor
 
         private bool IsMainMotionSelected(PreviewMotion motion)
         {
-            if (motion.Kind == PreviewMotionKind.Attack) return workspace == Workspace.Attack && motion.Attack == selectedAttack;
+            if (motion.Kind == PreviewMotionKind.Attack) return IsAttackEditingWorkspace && motion.Attack == selectedAttack;
             return motion.Kind == PreviewMotionKind.Idle && (workspace == Workspace.Idle || workspace == Workspace.Overview || workspace == Workspace.Movement)
                 || motion.Kind == PreviewMotionKind.Hit && workspace == Workspace.Hit
                 || motion.Kind == PreviewMotionKind.Defeat && workspace == Workspace.Defeat;
@@ -4020,7 +4411,7 @@ namespace CharacterEditor
 
         private SerializedProperty GetActiveFrames()
         {
-            if (workspace == Workspace.Attack && attackObject != null)
+            if (IsAttackEditingWorkspace && attackObject != null)
             {
                 attackObject.Update();
                 return attackObject.FindProperty("frames");
@@ -4031,7 +4422,7 @@ namespace CharacterEditor
 
         private SerializedProperty GetActiveFps()
         {
-            if (workspace == Workspace.Attack && attackObject != null) return attackObject.FindProperty("animationFps");
+            if (IsAttackEditingWorkspace && attackObject != null) return attackObject.FindProperty("animationFps");
             return GetActiveClip()?.FindPropertyRelative("animationFps");
         }
 
@@ -4072,7 +4463,7 @@ namespace CharacterEditor
 
         private bool IsAttackPreview()
         {
-            return actorKind == ActorKind.Character && workspace == Workspace.Attack && selectedAttack != null;
+            return actorKind == ActorKind.Character && IsAttackEditingWorkspace && selectedAttack != null;
         }
 
         private Sprite GetPreviewSprite(int index)
