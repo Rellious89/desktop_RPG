@@ -75,6 +75,7 @@ namespace CharacterArchiveEditor
                 Set(serialized, "questTypeLineTemplate", typeTemplate);
                 Set(serialized, "questDescriptionLineTemplate", descriptionTemplate);
                 Set(serialized, "completeButton", Find(root.transform, "pn_right/QuestInfo/QuestInfo/btn_QuestComplete").GetComponent<Button>());
+                Set(serialized, "completeButtonText", Find(root.transform, "pn_right/QuestInfo/QuestInfo/btn_QuestComplete/lb_QuestComplete").GetComponent<TMP_Text>());
                 Set(serialized, "objectiveScroll", scroll.GetComponent<ScrollRect>());
                 serialized.ApplyModifiedPropertiesWithoutUndo();
 

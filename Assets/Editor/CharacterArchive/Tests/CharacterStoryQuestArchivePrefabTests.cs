@@ -48,6 +48,11 @@ namespace CharacterArchiveEditorTests
                 Assert.AreSame(totalProgressText.GetComponent<TMP_Text>(),
                     controllerSerialized.FindProperty("totalProgressText").objectReferenceValue,
                     "보이는 전체 진행 문구가 컨트롤러에 연결되어야 합니다.");
+                Transform completeButtonText = Find(root.transform,
+                    "pn_right/QuestInfo/QuestInfo/btn_QuestComplete/lb_QuestComplete");
+                Assert.AreSame(completeButtonText.GetComponent<TMP_Text>(),
+                    controllerSerialized.FindProperty("completeButtonText").objectReferenceValue,
+                    "완료 버튼 문구는 진행/완료 상태에 따라 컨트롤러가 갱신해야 합니다.");
                 Transform content = Find(current, "ObjectiveScroll/Viewport/Content");
                 ScrollRect scroll = current.Find("ObjectiveScroll").GetComponent<ScrollRect>();
                 Assert.IsTrue(scroll.vertical); Assert.IsFalse(scroll.horizontal);
@@ -61,6 +66,9 @@ namespace CharacterArchiveEditorTests
                 LocalizedTMPText totalProgressLocalizer = totalProgressText.GetComponent<LocalizedTMPText>();
                 Assert.IsTrue(totalProgressLocalizer == null || !totalProgressLocalizer.enabled,
                     "동적 총 진행 문구는 컨트롤러가 단독 소유해야 합니다.");
+                LocalizedTMPText completeButtonLocalizer = completeButtonText.GetComponent<LocalizedTMPText>();
+                Assert.IsTrue(completeButtonLocalizer == null || !completeButtonLocalizer.enabled,
+                    "동적 완료 버튼 문구는 정적 LocalizedTMPText와 동시에 갱신되면 안 됩니다.");
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
         }

@@ -7965,6 +7965,7 @@ MonoBehaviour:
   questTypeLineTemplate: {fileID: 2687482215357816714}
   questDescriptionLineTemplate: {fileID: 748448507804973546}
   completeButton: {fileID: 4000634981908462201}
+  completeButtonText: {fileID: 3527886453458985811}
   objectiveScroll: {fileID: 3012345285097281181}
 --- !u!1 &6847384618704923900
 GameObject:

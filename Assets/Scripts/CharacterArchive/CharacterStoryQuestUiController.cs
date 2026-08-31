@@ -22,6 +22,8 @@ namespace CharacterArchive
         private const string QuestTableGuid = "11805744adb144cd3bb37f325635e0d9";
         private const string UiTableGuid = "32fd067a20b754a50b20446b9c78d2ae";
         private const int TotalProgressFormatKey = 87;
+        private const int CompleteButtonReadyKey = 91;
+        private const int CompleteButtonInProgressKey = 93;
         private static readonly int[] QuestLocalizationKeys = { 1, 2, 3, 4, 10001, 10002, 10003, 10004, 100002, 100004 };
 
         [Header("Catalogs (Inspector에서만 연결)")]
@@ -48,6 +50,7 @@ namespace CharacterArchive
         [SerializeField] private TMP_Text questTypeLineTemplate;
         [SerializeField] private TMP_Text questDescriptionLineTemplate;
         [SerializeField] private Button completeButton;
+        [SerializeField] private TMP_Text completeButtonText;
         [SerializeField] private ScrollRect objectiveScroll;
 
         private readonly List<TMP_Text> typeLines = new List<TMP_Text>();
@@ -59,6 +62,10 @@ namespace CharacterArchive
         private readonly Dictionary<LocalizedTextReference, LocalizedString.ChangeHandler> localizationHandlers = new Dictionary<LocalizedTextReference, LocalizedString.ChangeHandler>();
         private LocalizedTextReference totalProgressFormatReference;
         private string totalProgressFormat;
+        private LocalizedTextReference completeButtonReadyReference;
+        private LocalizedTextReference completeButtonInProgressReference;
+        private string completeButtonReadyText;
+        private string completeButtonInProgressText;
         private CharacterDefinition selected;
         private bool completionRequested;
         private bool subscribed;
@@ -71,7 +78,7 @@ namespace CharacterArchive
                                              swapButton != null && closeButton != null && completeButton != null &&
                                              currentProgressSlider != null && totalProgressSlider != null &&
                                              currentProgressPercentText != null && totalProgressPercentText != null && totalProgressText != null &&
-                                             questTypeLineTemplate != null && questDescriptionLineTemplate != null;
+                                             questTypeLineTemplate != null && questDescriptionLineTemplate != null && completeButtonText != null;
 
         public void OpenFor(CharacterDefinition definition)
         {
@@ -115,6 +122,7 @@ namespace CharacterArchive
             BindButtons();
             SubscribeLocalization();
             DisableDynamicLocalizer(totalProgressText);
+            DisableDynamicLocalizer(completeButtonText);
         }
 
         private void TearDown()
@@ -145,6 +153,18 @@ namespace CharacterArchive
             AddLocalization(totalProgressFormatReference, value =>
             {
                 totalProgressFormat = IsUsableLocalizedValue(value, TotalProgressFormatKey.ToString()) ? value : null;
+                Refresh();
+            });
+            completeButtonReadyReference = CreateLocalizedReference(UiTableGuid, CompleteButtonReadyKey);
+            AddLocalization(completeButtonReadyReference, value =>
+            {
+                completeButtonReadyText = IsUsableLocalizedValue(value, CompleteButtonReadyKey.ToString()) ? value : null;
+                Refresh();
+            });
+            completeButtonInProgressReference = CreateLocalizedReference(UiTableGuid, CompleteButtonInProgressKey);
+            AddLocalization(completeButtonInProgressReference, value =>
+            {
+                completeButtonInProgressText = IsUsableLocalizedValue(value, CompleteButtonInProgressKey.ToString()) ? value : null;
                 Refresh();
             });
             subscribed = true;
@@ -203,6 +223,10 @@ namespace CharacterArchive
             localizedQuestTexts.Clear();
             totalProgressFormatReference = null;
             totalProgressFormat = null;
+            completeButtonReadyReference = null;
+            completeButtonInProgressReference = null;
+            completeButtonReadyText = null;
+            completeButtonInProgressText = null;
             subscribed = false;
         }
 
@@ -266,7 +290,12 @@ namespace CharacterArchive
 
             SetActive(questTypeTitle != null ? questTypeTitle.gameObject : null, objectives.Count > 0);
             SetActive(questDescriptionTitle != null ? questDescriptionTitle.gameObject : null, objectives.Count > 0);
-            if (completeButton != null) completeButton.interactable = !completionRequested && active != null && snapshot.ReadyToComplete;
+            bool readyToComplete = active != null && snapshot.ReadyToComplete;
+            if (completeButton != null) completeButton.interactable = !completionRequested && readyToComplete;
+            if (completeButtonText != null)
+                completeButtonText.text = readyToComplete
+                    ? TextOrFallback(completeButtonReadyText, "퀘스트 완료")
+                    : TextOrFallback(completeButtonInProgressText, "진행중");
             if (objectiveScroll != null) { objectiveScroll.verticalNormalizedPosition = 1f; LayoutRebuilder.ForceRebuildLayoutImmediate(objectiveScroll.content); }
         }
 

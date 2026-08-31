@@ -121,6 +121,8 @@ namespace CharacterArchiveEditorTests
             Assert.IsNotEmpty(quest.GetEntry("4").Value);
             Assert.AreEqual("던전 2회 입장 (1/2)", string.Format(quest.GetEntry("10004").Value, "던전", 2, 1, 2));
             Assert.AreEqual("2번 퀘스트 진행 중 (1/3)", string.Format(ui.GetEntry("87").Value, 2, 1, 3));
+            Assert.AreEqual("퀘스트 완료", ui.GetEntry("91").Value);
+            Assert.AreEqual("진행중", ui.GetEntry("93").Value);
         }
 
         [TestCase(0f)]
@@ -146,15 +148,15 @@ namespace CharacterArchiveEditorTests
             GameObject host = new GameObject("story-quest-localization-lifecycle"); created.Add(host);
             var controller = host.AddComponent<CharacterStoryQuestUiController>();
             controller.OpenFor(null);
-            Assert.AreEqual(11, LocalizationSubscriptionCount(controller));
+            Assert.AreEqual(13, LocalizationSubscriptionCount(controller));
 
             controller.Close();
             Assert.AreEqual(0, LocalizationSubscriptionCount(controller));
 
             controller.OpenFor(null);
-            Assert.AreEqual(11, LocalizationSubscriptionCount(controller));
+            Assert.AreEqual(13, LocalizationSubscriptionCount(controller));
             controller.OpenFor(null);
-            Assert.AreEqual(11, LocalizationSubscriptionCount(controller));
+            Assert.AreEqual(13, LocalizationSubscriptionCount(controller));
         }
 
         [Test]
