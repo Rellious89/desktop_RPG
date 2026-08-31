@@ -36,6 +36,11 @@ MonoBehaviour:
   displayOrder: 20
   isFinal: 0
   enabled: 1
+  rewards:
+  - rewardType: 1
+    currency: {fileID: 11400000, guid: 25530e3cfd6944ca4873f62520cd7d22, type: 2}
+    item: {fileID: 0}
+    amount: 150
   references:
     version: 2
     RefIds: []

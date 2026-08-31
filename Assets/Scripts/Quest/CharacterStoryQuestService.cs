@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Character;
 using Common;
 using Dungeon;
+using Inventory;
 using UnityEngine;
 
 namespace Quest
@@ -15,12 +16,21 @@ namespace Quest
         [SerializeField] private CharacterStoryQuestCatalog questCatalog;
         [SerializeField] private CharacterStoryQuestObjectiveCatalog objectiveCatalog;
         [SerializeField] private CharacterRoster roster;
+        [SerializeField] private InventoryManager inventoryManager;
+
+        [Header("Reward Toast")]
+        [SerializeField] private string rewardToastFormat = "획득: +{0} 재화 / {1} x{2}";
+        [SerializeField] private string itemOnlyToastFormat = "획득: {0} x{1}";
+        [SerializeField] private string currencyOnlyToastFormat = "획득: +{0} 재화";
+
+        private static Func<bool> saveOverride;
 
         public static CharacterStoryQuestService Instance { get; private set; }
         public static event Action<string> QuestBecameReadyToComplete;
 
         /// <summary>씬 wiring 검사와 부트스트랩 실패 차단에 쓰는 최소 구성 계약.</summary>
-        public bool HasRequiredReferences => questCatalog != null && objectiveCatalog != null && roster != null;
+        public bool HasRequiredReferences => questCatalog != null && objectiveCatalog != null &&
+                                             roster != null && ResolveInventory() != null;
 
         private void Awake()
         {
@@ -62,16 +72,107 @@ namespace Quest
         public bool TryConfirmComplete(string characterId)
         {
             if (!SaveSystem.TryGetLoadedData(out SaveData data)) return false;
+            CharacterStoryQuestSaveState state = FindState(data, characterId);
+            CharacterStoryQuestDefinition current = state != null && questCatalog != null
+                ? questCatalog.Find(state.activeQuestId) : null;
+            if (current == null || !state.readyToComplete) return false;
+
+            InventoryManager inventory = ResolveInventory();
+            if (inventory == null) return false;
+            BuildRewardRequest(current, out int currencyAmount, out List<InventoryManager.RewardItemStack> itemStacks);
             CharacterStoryQuestMutationReceipt receipt = Capture(data, characterId);
-            if (!ConfirmWithoutSave(data, characterId)) return false;
-            if (SaveSystem.Save())
+            InventoryRewardMutationReceipt rewardReceipt =
+                inventory.ApplyRewardsWithoutSave(currencyAmount, itemStacks);
+            if (!ConfirmWithoutSave(data, characterId))
             {
-                NotifyReadyAfterExternalSave(receipt);
+                inventory.RollbackRewards(rewardReceipt);
+                return false;
+            }
+            bool saved;
+            try
+            {
+                saved = SaveNow();
+            }
+            catch (Exception exception)
+            {
+                // SaveSystem.Save는 자체적으로 예외를 삼키지만, 시험 이음매나 이후 저장 구현이
+                // 예외를 던져도 완료/보상이 메모리에 남으면 안 된다.
+                Debug.LogWarning("[CharacterStoryQuestService] 퀘스트 완료 저장 실패: " + exception.Message);
+                saved = false;
+            }
+            if (saved)
+            {
+                inventory.NotifyRewardsAfterExternalSave(rewardReceipt);
+                ShowRewardToast(rewardReceipt.Result);
                 return true;
             }
             Rollback(receipt);
+            inventory.RollbackRewards(rewardReceipt);
             return false;
         }
+
+        private static void BuildRewardRequest(CharacterStoryQuestDefinition quest, out int currencyAmount,
+            out List<InventoryManager.RewardItemStack> itemStacks)
+        {
+            currencyAmount = 0;
+            itemStacks = new List<InventoryManager.RewardItemStack>();
+            if (quest == null || quest.Rewards == null) return;
+            for (int i = 0; i < quest.Rewards.Count; i++)
+            {
+                CharacterStoryQuestRewardDefinition reward = quest.Rewards[i];
+                if (reward == null || !reward.IsValid) continue;
+                if (reward.RewardType == CharacterStoryQuestRewardType.Currency &&
+                    reward.Currency != null && reward.Currency.CurrencyId == "jewel")
+                    currencyAmount = SaturatingAdd(currencyAmount, reward.Amount);
+                else if (reward.RewardType == CharacterStoryQuestRewardType.Item)
+                    itemStacks.Add(new InventoryManager.RewardItemStack(reward.Item, reward.Amount));
+            }
+        }
+
+        private static int SaturatingAdd(int left, int right)
+        {
+            long sum = (long)left + right;
+            return sum >= int.MaxValue ? int.MaxValue : (int)sum;
+        }
+
+        private void ShowRewardToast(InventoryRewardApplyResult result)
+        {
+            if (result == null || result.IsEmpty || ToastManager.Instance == null) return;
+            bool hasCurrency = result.ActualCurrencyDelta > 0;
+            bool hasItem = result.ItemDeltas.Count > 0;
+            string message;
+            if (hasCurrency && hasItem)
+                message = string.Format(rewardToastFormat, result.ActualCurrencyDelta,
+                    DescribeItem(result.ItemDeltas[0].Definition), result.ItemDeltas[0].ActualCount);
+            else if (hasItem)
+                message = string.Format(itemOnlyToastFormat, DescribeItem(result.ItemDeltas[0].Definition),
+                    result.ItemDeltas[0].ActualCount);
+            else message = string.Format(currencyOnlyToastFormat, result.ActualCurrencyDelta);
+            ToastManager.Instance.Show(message);
+        }
+
+        private static string DescribeItem(ItemDefinition item)
+        {
+            if (item == null) return string.Empty;
+            try
+            {
+                string localized = item.LocalizedName.GetLocalizedString();
+                if (!string.IsNullOrWhiteSpace(localized) &&
+                    !localized.StartsWith("No translation found", StringComparison.Ordinal)) return localized;
+            }
+            catch (Exception) { }
+            return item.DisplayName;
+        }
+
+        private InventoryManager ResolveInventory()
+        {
+            if (inventoryManager != null) return inventoryManager;
+            inventoryManager = InventoryManager.Instance != null
+                ? InventoryManager.Instance : FindObjectOfType<InventoryManager>(true);
+            return inventoryManager;
+        }
+
+        private static bool SaveNow() => saveOverride != null ? saveOverride() : SaveSystem.Save();
 
         /// <summary>처치 저장 트랜잭션에 붙는 무저장 변경. caller는 SaveSystem.Save 실패 시 receipt를
         /// 롤백해야 하므로 보상/EXP/행동력과 완전히 같은 원자 경계를 공유한다.</summary>

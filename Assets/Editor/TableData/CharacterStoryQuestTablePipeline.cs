@@ -5,6 +5,7 @@ using System.IO;
 using Character;
 using CommonEditor;
 using Dungeon;
+using Inventory;
 using Quest;
 using UnityEditor;
 using UnityEngine;
@@ -22,7 +23,7 @@ namespace TableDataEditor
         private const string QuestCatalogPath = OutputFolder + "/CharacterStoryQuestCatalog.asset";
         private const string ObjectiveCatalogPath = ObjectiveOutputFolder + "/CharacterStoryQuestObjectiveCatalog.asset";
 
-        private static readonly string[] QuestColumns = { "quest_id", "character_id", "previous_quest_id", "title_category", "title_key", "description_category", "description_key", "display_order", "is_final", "enabled" };
+        private static readonly string[] QuestColumns = { "quest_id", "character_id", "previous_quest_id", "title_category", "title_key", "description_category", "description_key", "display_order", "is_final", "reward_type1", "reward_target_id1", "reward_amount1", "reward_type2", "reward_target_id2", "reward_amount2", "enabled" };
         private static readonly string[] ObjectiveColumns = { "objective_id", "quest_id", "condition_type", "target_ids", "required_value", "display_order", "enabled" };
 
         [MenuItem("Tools/Keybuddy/Table Data/Rebuild (Character Story Quest only)", priority = 110)]
@@ -67,6 +68,8 @@ namespace TableDataEditor
             var characters = ReadIdSet(TableDataPaths.CharacterCsvPath, "character_id");
             var monsters = ReadIdSet(TableDataPaths.MonsterCsvPath, "monster_id");
             var dungeons = ReadIdSet(TableDataPaths.DungeonCsvPath, "dungeon_id");
+            var currencies = ReadIdSet(TableDataPaths.CurrencyCsvPath, "currency_id");
+            var items = ReadIdSet(TableDataPaths.ItemCsvPath, "item_id");
             var byId = new Dictionary<string, QuestRow>(StringComparer.Ordinal);
             var roots = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (QuestRow row in quests)
@@ -76,6 +79,7 @@ namespace TableDataEditor
                 if (!characters.Contains(row.CharacterId)) Error(log, QuestCsvPath, row.Line, "character_id", row.CharacterId, "Character.csv에 없는 character_id입니다.");
                 if (string.IsNullOrEmpty(row.PreviousId)) roots[row.CharacterId] = roots.TryGetValue(row.CharacterId, out int count) ? count + 1 : 1;
                 if (row.Enabled != true && row.IsFinal) Error(log, QuestCsvPath, row.Line, "is_final", "1", "비활성 퀘스트를 final로 둘 수 없습니다.");
+                ValidateRewards(row, currencies, items, log);
             }
             foreach (QuestRow row in quests)
             {
@@ -112,6 +116,8 @@ namespace TableDataEditor
             foreach (var record in table.Records)
             {
                 var row = new QuestRow { Line = record.Line, Id = table.Get(record, "quest_id"), CharacterId = table.Get(record, "character_id"), PreviousId = table.Get(record, "previous_quest_id"), DisplayOrder = ParseInt(table.Get(record, "display_order"), QuestCsvPath, record.Line, "display_order", log), IsFinal = ParseBool(table.Get(record, "is_final"), QuestCsvPath, record.Line, "is_final", log), Enabled = ParseBool(table.Get(record, "enabled"), QuestCsvPath, record.Line, "enabled", log) };
+                row.Rewards.Add(ReadReward(table, record, 1, log));
+                row.Rewards.Add(ReadReward(table, record, 2, log));
                 TableDataFieldRules.TryResolveLocalizedEntry("CharacterStoryQuest.csv", record.Line, "title_category", table.Get(record, "title_category"), "title_key", table.Get(record, "title_key"), log, out row.Title);
                 TableDataFieldRules.TryResolveLocalizedEntry("CharacterStoryQuest.csv", record.Line, "description_category", table.Get(record, "description_category"), "description_key", table.Get(record, "description_key"), log, out row.Description);
                 if (string.IsNullOrWhiteSpace(row.Id) || string.IsNullOrWhiteSpace(row.CharacterId)) Error(log, QuestCsvPath, record.Line, "quest_id", row.Id, "quest_id와 character_id는 비어 있을 수 없습니다."); result.Add(row);
@@ -137,7 +143,95 @@ namespace TableDataEditor
             return new CsvTable(Path.GetFileName(path), header.Fields, records.GetRange(1, records.Count - 1));
         }
         private static CharacterStoryQuestDefinition WriteQuest(QuestRow row)
-        { var asset = ResolveOrCreate<CharacterStoryQuestDefinition>(OutputFolder + "/Quest_" + row.Id + ".asset"); var o = new SerializedObject(asset); o.FindProperty("questId").stringValue = row.Id; o.FindProperty("characterId").stringValue = row.CharacterId; o.FindProperty("previousQuestId").stringValue = row.PreviousId; WriteLocalized(o.FindProperty("localizedTitle"), row.Title); WriteLocalized(o.FindProperty("localizedDescription"), row.Description); o.FindProperty("displayOrder").intValue = row.DisplayOrder; o.FindProperty("isFinal").boolValue = row.IsFinal; o.FindProperty("enabled").boolValue = row.Enabled; o.ApplyModifiedPropertiesWithoutUndo(); EditorUtility.SetDirty(asset); return asset; }
+        { var asset = ResolveOrCreate<CharacterStoryQuestDefinition>(OutputFolder + "/Quest_" + row.Id + ".asset"); var o = new SerializedObject(asset); o.FindProperty("questId").stringValue = row.Id; o.FindProperty("characterId").stringValue = row.CharacterId; o.FindProperty("previousQuestId").stringValue = row.PreviousId; WriteLocalized(o.FindProperty("localizedTitle"), row.Title); WriteLocalized(o.FindProperty("localizedDescription"), row.Description); o.FindProperty("displayOrder").intValue = row.DisplayOrder; o.FindProperty("isFinal").boolValue = row.IsFinal; o.FindProperty("enabled").boolValue = row.Enabled; WriteRewards(o.FindProperty("rewards"), row.Rewards); o.ApplyModifiedPropertiesWithoutUndo(); EditorUtility.SetDirty(asset); return asset; }
+
+        private static void WriteRewards(SerializedProperty property, List<RewardRow> rewards)
+        {
+            int rewardCount = 0;
+            for (int i = 0; i < rewards.Count; i++)
+                if (rewards[i].Type != CharacterStoryQuestRewardType.None) rewardCount++;
+
+            property.arraySize = rewardCount;
+            int destination = 0;
+            for (int i = 0; i < rewards.Count; i++)
+            {
+                RewardRow row = rewards[i];
+                if (row.Type == CharacterStoryQuestRewardType.None) continue;
+                SerializedProperty element = property.GetArrayElementAtIndex(destination++);
+                element.FindPropertyRelative("rewardType").enumValueIndex = (int)row.Type;
+                element.FindPropertyRelative("amount").intValue = row.Amount;
+                element.FindPropertyRelative("currency").objectReferenceValue = row.Type == CharacterStoryQuestRewardType.Currency
+                    ? AssetDatabase.LoadAssetAtPath<CurrencyDefinition>(TableDataPaths.CurrencyAssetPath(row.TargetId)) : null;
+                element.FindPropertyRelative("item").objectReferenceValue = row.Type == CharacterStoryQuestRewardType.Item
+                    ? AssetDatabase.LoadAssetAtPath<ItemDefinition>(TableDataPaths.ItemAssetPath(row.TargetId)) : null;
+            }
+        }
+
+        private static RewardRow ReadReward(CsvTable table, CsvRecord record, int slot, TableDataDiagnosticLog log)
+        {
+            string suffix = slot.ToString(CultureInfo.InvariantCulture);
+            string typeText = table.Get(record, "reward_type" + suffix).Trim();
+            string targetId = table.Get(record, "reward_target_id" + suffix).Trim();
+            string amountText = table.Get(record, "reward_amount" + suffix).Trim();
+            CharacterStoryQuestRewardType type = ParseRewardType(typeText);
+            // 비어 있거나 None인 칸은 다른 두 열에 남은 편집 흔적까지 포함해 완전히 무시한다.
+            // 타입이 틀린 칸도 amount 형식 오류를 덧붙이지 않고 타입 오류 하나로 고정한다.
+            int amount = type == CharacterStoryQuestRewardType.Currency || type == CharacterStoryQuestRewardType.Item
+                ? (string.IsNullOrEmpty(amountText) ? 0 : ParseInt(amountText, QuestCsvPath, record.Line,
+                    "reward_amount" + suffix, log))
+                : 0;
+            return new RewardRow { Slot = slot, TypeText = typeText, Type = type, TargetId = targetId, Amount = amount };
+        }
+
+        private static CharacterStoryQuestRewardType ParseRewardType(string text)
+        {
+            if (string.IsNullOrEmpty(text) || string.Equals(text, "none", StringComparison.OrdinalIgnoreCase))
+                return CharacterStoryQuestRewardType.None;
+            if (string.Equals(text, "currency", StringComparison.OrdinalIgnoreCase))
+                return CharacterStoryQuestRewardType.Currency;
+            if (string.Equals(text, "item", StringComparison.OrdinalIgnoreCase))
+                return CharacterStoryQuestRewardType.Item;
+            return (CharacterStoryQuestRewardType)(-1);
+        }
+
+        private static void ValidateRewards(QuestRow quest, HashSet<string> currencies, HashSet<string> items,
+            TableDataDiagnosticLog log)
+        {
+            var usedTypes = new HashSet<CharacterStoryQuestRewardType>();
+            foreach (RewardRow reward in quest.Rewards)
+            {
+                string suffix = reward.Slot.ToString(CultureInfo.InvariantCulture);
+                if ((int)reward.Type < 0)
+                {
+                    Error(log, QuestCsvPath, quest.Line, "reward_type" + suffix, reward.TypeText,
+                        "보상 타입은 None, Currency, Item 중 하나여야 합니다.");
+                    continue;
+                }
+                if (reward.Type == CharacterStoryQuestRewardType.None)
+                {
+                    reward.TargetId = string.Empty; reward.Amount = 0;
+                    continue;
+                }
+                if (!usedTypes.Add(reward.Type))
+                    Error(log, QuestCsvPath, quest.Line, "reward_type" + suffix, reward.TypeText,
+                        "현재 UI 계약에서는 같은 타입의 보상을 두 슬롯에 중복할 수 없습니다.");
+                if (reward.Amount <= 0)
+                    Error(log, QuestCsvPath, quest.Line, "reward_amount" + suffix,
+                        reward.Amount.ToString(CultureInfo.InvariantCulture), "보상 수량은 양수여야 합니다.");
+                if (reward.Type == CharacterStoryQuestRewardType.Currency)
+                {
+                    if (!currencies.Contains(reward.TargetId))
+                        Error(log, QuestCsvPath, quest.Line, "reward_target_id" + suffix, reward.TargetId,
+                            "Currency.csv에 없는 재화입니다.");
+                    else if (!string.Equals(reward.TargetId, "jewel", StringComparison.Ordinal))
+                        Error(log, QuestCsvPath, quest.Line, "reward_target_id" + suffix, reward.TargetId,
+                            "현재 저장 구조에서 퀘스트 재화 보상은 jewel만 지원합니다.");
+                }
+                else if (!items.Contains(reward.TargetId))
+                    Error(log, QuestCsvPath, quest.Line, "reward_target_id" + suffix, reward.TargetId,
+                        "Item.csv에 없는 아이템입니다.");
+            }
+        }
         private static CharacterStoryQuestObjectiveDefinition WriteObjective(ObjectiveRow row)
         { var asset = ResolveOrCreate<CharacterStoryQuestObjectiveDefinition>(ObjectiveOutputFolder + "/Objective_" + row.Id + ".asset"); var o = new SerializedObject(asset); o.FindProperty("objectiveId").stringValue = row.Id; o.FindProperty("questId").stringValue = row.QuestId; o.FindProperty("conditionType").enumValueIndex = (int)row.Condition.Value; var targets = o.FindProperty("targetIds"); targets.arraySize = row.TargetIds.Count; for (int i = 0; i < row.TargetIds.Count; i++) targets.GetArrayElementAtIndex(i).stringValue = row.TargetIds[i]; o.FindProperty("requiredValue").intValue = row.RequiredValue; o.FindProperty("displayOrder").intValue = row.DisplayOrder; o.FindProperty("enabled").boolValue = row.Enabled; o.ApplyModifiedPropertiesWithoutUndo(); EditorUtility.SetDirty(asset); return asset; }
         private static void WriteLocalized(SerializedProperty property, LocalizedEntryRef entry)
@@ -155,7 +249,8 @@ namespace TableDataEditor
         private static long ParseLong(string text,string file,int line,string column,TableDataDiagnosticLog log) { if (long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out long value)) return value; Error(log,file,line,column,text,"정수여야 합니다."); return 0; }
         private static bool ParseBool(string text,string file,int line,string column,TableDataDiagnosticLog log) { if (text == "0") return false; if (text == "1") return true; Error(log,file,line,column,text,"0 또는 1이어야 합니다."); return false; }
         private static void Error(TableDataDiagnosticLog log,string path,int line,string column,string value,string message) => log.Error(Path.GetFileName(path),line,column,value,message);
-        private sealed class QuestRow { public int Line,DisplayOrder; public string Id,CharacterId,PreviousId; public LocalizedEntryRef Title,Description; public bool IsFinal,Enabled; }
+        private sealed class QuestRow { public int Line,DisplayOrder; public string Id,CharacterId,PreviousId; public LocalizedEntryRef Title,Description; public bool IsFinal,Enabled; public readonly List<RewardRow> Rewards = new List<RewardRow>(); }
+        private sealed class RewardRow { public int Slot,Amount; public string TypeText,TargetId; public CharacterStoryQuestRewardType Type; }
         private sealed class ObjectiveRow { public int Line,RequiredValue,DisplayOrder; public string Id,QuestId,ConditionText; public CharacterStoryQuestConditionType? Condition; public List<string> TargetIds; public bool Enabled; }
     }
 }

@@ -242,6 +242,43 @@ namespace Inventory
         public bool Changed => Result != null && Result.Changed;
     }
 
+    /// <summary>던전 처치 외 시스템도 같은 보상 변경/롤백 경계를 재사용하기 위한 일반 영수증.</summary>
+    public sealed class InventoryRewardMutationReceipt
+    {
+        internal InventoryRewardMutationReceipt(int currency, InventoryCostReceipt.ItemSlot[] items,
+            bool itemsWereNull, InventoryRewardApplyResult result)
+        {
+            CurrencyBefore = currency;
+            ItemsBefore = items ?? Array.Empty<InventoryCostReceipt.ItemSlot>();
+            ItemsWereNull = itemsWereNull;
+            Result = result;
+        }
+        public int CurrencyBefore { get; }
+        internal InventoryCostReceipt.ItemSlot[] ItemsBefore { get; }
+        internal bool ItemsWereNull { get; }
+        public InventoryRewardApplyResult Result { get; }
+        public bool Changed => Result != null && Result.Changed;
+
+        internal void Restore(SaveData data)
+        {
+            if (data == null) return;
+            data.currency = CurrencyBefore;
+            if (ItemsWereNull)
+            {
+                data.items = null;
+                return;
+            }
+            if (data.items == null) data.items = new List<InventoryItemState>();
+            data.items.Clear();
+            for (int i = 0; i < ItemsBefore.Length; i++)
+            {
+                InventoryCostReceipt.ItemSlot slot = ItemsBefore[i];
+                if (slot.State != null) slot.State.count = slot.Count;
+                data.items.Add(slot.State);
+            }
+        }
+    }
+
     /// <summary>
     /// <see cref="InventoryManager.TrySpendCostWithoutSave"/>가 <b>무엇을 뺐고, 빼기 <i>직전</i>의
     /// 인벤토리가 어떤 모양이었는지</b>를 함께 담는 영수증.
@@ -733,6 +770,41 @@ namespace Inventory
                 ? BuildResult(currencyBefore, countsBefore, itemStacks)
                 : InventoryRewardApplyResult.Empty;
             return new DefeatRewardMutationReceipt(currencyBefore, itemsBefore, result);
+        }
+
+        /// <summary>아이템과 재화를 저장·알림 없이 적용한다. 퀘스트처럼 다른 저장 상태와 한 번에
+        /// 확정해야 하는 호출부가 사용하며, 실패 시 반드시 <see cref="RollbackRewards"/>를 호출한다.</summary>
+        public InventoryRewardMutationReceipt ApplyRewardsWithoutSave(
+            int currencyAmount, IReadOnlyList<RewardItemStack> itemStacks)
+        {
+            SaveData data = SaveSystem.Data;
+            int currencyBefore = data.currency;
+            bool itemsWereNull = data.items == null;
+            InventoryCostReceipt.ItemSlot[] itemsBefore = InventoryCostReceipt.Capture(data.items);
+            if (itemsWereNull) data.items = new List<InventoryItemState>();
+            Dictionary<string, int> countsBefore = SnapshotItemCounts();
+            bool changed = ApplyCurrencyDelta(currencyAmount);
+            if (itemStacks != null)
+                for (int i = 0; i < itemStacks.Count; i++)
+                    changed |= ApplyItemDelta(itemStacks[i].Definition, itemStacks[i].Count);
+            InventoryRewardApplyResult result = changed
+                ? BuildResult(currencyBefore, countsBefore, itemStacks)
+                : InventoryRewardApplyResult.Empty;
+            return new InventoryRewardMutationReceipt(currencyBefore, itemsBefore, itemsWereNull, result);
+        }
+
+        public void RollbackRewards(InventoryRewardMutationReceipt receipt)
+        {
+            if (receipt == null) return;
+            receipt.Restore(SaveSystem.Data);
+            entryCacheDirty = true;
+        }
+
+        public void NotifyRewardsAfterExternalSave(InventoryRewardMutationReceipt receipt)
+        {
+            if (receipt == null || !receipt.Changed) return;
+            NotifyChangedAfterExternalSave();
+            RewardApplied?.Invoke(receipt.Result);
         }
 
         public void RollbackDefeatRewards(DefeatRewardMutationReceipt receipt)

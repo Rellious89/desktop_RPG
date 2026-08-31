@@ -8677,6 +8677,13 @@ MonoBehaviour:
   completeButton: {fileID: 4000634981908462201}
   completeButtonText: {fileID: 3527886453458985811}
   objectiveScroll: {fileID: 3012345285097281181}
+  rewardRoot: {fileID: 7869621813590004017}
+  rewardCurrencyRoot: {fileID: 4855196224400742900}
+  rewardCurrencyAmountText: {fileID: 9138765541559543502}
+  rewardCurrencyIcon: {fileID: 7940543894808911150}
+  rewardCurrencyAnimator: {fileID: 8802529496811412567}
+  rewardItemRoot: {fileID: 5860984126193889364}
+  rewardItemSlot: {fileID: 5255763960819463405, guid: f33a3506abea94cee928851987f11ccf, type: 3}
 --- !u!1 &6847384618704923900
 GameObject:
   m_ObjectHideFlags: 0

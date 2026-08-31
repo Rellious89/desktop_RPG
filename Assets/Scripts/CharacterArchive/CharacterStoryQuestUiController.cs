@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Character;
 using Common;
 using Dungeon;
+using Inventory;
 using Quest;
 using TMPro;
 using UnityEngine;
@@ -53,6 +54,15 @@ namespace CharacterArchive
         [SerializeField] private TMP_Text completeButtonText;
         [SerializeField] private ScrollRect objectiveScroll;
 
+        [Header("Quest Reward UI")]
+        [SerializeField] private GameObject rewardRoot;
+        [SerializeField] private GameObject rewardCurrencyRoot;
+        [SerializeField] private TMP_Text rewardCurrencyAmountText;
+        [SerializeField] private Image rewardCurrencyIcon;
+        [SerializeField] private Animator rewardCurrencyAnimator;
+        [SerializeField] private GameObject rewardItemRoot;
+        [SerializeField] private InventorySlotView rewardItemSlot;
+
         private readonly List<TMP_Text> typeLines = new List<TMP_Text>();
         private readonly List<TMP_Text> descriptionLines = new List<TMP_Text>();
         // 퀘스트 표 문구는 이 컨트롤러의 수명 동안 하나의 참조만 유지한다. Refresh마다 새
@@ -78,7 +88,9 @@ namespace CharacterArchive
                                              swapButton != null && closeButton != null && completeButton != null &&
                                              currentProgressSlider != null && totalProgressSlider != null &&
                                              currentProgressPercentText != null && totalProgressPercentText != null && totalProgressText != null &&
-                                             questTypeLineTemplate != null && questDescriptionLineTemplate != null && completeButtonText != null;
+                                             questTypeLineTemplate != null && questDescriptionLineTemplate != null && completeButtonText != null &&
+                                             rewardRoot != null && rewardCurrencyRoot != null && rewardCurrencyAmountText != null &&
+                                             rewardItemRoot != null && rewardItemSlot != null;
 
         public void OpenFor(CharacterDefinition definition)
         {
@@ -102,6 +114,7 @@ namespace CharacterArchive
             selected = null;
             completionRequested = false;
             ClearLines(typeLines); ClearLines(descriptionLines);
+            ClearRewardView();
             TearDown();
         }
 
@@ -290,6 +303,7 @@ namespace CharacterArchive
 
             SetActive(questTypeTitle != null ? questTypeTitle.gameObject : null, objectives.Count > 0);
             SetActive(questDescriptionTitle != null ? questDescriptionTitle.gameObject : null, objectives.Count > 0);
+            RefreshRewards(active);
             bool readyToComplete = active != null && snapshot.ReadyToComplete;
             if (completeButton != null) completeButton.interactable = !completionRequested && readyToComplete;
             if (completeButtonText != null)
@@ -297,6 +311,55 @@ namespace CharacterArchive
                     ? TextOrFallback(completeButtonReadyText, "퀘스트 완료")
                     : TextOrFallback(completeButtonInProgressText, "진행중");
             if (objectiveScroll != null) { objectiveScroll.verticalNormalizedPosition = 1f; LayoutRebuilder.ForceRebuildLayoutImmediate(objectiveScroll.content); }
+        }
+
+        private void RefreshRewards(CharacterStoryQuestDefinition quest)
+        {
+            CharacterStoryQuestRewardDefinition currency = null;
+            CharacterStoryQuestRewardDefinition item = null;
+            if (quest != null && quest.Rewards != null)
+            {
+                for (int i = 0; i < quest.Rewards.Count; i++)
+                {
+                    CharacterStoryQuestRewardDefinition reward = quest.Rewards[i];
+                    if (reward == null || !reward.IsValid) continue;
+                    if (reward.RewardType == CharacterStoryQuestRewardType.Currency && currency == null)
+                        currency = reward;
+                    else if (reward.RewardType == CharacterStoryQuestRewardType.Item && item == null)
+                        item = reward;
+                }
+            }
+
+            bool hasCurrency = currency != null;
+            bool hasItem = item != null;
+            SetActive(rewardRoot, hasCurrency || hasItem);
+            SetActive(rewardCurrencyRoot, hasCurrency);
+            SetActive(rewardItemRoot, hasItem);
+
+            if (hasCurrency)
+            {
+                rewardCurrencyAmountText.text = currency.Amount.ToString();
+                // jewel은 프리팹의 애니메이션 아이콘을 유지한다. 이후 정적 아이콘 재화가 생기면
+                // Definition.Icon이 연결된 경우에만 Animator 대신 그 스프라이트를 표시한다.
+                Sprite icon = currency.Currency != null ? currency.Currency.Icon : null;
+                if (icon != null && rewardCurrencyIcon != null)
+                {
+                    if (rewardCurrencyAnimator != null) rewardCurrencyAnimator.enabled = false;
+                    rewardCurrencyIcon.sprite = icon;
+                    rewardCurrencyIcon.enabled = true;
+                }
+                else if (rewardCurrencyAnimator != null)
+                    rewardCurrencyAnimator.enabled = true;
+            }
+
+            if (hasItem) rewardItemSlot.SetItem(item.Item, item.Amount);
+            else rewardItemSlot.SetEmpty();
+        }
+
+        private void ClearRewardView()
+        {
+            SetActive(rewardRoot, false);
+            if (rewardItemSlot != null) rewardItemSlot.SetEmpty();
         }
 
         private List<CharacterStoryQuestObjectiveDefinition> EnabledObjectives(string questId)

@@ -1,6 +1,7 @@
 using CharacterArchive;
 using Common;
 using Dungeon;
+using Inventory;
 using Quest;
 using TMPro;
 using UnityEditor;
@@ -63,10 +64,12 @@ namespace CharacterArchiveEditor
                 Set(serialized, "questInfoPage", Find(root.transform, "pn_right/QuestInfo").gameObject);
                 Set(serialized, "swapButton", Find(root.transform, "pn_right/btn_swap").GetComponent<Button>());
                 Set(serialized, "closeButton", Find(root.transform, "pn_right/QuestInfo/bg/top/btn_close").GetComponent<Button>());
-                Set(serialized, "currentProgressSlider", Find(current, "CurrentProgress").GetComponent<Slider>());
-                Set(serialized, "totalProgressSlider", Find(root.transform, "pn_right/QuestInfo/QuestInfo/TotalProgress").GetComponent<Slider>());
-                Set(serialized, "currentProgressPercentText", Find(current, "CurrentProgress/lb_percent").GetComponent<TMP_Text>());
-                Set(serialized, "totalProgressPercentText", Find(root.transform, "pn_right/QuestInfo/QuestInfo/TotalProgress/lb_percent").GetComponent<TMP_Text>());
+                Transform currentProgress = Find(current, "CurrentProgress");
+                Transform totalProgress = Find(root.transform, "pn_right/QuestInfo/QuestInfo/TotalProgress");
+                Set(serialized, "currentProgressSlider", currentProgress.GetComponent<Slider>());
+                Set(serialized, "totalProgressSlider", totalProgress.GetComponent<Slider>());
+                Set(serialized, "currentProgressPercentText", FindDescendant(currentProgress, "lb_percent").GetComponent<TMP_Text>());
+                Set(serialized, "totalProgressPercentText", FindDescendant(totalProgress, "lb_percent").GetComponent<TMP_Text>());
                 Transform totalProgressDescription = Find(root.transform,
                     "pn_right/QuestInfo/QuestInfo/TotalProgress/bottomDeco/sp_description/lb_totalProgress");
                 Set(serialized, "totalProgressText", totalProgressDescription.GetComponent<TMP_Text>());
@@ -77,6 +80,17 @@ namespace CharacterArchiveEditor
                 Set(serialized, "completeButton", Find(root.transform, "pn_right/QuestInfo/QuestInfo/btn_QuestComplete").GetComponent<Button>());
                 Set(serialized, "completeButtonText", Find(root.transform, "pn_right/QuestInfo/QuestInfo/btn_QuestComplete/lb_QuestComplete").GetComponent<TMP_Text>());
                 Set(serialized, "objectiveScroll", scroll.GetComponent<ScrollRect>());
+                Transform reward = Find(scroll, "Viewport/Content/QuestReward");
+                Transform rewardCurrency = Find(reward, "Reward_Currency");
+                Transform rewardItem = Find(reward, "Reward_Item");
+                Transform currencyIcon = Find(rewardCurrency, "sp_currencyIcon (1)");
+                Set(serialized, "rewardRoot", reward.gameObject);
+                Set(serialized, "rewardCurrencyRoot", rewardCurrency.gameObject);
+                Set(serialized, "rewardCurrencyAmountText", Find(rewardCurrency, "lb_RewardValue").GetComponent<TMP_Text>());
+                Set(serialized, "rewardCurrencyIcon", currencyIcon.GetComponent<Image>());
+                Set(serialized, "rewardCurrencyAnimator", currencyIcon.GetComponent<Animator>());
+                Set(serialized, "rewardItemRoot", rewardItem.gameObject);
+                Set(serialized, "rewardItemSlot", rewardItem.GetComponentInChildren<InventorySlotView>(true));
                 serialized.ApplyModifiedPropertiesWithoutUndo();
 
                 // lb_totalProgress는 동적 인자가 필요한 문구다. 정적 LocalizedTMPText가
@@ -150,6 +164,28 @@ namespace CharacterArchiveEditor
             Transform found = root.Find(path);
             if (found == null) throw new System.InvalidOperationException("프리팹 경로를 찾지 못했습니다: " + path);
             return found;
+        }
+
+        private static Transform FindDescendant(Transform root, string objectName)
+        {
+            foreach (Transform child in root)
+            {
+                if (child.name == objectName) return child;
+                Transform found = FindDescendantOrNull(child, objectName);
+                if (found != null) return found;
+            }
+            throw new System.InvalidOperationException("프리팹 하위 오브젝트를 찾지 못했습니다: " + objectName);
+        }
+
+        private static Transform FindDescendantOrNull(Transform root, string objectName)
+        {
+            foreach (Transform child in root)
+            {
+                if (child.name == objectName) return child;
+                Transform found = FindDescendantOrNull(child, objectName);
+                if (found != null) return found;
+            }
+            return null;
         }
 
         private static void Set(SerializedObject target, string propertyName, Object value)

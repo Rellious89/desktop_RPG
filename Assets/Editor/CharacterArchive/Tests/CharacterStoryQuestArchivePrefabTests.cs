@@ -63,6 +63,18 @@ namespace CharacterArchiveEditorTests
                 Assert.NotNull(fitter); Assert.AreEqual(ContentSizeFitter.FitMode.PreferredSize, fitter.verticalFit);
                 Assert.AreSame(content, Find(content, "QuestType").parent);
                 Assert.AreSame(content, Find(content, "QuestDesctiption").parent);
+                Transform reward = Find(content, "QuestReward");
+                Transform rewardCurrency = Find(reward, "Reward_Currency");
+                Transform rewardItem = Find(reward, "Reward_Item");
+                Assert.AreSame(reward.gameObject, controllerSerialized.FindProperty("rewardRoot").objectReferenceValue);
+                Assert.AreSame(rewardCurrency.gameObject,
+                    controllerSerialized.FindProperty("rewardCurrencyRoot").objectReferenceValue);
+                Assert.AreSame(Find(rewardCurrency, "lb_RewardValue").GetComponent<TMP_Text>(),
+                    controllerSerialized.FindProperty("rewardCurrencyAmountText").objectReferenceValue);
+                Assert.AreSame(rewardItem.gameObject, controllerSerialized.FindProperty("rewardItemRoot").objectReferenceValue);
+                Assert.AreSame(rewardItem.GetComponentInChildren<InventorySlotView>(true),
+                    controllerSerialized.FindProperty("rewardItemSlot").objectReferenceValue,
+                    "아이템 보상은 InventorySlotView를 써야 기존 아이콘/수량/호버 툴팁 경로를 그대로 공유합니다.");
                 LocalizedTMPText totalProgressLocalizer = totalProgressText.GetComponent<LocalizedTMPText>();
                 Assert.IsTrue(totalProgressLocalizer == null || !totalProgressLocalizer.enabled,
                     "동적 총 진행 문구는 컨트롤러가 단독 소유해야 합니다.");
