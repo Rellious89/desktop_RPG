@@ -1,2 +1,2 @@
 character_id,$character_name,skill_id,$skill_name,required_character_level,display_order,enabled,memo
-1,고양이기사,catknight_skill_01,고양이어택,5,10,1,
+CatKnight,고양이기사,catknight_skill_01,고양이어택,5,10,1,

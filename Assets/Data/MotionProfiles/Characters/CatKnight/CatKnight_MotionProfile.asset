@@ -58,6 +58,11 @@ MonoBehaviour:
     moveDistance: 0.9
     moveOutDuration: 0.08
     moveBackDuration: 0.05
+  chargeMovement:
+    enableChargeMovement: 1
+    chargeMoveDistance: -0.08
+    chargeMoveInDuration: 0.1
+    chargeMoveReturnDuration: 0.18
   preview:
     characterOffset: {x: 0, y: 0}
     receivePointOffset: {x: 0, y: 0.35}

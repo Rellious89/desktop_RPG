@@ -12,4 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: af3bc83bb5c1d4611a476cfa5721f627, type: 3}
   m_Name: CharacterSkillCatalog
   m_EditorClassIdentifier: 
-  relations: []
+  relations:
+  - {fileID: 11400000, guid: f8dba9a297fa34e28bcc6f167ff5223f, type: 2}

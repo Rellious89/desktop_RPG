@@ -57,6 +57,11 @@ MonoBehaviour:
     m_ReadOnly: 1
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ef851476db7ce4317937dab3f2073a73
+    m_Address: Assets/Localization/Tables/10_Skill/10_Skill Shared Data.asset
+    m_ReadOnly: 1
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f88e328a513a14716bedb0c25ad47841
     m_Address: Assets/Localization/Tables/05_Currency/05_Currency Shared Data.asset
     m_ReadOnly: 1
