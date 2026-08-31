@@ -26,7 +26,36 @@ namespace CommonEditor.Save
         Currency = 1 << 1,
         Construction = 1 << 2,
         Character = 1 << 3,
-        All = Item | Currency | Construction | Character,
+        Quest = 1 << 4,
+        All = Item | Currency | Construction | Character | Quest,
+    }
+
+    /// <summary>에디터 리셋 도구가 런타임 퀘스트 에셋에서 복사해 온 최소 연결 정보.</summary>
+    public readonly struct StoryQuestResetDefinition
+    {
+        public string QuestId { get; }
+        public string CharacterId { get; }
+        public string PreviousQuestId { get; }
+        public bool Enabled { get; }
+
+        public StoryQuestResetDefinition(string questId, string characterId, string previousQuestId, bool enabled = true)
+        {
+            QuestId = questId ?? string.Empty;
+            CharacterId = characterId ?? string.Empty;
+            PreviousQuestId = previousQuestId ?? string.Empty;
+            Enabled = enabled;
+        }
+
+        public bool IsValid => Enabled && !string.IsNullOrWhiteSpace(QuestId) &&
+                               !string.IsNullOrWhiteSpace(CharacterId);
+    }
+
+    public enum StoryQuestResetOutcome
+    {
+        Success,
+        QuestNotFound,
+        InvalidQuestChain,
+        SaveFailed,
     }
 
     /// <summary><see cref="SaveResetService.Apply(SaveData, SaveResetTargets, IReadOnlyList{string}, IReadOnlyCollection{string}, Func{bool})"/>의 결과 갈래.</summary>
@@ -83,7 +112,7 @@ namespace CommonEditor.Save
         /// <summary>캐릭터를 고르지 않는 기존 호출부를 위한 짧은 형태. 아이템·재화·건축만 다룬다.</summary>
         public static SaveResetResult Apply(SaveData data, SaveResetTargets targets, Func<bool> save)
         {
-            return Apply(data, targets, null, null, save);
+            return Apply(data, targets, null, null, null, save);
         }
 
         /// <summary>
@@ -117,6 +146,18 @@ namespace CommonEditor.Save
             IReadOnlyCollection<string> protectedCharacterIds,
             Func<bool> save)
         {
+            return Apply(data, targets, characterIdsToRemove, protectedCharacterIds, null, save);
+        }
+
+        /// <summary>퀘스트 정의를 함께 받아 Quest 대상의 모든 보유 캐릭터를 각 서사의 첫 단계로 되돌린다.</summary>
+        public static SaveResetResult Apply(
+            SaveData data,
+            SaveResetTargets targets,
+            IReadOnlyList<string> characterIdsToRemove,
+            IReadOnlyCollection<string> protectedCharacterIds,
+            IReadOnlyList<StoryQuestResetDefinition> questDefinitions,
+            Func<bool> save)
+        {
             if (data == null) throw new ArgumentNullException(nameof(data));
             if (save == null) throw new ArgumentNullException(nameof(save));
 
@@ -127,6 +168,7 @@ namespace CommonEditor.Save
             bool resetItems = (effective & SaveResetTargets.Item) != 0;
             bool resetCurrency = (effective & SaveResetTargets.Currency) != 0;
             bool resetConstruction = (effective & SaveResetTargets.Construction) != 0;
+            bool resetStory = (effective & SaveResetTargets.Quest) != 0;
 
             // 실제로 지울 캐릭터 집합을 미리 확정한다 - 요청 ∩ 존재 ∖ 기본 보유.
             HashSet<string> removeSet = null;
@@ -138,12 +180,10 @@ namespace CommonEditor.Save
             bool removeCharacters = removeSet != null && removeSet.Count > 0;
             bool resetAllUnlocks = effective == SaveResetTargets.All && data.unlockedRecruitmentCharacterIds != null &&
                                    data.unlockedRecruitmentCharacterIds.Count > 0;
-            bool resetAllStory = effective == SaveResetTargets.All && data.characterStoryQuests != null &&
-                                 data.characterStoryQuests.Count > 0;
-
             // 실제로 바뀌는 것이 하나도 없으면 저장하지 않는다. (아이템/재화/건축은 비트만으로 "적용"으로
             // 치지만, 캐릭터는 실제로 지울 대상이 있을 때만 적용이다.)
-            if (!resetItems && !resetCurrency && !resetConstruction && !removeCharacters && !resetAllUnlocks)
+            if (!resetItems && !resetCurrency && !resetConstruction && !resetStory && !removeCharacters &&
+                !resetAllUnlocks)
             {
                 return new SaveResetResult(SaveResetOutcome.NothingSelected, SaveResetTargets.None, 0);
             }
@@ -161,7 +201,7 @@ namespace CommonEditor.Save
             List<string> oldUnlockedRecruitmentCharacterIds = null;
             if (resetAllUnlocks) oldUnlockedRecruitmentCharacterIds = data.unlockedRecruitmentCharacterIds;
             List<CharacterStoryQuestSaveState> oldCharacterStoryQuests =
-                (resetAllStory || removeCharacters) ? data.characterStoryQuests : null;
+                (resetStory || removeCharacters) ? data.characterStoryQuests : null;
 
             List<CharacterSaveState> oldCharacters = null;
             List<string> oldPartyCharacterIds = null;
@@ -178,8 +218,6 @@ namespace CommonEditor.Save
                 data.purificationSlots = new List<PurificationSlotSaveState> { new PurificationSlotSaveState() };
             }
             if (resetAllUnlocks) data.unlockedRecruitmentCharacterIds = new List<string>();
-            if (resetAllStory) data.characterStoryQuests = new List<CharacterStoryQuestSaveState>();
-
             if (removeCharacters)
             {
                 oldCharacters = data.characters;
@@ -212,7 +250,7 @@ namespace CommonEditor.Save
                 }
 
                 data.characters = survivors;
-                if (!resetAllStory && data.characterStoryQuests != null)
+                if (!resetStory && data.characterStoryQuests != null)
                 {
                     var remainingStories = new List<CharacterStoryQuestSaveState>(data.characterStoryQuests);
                     remainingStories.RemoveAll(state => state != null && removeSet.Contains(state.characterId));
@@ -251,6 +289,12 @@ namespace CommonEditor.Save
                 }
             }
 
+            // 캐릭터 삭제와 함께 실행될 때는 살아남은 보유 목록을 기준으로 루트 상태를 만든다.
+            if (resetStory)
+            {
+                data.characterStoryQuests = BuildInitialStoryQuestStates(data.characters, questDefinitions);
+            }
+
             bool saved;
             try
             {
@@ -281,8 +325,142 @@ namespace CommonEditor.Save
             if (resetCurrency) applied |= SaveResetTargets.Currency;
             if (resetConstruction) applied |= SaveResetTargets.Construction;
             if (removeCharacters) applied |= SaveResetTargets.Character;
+            if (resetStory) applied |= SaveResetTargets.Quest;
 
             return new SaveResetResult(SaveResetOutcome.Success, applied, removedCount);
+        }
+
+        /// <summary>
+        /// 지정 퀘스트의 캐릭터만 해당 단계가 막 시작된 상태로 되돌린다. 이전 연결 단계들은 완료로
+        /// 기록하고 목표 진행도와 완료 가능 표시는 비운다. 정의에 없는 ID는 저장하지 않는다.
+        /// </summary>
+        public static StoryQuestResetOutcome ResetStoryQuestTo(
+            SaveData data,
+            string questId,
+            IReadOnlyList<StoryQuestResetDefinition> definitions,
+            Func<bool> save)
+        {
+            if (data == null) throw new ArgumentNullException(nameof(data));
+            if (save == null) throw new ArgumentNullException(nameof(save));
+
+            Dictionary<string, StoryQuestResetDefinition> byId = BuildQuestDefinitionMap(definitions);
+            string normalizedId = questId?.Trim() ?? string.Empty;
+            if (!byId.TryGetValue(normalizedId, out StoryQuestResetDefinition target))
+            {
+                return StoryQuestResetOutcome.QuestNotFound;
+            }
+
+            var reversedPreviousIds = new List<string>();
+            var visited = new HashSet<string>(StringComparer.Ordinal) { target.QuestId };
+            StoryQuestResetDefinition cursor = target;
+            while (!string.IsNullOrEmpty(cursor.PreviousQuestId))
+            {
+                if (!byId.TryGetValue(cursor.PreviousQuestId, out StoryQuestResetDefinition previous) ||
+                    !string.Equals(previous.CharacterId, target.CharacterId, StringComparison.Ordinal) ||
+                    !visited.Add(previous.QuestId))
+                {
+                    return StoryQuestResetOutcome.InvalidQuestChain;
+                }
+
+                reversedPreviousIds.Add(previous.QuestId);
+                cursor = previous;
+            }
+            reversedPreviousIds.Reverse();
+
+            List<CharacterStoryQuestSaveState> oldStates = data.characterStoryQuests;
+            var replacement = oldStates != null
+                ? new List<CharacterStoryQuestSaveState>(oldStates.Count + 1)
+                : new List<CharacterStoryQuestSaveState>();
+            if (oldStates != null)
+            {
+                foreach (CharacterStoryQuestSaveState state in oldStates)
+                {
+                    if (state == null || !string.Equals(state.characterId, target.CharacterId, StringComparison.Ordinal))
+                    {
+                        replacement.Add(state);
+                    }
+                }
+            }
+
+            replacement.Add(new CharacterStoryQuestSaveState
+            {
+                characterId = target.CharacterId,
+                activeQuestId = target.QuestId,
+                objectiveProgress = new List<CharacterStoryObjectiveProgressSaveState>(),
+                completedQuestIds = reversedPreviousIds,
+                readyToComplete = false,
+                graduated = false,
+            });
+            data.characterStoryQuests = replacement;
+
+            bool saved;
+            try
+            {
+                saved = save();
+            }
+            catch
+            {
+                data.characterStoryQuests = oldStates;
+                throw;
+            }
+
+            if (saved) return StoryQuestResetOutcome.Success;
+            data.characterStoryQuests = oldStates;
+            return StoryQuestResetOutcome.SaveFailed;
+        }
+
+        private static List<CharacterStoryQuestSaveState> BuildInitialStoryQuestStates(
+            IReadOnlyList<CharacterSaveState> characters,
+            IReadOnlyList<StoryQuestResetDefinition> definitions)
+        {
+            var rootsByCharacter = new Dictionary<string, StoryQuestResetDefinition>(StringComparer.Ordinal);
+            if (definitions != null)
+            {
+                foreach (StoryQuestResetDefinition definition in definitions)
+                {
+                    if (!definition.IsValid || !string.IsNullOrEmpty(definition.PreviousQuestId)) continue;
+                    if (!rootsByCharacter.ContainsKey(definition.CharacterId))
+                    {
+                        rootsByCharacter.Add(definition.CharacterId, definition);
+                    }
+                }
+            }
+
+            var result = new List<CharacterStoryQuestSaveState>();
+            var addedCharacters = new HashSet<string>(StringComparer.Ordinal);
+            if (characters == null) return result;
+            foreach (CharacterSaveState character in characters)
+            {
+                string characterId = character?.characterId;
+                if (string.IsNullOrEmpty(characterId) || !addedCharacters.Add(characterId)) continue;
+                if (!rootsByCharacter.TryGetValue(characterId, out StoryQuestResetDefinition root)) continue;
+                result.Add(new CharacterStoryQuestSaveState
+                {
+                    characterId = characterId,
+                    activeQuestId = root.QuestId,
+                    objectiveProgress = new List<CharacterStoryObjectiveProgressSaveState>(),
+                    completedQuestIds = new List<string>(),
+                    readyToComplete = false,
+                    graduated = false,
+                });
+            }
+
+            return result;
+        }
+
+        private static Dictionary<string, StoryQuestResetDefinition> BuildQuestDefinitionMap(
+            IReadOnlyList<StoryQuestResetDefinition> definitions)
+        {
+            var result = new Dictionary<string, StoryQuestResetDefinition>(StringComparer.Ordinal);
+            if (definitions == null) return result;
+            foreach (StoryQuestResetDefinition definition in definitions)
+            {
+                if (definition.IsValid && !result.ContainsKey(definition.QuestId))
+                {
+                    result.Add(definition.QuestId, definition);
+                }
+            }
+            return result;
         }
 
         /// <summary>

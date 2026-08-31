@@ -4,6 +4,7 @@ using Building;
 using Character;
 using Common;
 using Inventory;
+using Quest;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Localization;
@@ -22,6 +23,9 @@ namespace CommonEditor.Save
     /// </summary>
     public sealed class SaveResetWindow : EditorWindow
     {
+        private const string StoryQuestCatalogPath =
+            "Assets/Generated/TableData/CharacterStoryQuest/CharacterStoryQuestCatalog.asset";
+
         private SaveResetTargets selection = SaveResetTargets.None;
         private Vector2 scroll;
 
@@ -29,6 +33,11 @@ namespace CommonEditor.Save
         private Dictionary<string, ItemDefinition> itemsById;
         private Dictionary<string, BuildingDefinition> buildingsById;
         private Dictionary<string, CharacterDefinition> charactersById;
+        private List<StoryQuestResetDefinition> storyQuestDefinitions = new List<StoryQuestResetDefinition>();
+
+        private string specifiedQuestId = string.Empty;
+        private string questResetMessage = string.Empty;
+        private MessageType questResetMessageType = MessageType.None;
 
         // 로컬라이징 이름 조회 캐시. OnGUI는 자주 호출되므로 매 프레임 같은 에디터 에셋을 다시 뒤지지 않는다.
         // 키: 테이블 참조 + 엔트리 참조. 값: 확인된 문자열 또는 조회 실패(null). RefreshDefinitions에서 비운다.
@@ -99,6 +108,7 @@ namespace CommonEditor.Save
             DrawCurrencySection(data, (selection & SaveResetTargets.Currency) != 0);
             DrawConstructionSection(data, (selection & SaveResetTargets.Construction) != 0);
             DrawCharacterSection(data, characterSelected);
+            DrawQuestSection(data, (selection & SaveResetTargets.Quest) != 0);
 
             EditorGUILayout.EndScrollView();
 
@@ -119,7 +129,8 @@ namespace CommonEditor.Save
                 }
 
                 bool anyNonCharacter =
-                    (selection & (SaveResetTargets.Item | SaveResetTargets.Currency | SaveResetTargets.Construction)) != 0;
+                    (selection & (SaveResetTargets.Item | SaveResetTargets.Currency | SaveResetTargets.Construction |
+                                  SaveResetTargets.Quest)) != 0;
                 bool anyCharacterToDelete =
                     (selection & SaveResetTargets.Character) != 0 && selectedCharacterIds.Count > 0;
                 bool canRun = anyNonCharacter || anyCharacterToDelete;
@@ -268,12 +279,78 @@ namespace CommonEditor.Save
             }
         }
 
+        private void DrawQuestSection(SaveData data, bool highlighted)
+        {
+            using (BeginSection("Quest", highlighted))
+            {
+                List<CharacterStoryQuestSaveState> states = data.characterStoryQuests ??
+                                                           new List<CharacterStoryQuestSaveState>();
+                EditorGUILayout.LabelField($"서사 퀘스트 상태 수: {states.Count}");
+                if (highlighted)
+                {
+                    EditorGUILayout.LabelField(
+                        "Reset Selected 실행 시 보유 캐릭터 전체를 각 서사의 1단계로 초기화합니다.",
+                        EditorStyles.wordWrappedMiniLabel);
+                }
+
+                if (states.Count == 0)
+                {
+                    EditorGUILayout.LabelField("(저장된 서사 퀘스트 상태 없음)", EditorStyles.miniLabel);
+                }
+                else
+                {
+                    foreach (CharacterStoryQuestSaveState state in states)
+                    {
+                        if (state == null) continue;
+                        string character = DescribeCharacterName(state.characterId);
+                        string active = string.IsNullOrEmpty(state.activeQuestId) ? "(완료/없음)" : state.activeQuestId;
+                        int completed = state.completedQuestIds?.Count ?? 0;
+                        string suffix = state.graduated ? " · 졸업" : state.readyToComplete ? " · 완료 가능" : string.Empty;
+                        EditorGUILayout.LabelField($"• {character} — {active} · 완료 {completed}{suffix}");
+                    }
+                }
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField("지정 초기화", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField(
+                    "퀘스트 ID를 입력하면 그 퀘스트의 캐릭터만 해당 단계가 막 시작된 상태로 초기화합니다.",
+                    EditorStyles.wordWrappedMiniLabel);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    specifiedQuestId = EditorGUILayout.TextField("퀘스트 ID", specifiedQuestId);
+                    using (new EditorGUI.DisabledScope(EditorApplication.isPlaying ||
+                                                       string.IsNullOrWhiteSpace(specifiedQuestId)))
+                    {
+                        if (GUILayout.Button("적용", GUILayout.Width(64f)))
+                        {
+                            RunSpecifiedQuestReset();
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(questResetMessage))
+                {
+                    EditorGUILayout.HelpBox(questResetMessage, questResetMessageType);
+                }
+            }
+        }
+
         // ---- 실행 ----
 
         private void RunReset()
         {
             SaveData data = SaveSystem.Data;
             SaveResetTargets targets = selection & SaveResetTargets.All;
+
+            if ((targets & SaveResetTargets.Quest) != 0 && storyQuestDefinitions.Count == 0)
+            {
+                EditorUtility.DisplayDialog(
+                    "퀘스트 초기화 실패",
+                    "캐릭터 서사 퀘스트 카탈로그를 불러오지 못했습니다. Generated 테이블을 확인한 뒤 다시 시도하세요.",
+                    "확인");
+                return;
+            }
 
             // 캐릭터 삭제 대상과 보호 집합을 준비한다. Character 비트가 없으면 캐릭터는 건드리지 않는다.
             List<string> toRemove = null;
@@ -285,7 +362,8 @@ namespace CommonEditor.Save
             }
 
             bool anyNonCharacter =
-                (targets & (SaveResetTargets.Item | SaveResetTargets.Currency | SaveResetTargets.Construction)) != 0;
+                (targets & (SaveResetTargets.Item | SaveResetTargets.Currency | SaveResetTargets.Construction |
+                            SaveResetTargets.Quest)) != 0;
             bool anyCharacterToDelete = toRemove != null && toRemove.Count > 0;
             if (!anyNonCharacter && !anyCharacterToDelete) return;
 
@@ -304,7 +382,7 @@ namespace CommonEditor.Save
             if (!confirmed) return;
 
             SaveResetResult result =
-                SaveResetService.Apply(data, targets, toRemove, protectedIds, SaveSystem.Save);
+                SaveResetService.Apply(data, targets, toRemove, protectedIds, storyQuestDefinitions, SaveSystem.Save);
 
             RefreshDefinitions();
             Repaint();
@@ -333,6 +411,52 @@ namespace CommonEditor.Save
             }
         }
 
+        private void RunSpecifiedQuestReset()
+        {
+            string questId = specifiedQuestId?.Trim() ?? string.Empty;
+            StoryQuestResetDefinition? definition = FindQuestDefinition(questId);
+            if (!definition.HasValue)
+            {
+                questResetMessage = "퀘스트 리셋 실패: 퀘스트 테이블에 일치하는 ID가 없습니다. ID를 다시 확인하세요.";
+                questResetMessageType = MessageType.Error;
+                Repaint();
+                return;
+            }
+
+            StoryQuestResetDefinition target = definition.Value;
+            bool confirmed = EditorUtility.DisplayDialog(
+                "지정 퀘스트 초기화",
+                $"{DescribeCharacterName(target.CharacterId)}의 서사 퀘스트를\n{target.QuestId}\n단계가 막 시작된 상태로 초기화합니다. 계속할까요?",
+                "적용",
+                "취소");
+            if (!confirmed) return;
+
+            StoryQuestResetOutcome outcome = SaveResetService.ResetStoryQuestTo(
+                SaveSystem.Data, target.QuestId, storyQuestDefinitions, SaveSystem.Save);
+            switch (outcome)
+            {
+                case StoryQuestResetOutcome.Success:
+                    questResetMessage = $"{DescribeCharacterName(target.CharacterId)}: {target.QuestId} 단계로 초기화했습니다.";
+                    questResetMessageType = MessageType.Info;
+                    break;
+                case StoryQuestResetOutcome.QuestNotFound:
+                    questResetMessage = "퀘스트 리셋 실패: 퀘스트 테이블에 일치하는 ID가 없습니다. ID를 다시 확인하세요.";
+                    questResetMessageType = MessageType.Error;
+                    break;
+                case StoryQuestResetOutcome.InvalidQuestChain:
+                    questResetMessage = "퀘스트 리셋 실패: 선행 퀘스트 연결이 올바르지 않습니다. 테이블을 확인하세요.";
+                    questResetMessageType = MessageType.Error;
+                    break;
+                case StoryQuestResetOutcome.SaveFailed:
+                    questResetMessage = "퀘스트 리셋 저장에 실패해 변경을 되돌렸습니다. Console 로그를 확인하세요.";
+                    questResetMessageType = MessageType.Error;
+                    break;
+            }
+
+            RefreshDefinitions();
+            Repaint();
+        }
+
         private static string DescribeTargets(SaveResetTargets targets)
         {
             var lines = new List<string>();
@@ -345,6 +469,10 @@ namespace CommonEditor.Save
             if ((targets & SaveResetTargets.Character) != 0)
             {
                 lines.Add("• Character (선택한 캐릭터만 삭제)");
+            }
+            if ((targets & SaveResetTargets.Quest) != 0)
+            {
+                lines.Add("• Quest (보유 캐릭터 서사 퀘스트를 각 1단계로)");
             }
             return lines.Count == 0 ? "(없음)" : string.Join("\n", lines);
         }
@@ -427,9 +555,51 @@ namespace CommonEditor.Save
             itemsById = BuildMap<ItemDefinition>(def => def.ItemId);
             buildingsById = BuildMap<BuildingDefinition>(def => def.BuildingId);
             charactersById = BuildMap<CharacterDefinition>(def => def.CharacterId);
+            storyQuestDefinitions = BuildStoryQuestDefinitions();
 
             // 정의를 다시 읽었으니 이전 조회 결과도 버린다(테이블 값이 바뀌었을 수 있다).
             localizedNameCache.Clear();
+        }
+
+        private static List<StoryQuestResetDefinition> BuildStoryQuestDefinitions()
+        {
+            var definitions = new List<StoryQuestResetDefinition>();
+            CharacterStoryQuestCatalog catalog =
+                AssetDatabase.LoadAssetAtPath<CharacterStoryQuestCatalog>(StoryQuestCatalogPath);
+            if (catalog == null)
+            {
+                // 생성 에셋 경로가 바뀐 개발 중 상태를 위한 읽기 전용 폴백. 여러 카탈로그가 있으면
+                // 가장 먼저 발견한 유효 카탈로그만 사용한다.
+                string[] guids = AssetDatabase.FindAssets("t:CharacterStoryQuestCatalog");
+                foreach (string guid in guids)
+                {
+                    string path = AssetDatabase.GUIDToAssetPath(guid);
+                    catalog = AssetDatabase.LoadAssetAtPath<CharacterStoryQuestCatalog>(path);
+                    if (catalog != null) break;
+                }
+            }
+
+            if (catalog == null) return definitions;
+            foreach (CharacterStoryQuestDefinition quest in catalog.Quests)
+            {
+                if (quest == null) continue;
+                definitions.Add(new StoryQuestResetDefinition(
+                    quest.QuestId, quest.CharacterId, quest.PreviousQuestId, quest.Enabled));
+            }
+            return definitions;
+        }
+
+        private StoryQuestResetDefinition? FindQuestDefinition(string questId)
+        {
+            if (string.IsNullOrWhiteSpace(questId)) return null;
+            foreach (StoryQuestResetDefinition definition in storyQuestDefinitions)
+            {
+                if (definition.IsValid && string.Equals(definition.QuestId, questId, StringComparison.Ordinal))
+                {
+                    return definition;
+                }
+            }
+            return null;
         }
 
         private static Dictionary<string, T> BuildMap<T>(Func<T, string> keyOf) where T : UnityEngine.Object

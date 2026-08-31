@@ -171,7 +171,8 @@ namespace CommonEditor.SaveTests
             SaveResetResult result = SaveResetService.Apply(data, targets, Counting(out Box<int> calls));
 
             Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
-            Assert.AreEqual(SaveResetTargets.Item | SaveResetTargets.Construction, result.AppliedTargets);
+            Assert.AreEqual(SaveResetTargets.Item | SaveResetTargets.Construction | SaveResetTargets.Quest,
+                result.AppliedTargets);
             Assert.AreEqual(0, data.items.Count, "Item은 초기화됩니다.");
             Assert.AreEqual(0, data.buildingConstructions.Count, "Construction은 초기화됩니다.");
             Assert.AreEqual(0, data.recruitmentCycles.Count, "모집 주기도 Construction에 종속됩니다.");
@@ -469,7 +470,8 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
             Assert.AreEqual(1, calls.Value, "여러 대상을 골라도 저장은 한 번에 모아 한 번만 합니다.");
             Assert.AreEqual(
-                SaveResetTargets.Item | SaveResetTargets.Currency | SaveResetTargets.Construction | SaveResetTargets.Character,
+                SaveResetTargets.Item | SaveResetTargets.Currency | SaveResetTargets.Construction |
+                SaveResetTargets.Character | SaveResetTargets.Quest,
                 result.AppliedTargets);
 
             Assert.AreEqual(0, data.items.Count);
@@ -581,6 +583,148 @@ namespace CommonEditor.SaveTests
 
             CollectionAssert.AreEquivalent(new[] { "ElfArcher" }, removable,
                 "존재하고(=ElfArcher) 보호가 아니며(Barbarian 제외) 빈 값/미존재(Ghost, \"\")가 아닌 것만 남습니다.");
+        }
+
+        private static List<StoryQuestResetDefinition> MakeStoryDefinitions()
+        {
+            return new List<StoryQuestResetDefinition>
+            {
+                new StoryQuestResetDefinition("CatKnight_10001", "CatKnight", ""),
+                new StoryQuestResetDefinition("CatKnight_10002", "CatKnight", "CatKnight_10001"),
+                new StoryQuestResetDefinition("CatKnight_10003", "CatKnight", "CatKnight_10002"),
+                new StoryQuestResetDefinition("ElfArcher_10001", "ElfArcher", ""),
+                new StoryQuestResetDefinition("ElfArcher_10002", "ElfArcher", "ElfArcher_10001"),
+            };
+        }
+
+        private static SaveData MakeStoryFixture()
+        {
+            return new SaveData
+            {
+                currency = 777,
+                characters = new List<CharacterSaveState>
+                {
+                    new CharacterSaveState { characterId = "CatKnight", level = 8 },
+                    new CharacterSaveState { characterId = "ElfArcher", level = 4 },
+                },
+                characterStoryQuests = new List<CharacterStoryQuestSaveState>
+                {
+                    new CharacterStoryQuestSaveState
+                    {
+                        characterId = "CatKnight",
+                        activeQuestId = "CatKnight_10003",
+                        completedQuestIds = new List<string> { "CatKnight_10001", "CatKnight_10002" },
+                        objectiveProgress = new List<CharacterStoryObjectiveProgressSaveState>
+                        {
+                            new CharacterStoryObjectiveProgressSaveState { objectiveId = "kill", progress = 9 },
+                        },
+                        readyToComplete = true,
+                    },
+                    new CharacterStoryQuestSaveState
+                    {
+                        characterId = "ElfArcher",
+                        activeQuestId = "ElfArcher_10002",
+                        completedQuestIds = new List<string> { "ElfArcher_10001" },
+                        objectiveProgress = new List<CharacterStoryObjectiveProgressSaveState>
+                        {
+                            new CharacterStoryObjectiveProgressSaveState { objectiveId = "entry", progress = 2 },
+                        },
+                    },
+                },
+            };
+        }
+
+        [Test]
+        public void Quest_전체_초기화는_보유_캐릭터를_각_첫_단계로_되돌린다()
+        {
+            SaveData data = MakeStoryFixture();
+
+            SaveResetResult result = SaveResetService.Apply(
+                data, SaveResetTargets.Quest, null, null, MakeStoryDefinitions(),
+                Counting(out Box<int> calls));
+
+            Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
+            Assert.AreEqual(SaveResetTargets.Quest, result.AppliedTargets);
+            Assert.AreEqual(1, calls.Value);
+            Assert.AreEqual(2, data.characterStoryQuests.Count);
+            Assert.AreEqual("CatKnight_10001", data.characterStoryQuests[0].activeQuestId);
+            Assert.AreEqual("ElfArcher_10001", data.characterStoryQuests[1].activeQuestId);
+            foreach (CharacterStoryQuestSaveState state in data.characterStoryQuests)
+            {
+                Assert.AreEqual(0, state.completedQuestIds.Count);
+                Assert.AreEqual(0, state.objectiveProgress.Count);
+                Assert.IsFalse(state.readyToComplete);
+                Assert.IsFalse(state.graduated);
+            }
+            Assert.AreEqual(777, data.currency, "Quest만 선택하면 다른 저장 영역은 유지합니다.");
+        }
+
+        [Test]
+        public void 지정_초기화는_해당_캐릭터만_목표_단계의_시작_상태로_만든다()
+        {
+            SaveData data = MakeStoryFixture();
+            CharacterStoryQuestSaveState oldElf = data.characterStoryQuests[1];
+
+            StoryQuestResetOutcome result = SaveResetService.ResetStoryQuestTo(
+                data, "CatKnight_10002", MakeStoryDefinitions(), Counting(out Box<int> calls));
+
+            Assert.AreEqual(StoryQuestResetOutcome.Success, result);
+            Assert.AreEqual(1, calls.Value);
+            CharacterStoryQuestSaveState cat = data.characterStoryQuests.Find(s => s.characterId == "CatKnight");
+            Assert.NotNull(cat);
+            Assert.AreEqual("CatKnight_10002", cat.activeQuestId);
+            CollectionAssert.AreEqual(new[] { "CatKnight_10001" }, cat.completedQuestIds,
+                "지정 단계보다 앞선 퀘스트는 완료 이력이어야 전체 진행률과 다음 연결이 맞습니다.");
+            Assert.AreEqual(0, cat.objectiveProgress.Count);
+            Assert.IsFalse(cat.readyToComplete);
+            Assert.IsFalse(cat.graduated);
+            Assert.AreSame(oldElf, data.characterStoryQuests.Find(s => s.characterId == "ElfArcher"));
+        }
+
+        [Test]
+        public void 존재하지_않는_퀘스트_ID는_저장하거나_변경하지_않는다()
+        {
+            SaveData data = MakeStoryFixture();
+            List<CharacterStoryQuestSaveState> original = data.characterStoryQuests;
+
+            StoryQuestResetOutcome result = SaveResetService.ResetStoryQuestTo(
+                data, "Missing_99999", MakeStoryDefinitions(), Counting(out Box<int> calls));
+
+            Assert.AreEqual(StoryQuestResetOutcome.QuestNotFound, result);
+            Assert.AreEqual(0, calls.Value);
+            Assert.AreSame(original, data.characterStoryQuests);
+        }
+
+        [Test]
+        public void 지정_퀘스트_저장_실패는_전체_퀘스트_목록을_되돌린다()
+        {
+            SaveData data = MakeStoryFixture();
+            List<CharacterStoryQuestSaveState> original = data.characterStoryQuests;
+
+            StoryQuestResetOutcome result = SaveResetService.ResetStoryQuestTo(
+                data, "CatKnight_10002", MakeStoryDefinitions(), Counting(out Box<int> calls, succeeds: false));
+
+            Assert.AreEqual(StoryQuestResetOutcome.SaveFailed, result);
+            Assert.AreEqual(1, calls.Value);
+            Assert.AreSame(original, data.characterStoryQuests);
+            Assert.AreEqual("CatKnight_10003", data.characterStoryQuests[0].activeQuestId);
+        }
+
+        [Test]
+        public void 끊기거나_순환하는_선행_퀘스트는_지정_초기화를_거부한다()
+        {
+            SaveData data = MakeStoryFixture();
+            var broken = new List<StoryQuestResetDefinition>
+            {
+                new StoryQuestResetDefinition("CatKnight_10002", "CatKnight", "CatKnight_Missing"),
+            };
+
+            StoryQuestResetOutcome result = SaveResetService.ResetStoryQuestTo(
+                data, "CatKnight_10002", broken, Counting(out Box<int> calls));
+
+            Assert.AreEqual(StoryQuestResetOutcome.InvalidQuestChain, result);
+            Assert.AreEqual(0, calls.Value);
+            Assert.AreEqual("CatKnight_10003", data.characterStoryQuests[0].activeQuestId);
         }
     }
 }
