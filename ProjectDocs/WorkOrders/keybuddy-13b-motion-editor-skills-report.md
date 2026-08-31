@@ -19,10 +19,11 @@
 ## 집중 검증
 
 - Unity 2022.3.62f3 검증은 `/private/tmp/keybuddy-13b-unity.hVfNKy` 격리 복사본에서 수행했다. 원본 프로젝트를 Unity로 열거나 실제 `persistentDataPath`에 접근하지 않았다.
-- `CharacterEditor.Tests.MotionEditorSkillsTests`: **3/3 통과**
+- `CharacterEditor.Tests.MotionEditorSkillsTests`: **4/4 통과**
   - 빈 입력 안전성
   - 캐릭터 필터 및 `display_order → skill_id` 정렬
   - 결정적 스킬 모션 키 제안
+  - 기존 Attack T1/T2/T3 풀 매핑 회귀
 - `TableDataEditor.Tests.SkillTableTests`: **34/34 통과**
 - `TableDataEditor.Tests.CharacterSkillTableTests`: **22/22 통과**
 - Unity C# 컴파일 오류: **0건**.

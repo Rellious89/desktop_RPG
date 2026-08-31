@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Character;
 using NUnit.Framework;
 using Skill;
 using UnityEditor;
@@ -46,6 +47,29 @@ namespace CharacterEditor.Tests
         public void BuildSkillMotionName_IsDeterministicAndCopyableAsMotionKey()
         {
             Assert.AreEqual("CatKnight_Skill_arc_slash", MotionEditorWindow.BuildSkillMotionName("CatKnight", "arc_slash"));
+        }
+
+        [Test]
+        public void AttackWorkspace_TierOneToThreePoolMapping_IsUnchanged()
+        {
+            CharacterMotionProfile profile = ScriptableObject.CreateInstance<CharacterMotionProfile>();
+            ComboTierAttackPool tier1 = ScriptableObject.CreateInstance<ComboTierAttackPool>();
+            ComboTierAttackPool tier2 = ScriptableObject.CreateInstance<ComboTierAttackPool>();
+            ComboTierAttackPool tier3 = ScriptableObject.CreateInstance<ComboTierAttackPool>();
+            created.Add(profile);
+            created.Add(tier1);
+            created.Add(tier2);
+            created.Add(tier3);
+
+            var serialized = new SerializedObject(profile);
+            serialized.FindProperty("tier1Pool").objectReferenceValue = tier1;
+            serialized.FindProperty("tier2Pool").objectReferenceValue = tier2;
+            serialized.FindProperty("tier3Pool").objectReferenceValue = tier3;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            Assert.AreSame(tier1, MotionEditorWindow.GetPool(profile, 1));
+            Assert.AreSame(tier2, MotionEditorWindow.GetPool(profile, 2));
+            Assert.AreSame(tier3, MotionEditorWindow.GetPool(profile, 3));
         }
 
         private CharacterSkillDefinition CreateRelation(string characterId, string skillId, int displayOrder)

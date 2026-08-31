@@ -1395,7 +1395,7 @@ namespace CharacterEditor
             SelectAttack(first);
         }
 
-        private static ComboTierAttackPool GetPool(CharacterMotionProfile profile, int tier)
+        internal static ComboTierAttackPool GetPool(CharacterMotionProfile profile, int tier)
         {
             if (profile == null) return null;
             return tier == 1 ? profile.Tier1Pool : tier == 2 ? profile.Tier2Pool : profile.Tier3Pool;
