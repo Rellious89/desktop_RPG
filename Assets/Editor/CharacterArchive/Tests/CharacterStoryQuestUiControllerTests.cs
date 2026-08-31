@@ -6,6 +6,7 @@ using Common;
 using Dungeon;
 using NUnit.Framework;
 using Quest;
+using TMPro;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Localization.Tables;
@@ -254,12 +255,134 @@ namespace CharacterArchiveEditorTests
             Assert.AreEqual("dungeon_b, missing, dungeon_a", TargetName(controller, dungeonMany, false));
         }
 
+        [Test]
+        public void RuntimeObjectiveLines_ArePooledWithoutDuplicatesAcrossRepeatedPasses()
+        {
+            GameObject host = new GameObject("story-quest-line-pool"); created.Add(host);
+            var controller = host.AddComponent<CharacterStoryQuestUiController>();
+            GameObject content = new GameObject("content", typeof(RectTransform)); created.Add(content);
+            TextMeshProUGUI typeTemplate = CreateLineTemplate("type template", content.transform);
+            TextMeshProUGUI descriptionTemplate = CreateLineTemplate("description template", content.transform);
+            Set(controller, "questTypeLineTemplate", typeTemplate);
+            Set(controller, "questDescriptionLineTemplate", descriptionTemplate);
+
+            List<CharacterStoryQuestObjectiveDefinition> twoObjectives = new List<CharacterStoryQuestObjectiveDefinition>
+            {
+                StaminaObjective("A"), StaminaObjective("B")
+            };
+            List<CharacterStoryQuestObjectiveDefinition> oneObjective = new List<CharacterStoryQuestObjectiveDefinition>
+            {
+                StaminaObjective("A")
+            };
+            CharacterStoryQuestSnapshot snapshot = new CharacterStoryQuestSnapshot("CatKnight", "Q", false, false,
+                new List<string>(), new Dictionary<string, int> { { "A", 1 }, { "B", 2 } });
+
+            UpdateObjectiveLines(controller, twoObjectives, snapshot);
+            UpdateObjectiveLines(controller, twoObjectives, snapshot);
+            AssertLinePool(controller, "typeLines", 2, 2);
+            AssertLinePool(controller, "descriptionLines", 2, 2);
+            Assert.AreEqual(4, RuntimeLineCount(content.transform));
+
+            UpdateObjectiveLines(controller, oneObjective, snapshot);
+            AssertLinePool(controller, "typeLines", 2, 1);
+            AssertLinePool(controller, "descriptionLines", 2, 1);
+
+            UpdateObjectiveLines(controller, twoObjectives, snapshot);
+            AssertLinePool(controller, "typeLines", 2, 2);
+            AssertLinePool(controller, "descriptionLines", 2, 2);
+            Assert.AreEqual(4, RuntimeLineCount(content.transform));
+            Assert.IsFalse(typeTemplate.gameObject.activeSelf);
+            Assert.IsFalse(descriptionTemplate.gameObject.activeSelf);
+        }
+
+        [Test]
+        public void ObjectiveLayout_RebuildsVariableGroupsBeforeContentAndEnablesScrolling()
+        {
+            GameObject canvasObject = new GameObject("canvas", typeof(RectTransform), typeof(Canvas)); created.Add(canvasObject);
+            GameObject scrollObject = new GameObject("scroll", typeof(RectTransform), typeof(ScrollRect)); created.Add(scrollObject);
+            scrollObject.transform.SetParent(canvasObject.transform, false);
+            ScrollRect scroll = scrollObject.GetComponent<ScrollRect>();
+            scroll.horizontal = false;
+            GameObject viewportObject = new GameObject("viewport", typeof(RectTransform)); created.Add(viewportObject);
+            viewportObject.transform.SetParent(scrollObject.transform, false);
+            RectTransform viewport = viewportObject.GetComponent<RectTransform>();
+            viewport.sizeDelta = new Vector2(200f, 100f);
+            GameObject contentObject = new GameObject("content", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter)); created.Add(contentObject);
+            contentObject.transform.SetParent(viewport, false);
+            RectTransform content = contentObject.GetComponent<RectTransform>();
+            content.anchorMin = new Vector2(0f, 1f); content.anchorMax = new Vector2(1f, 1f); content.pivot = new Vector2(.5f, 1f);
+            VerticalLayoutGroup layout = contentObject.GetComponent<VerticalLayoutGroup>();
+            layout.childControlWidth = true; layout.childControlHeight = true; layout.childForceExpandHeight = false;
+            contentObject.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            for (int i = 0; i < 3; i++) AddVariableHeightGroup(content, 80f);
+            scroll.viewport = viewport; scroll.content = content;
+            var controller = scrollObject.AddComponent<CharacterStoryQuestUiController>();
+            Set(controller, "objectiveScroll", scroll);
+
+            RefreshObjectiveLayout(controller, false);
+            Assert.Greater(content.rect.height, viewport.rect.height);
+            scroll.verticalNormalizedPosition = 1f;
+            float topY = content.anchoredPosition.y;
+            scroll.verticalNormalizedPosition = 0f;
+            Assert.AreNotEqual(topY, content.anchoredPosition.y, "Content가 Viewport보다 길면 ScrollRect가 실제로 이동해야 합니다.");
+        }
+
         private CharacterStoryQuestObjectiveDefinition Objective(string id, int required)
         {
             CharacterStoryQuestObjectiveDefinition result = Create<CharacterStoryQuestObjectiveDefinition>();
             Set(result, "objectiveId", id); Set(result, "questId", "Q"); Set(result, "requiredValue", required); Set(result, "enabled", true);
             return result;
         }
+
+        private CharacterStoryQuestObjectiveDefinition StaminaObjective(string id)
+        {
+            CharacterStoryQuestObjectiveDefinition objective = Objective(id, 3);
+            Set(objective, "conditionType", CharacterStoryQuestConditionType.StaminaSpent);
+            return objective;
+        }
+
+        private TextMeshProUGUI CreateLineTemplate(string name, Transform parent)
+        {
+            GameObject line = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+            created.Add(line);
+            line.transform.SetParent(parent, false);
+            line.SetActive(false);
+            return line.GetComponent<TextMeshProUGUI>();
+        }
+
+        private static void UpdateObjectiveLines(CharacterStoryQuestUiController controller,
+            IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives, CharacterStoryQuestSnapshot snapshot) =>
+            typeof(CharacterStoryQuestUiController).GetMethod("UpdateObjectiveLines", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(controller, new object[] { objectives, snapshot });
+
+        private static void AssertLinePool(CharacterStoryQuestUiController controller, string fieldName, int expectedPool, int expectedActive)
+        {
+            var lines = (List<TMP_Text>)typeof(CharacterStoryQuestUiController).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(controller);
+            Assert.AreEqual(expectedPool, lines.Count, fieldName + " 풀 수가 목표 수 전환 뒤에도 재사용되어야 합니다.");
+            int active = 0;
+            foreach (TMP_Text line in lines) if (line != null && line.gameObject.activeSelf) active++;
+            Assert.AreEqual(expectedActive, active, fieldName + " 활성 런타임 라인 수가 현재 목표 수와 같아야 합니다.");
+        }
+
+        private static int RuntimeLineCount(Transform parent)
+        {
+            int count = 0;
+            foreach (Transform child in parent) if (child.name.Contains("(Runtime)")) count++;
+            return count;
+        }
+
+        private void AddVariableHeightGroup(Transform parent, float height)
+        {
+            GameObject group = new GameObject("variable group", typeof(RectTransform), typeof(LayoutElement));
+            created.Add(group);
+            group.transform.SetParent(parent, false);
+            group.GetComponent<LayoutElement>().preferredHeight = height;
+        }
+
+        private static void RefreshObjectiveLayout(CharacterStoryQuestUiController controller, bool resetToTop) =>
+            typeof(CharacterStoryQuestUiController).GetMethod("RefreshObjectiveLayout", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(controller, new object[] { resetToTop });
 
         private CharacterStoryQuestDefinition Quest(string id, int order)
         {

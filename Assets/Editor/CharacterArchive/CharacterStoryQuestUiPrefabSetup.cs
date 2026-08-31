@@ -44,6 +44,7 @@ namespace CharacterArchiveEditor
                     description = Find(scroll, "Viewport/Content/QuestDesctiption");
                 }
                 SetLayerRecursively(scroll, current.gameObject.layer);
+                EnsureViewportInputGraphic(scroll.Find("Viewport"));
                 TMP_Text typeTemplate = Find(type, "lb_contents").GetComponent<TMP_Text>();
                 TMP_Text descriptionTemplate = Find(description, "lb_contents").GetComponent<TMP_Text>();
                 typeTemplate.gameObject.SetActive(false); descriptionTemplate.gameObject.SetActive(false);
@@ -120,11 +121,12 @@ namespace CharacterArchiveEditor
             scrollRectComponent.movementType = ScrollRect.MovementType.Clamped;
             scrollRectComponent.scrollSensitivity = 12f;
 
-            var viewport = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D));
+            var viewport = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D), typeof(Image));
             viewport.transform.SetParent(scroll.transform, false);
             viewport.layer = current.gameObject.layer;
             RectTransform viewportRect = viewport.GetComponent<RectTransform>();
             Stretch(viewportRect, Vector2.zero, Vector2.zero);
+            ConfigureViewportInputGraphic(viewport.GetComponent<Image>());
             var content = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
             content.transform.SetParent(viewport.transform, false);
             content.layer = current.gameObject.layer;
@@ -151,6 +153,23 @@ namespace CharacterArchiveEditor
         private static void DisableTextRaycasts(Transform root)
         {
             foreach (TMP_Text text in root.GetComponentsInChildren<TMP_Text>(true)) text.raycastTarget = false;
+        }
+
+        private static void EnsureViewportInputGraphic(Transform viewport)
+        {
+            if (viewport == null) throw new System.InvalidOperationException("ObjectiveScroll Viewport를 찾을 수 없습니다.");
+            Image image = viewport.GetComponent<Image>();
+            if (image == null) image = viewport.gameObject.AddComponent<Image>();
+            ConfigureViewportInputGraphic(image);
+        }
+
+        // ScrollRect receives pointer events only through a Graphic raycast target.  This image is
+        // fully transparent, so it covers empty viewport space without changing the presentation.
+        private static void ConfigureViewportInputGraphic(Image image)
+        {
+            image.sprite = null;
+            image.color = new Color(1f, 1f, 1f, 0f);
+            image.raycastTarget = true;
         }
 
         private static void SetLayerRecursively(Transform root, int layer)

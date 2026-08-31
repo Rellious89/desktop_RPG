@@ -57,7 +57,14 @@ namespace CharacterArchiveEditorTests
                 ScrollRect scroll = current.Find("ObjectiveScroll").GetComponent<ScrollRect>();
                 Assert.IsTrue(scroll.vertical); Assert.IsFalse(scroll.horizontal);
                 Assert.AreEqual(ScrollRect.MovementType.Clamped, scroll.movementType);
-                Assert.NotNull(scroll.viewport.GetComponent<RectMask2D>());
+                RectTransform viewport = scroll.viewport;
+                Assert.NotNull(viewport.GetComponent<RectMask2D>());
+                Image viewportInput = viewport.GetComponent<Image>();
+                Assert.NotNull(viewportInput, "빈 Viewport 영역도 ScrollRect 포인터 입력을 받아야 합니다.");
+                Assert.IsTrue(viewportInput.raycastTarget);
+                Assert.AreEqual(0f, viewportInput.color.a, "입력용 Viewport Graphic은 화면에 보이면 안 됩니다.");
+                Assert.AreSame(viewport, scroll.viewport);
+                Assert.AreSame(content.GetComponent<RectTransform>(), scroll.content);
                 Assert.NotNull(content.GetComponent<VerticalLayoutGroup>());
                 ContentSizeFitter fitter = content.GetComponent<ContentSizeFitter>();
                 Assert.NotNull(fitter); Assert.AreEqual(ContentSizeFitter.FitMode.PreferredSize, fitter.verticalFit);

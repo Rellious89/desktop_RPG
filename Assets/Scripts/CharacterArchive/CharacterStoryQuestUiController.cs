@@ -79,6 +79,10 @@ namespace CharacterArchive
         private CharacterDefinition selected;
         private bool completionRequested;
         private bool subscribed;
+        private bool refreshing;
+        private bool refreshQueued;
+        private string displayedCharacterId;
+        private string displayedQuestId;
 
         public event Action CloseRequested;
 
@@ -113,8 +117,10 @@ namespace CharacterArchive
         {
             selected = null;
             completionRequested = false;
-            ClearLines(typeLines); ClearLines(descriptionLines);
+            SetLinesActive(typeLines, 0); SetLinesActive(descriptionLines, 0);
             ClearRewardView();
+            displayedCharacterId = null;
+            displayedQuestId = null;
             TearDown();
         }
 
@@ -253,6 +259,7 @@ namespace CharacterArchive
         {
             SetActive(characterInfoPage, page == RightPage.CharacterInfo);
             SetActive(questInfoPage, page == RightPage.QuestInfo);
+            if (page == RightPage.QuestInfo) RefreshObjectiveLayout(false);
         }
 
         private void ConfirmComplete()
@@ -267,6 +274,27 @@ namespace CharacterArchive
         }
 
         public void Refresh()
+        {
+            // StringChanged can arrive more than once while a table is being resolved.  Rendering
+            // recursively would be harmless to the data, but makes the UI work needlessly harder
+            // to reason about; finish the current pass, then synchronously apply one final state.
+            if (refreshing)
+            {
+                refreshQueued = true;
+                return;
+            }
+
+            do
+            {
+                refreshQueued = false;
+                refreshing = true;
+                try { RefreshImmediate(); }
+                finally { refreshing = false; }
+            }
+            while (refreshQueued);
+        }
+
+        private void RefreshImmediate()
         {
             if (!HasRequiredReferences)
             {
@@ -288,18 +316,8 @@ namespace CharacterArchive
             if (totalProgressPercentText != null) totalProgressPercentText.text = FormatProgressPercent(total);
             if (totalProgressText != null) totalProgressText.text = SafeFormat(totalProgressFormat, "{0}번 퀘스트 진행 중 ({1}/{2})", currentNumber, completedCount, totalCount);
 
-            ClearLines(typeLines); ClearLines(descriptionLines);
             BindObjectiveTargetLocalization(objectives);
-            for (int i = 0; i < objectives.Count; i++)
-            {
-                CharacterStoryQuestObjectiveDefinition objective = objectives[i];
-                int required = objective.RequiredValue;
-                int progress = GetProgress(snapshot, objective.ObjectiveId, required);
-                TMP_Text type = CreateLine(questTypeLineTemplate, typeLines);
-                TMP_Text description = CreateLine(questDescriptionLineTemplate, descriptionLines);
-                if (type != null) type.text = ConditionTitle(objective.ConditionType);
-                if (description != null) description.text = ObjectiveDescription(objective, progress, required);
-            }
+            UpdateObjectiveLines(objectives, snapshot);
 
             SetActive(questTypeTitle != null ? questTypeTitle.gameObject : null, objectives.Count > 0);
             SetActive(questDescriptionTitle != null ? questDescriptionTitle.gameObject : null, objectives.Count > 0);
@@ -310,7 +328,14 @@ namespace CharacterArchive
                 completeButtonText.text = readyToComplete
                     ? TextOrFallback(completeButtonReadyText, "퀘스트 완료")
                     : TextOrFallback(completeButtonInProgressText, "진행중");
-            if (objectiveScroll != null) { objectiveScroll.verticalNormalizedPosition = 1f; LayoutRebuilder.ForceRebuildLayoutImmediate(objectiveScroll.content); }
+
+            string characterId = selected != null ? selected.CharacterId : null;
+            string questId = active != null ? active.QuestId : null;
+            bool selectionChanged = !string.Equals(displayedCharacterId, characterId, StringComparison.Ordinal) ||
+                                  !string.Equals(displayedQuestId, questId, StringComparison.Ordinal);
+            RefreshObjectiveLayout(selectionChanged);
+            displayedCharacterId = characterId;
+            displayedQuestId = questId;
         }
 
         private void RefreshRewards(CharacterStoryQuestDefinition quest)
@@ -369,20 +394,71 @@ namespace CharacterArchive
             return all;
         }
 
-        private TMP_Text CreateLine(TMP_Text template, List<TMP_Text> destination)
+        private void UpdateObjectiveLines(IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives, CharacterStoryQuestSnapshot snapshot)
+        {
+            int count = objectives != null ? objectives.Count : 0;
+            for (int i = 0; i < count; i++)
+            {
+                CharacterStoryQuestObjectiveDefinition objective = objectives[i];
+                int required = objective.RequiredValue;
+                int progress = GetProgress(snapshot, objective.ObjectiveId, required);
+                TMP_Text type = GetOrCreateLine(questTypeLineTemplate, typeLines, i);
+                TMP_Text description = GetOrCreateLine(questDescriptionLineTemplate, descriptionLines, i);
+                if (type != null) type.text = ConditionTitle(objective.ConditionType);
+                if (description != null) description.text = ObjectiveDescription(objective, progress, required);
+            }
+            SetLinesActive(typeLines, count);
+            SetLinesActive(descriptionLines, count);
+        }
+
+        // Runtime lines are retained for the life of this panel.  In particular, do not Destroy
+        // them during Refresh: destruction is deferred to end-of-frame and a localization callback
+        // in that gap used to instantiate a second set of lines.
+        private static TMP_Text GetOrCreateLine(TMP_Text template, List<TMP_Text> pool, int index)
         {
             if (template == null || template.transform.parent == null) return null;
-            TMP_Text line = Instantiate(template, template.transform.parent);
-            line.name = template.name + " (Runtime)";
-            line.gameObject.SetActive(true);
-            destination.Add(line);
+            TMP_Text line;
+            if (index < pool.Count)
+            {
+                line = pool[index];
+            }
+            else
+            {
+                line = Instantiate(template, template.transform.parent);
+                line.name = template.name + " (Runtime)";
+                pool.Add(line);
+            }
+            if (line != null) line.gameObject.SetActive(true);
             return line;
         }
 
-        private static void ClearLines(List<TMP_Text> lines)
+        private static void SetLinesActive(List<TMP_Text> lines, int activeCount)
         {
-            for (int i = 0; i < lines.Count; i++) if (lines[i] != null) Destroy(lines[i].gameObject);
-            lines.Clear();
+            for (int i = activeCount; i < lines.Count; i++)
+                if (lines[i] != null) lines[i].gameObject.SetActive(false);
+        }
+
+        private void RefreshObjectiveLayout(bool resetToTop)
+        {
+            if (objectiveScroll == null || objectiveScroll.content == null) return;
+
+            RectTransform content = objectiveScroll.content;
+            // ContentSizeFitter reads the preferred height of its direct children.  Rebuild those
+            // variable-height groups first so their values are current before Content is measured.
+            for (int i = 0; i < content.childCount; i++)
+            {
+                RectTransform child = content.GetChild(i) as RectTransform;
+                if (child != null && child.gameObject.activeInHierarchy)
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(child);
+            }
+            LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+            Canvas.ForceUpdateCanvases();
+
+            if (resetToTop)
+            {
+                objectiveScroll.StopMovement();
+                objectiveScroll.verticalNormalizedPosition = 1f;
+            }
         }
 
         private string ObjectiveDescription(CharacterStoryQuestObjectiveDefinition objective, int current, int required)
