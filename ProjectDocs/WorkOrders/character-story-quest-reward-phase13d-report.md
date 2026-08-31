@@ -34,9 +34,12 @@
 ## 검증
 
 - `git diff --check`: 통과.
-- 새 집중 테스트 5개(테이블 계약 2, 완료 트랜잭션 성공/실패·예외 3)와 기존 프리팹 테스트의 보상 wiring/`InventorySlotView` 검증을 추가했다.
+- 활성 편집기를 건드리지 않도록 `/private/tmp/desktop-rpg-phase13d-isolated` 복제본에서 Unity `2022.3.62f3`로 컴파일했다. C# 컴파일 오류는 0건이다.
+- 집중 EditMode 8건이 모두 통과했다.
+  - 완료 트랜잭션: 3건(성공·저장 실패·저장 예외/중복 지급 차단)
+  - CSV/Generated 보상 계약: 2건
+  - 명부 보상 프리팹 wiring/`InventorySlotView` 툴팁 경로: 3건
 - 정적 확인으로 세 Generated asset의 보상 포인터·수량 및 `SaveData.CurrentSaveVersion == 8`을 확인했다.
-- Unity C# 컴파일 및 EditMode 실제 실행: 이 작업 환경에는 프로젝트가 요구하는 Unity `2022.3.62f3` 에디터 실행 파일이 설치되어 있지 않아 실행하지 못했다. 따라서 컴파일 오류 수는 **미측정**이며, 0건이라고 주장하지 않는다.
 
 ## 안전 경계
 
