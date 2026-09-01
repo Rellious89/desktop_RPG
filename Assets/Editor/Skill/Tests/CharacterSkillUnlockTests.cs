@@ -568,9 +568,10 @@ namespace SkillEditor.Tests
         }
 
         [Test]
-        public void 프로덕션의_생성된_스킬_카탈로그가_비어_있어도_안전하다()
+        public void 프로덕션의_생성된_CatKnight_샘플도_같은_레벨_해금_규칙을_쓴다()
         {
-            // 지금 표에는 스킬도 관계도 한 줄이 없다 - 그 상태가 오류가 아니라 정상이어야 한다.
+            // 13C 기준 프로덕션 표에는 CatKnight 레벨 5 샘플 한 줄이 있다. 메모리 정의 시험과 똑같이
+            // Generated 직접 참조와 필요 레벨 경계를 통과해야 한다.
             var skills = AssetDatabase.LoadAssetAtPath<SkillCatalog>(TableDataPaths.SkillCatalogAssetPath);
             var relations = AssetDatabase.LoadAssetAtPath<CharacterSkillCatalog>(
                 TableDataPaths.CharacterSkillCatalogAssetPath);
@@ -579,16 +580,20 @@ namespace SkillEditor.Tests
             Assert.IsNotNull(relations, "생성된 관계 카탈로그가 없습니다.");
             skills.MarkDirty();
             relations.MarkDirty();
-            Assert.AreEqual(0, skills.Count, "전제 확인 - 아직 스킬이 없다.");
-            Assert.AreEqual(0, relations.Count, "전제 확인 - 아직 관계가 없다.");
+            Assert.AreEqual(1, skills.Count, "전제 확인 - 현재 샘플 스킬 한 줄이다.");
+            Assert.AreEqual(1, relations.Count, "전제 확인 - 현재 CatKnight 관계 한 줄이다.");
 
+            CharacterSaveState state = State("CatKnight", level: 4);
             var service = new CharacterSkillUnlockService(
-                Catalog("CatKnight"), skills, relations, Document(State("CatKnight", level: 99)));
+                Catalog("CatKnight"), skills, relations, Document(state));
 
-            Assert.IsFalse(service.IsUnlocked("CatKnight", "cleave"));
+            Assert.IsFalse(service.IsUnlocked("CatKnight", "catknight_skill_01"));
             CollectionAssert.IsEmpty(Ids(service.GetUnlockedSkills("CatKnight")));
-            CollectionAssert.IsEmpty(Ids(service.GetLockedSkills("CatKnight")));
-            CollectionAssert.IsEmpty(Ids(service.GetNewlyUnlockedSkills("CatKnight", 1, 99)));
+            CollectionAssert.AreEqual(new[] { "catknight_skill_01" }, Ids(service.GetLockedSkills("CatKnight")));
+
+            state.level = 5;
+            Assert.IsTrue(service.IsUnlocked("CatKnight", "catknight_skill_01"));
+            CollectionAssert.AreEqual(new[] { "catknight_skill_01" }, Ids(service.GetUnlockedSkills("CatKnight")));
         }
 
         // ---- 조회는 아무것도 고치지 않는다 ----
