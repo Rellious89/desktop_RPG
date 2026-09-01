@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Common;
 using DesktopWindow;
+using Skill;
 using UnityEngine;
 
 namespace Character
@@ -134,10 +135,21 @@ namespace Character
         [Tooltip("기본 공격 1회(타격 1번)당 적용할 데미지량. 강공격/치명타 등 추가 계산식은 아직 없다.")]
         [SerializeField] private int basicAttackPower = 5;
 
+        [Header("Automatic Attack Skills")]
+        [Tooltip("활성 Skill.csv 행으로 생성된 정식 스킬 카탈로그. 비어 있으면 자동 공격 스킬 없이 기존 일반 공격만 사용한다.")]
+        [SerializeField] private SkillCatalog skillCatalog;
+
+        [Tooltip("활성 CharacterSkill.csv 행으로 생성된 관계 카탈로그. 현재 CharacterRoster의 실제 캐릭터 관계만 조회한다.")]
+        [SerializeField] private CharacterSkillCatalog characterSkillCatalog;
+
         private SpriteRenderer spriteRenderer;
         private FlashOnCue flashOnCue;
         private HitEffectSpawner castEffectSpawner;
         private ProjectileSpawner projectileSpawner;
+
+        // 선택/해금/쿨다운 정책은 이 작은 런타임 객체가 소유한다. 프로필 교체나 GameObject 비활성화로
+        // 지우지 않으므로, 캐릭터가 필드에서 빠졌다 돌아와도 같은 실행 세션의 경과 시간이 유지된다.
+        private AutoAttackSkillRuntime autoAttackSkills;
 
         // 컴포넌트 캐시/발사체 스포너/오버레이 렌더러를 "정확히 한 번만" 만들었는지 표시한다.
         // Awake와 TryApplyMotionProfile 어느 쪽이 먼저 오더라도(비활성 오브젝트에 Awake 전에 프로필을
@@ -591,7 +603,7 @@ namespace Character
                     else
                     {
                         // Direct: 복귀를 취소하고 대기 중인 타격을 이어서 처리한다.
-                        StartAttackCycle(1f);
+                        TryStartAttackCycle(1f);
                     }
                     break;
             }
@@ -602,27 +614,112 @@ namespace Character
             // 입력 경로(Update)와 별개로 여기서도 한 번 더 막는다 - 공격 세션을 여는 지점이 하나뿐이라,
             // 이 가드가 "마을에서는 어떤 경로로도 공격이 시작되지 않는다"의 마지막 근거가 된다.
             if (!combatEnabled) return;
-            if (GetPoolForTier(ComboManager.CurrentTier).Count == 0) return;
+            if (!TryResolveCycleMotion(out IAttackMotion motion, out SkillDefinition skill, out string characterId))
+            {
+                return;
+            }
 
             playingVariant = false;
             attackSessionActive = true;
             AttackStarted?.Invoke();
-            StartAttackCycle(1f); // 세션을 연 이 첫 입력 1회를 사이클 시작값으로 넘긴다.
+
+            // AttackStarted 구독자가 필드 전환/캐릭터 교체/비활성화를 일으켰다면 기존 취소 결과를
+            // 되살리지 않는다. 모션이 active 상태에 들어가기 전이므로 스킬 쿨다운도 소비되지 않는다.
+            if (!isActiveAndEnabled || !combatEnabled || !attackSessionActive) return;
+
+            StartAttackCycle(1f, motion, skill, characterId); // 세션을 연 이 첫 입력 1회를 사이클 시작값으로 넘긴다.
+        }
+
+        /// <summary>
+        /// 새 사이클의 모션을 고르는 유일한 경계. 현재 로스터 캐릭터의 준비된 스킬을 먼저 보고,
+        /// 없거나 데이터가 깨졌거나 쿨다운 중이면 기존 콤보 티어 풀 선택을 그대로 사용한다.
+        /// 조회만 하므로 이 단계에서 시작하지 못해도 쿨다운은 소비되지 않는다.
+        /// </summary>
+        private bool TryResolveCycleMotion(
+            out IAttackMotion motion,
+            out SkillDefinition selectedSkill,
+            out string characterId)
+        {
+            motion = null;
+            selectedSkill = null;
+            characterId = string.Empty;
+
+            CharacterRoster roster = CharacterRoster.Instance;
+            CharacterDefinition currentCharacter = roster != null ? roster.Current : null;
+            AutoAttackSkillRuntime runtime = GetAutoAttackSkillRuntime(roster);
+
+            if (runtime != null && currentCharacter != null)
+            {
+                characterId = currentCharacter.CharacterId;
+                if (runtime.TrySelectReady(characterId, out selectedSkill))
+                {
+                    motion = selectedSkill.AttackMotion;
+                    return true;
+                }
+            }
+
+            List<IAttackMotion> pool = GetPoolForTier(ComboManager.CurrentTier);
+            if (pool.Count == 0) return false;
+
+            motion = SelectMotion(pool);
+            return true;
+        }
+
+        /// <summary>Awake 순서에 기대지 않고 첫 유효 입력 때 한 번 만든다. CharacterRoster가 없는
+        /// 테스트/과도기 씬이나 Inspector 참조가 빠진 씬은 조용히 기존 일반 공격만 사용한다.</summary>
+        private AutoAttackSkillRuntime GetAutoAttackSkillRuntime(CharacterRoster roster)
+        {
+            if (autoAttackSkills != null) return autoAttackSkills;
+            if (roster == null || roster.Catalog == null) return null;
+            if (skillCatalog == null || characterSkillCatalog == null) return null;
+            if (!SaveSystem.TryGetLoadedData(out SaveData document)) return null;
+
+            autoAttackSkills = new AutoAttackSkillRuntime(
+                roster.Catalog,
+                skillCatalog,
+                characterSkillCatalog,
+                document,
+                new AutoAttackSkillRuntime.RealtimeSource());
+            return autoAttackSkills;
+        }
+
+        /// <summary>이미 열린 공격 세션에서 다음 사이클을 시작한다. 준비된 스킬이 없으면 일반 공격을
+        /// 고르며, 어느 쪽 모션도 없으면 false를 돌려 호출자가 기존 Recovery/종료 흐름을 유지한다.</summary>
+        private bool TryStartAttackCycle(float newInputs)
+        {
+            if (!TryResolveCycleMotion(out IAttackMotion motion, out SkillDefinition skill, out string characterId))
+            {
+                return false;
+            }
+
+            StartAttackCycle(newInputs, motion, skill, characterId);
+            return true;
         }
 
         /// <summary>공격 한 사이클(Windup 또는 Charging -> Strike -> Recovery)을 시작한다.
         /// 콤보 티어는 매 사이클 시작 시점에만 다시 확인한다 - 재생/충전 중인 공격을 끊지 않고
         /// "다음 공격 시작부터" 새 티어가 반영되도록 하기 위함이다.
         /// newInputs는 이 사이클을 시작시킨 새 키 입력 수다(Strike 직후 이어지는 사이클은 0).</summary>
-        private void StartAttackCycle(float newInputs)
+        private void StartAttackCycle(
+            float newInputs,
+            IAttackMotion motion,
+            SkillDefinition selectedSkill,
+            string characterId)
         {
-            activeMotion = SelectMotion(GetPoolForTier(ComboManager.CurrentTier));
+            activeMotion = motion;
             activeMotionFrames = activeMotion.Frames;
             // 콤보로 새 모션을 뽑았으면 오버레이도 그 모션 것으로 즉시 교체된다(직전 모션 것을 이어 쓰지 않는다).
             activeMotionOverlayFrames = activeMotion.OverlayFrames;
 
             attackPhaseTimer = 0f;
             castCueFired = false; // 새 공격 인스턴스 - Cast Cue를 다시 한 번만 쏠 수 있게 리셋한다.
+
+            // 모션과 프레임이 기존 파이프라인의 active 상태에 실제로 들어간 뒤에만 기록한다. 선택 조회나
+            // 시작 불가 입력은 이 지점에 도달하지 않으므로 쿨다운을 소비하지 않는다.
+            if (selectedSkill != null && autoAttackSkills != null)
+            {
+                autoAttackSkills.MarkStarted(characterId, selectedSkill);
+            }
 
             if (activeMotion.UseAccumulatedInput)
             {
@@ -910,9 +1007,10 @@ namespace Character
             // 마무리한다(끊지 않는다).
             bool canAttack = CanStartNewAttack;
             bool inputStillFresh = Time.time - lastInputTime < activeMotion.QueueExpireTimeout;
-            if (canAttack && pendingAttacks > 0 && inputStillFresh)
+            if (canAttack && pendingAttacks > 0 && inputStillFresh && TryStartAttackCycle(0f))
             {
-                StartAttackCycle(0f); // 대기 중인 타격이 있고 입력이 이어지고 있으면 곧바로 다음 재생으로(모션은 여기서 새로 뽑힌다)
+                // 대기 중인 타격이 있고 입력이 이어지고 있으면 곧바로 다음 재생으로. 준비된 스킬이
+                // 있으면 우선 사용하고, 아니면 콤보 티어의 일반 모션을 여기서 새로 뽑는다.
             }
             else
             {
@@ -991,9 +1089,10 @@ namespace Character
                             // 곧바로 다음 충전으로 이어간다(콤보 티어는 이 시점에 다시 반영된다).
                             // 공격 대상이 사라졌거나 행동력이 다 떨어졌다면 이월 입력은 버리고 그대로
                             // Idle로 돌아간다.
-                            if (activeMotion.UseAccumulatedInput && carriedInputs > 0f && CanStartNewAttack)
+                            if (activeMotion.UseAccumulatedInput && carriedInputs > 0f && CanStartNewAttack
+                                && TryStartAttackCycle(0f))
                             {
-                                StartAttackCycle(0f);
+                                // 이월 입력으로 다음 사이클이 열렸다.
                             }
                             else
                             {
