@@ -70,7 +70,12 @@ namespace CharacterArchiveEditor
                 scroll.horizontal = false;
                 scroll.vertical = true;
                 scroll.movementType = ScrollRect.MovementType.Clamped;
-                scroll.content = skillContent.GetComponent<RectTransform>();
+                // ScrollRect는 list_SkillInfo의 위치를 직접 움직이면 안 된다. 그 자식은 아래 Content의
+                // VerticalLayoutGroup이 배치하므로, ScrollRect가 부모 Content를 움직여야 두 소유자가
+                // 같은 anchoredPosition을 되돌려 쓰지 않는다.
+                scroll.content = skillContent.parent as RectTransform;
+                if (scroll.content == null)
+                    throw new System.InvalidOperationException("SkillInfo Content 부모 RectTransform이 없습니다.");
 
                 VerticalLayoutGroup layout = skillContent.GetComponent<VerticalLayoutGroup>();
                 if (layout == null) layout = skillContent.gameObject.AddComponent<VerticalLayoutGroup>();

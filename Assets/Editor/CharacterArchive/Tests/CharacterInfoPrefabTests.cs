@@ -5,6 +5,7 @@ using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.Localization.Tables;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -93,7 +94,15 @@ namespace CharacterArchiveEditorTests
                 Assert.IsTrue(scroll.vertical);
                 Assert.IsFalse(scroll.horizontal);
                 Assert.AreEqual(ScrollRect.MovementType.Clamped, scroll.movementType);
-                Assert.AreSame(content.GetComponent<RectTransform>(), scroll.content);
+                RectTransform scrollContent = content.parent as RectTransform;
+                Assert.NotNull(scrollContent);
+                Assert.AreSame(scrollContent, scroll.content,
+                    "ScrollRect는 VerticalLayoutGroup이 배치하는 list_SkillInfo가 아니라 그 부모 Content를 움직여야 합니다.");
+                Assert.AreSame(scroll.viewport, scrollContent.parent,
+                    "ScrollRect Content는 Viewport의 직접 자식이어야 합니다.");
+                Assert.NotNull(scrollContent.GetComponent<VerticalLayoutGroup>());
+                Assert.AreEqual(ContentSizeFitter.FitMode.PreferredSize,
+                    scrollContent.GetComponent<ContentSizeFitter>().verticalFit);
 
                 TMP_Text title = (TMP_Text)serialized.FindProperty("skillTitleText").objectReferenceValue;
                 LocalizedTMPText titleLocalizer = title.GetComponent<LocalizedTMPText>();
@@ -107,6 +116,58 @@ namespace CharacterArchiveEditorTests
                     empty.GetComponent<LocalizedTMPText>().TextReference.TableEntryReference.KeyId);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        [Test]
+        public void CharacterArchive_SkillScrollLayoutAndHoverKeepContentAndRowsStable()
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(PanelPath);
+            GameObject eventSystemObject = new GameObject("SkillInfoEventSystem", typeof(EventSystem));
+            try
+            {
+                Transform characterInfo = Find(root.transform, "pn_right/CharacterInfo");
+                ScrollRect scroll = Find(characterInfo, "SkillInfo").GetComponent<ScrollRect>();
+                RectTransform scrollContent = scroll.content;
+                RectTransform skillList = Find(scrollContent, "list_SkillInfo").GetComponent<RectTransform>();
+                SkillListItemView template = skillList.GetComponentInChildren<SkillListItemView>(true);
+                Find(skillList, "lb_empty").gameObject.SetActive(false);
+
+                for (int i = 0; i < 8; i++)
+                {
+                    SkillListItemView row = Object.Instantiate(template, skillList);
+                    row.name = "layout-row-" + i;
+                    row.gameObject.SetActive(true);
+                }
+
+                LayoutRebuilder.ForceRebuildLayoutImmediate(skillList);
+                LayoutRebuilder.ForceRebuildLayoutImmediate(scrollContent);
+                Canvas.ForceUpdateCanvases();
+
+                scroll.verticalNormalizedPosition = .35f;
+                Canvas.ForceUpdateCanvases();
+
+                RectTransform firstRow = skillList.GetChild(2) as RectTransform;
+                Vector2 contentPosition = scrollContent.anchoredPosition;
+                float contentHeight = scrollContent.rect.height;
+                Vector2 firstRowPosition = firstRow.anchoredPosition;
+                Vector2 firstRowSize = firstRow.rect.size;
+
+                ExecuteEvents.Execute<IPointerEnterHandler>(firstRow.gameObject,
+                    new PointerEventData(eventSystemObject.GetComponent<EventSystem>()), ExecuteEvents.pointerEnterHandler);
+                LayoutRebuilder.ForceRebuildLayoutImmediate(skillList);
+                LayoutRebuilder.ForceRebuildLayoutImmediate(scrollContent);
+                Canvas.ForceUpdateCanvases();
+
+                Assert.AreEqual(contentHeight, scrollContent.rect.height);
+                Assert.AreEqual(contentPosition, scrollContent.anchoredPosition);
+                Assert.AreEqual(firstRowPosition, firstRow.anchoredPosition);
+                Assert.AreEqual(firstRowSize, firstRow.rect.size);
+            }
+            finally
+            {
+                Object.DestroyImmediate(eventSystemObject);
+                PrefabUtility.UnloadPrefabContents(root);
+            }
         }
 
         [Test]
