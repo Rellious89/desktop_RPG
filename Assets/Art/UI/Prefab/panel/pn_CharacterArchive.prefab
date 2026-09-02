@@ -2714,7 +2714,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2028483157554634118}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ac2fe041186f04abb8c0c248afb8f108, type: 3}
   m_Name: 
@@ -6705,6 +6705,7 @@ GameObject:
   - component: {fileID: 7900621410459804614}
   - component: {fileID: 5409519074543505675}
   - component: {fileID: 2674537723249871833}
+  - component: {fileID: 2377562359492336923}
   m_Layer: 5
   m_Name: CharacterInfo
   m_TagString: Untagged
@@ -6772,6 +6773,30 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &2377562359492336923
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5182944336791768952}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8f03e592ae0c426485f605dcb44520f, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  characterCatalog: {fileID: 11400000, guid: 5f24823f983054d358a82014246a9fa7, type: 2}
+  skillCatalog: {fileID: 11400000, guid: 6f83e310e008c4b8dbc41d382a075cac, type: 2}
+  characterSkillCatalog: {fileID: 11400000, guid: 3f9eaae2823dc4c8a87a194e8165f086, type: 2}
+  characterModelImage: {fileID: 9149484187474164027}
+  characterNameText: {fileID: 5198706103742985789}
+  levelText: {fileID: 1980870208216423147}
+  originWorldText: {fileID: 1917751236955620703}
+  skillTitleText: {fileID: 7347640154653497896}
+  skillTitleLocalizer: {fileID: 5295142808750306953}
+  emptyState: {fileID: 1460024143745732097}
+  skillContent: {fileID: 6017895879231543916}
+  skillTemplate: {fileID: 964654987442841930}
 --- !u!1 &5204694340424991949
 GameObject:
   m_ObjectHideFlags: 0
@@ -7251,10 +7276,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1aa08ab6e0800fa44ae55d278d1423e3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Content: {fileID: 9141932697437803575}
-  m_Horizontal: 1
+  m_Content: {fileID: 6017895879231543916}
+  m_Horizontal: 0
   m_Vertical: 1
-  m_MovementType: 1
+  m_MovementType: 2
   m_Elasticity: 0.1
   m_Inertia: 1
   m_DecelerationRate: 0.135
@@ -8087,6 +8112,7 @@ MonoBehaviour:
     m_WaitForCompletion: 0
     m_LocalVariables: []
   storyQuestUi: {fileID: 3302380484753878159}
+  characterInfoUi: {fileID: 2377562359492336923}
   references:
     version: 2
     RefIds: []
@@ -8635,7 +8661,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_HorizontalFit: 0
-  m_VerticalFit: 0
+  m_VerticalFit: 2
 --- !u!114 &3199563064572018493
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8655,10 +8681,10 @@ MonoBehaviour:
     m_Bottom: 0
   m_ChildAlignment: 0
   m_Spacing: 3
-  m_ChildForceExpandWidth: 0
+  m_ChildForceExpandWidth: 1
   m_ChildForceExpandHeight: 0
-  m_ChildControlWidth: 0
-  m_ChildControlHeight: 0
+  m_ChildControlWidth: 1
+  m_ChildControlHeight: 1
   m_ChildScaleWidth: 1
   m_ChildScaleHeight: 1
   m_ReverseArrangement: 0
@@ -11277,6 +11303,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 775730a861c47414cb8567d6079ba364, type: 3}
+--- !u!114 &964654987442841930 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2342806274523521810, guid: 775730a861c47414cb8567d6079ba364, type: 3}
+  m_PrefabInstance: {fileID: 3305771308298603096}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c755d233c78fa41ab8f40f95b8c593dc, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
 --- !u!224 &7287784253688573383 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 5243065554987378591, guid: 775730a861c47414cb8567d6079ba364, type: 3}

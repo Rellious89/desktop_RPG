@@ -765,8 +765,8 @@ namespace SkillEditor.Tests
                 Relation("CatKnight", "b", requiredLevel: 3),
                 Relation("CatKnight", "c", requiredLevel: 4));
 
-            Progress(expPerDefeat: 35);
-            Defeat("Scarecrow");
+            PlayerProgress progress = Progress(expPerDefeat: 35);
+            Defeat(progress, "Scarecrow");
 
             Assert.AreEqual(4, document.characters[0].level);
             CollectionAssert.AreEqual(new[] { "a", "b", "c" }, UnlockedIds());
@@ -800,8 +800,8 @@ namespace SkillEditor.Tests
 
             try
             {
-                Progress(expPerDefeat: 10);
-                Defeat("Scarecrow");
+                PlayerProgress progress = Progress(expPerDefeat: 10);
+                Defeat(progress, "Scarecrow");
             }
             finally
             {
@@ -888,7 +888,7 @@ namespace SkillEditor.Tests
 
             PlayerProgress progress = Progress();
             progress.AddExp(50);
-            Defeat("Scarecrow");
+            Defeat(progress, "Scarecrow");
 
             Assert.AreEqual(1, document.characters[0].level, "전제 확인 - 아무도 자라지 않았다.");
             CollectionAssert.IsEmpty(UnlockedIds());
@@ -1000,10 +1000,12 @@ namespace SkillEditor.Tests
             return progress;
         }
 
-        private static void Defeat(string targetId)
+        private static void Defeat(PlayerProgress progress, string targetId)
         {
-            var handler = (Action<string>)GetStaticEvent(typeof(Target), "AnyTargetDefeated");
-            handler?.Invoke(targetId);
+            MethodInfo method = typeof(PlayerProgress).GetMethod(
+                "HandleAnyTargetDefeated", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(method, "PlayerProgress.HandleAnyTargetDefeated를 찾지 못했습니다.");
+            method.Invoke(progress, new object[] { targetId });
         }
 
         private static void SwitchCurrentTo(CharacterRoster roster, string characterId)
@@ -1028,7 +1030,20 @@ namespace SkillEditor.Tests
 
         private static SaveData Inject(params CharacterSaveState[] states)
         {
-            var document = new SaveData { characters = new List<CharacterSaveState>(states) };
+            var party = new List<string>();
+            for (int i = 0; i < states.Length; i++)
+            {
+                CharacterSaveState state = states[i];
+                if (state != null && !string.IsNullOrEmpty(state.characterId)) party.Add(state.characterId);
+            }
+
+            // CharacterRoster는 v4부터 보유 목록이 아니라 저장된 고정 파티 슬롯을 기준으로
+            // 출전 항목을 만든다. 성장/스킬 테스트의 전제 캐릭터를 실제 파티에도 배치한다.
+            var document = new SaveData
+            {
+                characters = new List<CharacterSaveState>(states),
+                partyCharacterIds = party,
+            };
             DataField.SetValue(null, document);
             LoadResultField.SetValue(null, SaveLoadResult.NewGame(document));
             LoadedFromFileField.SetValue(null, false);

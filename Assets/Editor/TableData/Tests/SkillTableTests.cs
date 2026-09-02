@@ -428,12 +428,20 @@ namespace TableDataEditor.Tests
         // ---- 실제 프로젝트 데이터(읽기 전용) ----
 
         [Test]
-        public void LiveCsv_HasNoProductionRowsAndNoDiagnostics()
+        public void LiveCsv_HasCommittedCatKnightSampleWithExpectedIconWarning()
         {
             TableDataSnapshot snapshot = Live().Snapshot;
             Assert.IsNotNull(snapshot, "여덟 표가 모두 읽혀야 스냅샷이 만들어진다: " + Live().Summary);
 
-            Assert.AreEqual(0, snapshot.Skills.Count, "지금 단계의 Skill.csv에는 실제 스킬 행이 없어야 한다.");
+            Assert.AreEqual(1, snapshot.Skills.Count, "13D 입력으로 커밋된 스킬 한 줄을 소비해야 한다.");
+            SkillRow row = snapshot.Skills[0];
+            Assert.AreEqual("catknight_skill_01", row.Id);
+            Assert.AreEqual("active_attack", row.SkillType);
+            Assert.AreEqual("attack_motion", row.BehaviorKey);
+            Assert.AreEqual(10f, row.CooldownSeconds);
+            Assert.AreEqual("CatKnight_Skill_01", row.MotionKey);
+            Assert.AreEqual(10, row.DisplayOrder);
+            Assert.IsTrue(row.Enabled);
 
             var messages = new List<string>();
             foreach (TableDataDiagnostic diagnostic in Live().Diagnostics)
@@ -441,8 +449,10 @@ namespace TableDataEditor.Tests
                 if (string.Equals(diagnostic.File, File, StringComparison.Ordinal)) messages.Add(diagnostic.ToString());
             }
 
-            Assert.AreEqual(0, messages.Count,
-                "헤더만 있는 표는 오류도 경고도 남기지 않아야 한다:\n" + string.Join("\n", messages));
+            Assert.AreEqual(1, messages.Count,
+                "icon_key가 비어 있다는 선택 항목 경고만 남아야 한다:\n" + string.Join("\n", messages));
+            StringAssert.Contains("column 'icon_key'", messages[0]);
+            StringAssert.Contains("icon_key가 비어 있습니다", messages[0]);
         }
 
         // ---- 도우미 ----

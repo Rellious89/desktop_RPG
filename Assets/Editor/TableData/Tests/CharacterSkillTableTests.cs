@@ -270,13 +270,19 @@ namespace TableDataEditor.Tests
         // ---- 실제 프로젝트 데이터(읽기 전용) ----
 
         [Test]
-        public void LiveCsv_HasNoProductionRowsAndNoDiagnostics()
+        public void LiveCsv_HasCommittedCatKnightSampleAndNoDiagnostics()
         {
             TableDataSnapshot snapshot = Live().Snapshot;
             Assert.IsNotNull(snapshot, "여덟 표가 모두 읽혀야 스냅샷이 만들어진다: " + Live().Summary);
 
-            Assert.AreEqual(0, snapshot.CharacterSkills.Count,
-                "지금 단계의 CharacterSkill.csv에는 실제 관계 행이 없어야 한다.");
+            Assert.AreEqual(1, snapshot.CharacterSkills.Count,
+                "13D 입력으로 커밋된 CatKnight 샘플 관계 한 줄을 소비해야 한다.");
+            CharacterSkillRow row = snapshot.CharacterSkills[0];
+            Assert.AreEqual("CatKnight", row.CharacterId);
+            Assert.AreEqual("catknight_skill_01", row.SkillId);
+            Assert.AreEqual(5, row.RequiredCharacterLevel);
+            Assert.AreEqual(10, row.DisplayOrder);
+            Assert.IsTrue(row.Enabled);
 
             var messages = new List<string>();
             foreach (TableDataDiagnostic diagnostic in Live().Diagnostics)
@@ -285,7 +291,7 @@ namespace TableDataEditor.Tests
             }
 
             Assert.AreEqual(0, messages.Count,
-                "헤더만 있는 표는 오류도 경고도 남기지 않아야 한다:\n" + string.Join("\n", messages));
+                "커밋된 샘플 관계는 오류도 경고도 남기지 않아야 한다:\n" + string.Join("\n", messages));
         }
 
         // ---- 도우미 ----

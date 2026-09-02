@@ -43,6 +43,8 @@ namespace CharacterArchive
         [SerializeField] private LocalizedTextReference activeCharacterBlockedToast;
         [Header("Story Quest UI (Inspector에서만 연결)")]
         [SerializeField] private CharacterStoryQuestUiController storyQuestUi;
+        [Header("Character Info UI (Inspector에서만 연결)")]
+        [SerializeField] private CharacterInfoController characterInfoUi;
 
         private readonly List<CharacterArchiveCardView> cards = new List<CharacterArchiveCardView>();
         private readonly List<PartySlotView> partySlots = new List<PartySlotView>();
@@ -114,6 +116,7 @@ namespace CharacterArchive
                 storyQuestUi.CloseRequested -= CloseRight;
                 storyQuestUi.Close();
             }
+            if (characterInfoUi != null) characterInfoUi.BindCharacter(null, null);
             if (openInstance == this) openInstance = null;
         }
 
@@ -135,7 +138,9 @@ namespace CharacterArchive
             }
             for (int i = source.Count; i < cards.Count; i++) cards[i].gameObject.SetActive(false);
 
-            SetActive(rightPanel, selected != null && rightPanelOpen);
+            bool showRight = selected != null && rightPanelOpen;
+            if (characterInfoUi != null) characterInfoUi.BindCharacter(showRight ? selected : null, data);
+            SetActive(rightPanel, showRight);
             SetActive(expandRightButton != null ? expandRightButton.gameObject : null, selected != null && !rightPanelOpen);
             if (detailCard != null)
             {
