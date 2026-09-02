@@ -5045,7 +5045,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\uC6A9\uBCD1 \uBA85\uBD80"
+  m_text: "\uC6A9\uBCD1 \uC815\uBCF4"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8b0950d02f08e461885e337917d59bc9, type: 2}
   m_sharedMaterial: {fileID: 2100000, guid: 0cbc58f1e2168420aa593613f63766cc, type: 2}
@@ -5145,7 +5145,7 @@ MonoBehaviour:
     m_TableReference:
       m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
     m_TableEntryReference:
-      m_KeyId: 274212265648128
+      m_KeyId: 13022013881835520
       m_Key: 
     m_FallbackState: 0
     m_WaitForCompletion: 0
@@ -6783,8 +6783,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e8f03e592ae0c426485f605dcb44520f, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   characterCatalog: {fileID: 11400000, guid: 5f24823f983054d358a82014246a9fa7, type: 2}
   skillCatalog: {fileID: 11400000, guid: 6f83e310e008c4b8dbc41d382a075cac, type: 2}
   characterSkillCatalog: {fileID: 11400000, guid: 3f9eaae2823dc4c8a87a194e8165f086, type: 2}
@@ -8296,7 +8296,7 @@ MonoBehaviour:
     m_TableReference:
       m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
     m_TableEntryReference:
-      m_KeyId: 274212265648128
+      m_KeyId: 9461659767660544
       m_Key: 
     m_FallbackState: 0
     m_WaitForCompletion: 0
@@ -11312,8 +11312,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c755d233c78fa41ab8f40f95b8c593dc, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!224 &7287784253688573383 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 5243065554987378591, guid: 775730a861c47414cb8567d6079ba364, type: 3}
