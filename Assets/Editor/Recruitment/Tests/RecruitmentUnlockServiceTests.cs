@@ -154,18 +154,21 @@ namespace RecruitmentEditor.Tests
         {
             var old = Data("Barbarian", 10); old.saveVersion = 6; old.unlockedRecruitmentCharacterIds = null;
             SaveMigrationResult migration = SaveMigrationRunner.Default.Migrate(old, 6);
-            Assert.IsTrue(migration.Succeeded); Assert.AreEqual(7, old.saveVersion); Assert.AreEqual(0, old.unlockedRecruitmentCharacterIds.Count);
+            Assert.IsTrue(migration.Succeeded); Assert.AreEqual(SaveData.CurrentSaveVersion, old.saveVersion); Assert.AreEqual(0, old.unlockedRecruitmentCharacterIds.Count);
             var unversioned = new SaveData { characters = new List<CharacterSaveState>() };
             Assert.IsTrue(SaveMigrationRunner.Default.Migrate(unversioned, 0).Succeeded,
-                "기존 v0→…→v7 순차 경로에도 새 단계가 빠지면 안 된다.");
-            Assert.AreEqual(7, unversioned.saveVersion);
+                "기존 v0→현재 버전 순차 경로에도 새 단계가 빠지면 안 된다.");
+            Assert.AreEqual(SaveData.CurrentSaveVersion, unversioned.saveVersion);
             old.unlockedRecruitmentCharacterIds = new List<string> { "Barbarian", "", "Barbarian", "Unknown" };
             SaveDataNormalizer.Normalize(old); CollectionAssert.AreEqual(new[] { "Barbarian", "Unknown" }, old.unlockedRecruitmentCharacterIds);
             SaveMigrationRunner.Default.Migrate(old, 7); old.unlockedRecruitmentCharacterIds.Add("ElfArcher");
             Assert.IsFalse(old.unlockedRecruitmentCharacterIds.Contains("CatKnight"));
-            SaveResetService.Apply(old, SaveResetTargets.Character, new[] { "Barbarian" }, new[] { "CatKnight" }, () => true);
+            var initialSeeds = new[] { new InitialCharacterResetSeed("CatKnight", 0d) };
+            SaveResetService.Apply(
+                old, SaveResetTargets.Character, new[] { "Barbarian" }, initialSeeds, 3, null, () => true);
             CollectionAssert.AreEqual(new[] { "Unknown", "ElfArcher" }, old.unlockedRecruitmentCharacterIds);
-            SaveResetService.Apply(old, SaveResetTargets.All, new[] { "ElfArcher" }, new[] { "CatKnight" }, () => true);
+            SaveResetService.Apply(
+                old, SaveResetTargets.All, new[] { "ElfArcher" }, initialSeeds, 3, null, () => true);
             Assert.AreEqual(0, old.unlockedRecruitmentCharacterIds.Count);
         }
 

@@ -4,6 +4,7 @@ using Building;
 using Character;
 using Common;
 using Inventory;
+using Party;
 using Quest;
 using UnityEditor;
 using UnityEngine;
@@ -25,6 +26,10 @@ namespace CommonEditor.Save
     {
         private const string StoryQuestCatalogPath =
             "Assets/Generated/TableData/CharacterStoryQuest/CharacterStoryQuestCatalog.asset";
+        private const string CharacterCatalogPath =
+            "Assets/Generated/TableData/Character/CharacterCatalog.asset";
+        private const string PartyConfigCatalogPath =
+            "Assets/Generated/TableData/PartyConfig/PartyConfigCatalog.asset";
 
         private SaveResetTargets selection = SaveResetTargets.None;
         private Vector2 scroll;
@@ -33,6 +38,8 @@ namespace CommonEditor.Save
         private Dictionary<string, ItemDefinition> itemsById;
         private Dictionary<string, BuildingDefinition> buildingsById;
         private Dictionary<string, CharacterDefinition> charactersById;
+        private CharacterCatalog characterCatalog;
+        private PartyConfigCatalog partyConfigCatalog;
         private List<StoryQuestResetDefinition> storyQuestDefinitions = new List<StoryQuestResetDefinition>();
 
         private string specifiedQuestId = string.Empty;
@@ -72,7 +79,7 @@ namespace CommonEditor.Save
 
             EditorGUILayout.LabelField("개발용 저장 데이터 초기화", EditorStyles.boldLabel);
             EditorGUILayout.LabelField(
-                "고른 항목만 초기화합니다. Character는 체크한 캐릭터만 삭제하며, 계정 진행 등 나머지는 건드리지 않습니다.",
+                "고른 항목만 초기화합니다. Character는 기본 캐릭터를 초기 상태로 복원하고 체크한 비기본 캐릭터를 삭제합니다.",
                 EditorStyles.wordWrappedMiniLabel);
 
             EditorGUILayout.Space();
@@ -131,9 +138,7 @@ namespace CommonEditor.Save
                 bool anyNonCharacter =
                     (selection & (SaveResetTargets.Item | SaveResetTargets.Currency | SaveResetTargets.Construction |
                                   SaveResetTargets.Quest)) != 0;
-                bool anyCharacterToDelete =
-                    (selection & SaveResetTargets.Character) != 0 && selectedCharacterIds.Count > 0;
-                bool canRun = anyNonCharacter || anyCharacterToDelete;
+                bool canRun = anyNonCharacter || (selection & SaveResetTargets.Character) != 0;
 
                 using (new EditorGUI.DisabledScope(!canRun || EditorApplication.isPlaying))
                 {
@@ -229,19 +234,28 @@ namespace CommonEditor.Save
                 if (!sectionActive)
                 {
                     EditorGUILayout.LabelField(
-                        "상단에서 Character를 선택하면 개별 캐릭터를 고를 수 있습니다.", EditorStyles.miniLabel);
+                        "Character 선택 시 기본 캐릭터는 초기화·복구하고, 체크한 비기본 캐릭터는 삭제합니다.",
+                        EditorStyles.wordWrappedMiniLabel);
+                }
+                else
+                {
+                    EditorGUILayout.LabelField(
+                        "기본 캐릭터는 삭제할 수 없으며 레벨·EXP·행동력·오염·패시브 회복 진행이 초기값으로 돌아갑니다. " +
+                        "저장에 누락돼 있어도 Character Catalog에서 복구합니다.",
+                        EditorStyles.wordWrappedMiniLabel);
                 }
 
                 if (characters.Count == 0)
                 {
                     EditorGUILayout.LabelField("(보유 캐릭터 없음)", EditorStyles.miniLabel);
-                    return;
                 }
-
-                foreach (CharacterSaveState character in characters)
+                else
                 {
-                    if (character == null) continue;
-                    DrawCharacterRow(character, sectionActive);
+                    foreach (CharacterSaveState character in characters)
+                    {
+                        if (character == null) continue;
+                        DrawCharacterRow(character, sectionActive);
+                    }
                 }
             }
         }
@@ -274,7 +288,8 @@ namespace CommonEditor.Save
                 if (initiallyOwned)
                 {
                     EditorGUILayout.LabelField(
-                        "기본 캐릭터 · 삭제 불가", EditorStyles.miniBoldLabel, GUILayout.Width(120f));
+                        sectionActive ? "기본 · 상태 초기화" : "기본 · 삭제 불가",
+                        EditorStyles.miniBoldLabel, GUILayout.Width(120f));
                 }
             }
         }
@@ -352,37 +367,56 @@ namespace CommonEditor.Save
                 return;
             }
 
-            // 캐릭터 삭제 대상과 보호 집합을 준비한다. Character 비트가 없으면 캐릭터는 건드리지 않는다.
+            // Character 비트가 켜지면 저장 목록이 아니라 catalog 전체에서 InitiallyOwned 시드를 만든다.
             List<string> toRemove = null;
-            List<string> protectedIds = null;
+            List<InitialCharacterResetSeed> initialSeeds = null;
+            int partySlotCount = 0;
             if ((targets & SaveResetTargets.Character) != 0)
             {
                 toRemove = new List<string>(selectedCharacterIds);
-                protectedIds = GetProtectedIds(data);
+                initialSeeds = BuildInitialCharacterSeeds(characterCatalog);
+                partySlotCount = ResolvePartySlotCount(partyConfigCatalog);
+                if (initialSeeds.Count == 0 || partySlotCount < 1)
+                {
+                    EditorUtility.DisplayDialog(
+                        "캐릭터 초기화 실패",
+                        "Character Catalog의 기본 보유 캐릭터 또는 PartyConfig/default의 유효한 슬롯 수를 " +
+                        "불러오지 못했습니다. Generated 테이블을 확인한 뒤 다시 시도하세요.",
+                        "확인");
+                    return;
+                }
             }
 
             bool anyNonCharacter =
                 (targets & (SaveResetTargets.Item | SaveResetTargets.Currency | SaveResetTargets.Construction |
                             SaveResetTargets.Quest)) != 0;
-            bool anyCharacterToDelete = toRemove != null && toRemove.Count > 0;
-            if (!anyNonCharacter && !anyCharacterToDelete) return;
+            bool resetCharacters = (targets & SaveResetTargets.Character) != 0;
+            if (!anyNonCharacter && !resetCharacters) return;
 
             string body = DescribeTargets(targets);
-            if (anyCharacterToDelete)
+            if (resetCharacters)
+            {
+                body += "\n\n초기화·복구할 기본 캐릭터:\n" +
+                        DescribeCharacterList(ConvertSeedIds(initialSeeds));
+            }
+            if (toRemove != null && toRemove.Count > 0)
             {
                 body += "\n\n삭제할 캐릭터:\n" + DescribeCharacterList(toRemove);
             }
 
             bool confirmed = EditorUtility.DisplayDialog(
                 "저장 데이터 초기화",
-                $"다음 항목을 초기화합니다:\n\n{body}\n\n선택하지 않은 캐릭터·계정 진행·회복소 등 나머지는 그대로 유지됩니다.\n계속할까요?",
+                $"다음 항목을 초기화합니다:\n\n{body}\n\nCharacter 대상의 파티는 기본 편성으로 복원되고, " +
+                "초기화·삭제 캐릭터의 회복/정화 슬롯은 같은 인덱스에서 비워집니다. " +
+                "Quest를 선택하지 않으면 기본 캐릭터의 퀘스트 진행은 유지됩니다.\n계속할까요?",
                 "초기화",
                 "취소");
 
             if (!confirmed) return;
 
             SaveResetResult result =
-                SaveResetService.Apply(data, targets, toRemove, protectedIds, storyQuestDefinitions, SaveSystem.Save);
+                SaveResetService.Apply(
+                    data, targets, toRemove, initialSeeds, partySlotCount, storyQuestDefinitions, SaveSystem.Save);
 
             RefreshDefinitions();
             Repaint();
@@ -394,6 +428,10 @@ namespace CommonEditor.Save
                     if (result.RemovedCharacterCount > 0)
                     {
                         done += $"\n\n삭제한 캐릭터 수: {result.RemovedCharacterCount}";
+                    }
+                    if (result.ResetInitialCharacterCount > 0)
+                    {
+                        done += $"\n초기화·복구한 기본 캐릭터 수: {result.ResetInitialCharacterCount}";
                     }
                     EditorUtility.DisplayDialog("초기화 완료", $"다음 항목을 초기화하고 저장했습니다:\n\n{done}", "확인");
                     break;
@@ -407,6 +445,13 @@ namespace CommonEditor.Save
 
                 case SaveResetOutcome.NothingSelected:
                     // 버튼이 비활성화되어 여기 오지 않지만, 방어적으로 아무것도 하지 않는다.
+                    break;
+
+                case SaveResetOutcome.InvalidCharacterResetConfiguration:
+                    EditorUtility.DisplayDialog(
+                        "캐릭터 초기화 실패",
+                        "기본 캐릭터 시드 또는 파티 슬롯 계약이 유효하지 않아 아무것도 변경하거나 저장하지 않았습니다.",
+                        "확인");
                     break;
             }
         }
@@ -468,7 +513,7 @@ namespace CommonEditor.Save
             }
             if ((targets & SaveResetTargets.Character) != 0)
             {
-                lines.Add("• Character (선택한 캐릭터만 삭제)");
+                lines.Add("• Character (기본 캐릭터 초기화·복구 + 선택한 비기본 캐릭터 삭제 + 초기 파티 복원)");
             }
             if ((targets & SaveResetTargets.Quest) != 0)
             {
@@ -497,20 +542,30 @@ namespace CommonEditor.Save
             return set;
         }
 
-        /// <summary>절대 지우면 안 되는 기본 보유 캐릭터 id(저장에 존재하는 것만).</summary>
-        private List<string> GetProtectedIds(SaveData data)
+        internal static List<InitialCharacterResetSeed> BuildInitialCharacterSeeds(CharacterCatalog catalog)
         {
-            var list = new List<string>();
-            if (data.characters == null) return list;
-
-            foreach (CharacterSaveState character in data.characters)
+            var result = new List<InitialCharacterResetSeed>();
+            if (catalog == null) return result;
+            foreach (CharacterDefinition definition in catalog.Characters)
             {
-                if (character == null) continue;
-                string id = character.characterId;
-                if (!string.IsNullOrEmpty(id) && IsInitiallyOwned(id)) list.Add(id);
+                if (definition == null || !definition.InitiallyOwned) continue;
+                result.Add(new InitialCharacterResetSeed(definition.CharacterId, definition.BaseCorruption));
             }
+            return result;
+        }
 
-            return list;
+        internal static int ResolvePartySlotCount(PartyConfigCatalog catalog)
+        {
+            PartyConfigDefinition config = catalog != null ? catalog.Find(PartyConfigIds.Default) : null;
+            return config != null && config.IsValid ? config.BaseCapacity : 0;
+        }
+
+        private static List<string> ConvertSeedIds(IReadOnlyList<InitialCharacterResetSeed> seeds)
+        {
+            var result = new List<string>();
+            if (seeds == null) return result;
+            foreach (InitialCharacterResetSeed seed in seeds) result.Add(seed.CharacterId);
+            return result;
         }
 
         private bool IsInitiallyOwned(string characterId)
@@ -554,7 +609,9 @@ namespace CommonEditor.Save
         {
             itemsById = BuildMap<ItemDefinition>(def => def.ItemId);
             buildingsById = BuildMap<BuildingDefinition>(def => def.BuildingId);
-            charactersById = BuildMap<CharacterDefinition>(def => def.CharacterId);
+            characterCatalog = LoadGeneratedCatalog<CharacterCatalog>(CharacterCatalogPath);
+            partyConfigCatalog = LoadGeneratedCatalog<PartyConfigCatalog>(PartyConfigCatalogPath);
+            charactersById = BuildCharacterMap(characterCatalog);
             storyQuestDefinitions = BuildStoryQuestDefinitions();
 
             // 정의를 다시 읽었으니 이전 조회 결과도 버린다(테이블 값이 바뀌었을 수 있다).
@@ -620,6 +677,23 @@ namespace CommonEditor.Save
             }
 
             return map;
+        }
+
+        private static Dictionary<string, CharacterDefinition> BuildCharacterMap(CharacterCatalog catalog)
+        {
+            var map = new Dictionary<string, CharacterDefinition>(StringComparer.Ordinal);
+            if (catalog == null) return map;
+            foreach (CharacterDefinition definition in catalog.Characters)
+            {
+                if (definition == null || string.IsNullOrEmpty(definition.CharacterId)) continue;
+                if (!map.ContainsKey(definition.CharacterId)) map.Add(definition.CharacterId, definition);
+            }
+            return map;
+        }
+
+        private static T LoadGeneratedCatalog<T>(string path) where T : UnityEngine.Object
+        {
+            return AssetDatabase.LoadAssetAtPath<T>(path);
         }
 
         private string DescribeItem(string itemId)

@@ -1086,7 +1086,7 @@ namespace CommonEditor.Tests
                 "saveVersion", "saveRevision", "lastSavedAtUtc",
                 "currentLevel", "currentExp", "totalKillCount",
                 "characters", "partyCharacterIds", "currency", "items", "recoverySlots", "buildingConstructions",
-                "recruitmentCycles", "unlockedRecruitmentCharacterIds", "purificationSlots",
+                "recruitmentCycles", "unlockedRecruitmentCharacterIds", "purificationSlots", "characterStoryQuests",
             };
 
             List<string> actual = new List<string>();
@@ -1627,7 +1627,7 @@ namespace CommonEditor.Tests
         }
 
         [Test]
-        public void 기본_표는_v0부터_v3까지_빈틈없이_등록한다()
+        public void 기본_표는_v0부터_현재_버전까지_빈틈없이_등록한다()
         {
             List<ISaveMigrationStep> steps = new List<ISaveMigrationStep>(SaveMigrationRunner.CreateDefaultSteps());
 
@@ -1637,8 +1637,13 @@ namespace CommonEditor.Tests
             List<int> fromVersions = new List<int>();
             foreach (ISaveMigrationStep step in steps) fromVersions.Add(step.FromVersion);
 
-            CollectionAssert.AreEquivalent(new[] { 0, 1, 2, 3, 4, 5 }, fromVersions,
-                "0->1부터 5->6까지 모든 단계가 있어야 합니다.");
+            var expectedFromVersions = new List<int>();
+            for (int version = 0; version < SaveData.CurrentSaveVersion; version++)
+            {
+                expectedFromVersions.Add(version);
+            }
+            CollectionAssert.AreEquivalent(expectedFromVersions, fromVersions,
+                "v0부터 현재 버전까지 모든 단일 단계가 있어야 합니다.");
             Assert.AreEqual(SaveData.CurrentSaveVersion, SaveMigrationRunner.Default.TargetVersion);
         }
 
@@ -1973,7 +1978,7 @@ namespace CommonEditor.Tests
         }
 
         [Test]
-        public void v5_문서는_기존_진행을_보존하며_빈_정화_슬롯_하나로_v6이_된다()
+        public void v5_문서는_기존_진행을_보존하며_빈_정화_슬롯을_갖춘_현재_버전이_된다()
         {
             SaveData data = FullyPopulated();
             data.saveVersion = 5;
@@ -1982,7 +1987,7 @@ namespace CommonEditor.Tests
             SaveMigrationResult result = SaveMigrationRunner.Default.Migrate(data, 5);
 
             Assert.AreEqual(SaveMigrationOutcome.Migrated, result.Outcome);
-            Assert.AreEqual(6, result.ReachedVersion);
+            Assert.AreEqual(SaveData.CurrentSaveVersion, result.ReachedVersion);
             Assert.AreEqual(SaveData.CurrentSaveVersion, data.saveVersion);
             Assert.AreEqual(77.25d, data.characters[0].currentCorruption, 0.0000001d);
             CollectionAssert.AreEqual(new[] { "barbarian" }, data.partyCharacterIds);

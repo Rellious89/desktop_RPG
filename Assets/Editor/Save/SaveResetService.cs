@@ -13,10 +13,8 @@ namespace CommonEditor.Save
     /// 값은 <c>1 &lt;&lt; n</c>로 떨어뜨려 두어 <c>EnumFlagsField</c>가 항목별 토글로 그리고,
     /// <see cref="All"/>을 고른 뒤 하나만 해제하는 조합이 그대로 만들어지게 한다.
     ///
-    /// <see cref="Character"/>는 다른 항목과 성격이 다르다 - 목록을 통째로 비우는 것이 아니라 <b>고른
-    /// 캐릭터만</b> 지운다. 그래서 이 비트가 켜져 있어도 실제로 고른 characterId가 없으면 캐릭터는
-    /// 아무것도 바뀌지 않는다(<see cref="SaveResetService.Apply(SaveData, SaveResetTargets,
-    /// IReadOnlyList{string}, IReadOnlyCollection{string}, Func{bool})"/> 참고).
+    /// <see cref="Character"/>는 카탈로그의 기본 보유 캐릭터를 초기 상태로 복원하고, 고른 비기본
+    /// 캐릭터만 삭제하며, 파티를 기본 편성으로 되돌린다.
     /// </summary>
     [Flags]
     public enum SaveResetTargets
@@ -28,6 +26,23 @@ namespace CommonEditor.Save
         Character = 1 << 3,
         Quest = 1 << 4,
         All = Item | Currency | Construction | Character | Quest,
+    }
+
+    /// <summary>Character reset이 카탈로그에서 복사해 온 기본 보유 캐릭터의 초기 상태.</summary>
+    public readonly struct InitialCharacterResetSeed
+    {
+        public string CharacterId { get; }
+        public double BaseCorruption { get; }
+
+        public InitialCharacterResetSeed(string characterId, double baseCorruption)
+        {
+            CharacterId = characterId ?? string.Empty;
+            BaseCorruption = baseCorruption;
+        }
+
+        public bool IsValid => !string.IsNullOrWhiteSpace(CharacterId) &&
+                               !double.IsNaN(BaseCorruption) && !double.IsInfinity(BaseCorruption) &&
+                               BaseCorruption >= 0d;
     }
 
     /// <summary>에디터 리셋 도구가 런타임 퀘스트 에셋에서 복사해 온 최소 연결 정보.</summary>
@@ -58,7 +73,7 @@ namespace CommonEditor.Save
         SaveFailed,
     }
 
-    /// <summary><see cref="SaveResetService.Apply(SaveData, SaveResetTargets, IReadOnlyList{string}, IReadOnlyCollection{string}, Func{bool})"/>의 결과 갈래.</summary>
+    /// <summary><see cref="SaveResetService.Apply(SaveData, SaveResetTargets, IReadOnlyList{string}, IReadOnlyList{InitialCharacterResetSeed}, int, IReadOnlyList{StoryQuestResetDefinition}, Func{bool})"/>의 결과 갈래.</summary>
     public enum SaveResetOutcome
     {
         /// <summary>고른 항목이 없어 아무것도 하지 않았다 - 저장도 하지 않는다.</summary>
@@ -69,26 +84,37 @@ namespace CommonEditor.Save
 
         /// <summary>저장에 실패해 <b>변경 전 상태로 전부 되돌렸다</b>(부분 초기화는 남지 않는다).</summary>
         SaveFailed,
+
+        /// <summary>Character 초기 상태를 만들 카탈로그 시드나 유효한 파티 슬롯 계약이 없어
+        /// 아무것도 바꾸거나 저장하지 않았다.</summary>
+        InvalidCharacterResetConfiguration,
     }
 
-    /// <summary><see cref="SaveResetService.Apply(SaveData, SaveResetTargets, IReadOnlyList{string}, IReadOnlyCollection{string}, Func{bool})"/>가 무엇을 어떻게 했는지.</summary>
+    /// <summary><see cref="SaveResetService.Apply(SaveData, SaveResetTargets, IReadOnlyList{string}, IReadOnlyList{InitialCharacterResetSeed}, int, IReadOnlyList{StoryQuestResetDefinition}, Func{bool})"/>가 무엇을 어떻게 했는지.</summary>
     public readonly struct SaveResetResult
     {
         public SaveResetOutcome Outcome { get; }
 
-        /// <summary>실제로 <b>바꾼</b> 항목. 비트가 켜져 있어도 실제 변경이 없으면(예: 고른 캐릭터가
-        /// 하나도 없는 <see cref="SaveResetTargets.Character"/>) 여기에 들어가지 않는다. 아무것도 안
-        /// 바꿨으면 <see cref="SaveResetTargets.None"/>이다.</summary>
+        /// <summary>실제로 <b>바꾼</b> 항목. 아무것도 안 바꿨으면
+        /// <see cref="SaveResetTargets.None"/>이다.</summary>
         public SaveResetTargets AppliedTargets { get; }
 
         /// <summary>실제로 저장 데이터에서 지운 캐릭터 수. 캐릭터를 고르지 않았으면 0이다.</summary>
         public int RemovedCharacterCount { get; }
 
-        public SaveResetResult(SaveResetOutcome outcome, SaveResetTargets appliedTargets, int removedCharacterCount)
+        /// <summary>초기 상태로 되돌렸거나 누락에서 복구한 기본 보유 캐릭터 수.</summary>
+        public int ResetInitialCharacterCount { get; }
+
+        public SaveResetResult(
+            SaveResetOutcome outcome,
+            SaveResetTargets appliedTargets,
+            int removedCharacterCount,
+            int resetInitialCharacterCount = 0)
         {
             Outcome = outcome;
             AppliedTargets = appliedTargets;
             RemovedCharacterCount = removedCharacterCount;
+            ResetInitialCharacterCount = resetInitialCharacterCount;
         }
 
         public bool Saved => Outcome == SaveResetOutcome.Success;
@@ -98,7 +124,7 @@ namespace CommonEditor.Save
     /// 저장 데이터의 <b>일부 항목만</b> 초기화하는 순수 로직. <see cref="SaveResetWindow"/>가 이 자리로
     /// <see cref="SaveSystem.Data"/>와 <see cref="SaveSystem.Save"/>를 넘기고, 시험은 격리된 메모리
     /// <see cref="SaveData"/>와 저장 대리자를 넘긴다 - 그래서 이 로직은 실제 저장 파일도, 캐릭터 정의
-    /// 에셋도 알지 못한다(기본 보유 여부는 <b>문자열 집합</b>으로만 넘어온다).
+    /// 에셋도 알지 못한다(기본 캐릭터는 id와 기본 오염도만 담은 순수 시드로 넘어온다).
     ///
     /// <b>SaveSystem에 런타임 Reset API를 만들지 않으려는 것이 이 분리의 목적이다.</b> 초기화는 개발
     /// 도구에서만 필요하므로, 저장 계층은 그대로 두고 여기(Editor 전용)에서 <see cref="SaveData"/>의
@@ -109,52 +135,23 @@ namespace CommonEditor.Save
     /// </summary>
     public static class SaveResetService
     {
-        /// <summary>캐릭터를 고르지 않는 기존 호출부를 위한 짧은 형태. 아이템·재화·건축만 다룬다.</summary>
+        /// <summary>Character 시드가 필요 없는 호출부를 위한 짧은 형태.</summary>
         public static SaveResetResult Apply(SaveData data, SaveResetTargets targets, Func<bool> save)
         {
-            return Apply(data, targets, null, null, null, save);
+            return Apply(data, targets, null, null, 0, null, save);
         }
 
         /// <summary>
-        /// 선택한 항목을 초기화하고 <paramref name="save"/>를 <b>최대 한 번</b> 부른다.
-        ///
-        /// <list type="bullet">
-        ///   <item>고른 항목이 없거나, 골랐어도 실제로 바뀌는 것이 없으면(예: 고른 캐릭터가 모두 기본
-        ///         보유이거나 목록에 없음) 아무것도 바꾸지 않고 저장도 하지 않는다
-        ///         (<see cref="SaveResetOutcome.NothingSelected"/>).</item>
-        ///   <item>선택 항목을 모두 메모리에 적용한 뒤 <paramref name="save"/>를 한 번 부른다.</item>
-        ///   <item>저장이 false를 돌려주면(또는 예외를 던지면) 이번에 바꾼 필드를 전부 되돌린다.</item>
-        /// </list>
-        ///
-        /// <b>캐릭터 삭제 규칙.</b> <see cref="SaveResetTargets.Character"/> 비트가 켜져 있고
-        /// <paramref name="characterIdsToRemove"/>에 실제로 지울 것이 있을 때만 캐릭터를 지운다. 지우는
-        /// 대상은 <c>요청 ∩ 저장에 존재 ∖ 기본 보유</c>다 - <paramref name="protectedCharacterIds"/>에
-        /// 든 id는 요청에 있어도 <b>절대 지우지 않는다</b>. 지운 캐릭터가 회복 중이던 회복 슬롯은
-        /// 목록에서 빼지 않고 <b>그 슬롯만 빈 상태로 바꾼다</b>(인덱스가 슬롯 번호이므로 목록을 줄이면
-        /// 다른 슬롯 번호가 밀린다).
+        /// Character 카탈로그에서 만든 초기 시드와 파티 고정 슬롯 계약을 함께 받아 선택 항목을 원자적으로
+        /// 초기화한다. Character 비트가 켜져 있으면 기본 캐릭터는 전부 초기 상태로 복원하고, 선택된
+        /// 비기본 캐릭터만 삭제하며, 파티는 카탈로그 시드 순서의 초기 편성으로 다시 만든다.
         /// </summary>
-        /// <param name="data">고칠 저장 문서. null이면 <see cref="ArgumentNullException"/>.</param>
-        /// <param name="targets">초기화할 항목. <see cref="SaveResetTargets.All"/> 밖의 비트는 무시한다.</param>
-        /// <param name="characterIdsToRemove">지울 캐릭터 id. null/빈 목록이면 캐릭터는 건드리지 않는다.</param>
-        /// <param name="protectedCharacterIds">절대 지우지 않을 캐릭터 id(기본 보유). null이면 없음.</param>
-        /// <param name="save">메모리 적용 뒤 파일에 기록하는 대리자. 성공하면 true. null이면
-        /// <see cref="ArgumentNullException"/>.</param>
         public static SaveResetResult Apply(
             SaveData data,
             SaveResetTargets targets,
             IReadOnlyList<string> characterIdsToRemove,
-            IReadOnlyCollection<string> protectedCharacterIds,
-            Func<bool> save)
-        {
-            return Apply(data, targets, characterIdsToRemove, protectedCharacterIds, null, save);
-        }
-
-        /// <summary>퀘스트 정의를 함께 받아 Quest 대상의 모든 보유 캐릭터를 각 서사의 첫 단계로 되돌린다.</summary>
-        public static SaveResetResult Apply(
-            SaveData data,
-            SaveResetTargets targets,
-            IReadOnlyList<string> characterIdsToRemove,
-            IReadOnlyCollection<string> protectedCharacterIds,
+            IReadOnlyList<InitialCharacterResetSeed> initialCharacterSeeds,
+            int partySlotCount,
             IReadOnlyList<StoryQuestResetDefinition> questDefinitions,
             Func<bool> save)
         {
@@ -169,20 +166,28 @@ namespace CommonEditor.Save
             bool resetCurrency = (effective & SaveResetTargets.Currency) != 0;
             bool resetConstruction = (effective & SaveResetTargets.Construction) != 0;
             bool resetStory = (effective & SaveResetTargets.Quest) != 0;
+            bool resetCharacters = (effective & SaveResetTargets.Character) != 0;
 
-            // 실제로 지울 캐릭터 집합을 미리 확정한다 - 요청 ∩ 존재 ∖ 기본 보유.
-            HashSet<string> removeSet = null;
-            if ((effective & SaveResetTargets.Character) != 0)
+            List<InitialCharacterResetSeed> seeds = null;
+            HashSet<string> initialIds = null;
+            if (resetCharacters && !TryNormalizeInitialSeeds(initialCharacterSeeds, partySlotCount, out seeds, out initialIds))
             {
-                removeSet = ResolveRemovableIds(data.characters, characterIdsToRemove, protectedCharacterIds);
+                // Character reset 계약을 만족할 수 없으면 다른 선택 항목도 함께 적용하지 않는다.
+                return new SaveResetResult(
+                    SaveResetOutcome.InvalidCharacterResetConfiguration, SaveResetTargets.None, 0);
             }
+
+            // 실제로 지울 캐릭터 집합을 미리 확정한다 - 요청 ∩ 존재 ∖ catalog InitiallyOwned.
+            HashSet<string> removeSet = resetCharacters
+                ? ResolveRemovableIds(data.characters, characterIdsToRemove, initialIds)
+                : null;
 
             bool removeCharacters = removeSet != null && removeSet.Count > 0;
             bool resetAllUnlocks = effective == SaveResetTargets.All && data.unlockedRecruitmentCharacterIds != null &&
                                    data.unlockedRecruitmentCharacterIds.Count > 0;
-            // 실제로 바뀌는 것이 하나도 없으면 저장하지 않는다. (아이템/재화/건축은 비트만으로 "적용"으로
-            // 치지만, 캐릭터는 실제로 지울 대상이 있을 때만 적용이다.)
-            if (!resetItems && !resetCurrency && !resetConstruction && !resetStory && !removeCharacters &&
+            // Character는 삭제 대상이 없어도 기본 캐릭터 진행 초기화/누락 복구/초기 파티 복원이 있으므로
+            // 비트 자체가 실제 적용이다.
+            if (!resetItems && !resetCurrency && !resetConstruction && !resetStory && !resetCharacters &&
                 !resetAllUnlocks)
             {
                 return new SaveResetResult(SaveResetOutcome.NothingSelected, SaveResetTargets.None, 0);
@@ -203,10 +208,10 @@ namespace CommonEditor.Save
             List<CharacterStoryQuestSaveState> oldCharacterStoryQuests =
                 (resetStory || removeCharacters) ? data.characterStoryQuests : null;
 
-            List<CharacterSaveState> oldCharacters = null;
-            List<string> oldPartyCharacterIds = null;
-            List<RecoverySlotBackup> slotBackups = null;
-            List<PurificationSlotBackup> purificationBackups = null;
+            List<CharacterSaveState> oldCharacters = resetCharacters ? data.characters : null;
+            List<string> oldPartyCharacterIds = resetCharacters ? data.partyCharacterIds : null;
+            List<RecoverySlotSaveState> oldRecoverySlots = resetCharacters ? data.recoverySlots : null;
+            if (resetCharacters && !resetConstruction) oldPurificationSlots = data.purificationSlots;
             int removedCount = 0;
 
             if (resetItems) data.items = new List<InventoryItemState>();
@@ -218,38 +223,63 @@ namespace CommonEditor.Save
                 data.purificationSlots = new List<PurificationSlotSaveState> { new PurificationSlotSaveState() };
             }
             if (resetAllUnlocks) data.unlockedRecruitmentCharacterIds = new List<string>();
-            if (removeCharacters)
+            if (resetCharacters)
             {
-                oldCharacters = data.characters;
                 if (!resetAllUnlocks) oldUnlockedRecruitmentCharacterIds = data.unlockedRecruitmentCharacterIds;
 
-                // 지울 대상을 뺀 새 목록으로 교체한다. 살아남는 캐릭터의 순서는 그대로 유지한다.
-                var survivors = new List<CharacterSaveState>(oldCharacters.Count);
-                foreach (CharacterSaveState state in oldCharacters)
+                // 비기본 생존자는 객체와 순서를 보존한다. 기본 캐릭터는 현재 저장에 있으면 같은 위치에
+                // 초기 상태 객체로 교체하고, 누락된 시드는 catalog 순서대로 뒤에 복구한다.
+                var restored = new List<CharacterSaveState>(oldCharacters?.Count ?? seeds.Count);
+                var restoredInitialIds = new HashSet<string>(StringComparer.Ordinal);
+                if (oldCharacters != null)
                 {
-                    if (state != null && state.characterId != null && removeSet.Contains(state.characterId))
+                    foreach (CharacterSaveState state in oldCharacters)
                     {
-                        removedCount++;
-                        continue; // 이 항목을 지운다 - 레벨·경험치·행동력도 이 객체와 함께 사라진다.
-                    }
-
-                    survivors.Add(state);
-                }
-                if (data.purificationSlots != null)
-                {
-                    purificationBackups = new List<PurificationSlotBackup>();
-                    for (int i = 0; i < data.purificationSlots.Count; i++)
-                    {
-                        PurificationSlotSaveState slot = data.purificationSlots[i];
-                        if (slot != null && removeSet.Contains(slot.characterId))
+                        string id = state?.characterId;
+                        if (!string.IsNullOrEmpty(id) && removeSet.Contains(id))
                         {
-                            purificationBackups.Add(PurificationSlotBackup.Capture(i, slot));
-                            slot.Clear();
+                            removedCount++;
+                            continue;
+                        }
+
+                        if (!string.IsNullOrEmpty(id) && initialIds.Contains(id))
+                        {
+                            InitialCharacterResetSeed seed = FindSeed(seeds, id);
+                            restored.Add(CreateInitialCharacterState(seed));
+                            restoredInitialIds.Add(id);
+                        }
+                        else
+                        {
+                            restored.Add(state);
                         }
                     }
                 }
 
-                data.characters = survivors;
+                foreach (InitialCharacterResetSeed seed in seeds)
+                {
+                    if (restoredInitialIds.Add(seed.CharacterId))
+                    {
+                        restored.Add(CreateInitialCharacterState(seed));
+                    }
+                }
+
+                data.characters = restored;
+
+                // Character reset은 초기 편성으로 돌아간다. 슬롯 길이는 PartyConfig 계약 그대로이고,
+                // 여러 기본 캐릭터는 catalog 순서로 가능한 앞 슬롯부터 채운다.
+                var initialParty = new List<string>(partySlotCount);
+                for (int i = 0; i < partySlotCount; i++) initialParty.Add(string.Empty);
+                for (int i = 0; i < seeds.Count && i < initialParty.Count; i++)
+                {
+                    initialParty[i] = seeds[i].CharacterId;
+                }
+                data.partyCharacterIds = initialParty;
+
+                var affectedCharacterIds = new HashSet<string>(initialIds, StringComparer.Ordinal);
+                affectedCharacterIds.UnionWith(removeSet);
+                data.recoverySlots = CloneRecoverySlotsClearing(data.recoverySlots, affectedCharacterIds);
+                data.purificationSlots = ClonePurificationSlotsClearing(data.purificationSlots, affectedCharacterIds);
+
                 if (!resetStory && data.characterStoryQuests != null)
                 {
                     var remainingStories = new List<CharacterStoryQuestSaveState>(data.characterStoryQuests);
@@ -261,31 +291,6 @@ namespace CommonEditor.Save
                     var remainingUnlocks = new List<string>(data.unlockedRecruitmentCharacterIds);
                     remainingUnlocks.RemoveAll(id => removeSet.Contains(id));
                     data.unlockedRecruitmentCharacterIds = remainingUnlocks;
-                }
-
-                oldPartyCharacterIds = data.partyCharacterIds;
-                if (oldPartyCharacterIds != null)
-                {
-                    var remainingParty = new List<string>(oldPartyCharacterIds);
-                    for (int i = 0; i < remainingParty.Count; i++)
-                        if (removeSet.Contains(remainingParty[i])) remainingParty[i] = string.Empty;
-
-                    data.partyCharacterIds = remainingParty;
-                }
-
-                // 지운 캐릭터가 회복 중이던 슬롯만 빈 상태로 바꾼다. 목록에서 빼지 않아 인덱스가 유지된다.
-                if (data.recoverySlots != null)
-                {
-                    slotBackups = new List<RecoverySlotBackup>();
-                    for (int i = 0; i < data.recoverySlots.Count; i++)
-                    {
-                        RecoverySlotSaveState slot = data.recoverySlots[i];
-                        if (slot != null && slot.HasCharacter && removeSet.Contains(slot.characterId))
-                        {
-                            slotBackups.Add(RecoverySlotBackup.Capture(i, slot));
-                            slot.Clear();
-                        }
-                    }
                 }
             }
 
@@ -305,8 +310,8 @@ namespace CommonEditor.Save
                 // 대리자가 터져도 메모리는 원래대로 돌려놓고 예외는 그대로 올려보낸다 - 부분 초기화가
                 // 남는 것보다 호출부가 실패를 알아채는 편이 낫다.
                 Rollback(data, resetItems, oldItems, resetCurrency, oldCurrency, resetConstruction,
-                    oldConstructions, oldRecruitmentCycles, oldPurificationSlots, removeCharacters, oldCharacters,
-                    oldPartyCharacterIds, oldUnlockedRecruitmentCharacterIds, resetAllUnlocks, slotBackups, purificationBackups,
+                    oldConstructions, oldRecruitmentCycles, oldPurificationSlots, resetCharacters, oldCharacters,
+                    oldPartyCharacterIds, oldRecoverySlots, oldUnlockedRecruitmentCharacterIds, resetAllUnlocks,
                     oldCharacterStoryQuests);
                 throw;
             }
@@ -314,8 +319,8 @@ namespace CommonEditor.Save
             if (!saved)
             {
                 Rollback(data, resetItems, oldItems, resetCurrency, oldCurrency, resetConstruction,
-                    oldConstructions, oldRecruitmentCycles, oldPurificationSlots, removeCharacters, oldCharacters,
-                    oldPartyCharacterIds, oldUnlockedRecruitmentCharacterIds, resetAllUnlocks, slotBackups, purificationBackups,
+                    oldConstructions, oldRecruitmentCycles, oldPurificationSlots, resetCharacters, oldCharacters,
+                    oldPartyCharacterIds, oldRecoverySlots, oldUnlockedRecruitmentCharacterIds, resetAllUnlocks,
                     oldCharacterStoryQuests);
                 return new SaveResetResult(SaveResetOutcome.SaveFailed, effective, 0);
             }
@@ -324,10 +329,11 @@ namespace CommonEditor.Save
             if (resetItems) applied |= SaveResetTargets.Item;
             if (resetCurrency) applied |= SaveResetTargets.Currency;
             if (resetConstruction) applied |= SaveResetTargets.Construction;
-            if (removeCharacters) applied |= SaveResetTargets.Character;
+            if (resetCharacters) applied |= SaveResetTargets.Character;
             if (resetStory) applied |= SaveResetTargets.Quest;
 
-            return new SaveResetResult(SaveResetOutcome.Success, applied, removedCount);
+            return new SaveResetResult(
+                SaveResetOutcome.Success, applied, removedCount, resetCharacters ? seeds.Count : 0);
         }
 
         /// <summary>
@@ -497,6 +503,110 @@ namespace CommonEditor.Save
             return result;
         }
 
+        private static bool TryNormalizeInitialSeeds(
+            IReadOnlyList<InitialCharacterResetSeed> source,
+            int partySlotCount,
+            out List<InitialCharacterResetSeed> seeds,
+            out HashSet<string> ids)
+        {
+            seeds = new List<InitialCharacterResetSeed>();
+            ids = new HashSet<string>(StringComparer.Ordinal);
+            if (partySlotCount < 1 || source == null || source.Count == 0) return false;
+
+            foreach (InitialCharacterResetSeed seed in source)
+            {
+                // 창은 catalog의 유효한 InitiallyOwned 정의만 넘겨야 한다. 서비스도 잘못된 시드를
+                // 조용히 일부만 적용하지 않고 전체 Character reset을 거부한다.
+                if (!seed.IsValid || !ids.Add(seed.CharacterId)) return false;
+                seeds.Add(seed);
+            }
+
+            return seeds.Count > 0;
+        }
+
+        private static InitialCharacterResetSeed FindSeed(
+            IReadOnlyList<InitialCharacterResetSeed> seeds,
+            string characterId)
+        {
+            for (int i = 0; i < seeds.Count; i++)
+            {
+                if (string.Equals(seeds[i].CharacterId, characterId, StringComparison.Ordinal)) return seeds[i];
+            }
+
+            throw new InvalidOperationException($"초기 캐릭터 시드 '{characterId}'를 찾을 수 없습니다.");
+        }
+
+        private static CharacterSaveState CreateInitialCharacterState(InitialCharacterResetSeed seed)
+        {
+            return new CharacterSaveState
+            {
+                characterId = seed.CharacterId,
+                level = 1,
+                currentExp = 0,
+                currentStamina = -1,
+                passiveStaminaLastCalculatedUtc = string.Empty,
+                passiveStaminaProgress = 0,
+                currentCorruption = seed.BaseCorruption,
+            };
+        }
+
+        private static List<RecoverySlotSaveState> CloneRecoverySlotsClearing(
+            IReadOnlyList<RecoverySlotSaveState> source,
+            HashSet<string> affectedCharacterIds)
+        {
+            if (source == null) return null;
+            var result = new List<RecoverySlotSaveState>(source.Count);
+            foreach (RecoverySlotSaveState slot in source)
+            {
+                if (slot == null)
+                {
+                    result.Add(null);
+                    continue;
+                }
+
+                var clone = new RecoverySlotSaveState
+                {
+                    characterId = slot.characterId,
+                    startStamina = slot.startStamina,
+                    startedAtUtc = slot.startedAtUtc,
+                    completeAtUtc = slot.completeAtUtc,
+                    completionNotified = slot.completionNotified,
+                };
+                if (affectedCharacterIds.Contains(clone.characterId)) clone.Clear();
+                result.Add(clone);
+            }
+
+            return result;
+        }
+
+        private static List<PurificationSlotSaveState> ClonePurificationSlotsClearing(
+            IReadOnlyList<PurificationSlotSaveState> source,
+            HashSet<string> affectedCharacterIds)
+        {
+            if (source == null) return null;
+            var result = new List<PurificationSlotSaveState>(source.Count);
+            foreach (PurificationSlotSaveState slot in source)
+            {
+                if (slot == null)
+                {
+                    result.Add(null);
+                    continue;
+                }
+
+                var clone = new PurificationSlotSaveState
+                {
+                    purificationTypeId = slot.purificationTypeId,
+                    characterId = slot.characterId,
+                    lastCalculatedAtUtc = slot.lastCalculatedAtUtc,
+                    progressTicks = slot.progressTicks,
+                };
+                if (affectedCharacterIds.Contains(clone.characterId)) clone.Clear();
+                result.Add(clone);
+            }
+
+            return result;
+        }
+
         private static void Rollback(
             SaveData data,
             bool resetItems, List<InventoryItemState> oldItems,
@@ -504,9 +614,9 @@ namespace CommonEditor.Save
             bool resetConstruction, List<BuildingConstructionSaveState> oldConstructions,
             List<RecruitmentCycleSaveState> oldRecruitmentCycles,
             List<PurificationSlotSaveState> oldPurificationSlots,
-            bool removeCharacters, List<CharacterSaveState> oldCharacters, List<string> oldPartyCharacterIds,
+            bool resetCharacters, List<CharacterSaveState> oldCharacters, List<string> oldPartyCharacterIds,
+            List<RecoverySlotSaveState> oldRecoverySlots,
             List<string> oldUnlockedRecruitmentCharacterIds, bool resetAllUnlocks,
-            List<RecoverySlotBackup> slotBackups, List<PurificationSlotBackup> purificationBackups,
             List<CharacterStoryQuestSaveState> oldCharacterStoryQuests = null)
         {
             if (resetItems) data.items = oldItems;
@@ -518,104 +628,16 @@ namespace CommonEditor.Save
                 data.purificationSlots = oldPurificationSlots;
             }
 
-            if (removeCharacters)
+            if (resetCharacters)
             {
                 data.characters = oldCharacters;
                 data.partyCharacterIds = oldPartyCharacterIds;
+                data.recoverySlots = oldRecoverySlots;
+                data.purificationSlots = oldPurificationSlots;
                 data.unlockedRecruitmentCharacterIds = oldUnlockedRecruitmentCharacterIds;
-
-                // 빈 상태로 바꿨던 회복 슬롯을 원래 값으로 되돌린다(같은 객체, 같은 인덱스).
-                if (slotBackups != null && data.recoverySlots != null)
-                {
-                    foreach (RecoverySlotBackup backup in slotBackups)
-                    {
-                        if (backup.Index >= 0 && backup.Index < data.recoverySlots.Count)
-                        {
-                            backup.RestoreTo(data.recoverySlots[backup.Index]);
-                        }
-                    }
-                }
-                if (purificationBackups != null && data.purificationSlots != null)
-                {
-                    foreach (PurificationSlotBackup backup in purificationBackups)
-                    {
-                        if (backup.Index >= 0 && backup.Index < data.purificationSlots.Count)
-                        {
-                            backup.RestoreTo(data.purificationSlots[backup.Index]);
-                        }
-                    }
-                }
             }
             if (resetAllUnlocks) data.unlockedRecruitmentCharacterIds = oldUnlockedRecruitmentCharacterIds;
             if (oldCharacterStoryQuests != null) data.characterStoryQuests = oldCharacterStoryQuests;
-        }
-
-        /// <summary>빈 상태로 바꾼 회복 슬롯 한 칸의 원래 값. 저장 실패 시 <see cref="RestoreTo"/>로 되돌린다.</summary>
-        private readonly struct RecoverySlotBackup
-        {
-            public int Index { get; }
-            private readonly string characterId;
-            private readonly int startStamina;
-            private readonly string startedAtUtc;
-            private readonly string completeAtUtc;
-            private readonly bool completionNotified;
-
-            private RecoverySlotBackup(int index, RecoverySlotSaveState slot)
-            {
-                Index = index;
-                characterId = slot.characterId;
-                startStamina = slot.startStamina;
-                startedAtUtc = slot.startedAtUtc;
-                completeAtUtc = slot.completeAtUtc;
-                completionNotified = slot.completionNotified;
-            }
-
-            public static RecoverySlotBackup Capture(int index, RecoverySlotSaveState slot)
-            {
-                return new RecoverySlotBackup(index, slot);
-            }
-
-            public void RestoreTo(RecoverySlotSaveState slot)
-            {
-                if (slot == null) return;
-                slot.characterId = characterId;
-                slot.startStamina = startStamina;
-                slot.startedAtUtc = startedAtUtc;
-                slot.completeAtUtc = completeAtUtc;
-                slot.completionNotified = completionNotified;
-            }
-        }
-
-        private readonly struct PurificationSlotBackup
-        {
-            public int Index { get; }
-            private readonly string purificationTypeId;
-            private readonly string characterId;
-            private readonly string lastCalculatedAtUtc;
-            private readonly long progressTicks;
-
-            private PurificationSlotBackup(int index, PurificationSlotSaveState slot)
-            {
-                Index = index;
-                purificationTypeId = slot.purificationTypeId;
-                characterId = slot.characterId;
-                lastCalculatedAtUtc = slot.lastCalculatedAtUtc;
-                progressTicks = slot.progressTicks;
-            }
-
-            public static PurificationSlotBackup Capture(int index, PurificationSlotSaveState slot)
-            {
-                return new PurificationSlotBackup(index, slot);
-            }
-
-            public void RestoreTo(PurificationSlotSaveState slot)
-            {
-                if (slot == null) return;
-                slot.purificationTypeId = purificationTypeId;
-                slot.characterId = characterId;
-                slot.lastCalculatedAtUtc = lastCalculatedAtUtc;
-                slot.progressTicks = progressTicks;
-            }
         }
     }
 }

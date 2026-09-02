@@ -16,6 +16,29 @@ namespace CommonEditor.SaveTests
     /// </summary>
     public sealed class SaveResetServiceTests
     {
+        private const int PartySlotCount = 3;
+
+        private static List<InitialCharacterResetSeed> DefaultInitialSeeds()
+        {
+            return new List<InitialCharacterResetSeed>
+            {
+                new InitialCharacterResetSeed("CatKnight", 0d),
+            };
+        }
+
+        private static SaveResetResult ApplyCharacterReset(
+            SaveData data,
+            SaveResetTargets targets,
+            IReadOnlyList<string> idsToRemove,
+            Func<bool> save,
+            IReadOnlyList<InitialCharacterResetSeed> seeds = null,
+            int partySlotCount = PartySlotCount,
+            IReadOnlyList<StoryQuestResetDefinition> questDefinitions = null)
+        {
+            return SaveResetService.Apply(
+                data, targets, idsToRemove, seeds ?? DefaultInitialSeeds(), partySlotCount, questDefinitions, save);
+        }
+
         /// <summary>세 초기화 대상과 몇 개의 비대상 필드를 모두 0이 아닌 값으로 채운 문서를 만든다 -
         /// 비대상이 기본값으로 되돌아오는 사고가 있으면 보이도록 전부 눈에 띄는 값으로 둔다.</summary>
         private static SaveData MakePopulated()
@@ -144,10 +167,11 @@ namespace CommonEditor.SaveTests
         // ---- 4. All ----
 
         [Test]
-        public void All은_세_항목을_모두_초기화한다()
+        public void Character를_제외한_전체는_비캐릭터_항목을_모두_초기화한다()
         {
             SaveData data = MakePopulated();
-            SaveResetResult result = SaveResetService.Apply(data, SaveResetTargets.All, Counting(out Box<int> calls));
+            SaveResetTargets targets = SaveResetTargets.All & ~SaveResetTargets.Character;
+            SaveResetResult result = SaveResetService.Apply(data, targets, Counting(out Box<int> calls));
 
             Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
             Assert.AreEqual(0, data.items.Count);
@@ -166,7 +190,8 @@ namespace CommonEditor.SaveTests
         public void All에서_Currency를_해제하면_Item과_Construction만_초기화한다()
         {
             SaveData data = MakePopulated();
-            SaveResetTargets targets = SaveResetTargets.All & ~SaveResetTargets.Currency;
+            SaveResetTargets targets = SaveResetTargets.All &
+                                       ~(SaveResetTargets.Currency | SaveResetTargets.Character);
 
             SaveResetResult result = SaveResetService.Apply(data, targets, Counting(out Box<int> calls));
 
@@ -207,7 +232,8 @@ namespace CommonEditor.SaveTests
         public void 성공하면_저장_대리자를_정확히_한_번만_부른다()
         {
             SaveData data = MakePopulated();
-            SaveResetService.Apply(data, SaveResetTargets.All, Counting(out Box<int> calls));
+            SaveResetService.Apply(
+                data, SaveResetTargets.All & ~SaveResetTargets.Character, Counting(out Box<int> calls));
 
             Assert.AreEqual(1, calls.Value, "선택 항목이 몇 개든 저장은 한 번에 모아 한 번만 합니다.");
         }
@@ -224,7 +250,9 @@ namespace CommonEditor.SaveTests
             List<PurificationSlotSaveState> originalPurificationSlots = data.purificationSlots;
 
             SaveResetResult result =
-                SaveResetService.Apply(data, SaveResetTargets.All, Counting(out Box<int> calls, succeeds: false));
+                SaveResetService.Apply(
+                    data, SaveResetTargets.All & ~SaveResetTargets.Character,
+                    Counting(out Box<int> calls, succeeds: false));
 
             Assert.AreEqual(SaveResetOutcome.SaveFailed, result.Outcome);
             Assert.AreEqual(1, calls.Value, "실패해도 저장 시도는 한 번뿐입니다.");
@@ -248,7 +276,8 @@ namespace CommonEditor.SaveTests
         public void 초기화해도_캐릭터_회복소_계정진행은_그대로다()
         {
             SaveData data = MakePopulated();
-            SaveResetService.Apply(data, SaveResetTargets.All, Counting(out Box<int> _));
+            SaveResetService.Apply(
+                data, SaveResetTargets.All & ~SaveResetTargets.Character, Counting(out Box<int> _));
 
             AssertNonTargetsPreserved(data);
             Assert.AreEqual(5, data.saveRevision, "저장 메타데이터는 이 로직이 건드리지 않습니다(저장 대리자의 몫).");
@@ -352,9 +381,8 @@ namespace CommonEditor.SaveTests
         {
             SaveData data = MakeCharacterFixture();
 
-            SaveResetResult result = SaveResetService.Apply(
-                data, SaveResetTargets.Character,
-                new List<string> { "ElfArcher" }, new List<string> { "Barbarian" },
+            SaveResetResult result = ApplyCharacterReset(
+                data, SaveResetTargets.Character, new List<string> { "ElfArcher" },
                 Counting(out Box<int> calls));
 
             Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
@@ -364,8 +392,8 @@ namespace CommonEditor.SaveTests
 
             CollectionAssert.AreEqual(new[] { "CatKnight", "Barbarian" }, IdsOf(data.characters),
                 "고른 ElfArcher만 빠지고 나머지는 순서 그대로 남아야 합니다.");
-            CollectionAssert.AreEqual(new[] { "CatKnight", string.Empty, "Barbarian" }, data.partyCharacterIds,
-                "삭제한 캐릭터의 슬롯만 비우고 선택하지 않은 슬롯 위치는 유지돼야 합니다.");
+            CollectionAssert.AreEqual(new[] { "CatKnight", string.Empty, string.Empty }, data.partyCharacterIds,
+                "Character reset은 고정 길이를 지키며 catalog 순서의 기본 편성으로 돌아가야 합니다.");
 
             // 비대상은 그대로.
             Assert.AreEqual(500, data.currency);
@@ -379,14 +407,13 @@ namespace CommonEditor.SaveTests
         {
             SaveData data = MakeCharacterFixture();
 
-            SaveResetResult result = SaveResetService.Apply(
+            SaveResetResult result = ApplyCharacterReset(
                 data, SaveResetTargets.Character,
-                new List<string> { "Barbarian", "ElfArcher" }, // Barbarian은 기본 보유(보호)
-                new List<string> { "Barbarian" },
+                new List<string> { "CatKnight", "ElfArcher" },
                 Counting(out Box<int> calls));
 
             Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
-            Assert.AreEqual(1, result.RemovedCharacterCount, "보호된 Barbarian은 빠지지 않습니다.");
+            Assert.AreEqual(1, result.RemovedCharacterCount, "기본 캐릭터 CatKnight는 빠지지 않습니다.");
             CollectionAssert.AreEqual(new[] { "CatKnight", "Barbarian" }, IdsOf(data.characters));
             Assert.AreEqual(1, calls.Value);
         }
@@ -396,9 +423,8 @@ namespace CommonEditor.SaveTests
         {
             SaveData data = MakeCharacterFixture();
 
-            SaveResetService.Apply(
-                data, SaveResetTargets.Character,
-                new List<string> { "ElfArcher" }, null, Counting(out Box<int> _));
+            ApplyCharacterReset(
+                data, SaveResetTargets.Character, new List<string> { "ElfArcher" }, Counting(out Box<int> _));
 
             Assert.AreEqual(3, data.recoverySlots.Count, "슬롯을 목록에서 빼면 안 됩니다(인덱스=슬롯 번호).");
 
@@ -411,11 +437,11 @@ namespace CommonEditor.SaveTests
             // index1: 원래 빈 슬롯 그대로.
             Assert.IsFalse(data.recoverySlots[1].HasCharacter);
 
-            // index2: CatKnight 슬롯은 값과 자리 모두 보존.
-            Assert.AreEqual("CatKnight", data.recoverySlots[2].characterId);
-            Assert.AreEqual(6, data.recoverySlots[2].startStamina);
-            Assert.AreEqual("cs", data.recoverySlots[2].startedAtUtc);
-            Assert.AreEqual("cc", data.recoverySlots[2].completeAtUtc);
+            // index2: 초기화되는 기본 캐릭터 CatKnight 슬롯도 같은 자리에서 비운다.
+            Assert.IsFalse(data.recoverySlots[2].HasCharacter);
+            Assert.AreEqual(0, data.recoverySlots[2].startStamina);
+            Assert.IsTrue(string.IsNullOrEmpty(data.recoverySlots[2].startedAtUtc));
+            Assert.IsTrue(string.IsNullOrEmpty(data.recoverySlots[2].completeAtUtc));
         }
 
         [Test]
@@ -423,9 +449,8 @@ namespace CommonEditor.SaveTests
         {
             SaveData data = MakeCharacterFixture();
 
-            SaveResetService.Apply(
-                data, SaveResetTargets.Character,
-                new List<string> { "ElfArcher" }, null, Counting(out Box<int> _));
+            ApplyCharacterReset(
+                data, SaveResetTargets.Character, new List<string> { "ElfArcher" }, Counting(out Box<int> _));
 
             Assert.AreEqual(3, data.purificationSlots.Count);
             Assert.IsFalse(data.purificationSlots[0].HasCharacter);
@@ -433,10 +458,10 @@ namespace CommonEditor.SaveTests
             Assert.IsTrue(string.IsNullOrEmpty(data.purificationSlots[0].lastCalculatedAtUtc));
             Assert.AreEqual(0, data.purificationSlots[0].progressTicks);
             Assert.IsFalse(data.purificationSlots[1].HasCharacter);
-            Assert.AreEqual("CatKnight", data.purificationSlots[2].characterId);
-            Assert.AreEqual("church_prayer", data.purificationSlots[2].purificationTypeId);
-            Assert.AreEqual("cps", data.purificationSlots[2].lastCalculatedAtUtc);
-            Assert.AreEqual(22, data.purificationSlots[2].progressTicks);
+            Assert.IsFalse(data.purificationSlots[2].HasCharacter,
+                "초기화되는 기본 캐릭터의 정화 슬롯도 비워야 합니다.");
+            Assert.IsTrue(string.IsNullOrEmpty(data.purificationSlots[2].purificationTypeId));
+            Assert.AreEqual(0, data.purificationSlots[2].progressTicks);
         }
 
         [Test]
@@ -444,9 +469,8 @@ namespace CommonEditor.SaveTests
         {
             SaveData data = MakeCharacterFixture();
 
-            SaveResetService.Apply(
-                data, SaveResetTargets.Character,
-                new List<string> { "ElfArcher" }, null, Counting(out Box<int> _));
+            ApplyCharacterReset(
+                data, SaveResetTargets.Character, new List<string> { "ElfArcher" }, Counting(out Box<int> _));
 
             Assert.AreEqual(1, data.items.Count, "아이템은 그대로입니다.");
             Assert.AreEqual(500, data.currency, "재화는 그대로입니다.");
@@ -454,7 +478,8 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(1, data.recruitmentCycles.Count, "모집 주기는 그대로입니다.");
             Assert.AreEqual(3, data.purificationSlots.Count, "기도 슬롯 목록은 그대로입니다.");
             Assert.IsFalse(data.purificationSlots[0].HasCharacter, "삭제한 캐릭터의 기도 슬롯만 비웁니다.");
-            Assert.AreEqual("CatKnight", data.purificationSlots[2].characterId);
+            Assert.IsFalse(data.purificationSlots[2].HasCharacter,
+                "초기화되는 기본 캐릭터의 기도 슬롯도 비웁니다.");
         }
 
         [Test]
@@ -462,10 +487,9 @@ namespace CommonEditor.SaveTests
         {
             SaveData data = MakeCharacterFixture();
 
-            SaveResetResult result = SaveResetService.Apply(
-                data, SaveResetTargets.All,
-                new List<string> { "ElfArcher" }, new List<string> { "Barbarian" },
-                Counting(out Box<int> calls));
+            SaveResetResult result = ApplyCharacterReset(
+                data, SaveResetTargets.All, new List<string> { "ElfArcher" },
+                Counting(out Box<int> calls), questDefinitions: MakeStoryDefinitions());
 
             Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
             Assert.AreEqual(1, calls.Value, "여러 대상을 골라도 저장은 한 번에 모아 한 번만 합니다.");
@@ -487,15 +511,19 @@ namespace CommonEditor.SaveTests
         public void 저장에_실패하면_캐릭터와_회복_슬롯과_다른_대상을_전부_되돌린다()
         {
             SaveData data = MakeCharacterFixture();
+            data.unlockedRecruitmentCharacterIds = new List<string> { "ElfArcher", "Barbarian" };
+            data.characterStoryQuests = MakeStoryFixture().characterStoryQuests;
             List<CharacterSaveState> originalCharacters = data.characters;
             List<string> originalParty = data.partyCharacterIds;
             List<InventoryItemState> originalItems = data.items;
+            List<RecoverySlotSaveState> originalRecoverySlots = data.recoverySlots;
             List<PurificationSlotSaveState> originalPurificationSlots = data.purificationSlots;
+            List<string> originalUnlocks = data.unlockedRecruitmentCharacterIds;
+            List<CharacterStoryQuestSaveState> originalStories = data.characterStoryQuests;
 
-            SaveResetResult result = SaveResetService.Apply(
-                data, SaveResetTargets.All,
-                new List<string> { "ElfArcher" }, new List<string> { "Barbarian" },
-                Counting(out Box<int> calls, succeeds: false));
+            SaveResetResult result = ApplyCharacterReset(
+                data, SaveResetTargets.All, new List<string> { "ElfArcher" },
+                Counting(out Box<int> calls, succeeds: false), questDefinitions: MakeStoryDefinitions());
 
             Assert.AreEqual(SaveResetOutcome.SaveFailed, result.Outcome);
             Assert.AreEqual(1, calls.Value);
@@ -510,7 +538,10 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(500, data.currency);
             Assert.AreEqual(1, data.buildingConstructions.Count);
             Assert.AreEqual(1, data.recruitmentCycles.Count);
+            Assert.AreSame(originalRecoverySlots, data.recoverySlots);
             Assert.AreSame(originalPurificationSlots, data.purificationSlots);
+            Assert.AreSame(originalUnlocks, data.unlockedRecruitmentCharacterIds);
+            Assert.AreSame(originalStories, data.characterStoryQuests);
             Assert.AreEqual("ElfArcher", data.purificationSlots[0].characterId);
             Assert.AreEqual("CatKnight", data.purificationSlots[2].characterId);
 
@@ -525,16 +556,25 @@ namespace CommonEditor.SaveTests
         public void 캐릭터_삭제_저장_예외도_파티를_포함해_전부_되돌린다()
         {
             SaveData data = MakeCharacterFixture();
+            data.unlockedRecruitmentCharacterIds = new List<string> { "ElfArcher", "Barbarian" };
+            data.characterStoryQuests = MakeStoryFixture().characterStoryQuests;
             List<CharacterSaveState> originalCharacters = data.characters;
             List<string> originalParty = data.partyCharacterIds;
+            List<RecoverySlotSaveState> originalRecoverySlots = data.recoverySlots;
+            List<PurificationSlotSaveState> originalPurificationSlots = data.purificationSlots;
+            List<string> originalUnlocks = data.unlockedRecruitmentCharacterIds;
+            List<CharacterStoryQuestSaveState> originalStories = data.characterStoryQuests;
 
-            Assert.Throws<InvalidOperationException>(() => SaveResetService.Apply(
-                data, SaveResetTargets.Character,
-                new List<string> { "ElfArcher" }, null,
+            Assert.Throws<InvalidOperationException>(() => ApplyCharacterReset(
+                data, SaveResetTargets.Character, new List<string> { "ElfArcher" },
                 () => { throw new InvalidOperationException("write failed"); }));
 
             Assert.AreSame(originalCharacters, data.characters);
             Assert.AreSame(originalParty, data.partyCharacterIds);
+            Assert.AreSame(originalRecoverySlots, data.recoverySlots);
+            Assert.AreSame(originalPurificationSlots, data.purificationSlots);
+            Assert.AreSame(originalUnlocks, data.unlockedRecruitmentCharacterIds);
+            Assert.AreSame(originalStories, data.characterStoryQuests);
             CollectionAssert.AreEqual(new[] { "CatKnight", "ElfArcher", "Barbarian" }, data.partyCharacterIds);
             Assert.AreEqual("ElfArcher", data.recoverySlots[0].characterId);
             Assert.AreEqual("ElfArcher", data.purificationSlots[0].characterId);
@@ -542,33 +582,242 @@ namespace CommonEditor.SaveTests
         }
 
         [Test]
-        public void Character만_골랐어도_실제_선택이_없으면_저장하지_않는다()
+        public void 기본_캐릭터만_있고_삭제_선택이_없어도_Character는_저장_한_번으로_적용된다()
+        {
+            SaveData data = new SaveData
+            {
+                characters = new List<CharacterSaveState>
+                {
+                    new CharacterSaveState { characterId = "CatKnight", level = 1, currentStamina = -1 },
+                },
+                partyCharacterIds = new List<string> { "CatKnight", string.Empty, string.Empty },
+            };
+
+            SaveResetResult result = ApplyCharacterReset(
+                data, SaveResetTargets.Character, new List<string>(), Counting(out Box<int> calls));
+
+            Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
+            Assert.AreEqual(SaveResetTargets.Character, result.AppliedTargets);
+            Assert.AreEqual(1, result.ResetInitialCharacterCount);
+            Assert.AreEqual(0, result.RemovedCharacterCount);
+            Assert.AreEqual(1, calls.Value);
+        }
+
+        [Test]
+        public void 존재하는_기본_캐릭터의_모든_진행값을_정의된_초기값으로_되돌린다()
+        {
+            SaveData data = new SaveData
+            {
+                characters = new List<CharacterSaveState>
+                {
+                    new CharacterSaveState
+                    {
+                        characterId = "CatKnight",
+                        level = 17,
+                        currentExp = 932,
+                        currentStamina = 2,
+                        passiveStaminaLastCalculatedUtc = "2026-08-31T12:00:00.0000000Z",
+                        passiveStaminaProgress = 987654,
+                        currentCorruption = 77.5d,
+                    },
+                },
+                partyCharacterIds = new List<string> { string.Empty },
+            };
+
+            SaveResetResult result = ApplyCharacterReset(
+                data, SaveResetTargets.Character, null, Counting(out Box<int> calls),
+                new[] { new InitialCharacterResetSeed("CatKnight", 12d) });
+
+            Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
+            Assert.AreEqual(1, result.ResetInitialCharacterCount);
+            Assert.AreEqual(1, calls.Value);
+            CharacterSaveState state = data.characters[0];
+            Assert.AreEqual("CatKnight", state.characterId);
+            Assert.AreEqual(1, state.level);
+            Assert.AreEqual(0, state.currentExp);
+            Assert.AreEqual(-1, state.currentStamina,
+                "Roster가 다음 초기화에서 정의 MaxStamina를 적용할 sentinel이어야 합니다.");
+            Assert.AreEqual(string.Empty, state.passiveStaminaLastCalculatedUtc);
+            Assert.AreEqual(0, state.passiveStaminaProgress);
+            Assert.AreEqual(12d, state.currentCorruption);
+        }
+
+        [Test]
+        public void 저장에서_누락된_기본_캐릭터를_catalog_시드로_복구한다()
+        {
+            SaveData data = new SaveData
+            {
+                characters = new List<CharacterSaveState>
+                {
+                    new CharacterSaveState { characterId = "Barbarian", level = 6 },
+                },
+                partyCharacterIds = new List<string> { string.Empty },
+            };
+
+            SaveResetResult result = ApplyCharacterReset(
+                data, SaveResetTargets.Character, null, Counting(out Box<int> calls));
+
+            Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
+            Assert.AreEqual(1, calls.Value);
+            CollectionAssert.AreEqual(new[] { "Barbarian", "CatKnight" }, IdsOf(data.characters));
+            CharacterSaveState restored = data.characters.Find(c => c.characterId == "CatKnight");
+            Assert.NotNull(restored);
+            Assert.AreEqual(1, restored.level);
+            Assert.AreEqual(0, restored.currentExp);
+            Assert.AreEqual(-1, restored.currentStamina);
+            Assert.AreEqual(0d, restored.currentCorruption);
+            CollectionAssert.AreEqual(new[] { "CatKnight", string.Empty, string.Empty }, data.partyCharacterIds);
+        }
+
+        [Test]
+        public void 복수_기본_캐릭터는_catalog_순서대로_고정_파티_슬롯에_배치된다()
+        {
+            var seeds = new List<InitialCharacterResetSeed>
+            {
+                new InitialCharacterResetSeed("CatKnight", 1d),
+                new InitialCharacterResetSeed("Paladin", 2d),
+                new InitialCharacterResetSeed("Priest", 3d),
+                new InitialCharacterResetSeed("Ranger", 4d),
+            };
+            SaveData data = new SaveData
+            {
+                characters = new List<CharacterSaveState>
+                {
+                    new CharacterSaveState { characterId = "Paladin", level = 9 },
+                    new CharacterSaveState { characterId = "Guest", level = 4 },
+                },
+                partyCharacterIds = new List<string> { "Guest" },
+            };
+
+            ApplyCharacterReset(
+                data, SaveResetTargets.Character, null, Counting(out Box<int> calls), seeds, partySlotCount: 3);
+
+            Assert.AreEqual(1, calls.Value);
+            CollectionAssert.AreEqual(new[] { "CatKnight", "Paladin", "Priest" }, data.partyCharacterIds,
+                "정원을 넘는 기본 캐릭터도 보유에는 남되 가능한 슬롯까지만 catalog 순서로 편성합니다.");
+            CollectionAssert.IsSubsetOf(
+                new[] { "CatKnight", "Paladin", "Priest", "Ranger" }, IdsOf(data.characters));
+            Assert.AreEqual(4d, data.characters.Find(c => c.characterId == "Ranger").currentCorruption);
+        }
+
+        [Test]
+        public void Character_reset은_기본_초기화와_선택한_비기본_삭제를_동시에_수행한다()
         {
             SaveData data = MakeCharacterFixture();
 
-            // 빈 목록.
-            SaveResetResult empty = SaveResetService.Apply(
-                data, SaveResetTargets.Character, new List<string>(), null, Counting(out Box<int> emptyCalls));
-            Assert.AreEqual(SaveResetOutcome.NothingSelected, empty.Outcome);
-            Assert.AreEqual(0, emptyCalls.Value);
+            SaveResetResult result = ApplyCharacterReset(
+                data, SaveResetTargets.Character, new[] { "ElfArcher" }, Counting(out Box<int> calls),
+                new[] { new InitialCharacterResetSeed("CatKnight", 9d) });
 
-            // 보호된 캐릭터만 요청.
-            SaveResetResult guarded = SaveResetService.Apply(
-                data, SaveResetTargets.Character,
-                new List<string> { "Barbarian" }, new List<string> { "Barbarian" },
-                Counting(out Box<int> guardedCalls));
-            Assert.AreEqual(SaveResetOutcome.NothingSelected, guarded.Outcome);
-            Assert.AreEqual(0, guardedCalls.Value);
+            Assert.AreEqual(1, calls.Value);
+            Assert.AreEqual(1, result.RemovedCharacterCount);
+            Assert.AreEqual(1, result.ResetInitialCharacterCount);
+            CollectionAssert.AreEqual(new[] { "CatKnight", "Barbarian" }, IdsOf(data.characters));
+            CharacterSaveState initial = data.characters.Find(c => c.characterId == "CatKnight");
+            Assert.AreEqual(1, initial.level);
+            Assert.AreEqual(-1, initial.currentStamina);
+            Assert.AreEqual(9d, initial.currentCorruption);
+        }
 
-            // 저장에 없는 id만 요청.
-            SaveResetResult missing = SaveResetService.Apply(
-                data, SaveResetTargets.Character,
-                new List<string> { "Ghost" }, null, Counting(out Box<int> missingCalls));
-            Assert.AreEqual(SaveResetOutcome.NothingSelected, missing.Outcome);
-            Assert.AreEqual(0, missingCalls.Value);
+        [Test]
+        public void Character만_선택하면_기본_퀘스트는_유지하고_삭제된_캐릭터_퀘스트만_제거한다()
+        {
+            SaveData data = MakeStoryFixture();
+            data.partyCharacterIds = new List<string> { "ElfArcher", "CatKnight" };
+            CharacterStoryQuestSaveState originalCat = data.characterStoryQuests[0];
 
-            // 세 경우 모두 캐릭터는 그대로.
-            Assert.AreEqual(3, data.characters.Count);
+            ApplyCharacterReset(
+                data, SaveResetTargets.Character, new[] { "ElfArcher" }, Counting(out Box<int> calls),
+                questDefinitions: MakeStoryDefinitions());
+
+            Assert.AreEqual(1, calls.Value);
+            Assert.AreEqual(1, data.characterStoryQuests.Count);
+            Assert.AreSame(originalCat, data.characterStoryQuests[0],
+                "Character reset만으로 기본 캐릭터의 Quest 진행을 초기화하면 안 됩니다.");
+            Assert.AreEqual("CatKnight_10003", data.characterStoryQuests[0].activeQuestId);
+        }
+
+        [Test]
+        public void Character와_Quest를_함께_선택하면_남은_캐릭터_퀘스트를_첫_단계로_초기화한다()
+        {
+            SaveData data = MakeStoryFixture();
+            data.partyCharacterIds = new List<string> { "ElfArcher", "CatKnight", string.Empty };
+
+            SaveResetResult result = ApplyCharacterReset(
+                data, SaveResetTargets.Character | SaveResetTargets.Quest,
+                new[] { "ElfArcher" }, Counting(out Box<int> calls),
+                questDefinitions: MakeStoryDefinitions());
+
+            Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
+            Assert.AreEqual(1, calls.Value);
+            Assert.AreEqual(1, data.characterStoryQuests.Count);
+            Assert.AreEqual("CatKnight_10001", data.characterStoryQuests[0].activeQuestId);
+            Assert.AreEqual(0, data.characterStoryQuests[0].completedQuestIds.Count);
+            Assert.AreEqual(0, data.characterStoryQuests[0].objectiveProgress.Count);
+        }
+
+        [Test]
+        public void Character_reset은_선택_삭제의_모집해금만_지우고_All은_전체_해금을_지운다()
+        {
+            SaveData selected = MakeCharacterFixture();
+            selected.unlockedRecruitmentCharacterIds = new List<string> { "CatKnight", "ElfArcher", "Barbarian" };
+            ApplyCharacterReset(
+                selected, SaveResetTargets.Character, new[] { "ElfArcher" }, Counting(out Box<int> selectedCalls));
+
+            Assert.AreEqual(1, selectedCalls.Value);
+            CollectionAssert.AreEqual(
+                new[] { "CatKnight", "Barbarian" }, selected.unlockedRecruitmentCharacterIds);
+
+            SaveData all = MakeCharacterFixture();
+            all.unlockedRecruitmentCharacterIds = new List<string> { "CatKnight", "ElfArcher", "Barbarian" };
+            ApplyCharacterReset(
+                all, SaveResetTargets.All, new[] { "ElfArcher" }, Counting(out Box<int> allCalls),
+                questDefinitions: MakeStoryDefinitions());
+
+            Assert.AreEqual(1, allCalls.Value);
+            Assert.AreEqual(0, all.unlockedRecruitmentCharacterIds.Count);
+        }
+
+        [Test]
+        public void Character_설정이_없거나_유효하지_않으면_혼합_대상도_변경하거나_저장하지_않는다()
+        {
+            IReadOnlyList<InitialCharacterResetSeed>[] invalidSeeds =
+            {
+                null,
+                new InitialCharacterResetSeed[0],
+                new[] { new InitialCharacterResetSeed(string.Empty, 0d) },
+                new[] { new InitialCharacterResetSeed("CatKnight", -1d) },
+                new[]
+                {
+                    new InitialCharacterResetSeed("CatKnight", 0d),
+                    new InitialCharacterResetSeed("CatKnight", 0d),
+                },
+            };
+
+            foreach (IReadOnlyList<InitialCharacterResetSeed> seeds in invalidSeeds)
+            {
+                SaveData data = MakeCharacterFixture();
+                List<CharacterSaveState> originalCharacters = data.characters;
+                List<InventoryItemState> originalItems = data.items;
+                SaveResetResult result = SaveResetService.Apply(
+                    data, SaveResetTargets.Character | SaveResetTargets.Item, new[] { "ElfArcher" },
+                    seeds, PartySlotCount, null, Counting(out Box<int> calls));
+
+                Assert.AreEqual(SaveResetOutcome.InvalidCharacterResetConfiguration, result.Outcome);
+                Assert.AreEqual(SaveResetTargets.None, result.AppliedTargets);
+                Assert.AreEqual(0, calls.Value);
+                Assert.AreSame(originalCharacters, data.characters);
+                Assert.AreSame(originalItems, data.items);
+            }
+
+            SaveData invalidSlots = MakeCharacterFixture();
+            List<CharacterSaveState> original = invalidSlots.characters;
+            SaveResetResult slotResult = SaveResetService.Apply(
+                invalidSlots, SaveResetTargets.Character, null, DefaultInitialSeeds(), 0, null,
+                Counting(out Box<int> slotCalls));
+            Assert.AreEqual(SaveResetOutcome.InvalidCharacterResetConfiguration, slotResult.Outcome);
+            Assert.AreEqual(0, slotCalls.Value);
+            Assert.AreSame(original, invalidSlots.characters);
         }
 
         [Test]
@@ -640,7 +889,7 @@ namespace CommonEditor.SaveTests
             SaveData data = MakeStoryFixture();
 
             SaveResetResult result = SaveResetService.Apply(
-                data, SaveResetTargets.Quest, null, null, MakeStoryDefinitions(),
+                data, SaveResetTargets.Quest, null, null, 0, MakeStoryDefinitions(),
                 Counting(out Box<int> calls));
 
             Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
