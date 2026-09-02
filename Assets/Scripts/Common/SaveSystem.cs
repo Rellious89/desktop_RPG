@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Common
@@ -35,6 +36,13 @@ namespace Common
         /// 문서를 미리 끼워 넣은 시험이 파일 근처에도 가지 않는다.</summary>
         private static ISaveStorage storage;
 
+        // EditMode 시험은 실제 persistentDataPath에 닿지 않도록 이 스택의 맨 위 저장소를
+        // 기본값으로 쓴다. 일반 실행에서는 비어 있으므로 제품의 기본 경로 계약은 바뀌지 않는다.
+        // 기존 시험의 ConfigureForTests(null, null, null)도 이 경계를 지우지 않고, 그저 자신이
+        // 직접 끼운 저장소만 비우게 하려는 별도 층이다.
+        private static readonly Stack<TestStorageOverride> testStorageOverrides =
+            new Stack<TestStorageOverride>();
+
         private static Func<DateTime> utcNowProvider;
 
         /// <summary>변환 표. 실제로는 <see cref="SaveMigrationRunner.Default"/> 하나뿐이지만, 시험이
@@ -50,7 +58,15 @@ namespace Common
         /// "기본값으로 진행(CorruptFallback)"이지만, 원본을 치우지 못했으므로 저장은 막아야 한다.</summary>
         private static bool saveBlocked;
 
-        private static ISaveStorage Storage => storage ??= new LocalFileSaveStorage();
+        private static ISaveStorage Storage
+        {
+            get
+            {
+                if (storage != null) return storage;
+                if (testStorageOverrides.Count > 0) return testStorageOverrides.Peek().Storage;
+                return storage = new LocalFileSaveStorage();
+            }
+        }
 
         private static SaveMigrationRunner Runner => migrationRunner ??= SaveMigrationRunner.Default;
 
@@ -266,6 +282,70 @@ namespace Common
             loadedFromFile = false;
             loadResult = default;
             saveBlocked = false;
+        }
+
+        /// <summary>
+        /// EditMode 시험 묶음이 실제 저장소를 향하지 않게 하는 <b>범위형</b> 이음매.
+        /// 반환값을 반드시 Dispose해야 하며, 중첩 범위는 LIFO로 복귀한다. 바깥 범위를 먼저
+        /// Dispose하는 잘못된 사용은 즉시 예외로 막아 조용한 저장 경로 누출이 남지 않게 한다.
+        /// 이 메서드는 제품 코드에서 쓰지 않으며 Editor 시험이 리플렉션으로만 호출한다.
+        /// </summary>
+        private static IDisposable PushStorageOverrideForTests(ISaveStorage testStorage)
+        {
+            if (testStorage == null) throw new ArgumentNullException(nameof(testStorage));
+
+            var entry = new TestStorageOverride(testStorage);
+            testStorageOverrides.Push(entry);
+            ResetConfiguredStateForTests();
+            return new TestStorageOverrideScope(entry);
+        }
+
+        private static void ResetConfiguredStateForTests()
+        {
+            storage = null;
+            utcNowProvider = null;
+            migrationRunner = null;
+            data = null;
+            loadedFromFile = false;
+            loadResult = default;
+            saveBlocked = false;
+        }
+
+        private sealed class TestStorageOverride
+        {
+            public TestStorageOverride(ISaveStorage testStorage)
+            {
+                Storage = testStorage;
+            }
+
+            public ISaveStorage Storage { get; }
+        }
+
+        private sealed class TestStorageOverrideScope : IDisposable
+        {
+            private readonly TestStorageOverride entry;
+            private bool disposed;
+
+            public TestStorageOverrideScope(TestStorageOverride entry)
+            {
+                this.entry = entry;
+            }
+
+            public void Dispose()
+            {
+                if (disposed) return;
+
+                if (testStorageOverrides.Count == 0 ||
+                    !ReferenceEquals(testStorageOverrides.Peek(), entry))
+                {
+                    throw new InvalidOperationException(
+                        "SaveSystem 테스트 저장소 override는 만든 역순으로만 해제할 수 있습니다.");
+                }
+
+                testStorageOverrides.Pop();
+                disposed = true;
+                ResetConfiguredStateForTests();
+            }
         }
     }
 }

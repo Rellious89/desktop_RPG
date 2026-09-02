@@ -419,10 +419,10 @@ namespace CommonEditor.Tests
         }
 
         [Test]
-        public void v3_저장_형식_번호가_실제_파일에도_기록된다()
+        public void v8_저장_형식_번호가_실제_파일에도_기록된다()
         {
-            Assert.AreEqual(3, SaveData.CurrentSaveVersion,
-                "v2의 보유 목록에서 역사적 초기 파티를 만들려면 v3 마이그레이션이 필요합니다.");
+            Assert.AreEqual(8, SaveData.CurrentSaveVersion,
+                "현재 SaveData 형식은 v8이어야 합니다. 이 시험은 버전/마이그레이션을 바꾸지 않습니다.");
 
             LocalFileSaveStorage real = UseTemporaryDirectoryStorage();
             SaveSystem.Data.characters.Add(new CharacterSaveState
@@ -432,8 +432,8 @@ namespace CommonEditor.Tests
 
             Assert.IsTrue(SaveSystem.Save());
 
-            Assert.AreEqual(3, SaveVersionProbe.Probe(File.ReadAllText(real.PrimaryPath)).Version,
-                "실제로 쓴 파일에도 3이 적혀 있어야 합니다.");
+            Assert.AreEqual(8, SaveVersionProbe.Probe(File.ReadAllText(real.PrimaryPath)).Version,
+                "실제로 쓴 파일에도 현재 v8이 적혀 있어야 합니다.");
         }
 
         // ---- 기존 호출부와의 계약 ----

@@ -603,12 +603,15 @@ namespace CharacterEditor.Tests
         public void NewGameGrantHappensOnlyForTheNewGameLoadStatus()
         {
             SaveData document = Inject();
+            MemoryStorage storage = UseMemoryStorage();
             Assert.AreEqual(SaveLoadStatus.NewGame, SaveSystem.LoadStatus, "전제 확인");
 
             CharacterRoster roster = Roster(Catalog(SixIds));
             GrantInitialCharacters(roster);
 
             Assert.AreEqual(6, document.characters.Count, "새 게임에서는 표의 시작 캐릭터를 지급한다.");
+            Assert.AreEqual(0, storage.WriteCalls,
+                "초기 지급은 저장을 직접 부르지 않는다 - 시험 저장 경계 밖의 파일에 닿을 이유도 없다.");
         }
 
         [Test]
