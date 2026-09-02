@@ -40,6 +40,25 @@ namespace CharacterArchiveEditorTests
         }
 
         [Test]
+        public void SkillPrefab_ExposesItsDesignedRowHeightToParentLayouts()
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(SkillPath);
+            try
+            {
+                LayoutElement layout = root.GetComponent<LayoutElement>();
+                Assert.NotNull(layout);
+                Assert.Greater(layout.minHeight, 0f);
+                Assert.Greater(layout.preferredHeight, 0f);
+                Assert.AreEqual(root.GetComponent<RectTransform>().rect.height, layout.preferredHeight);
+
+                HorizontalLayoutGroup horizontal = root.GetComponent<HorizontalLayoutGroup>();
+                Assert.NotNull(horizontal);
+                Assert.IsFalse(horizontal.enabled, "행 내부의 기존 절대 배치는 외부 세로 목록이 소유하지 않습니다.");
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        [Test]
         public void CharacterArchive_CharacterInfoOwnsReferencesTemplateAndExpandingVerticalContent()
         {
             GameObject root = PrefabUtility.LoadPrefabContents(PanelPath);
@@ -63,6 +82,13 @@ namespace CharacterArchiveEditorTests
                 ContentSizeFitter fitter = content.GetComponent<ContentSizeFitter>();
                 Assert.NotNull(fitter);
                 Assert.AreEqual(ContentSizeFitter.FitMode.PreferredSize, fitter.verticalFit);
+                RectTransform contentRect = content.GetComponent<RectTransform>();
+                Assert.AreEqual(Vector2.up, contentRect.anchorMin);
+                Assert.AreEqual(Vector2.up, contentRect.anchorMax);
+                Assert.AreEqual(new Vector2(.5f, 1f), contentRect.pivot);
+                VerticalLayoutGroup rows = content.GetComponent<VerticalLayoutGroup>();
+                Assert.IsTrue(rows.childControlHeight,
+                    "행 컨테이너는 list_Skill의 LayoutElement preferred height를 소비해야 합니다.");
                 ScrollRect scroll = Find(characterInfo, "SkillInfo").GetComponent<ScrollRect>();
                 Assert.IsTrue(scroll.vertical);
                 Assert.IsFalse(scroll.horizontal);
