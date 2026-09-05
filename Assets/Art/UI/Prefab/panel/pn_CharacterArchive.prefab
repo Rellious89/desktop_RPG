@@ -7513,6 +7513,7 @@ MonoBehaviour:
   originWorldText: {fileID: 1917751236955620703}
   skillTitleText: {fileID: 7347640154653497896}
   skillTitleLocalizer: {fileID: 5295142808750306953}
+  skillInfoRoot: {fileID: 5579969795456606703}
   emptyState: {fileID: 1460024143745732097}
   skillContent: {fileID: 6017895879231543916}
   skillTemplate: {fileID: 964654987442841930}
@@ -8832,6 +8833,7 @@ MonoBehaviour:
     m_LocalVariables: []
   storyQuestUi: {fileID: 3302380484753878159}
   characterInfoUi: {fileID: 2377562359492336923}
+  characterUnlockInfoUi: {fileID: 7856123491234567890}
   references:
     version: 2
     RefIds: []
@@ -9222,6 +9224,7 @@ GameObject:
   - component: {fileID: 4170838826615767305}
   - component: {fileID: 1333546631720963145}
   - component: {fileID: 3183318941180754035}
+  - component: {fileID: 7856123491234567890}
   m_Layer: 5
   m_Name: UnlockInfo
   m_TagString: Untagged
@@ -9317,6 +9320,24 @@ MonoBehaviour:
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &7856123491234567890
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7252810618134454564}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2b264dc85d0a42e9a36ab8b068ad57e7, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  acquisitionCatalog: {fileID: 11400000, guid: 96e8731f155dd4acb82f20a84660c9f0, type: 2}
+  conditionCatalog: {fileID: 11400000, guid: b9bcf5f260294895aa0debd20f430529, type: 2}
+  titleText: {fileID: 1197565615959449018}
+  conditionContent: {fileID: 8035664947602982043}
+  conditionTemplate: {fileID: 3216702760150966532}
+  completeRoot: {fileID: 1725949909851550714}
 --- !u!1 &7376700910156456666
 GameObject:
   m_ObjectHideFlags: 0

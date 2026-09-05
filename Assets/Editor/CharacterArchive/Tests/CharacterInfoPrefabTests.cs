@@ -72,6 +72,18 @@ namespace CharacterArchiveEditorTests
                 Assert.IsTrue(controller.HasRequiredReferences);
                 CharacterArchivePanel panel = root.GetComponent<CharacterArchivePanel>();
                 Assert.AreSame(controller, new SerializedObject(panel).FindProperty("characterInfoUi").objectReferenceValue);
+                Transform unlockInfo = Find(root.transform, "pn_right/CharacterInfo/UnlockInfo");
+                CharacterUnlockInfoController unlockController = unlockInfo.GetComponent<CharacterUnlockInfoController>();
+                Assert.NotNull(unlockController);
+                Assert.IsTrue(unlockController.HasRequiredReferences);
+                Assert.AreSame(unlockController, new SerializedObject(panel).FindProperty("characterUnlockInfoUi").objectReferenceValue);
+                SerializedObject unlockSerialized = new SerializedObject(unlockController);
+                TMP_Text unlockTemplate = (TMP_Text)unlockSerialized.FindProperty("conditionTemplate").objectReferenceValue;
+                Assert.IsFalse(unlockTemplate.gameObject.activeSelf, "lb_contents는 조건 행 템플릿으로만 남아야 합니다.");
+                Assert.AreSame(Find(unlockInfo, "Viewport/Content/list_UnlockInfo").GetComponent<RectTransform>(),
+                    unlockSerialized.FindProperty("conditionContent").objectReferenceValue);
+                Assert.AreSame(Find(unlockInfo, "Viewport/Content/list_UnlockInfo/lb_complete").gameObject,
+                    unlockSerialized.FindProperty("completeRoot").objectReferenceValue);
 
                 SerializedObject serialized = new SerializedObject(controller);
                 SkillListItemView template = (SkillListItemView)serialized.FindProperty("skillTemplate").objectReferenceValue;

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Building;
 using Character;
+using CharacterArchive;
 using Common;
 using Field;
 using Recovery;
@@ -302,6 +303,7 @@ namespace Recruitment
         {
             CharacterRoster.Instance?.RefreshOwnedCharactersAfterExternalSave();
             CharacterSwapPanel.RequestRefresh();
+            CharacterArchivePanel.RequestRefresh();
             RecoveryService.NotifyRosterChangedAfterExternalSave();
         }
         private static void ShowToast(LocalizedTextReference message, CharacterDefinition character)

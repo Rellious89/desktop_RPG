@@ -41,6 +41,7 @@ namespace CharacterArchive
         [Header("Skill Info (Inspector에서만 연결)")]
         [SerializeField] private TMP_Text skillTitleText;
         [SerializeField] private LocalizedTMPText skillTitleLocalizer;
+        [SerializeField] private GameObject skillInfoRoot;
         [SerializeField] private GameObject emptyState;
         [SerializeField] private RectTransform skillContent;
         [SerializeField] private SkillListItemView skillTemplate;
@@ -57,6 +58,7 @@ namespace CharacterArchive
         private int previewIndex;
         private int unlockedCount;
         private int totalCount;
+        private bool owned = true;
 
         public CharacterDefinition Character => character;
         public int ActiveItemCount { get; private set; }
@@ -71,11 +73,13 @@ namespace CharacterArchive
             && levelText != null && originWorldText != null && skillTitleText != null
             && skillTitleLocalizer != null && emptyState != null && skillContent != null && skillTemplate != null;
 
-        public void BindCharacter(CharacterDefinition value, SaveData data)
+        public void BindCharacter(CharacterDefinition value, SaveData data, bool isOwned = true)
         {
             bool sameCharacter = ReferenceEquals(character, value);
             character = value;
             document = data;
+            owned = isOwned;
+            SetActive(skillInfoRoot, character != null && owned);
             if (!isActiveAndEnabled) return;
 
             // 저장 레벨/해금 결과는 같은 캐릭터를 다시 전달해도 바뀔 수 있다.

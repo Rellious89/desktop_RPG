@@ -83,6 +83,7 @@ namespace CharacterArchive
         private bool refreshQueued;
         private string displayedCharacterId;
         private string displayedQuestId;
+        private bool selectedOwned = true;
 
         public event Action CloseRequested;
 
@@ -96,26 +97,32 @@ namespace CharacterArchive
                                              rewardRoot != null && rewardCurrencyRoot != null && rewardCurrencyAmountText != null &&
                                              rewardItemRoot != null && rewardItemSlot != null;
 
-        public void OpenFor(CharacterDefinition definition)
+        public void OpenFor(CharacterDefinition definition, bool isOwned = true)
         {
             EnsureInitialized();
             selected = definition;
+            selectedOwned = isOwned;
             completionRequested = false;
-            ShowPage(defaultRightPage);
+            SetActive(swapButton != null ? swapButton.gameObject : null, selected != null && selectedOwned);
+            ShowPage(selectedOwned ? defaultRightPage : RightPage.CharacterInfo);
             Refresh();
         }
 
-        public void BindCharacter(CharacterDefinition definition)
+        public void BindCharacter(CharacterDefinition definition, bool isOwned = true)
         {
             EnsureInitialized();
             selected = definition;
+            selectedOwned = isOwned;
             completionRequested = false;
+            SetActive(swapButton != null ? swapButton.gameObject : null, selected != null && selectedOwned);
+            if (!selectedOwned) ShowPage(RightPage.CharacterInfo);
             Refresh();
         }
 
         public void Close()
         {
             selected = null;
+            selectedOwned = true;
             completionRequested = false;
             SetLinesActive(typeLines, 0); SetLinesActive(descriptionLines, 0);
             ClearRewardView();
@@ -251,12 +258,17 @@ namespace CharacterArchive
 
         private void HandleLocaleChanged(string _) => Refresh();
 
-        private void TogglePage() => ShowPage(questInfoPage != null && questInfoPage.activeSelf ? RightPage.CharacterInfo : RightPage.QuestInfo);
+        private void TogglePage()
+        {
+            if (!selectedOwned) { ShowPage(RightPage.CharacterInfo); return; }
+            ShowPage(questInfoPage != null && questInfoPage.activeSelf ? RightPage.CharacterInfo : RightPage.QuestInfo);
+        }
 
         private void RequestClose() => CloseRequested?.Invoke();
 
         private void ShowPage(RightPage page)
         {
+            if (!selectedOwned) page = RightPage.CharacterInfo;
             SetActive(characterInfoPage, page == RightPage.CharacterInfo);
             SetActive(questInfoPage, page == RightPage.QuestInfo);
             if (page == RightPage.QuestInfo) RefreshObjectiveLayout(false);

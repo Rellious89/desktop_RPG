@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Character;
 using CharacterArchive;
 using Common;
 using Dungeon;
@@ -202,6 +203,33 @@ namespace CharacterArchiveEditorTests
             Assert.IsTrue(characterPage.activeSelf);
             Assert.IsFalse(questPage.activeSelf);
             swapButton.onClick.Invoke();
+            Assert.IsTrue(questPage.activeSelf);
+        }
+
+        [Test]
+        public void UnownedSelection_HidesSwapAndCannotEnterQuestUntilOwnedSelectionRestoresIt()
+        {
+            GameObject host = new GameObject("story-quest-ownership-test"); created.Add(host);
+            var controller = host.AddComponent<CharacterStoryQuestUiController>();
+            GameObject characterPage = new GameObject("character-page"); created.Add(characterPage);
+            GameObject questPage = new GameObject("quest-page"); created.Add(questPage);
+            GameObject swap = new GameObject("swap", typeof(Button)); created.Add(swap);
+            CharacterDefinition character = Create<CharacterDefinition>();
+            Set(controller, "characterInfoPage", characterPage);
+            Set(controller, "questInfoPage", questPage);
+            Set(controller, "swapButton", swap.GetComponent<Button>());
+
+            controller.OpenFor(character, false);
+            Assert.IsTrue(characterPage.activeSelf);
+            Assert.IsFalse(questPage.activeSelf);
+            Assert.IsFalse(swap.activeSelf);
+            swap.GetComponent<Button>().onClick.Invoke();
+            Assert.IsTrue(characterPage.activeSelf);
+            Assert.IsFalse(questPage.activeSelf);
+
+            controller.OpenFor(character, true);
+            Assert.IsTrue(swap.activeSelf);
+            swap.GetComponent<Button>().onClick.Invoke();
             Assert.IsTrue(questPage.activeSelf);
         }
 

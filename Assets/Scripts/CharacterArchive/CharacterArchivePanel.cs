@@ -45,6 +45,7 @@ namespace CharacterArchive
         [SerializeField] private CharacterStoryQuestUiController storyQuestUi;
         [Header("Character Info UI (Inspector에서만 연결)")]
         [SerializeField] private CharacterInfoController characterInfoUi;
+        [SerializeField] private CharacterUnlockInfoController characterUnlockInfoUi;
 
         private readonly List<CharacterArchiveCardView> cards = new List<CharacterArchiveCardView>();
         private readonly List<PartySlotView> partySlots = new List<PartySlotView>();
@@ -52,6 +53,7 @@ namespace CharacterArchive
         private bool ownedOnly;
         private bool rightPanelOpen;
         private bool pendingRefresh;
+        private bool selectedOwned;
         private CharacterDefinition selected;
         private LocalizedTextReference boundCountFormat;
         private static CharacterArchivePanel openInstance;
@@ -95,7 +97,7 @@ namespace CharacterArchive
             {
                 storyQuestUi.CloseRequested -= CloseRight;
                 storyQuestUi.CloseRequested += CloseRight;
-                storyQuestUi.OpenFor(selected);
+                storyQuestUi.OpenFor(selected, selectedOwned);
             }
             CharacterRoster.CurrentCharacterChanged += HandleRosterChanged;
             CharacterRoster.CharacterStateChanged += HandleRosterChanged;
@@ -117,6 +119,7 @@ namespace CharacterArchive
                 storyQuestUi.Close();
             }
             if (characterInfoUi != null) characterInfoUi.BindCharacter(null, null);
+            if (characterUnlockInfoUi != null) characterUnlockInfoUi.BindCharacter(null, null);
             if (openInstance == this) openInstance = null;
         }
 
@@ -139,7 +142,10 @@ namespace CharacterArchive
             for (int i = source.Count; i < cards.Count; i++) cards[i].gameObject.SetActive(false);
 
             bool showRight = selected != null && rightPanelOpen;
-            if (characterInfoUi != null) characterInfoUi.BindCharacter(showRight ? selected : null, data);
+            selectedOwned = selected != null && owned.IsOwned(selected);
+            if (characterInfoUi != null) characterInfoUi.BindCharacter(showRight ? selected : null, data, selectedOwned);
+            if (characterUnlockInfoUi != null) characterUnlockInfoUi.BindCharacter(showRight && !selectedOwned ? selected : null, data);
+            SetActive(characterUnlockInfoUi != null ? characterUnlockInfoUi.gameObject : null, showRight && !selectedOwned);
             SetActive(rightPanel, showRight);
             SetActive(expandRightButton != null ? expandRightButton.gameObject : null, selected != null && !rightPanelOpen);
             if (detailCard != null)
@@ -147,7 +153,7 @@ namespace CharacterArchive
                 SetActive(detailCard.gameObject, selected != null && rightPanelOpen);
                 if (selected != null) detailCard.Bind(selected, data, current, false, null, false);
             }
-            if (storyQuestUi != null && selected != null && rightPanelOpen) storyQuestUi.BindCharacter(selected);
+            if (storyQuestUi != null && selected != null && rightPanelOpen) storyQuestUi.BindCharacter(selected, selectedOwned);
             RefreshBookmarks();
             RefreshCount(owned.OwnedCount, owned.AllCharacters.Count);
             RefreshPartySlots(data, current);
@@ -188,8 +194,8 @@ namespace CharacterArchive
         private void ShowAll() { if (!ownedOnly) return; ownedOnly = false; RefreshContents(); }
         private void ShowOwned() { if (ownedOnly) return; ownedOnly = true; RefreshContents(); }
         private void CloseRight() { rightPanelOpen = false; RefreshContents(); }
-        private void OpenRight() { if (selected == null) return; rightPanelOpen = true; if (storyQuestUi != null) storyQuestUi.OpenFor(selected); RefreshContents(); }
-        private void SelectCard(CharacterArchiveCardView card) { selected = card != null ? card.Definition : null; rightPanelOpen = selected != null; if (storyQuestUi != null) storyQuestUi.OpenFor(selected); RefreshContents(); }
+        private void OpenRight() { if (selected == null) return; rightPanelOpen = true; RefreshContents(); if (storyQuestUi != null) storyQuestUi.OpenFor(selected, selectedOwned); }
+        private void SelectCard(CharacterArchiveCardView card) { selected = card != null ? card.Definition : null; rightPanelOpen = selected != null; RefreshContents(); if (storyQuestUi != null) storyQuestUi.OpenFor(selected, selectedOwned); }
         private void HandleRosterChanged(CharacterDefinition _) => RefreshContents();
         private void HandleRecoverySlotsChanged() => RefreshContents();
 

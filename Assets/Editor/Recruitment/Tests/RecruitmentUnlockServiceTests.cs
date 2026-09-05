@@ -85,6 +85,73 @@ namespace RecruitmentEditor.Tests
         }
 
         [Test]
+        public void ReadOnlyProgress_개별조건수와_AND_OR전체판정을함께보존한다()
+        {
+            SaveData data = Data("CatKnight", 10);
+            CharacterUnlockConditionDefinition and = ConditionAsset("and",
+                Entry("1", "same", "MAX_OWNED_CHARACTER_LEVEL_AT_LEAST", 10),
+                Entry("2", "same", "OWNED_CHARACTER_COUNT_AT_LEAST", 2));
+            CharacterUnlockConditionDefinition or = ConditionAsset("or",
+                Entry("1", "first", "MAX_OWNED_CHARACTER_LEVEL_AT_LEAST", 10),
+                Entry("2", "second", "OWNED_CHARACTER_COUNT_AT_LEAST", 20));
+
+            RecruitmentUnlockService.UnlockProgressSnapshot andProgress = RecruitmentUnlockService.EvaluateProgress(and, data.characters);
+            Assert.AreEqual(2, andProgress.Conditions.Count);
+            Assert.AreEqual(1, andProgress.SatisfiedConditionCount);
+            Assert.IsFalse(andProgress.IsCurrentConditionSatisfied);
+
+            RecruitmentUnlockService.UnlockProgressSnapshot orProgress = RecruitmentUnlockService.EvaluateProgress(or, data.characters);
+            Assert.AreEqual(1, orProgress.SatisfiedConditionCount);
+            Assert.IsTrue(orProgress.IsCurrentConditionSatisfied,
+                "OR 그룹은 개별 조건을 전부 만족하지 않아도 전체 자격이 될 수 있다.");
+        }
+
+        [Test]
+        public void ReadOnlyProgress_영구해금과현재후퇴를분리하고저장하지않는다()
+        {
+            SaveData data = Data("CatKnight", 1);
+            CharacterUnlockConditionDefinition condition = ConditionAsset("unlock",
+                Entry("1", "only", "MAX_OWNED_CHARACTER_LEVEL_AT_LEAST", 10));
+
+            RecruitmentUnlockService.UnlockProgressSnapshot progress = RecruitmentUnlockService.EvaluateProgress(condition, data.characters, permanentlyUnlocked: true);
+
+            Assert.AreEqual(0, progress.SatisfiedConditionCount);
+            Assert.IsFalse(progress.IsCurrentConditionSatisfied);
+            Assert.IsTrue(progress.IsPermanentlyUnlocked);
+            Assert.IsTrue(progress.IsRecruitmentEligible,
+                "현재 수치가 후퇴해도 기존 모집 자격은 사라지지 않는다.");
+        }
+
+        [Test]
+        public void ReadOnlyProgress_조건없는활성행만즉시완료고누락비활성행은안전하게실패한다()
+        {
+            SaveData data = Data("CatKnight", 1);
+            CharacterAcquisitionCatalog catalog = Create<CharacterAcquisitionCatalog>();
+            CharacterAcquisitionDefinition noCondition = AcquisitionAsset("RabbitHealer", string.Empty);
+            CharacterAcquisitionDefinition disabled = AcquisitionAsset("Disabled", string.Empty);
+            var disabledSerialized = new SerializedObject(disabled); disabledSerialized.FindProperty("enabled").boolValue = false; disabledSerialized.ApplyModifiedPropertiesWithoutUndo();
+            CharacterAcquisitionDefinition missingCondition = AcquisitionAsset("Broken", "missing_condition");
+            SetObjects(catalog, "acquisitions", new Object[] { noCondition, disabled, missingCondition }); catalog.MarkDirty();
+            CharacterUnlockConditionCatalog conditions = Create<CharacterUnlockConditionCatalog>();
+
+            RecruitmentUnlockService.UnlockProgressSnapshot immediate = RecruitmentUnlockService.EvaluateProgress(
+                catalog, conditions, data, "RabbitHealer");
+            RecruitmentUnlockService.UnlockProgressSnapshot missing = RecruitmentUnlockService.EvaluateProgress(
+                catalog, conditions, data, "Missing");
+            RecruitmentUnlockService.UnlockProgressSnapshot disabledProgress = RecruitmentUnlockService.EvaluateProgress(
+                catalog, conditions, data, "Disabled");
+            RecruitmentUnlockService.UnlockProgressSnapshot missingConditionProgress = RecruitmentUnlockService.EvaluateProgress(
+                catalog, conditions, data, "Broken");
+
+            Assert.AreEqual(0, immediate.Conditions.Count);
+            Assert.IsTrue(immediate.IsRecruitmentEligible);
+            Assert.IsFalse(missing.IsRecruitmentEligible);
+            Assert.IsFalse(missing.IsDefinitionValid);
+            Assert.IsFalse(disabledProgress.IsRecruitmentEligible);
+            Assert.IsFalse(missingConditionProgress.IsRecruitmentEligible);
+        }
+
+        [Test]
         public void 영구해금은_최초달성시_한번저장하고_조건후퇴후에도_유지한다()
         {
             SaveData data = Data("CatKnight", 10);
