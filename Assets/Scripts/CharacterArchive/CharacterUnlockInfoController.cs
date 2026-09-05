@@ -98,6 +98,7 @@ namespace CharacterArchive
                 SetActive(line.CheckOn, progress.IsSatisfied);
                 SetActive(line.Text.gameObject, true);
             }
+            OrderPooledLines();
             SetLinesActive(snapshot.Conditions.Count);
             SetActive(completeRoot, snapshot.IsRecruitmentEligible);
             LayoutRebuilder.MarkLayoutForRebuild(conditionContent);
@@ -120,12 +121,24 @@ namespace CharacterArchive
                     DefaultColor = clone.color
                 });
             }
-            Line line = linePool[index];
-            // Instantiate는 부모의 마지막에 붙지만 완료 안내는 템플릿의 바로 다음 형제다.
-            // 풀에서 꺼낸 행도 매번 완료 안내 앞에 재배치해 조건 수와 재사용 순서에 무관하게
-            // title → 조건들 → 완료 안내를 보장한다.
-            if (completeRoot != null) line.Text.transform.SetSiblingIndex(completeRoot.transform.GetSiblingIndex());
-            return line;
+            return linePool[index];
+        }
+
+        /// <summary>
+        /// 풀을 확보한 뒤 한 번만 정렬한다. 각 행을 완료 문구의 현재 위치로 옮기면 앞에서 옮긴
+        /// 행의 인덱스가 바뀌어 재바인드마다 순서가 뒤집힐 수 있으므로, 템플릿 뒤의 고정 슬롯을
+        /// linePool 순서대로 채운 다음 완료 문구를 마지막에 둔다.
+        /// </summary>
+        private void OrderPooledLines()
+        {
+            if (conditionTemplate == null || completeRoot == null) return;
+            int siblingIndex = conditionTemplate.transform.GetSiblingIndex() + 1;
+            for (int i = 0; i < linePool.Count; i++)
+            {
+                Line line = linePool[i];
+                if (line.Text != null) line.Text.transform.SetSiblingIndex(siblingIndex++);
+            }
+            completeRoot.transform.SetSiblingIndex(siblingIndex);
         }
 
         private void SetLinesActive(int count)

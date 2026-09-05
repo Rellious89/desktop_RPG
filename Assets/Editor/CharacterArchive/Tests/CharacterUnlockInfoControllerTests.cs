@@ -65,6 +65,7 @@ namespace CharacterArchiveEditorTests
 
             data.characters[0].level = 10;
             controller.BindCharacter(character, data);
+            AssertRowOrder(content, template, complete, "10/10", "1/1");
             Assert.IsTrue(complete.activeSelf);
             Assert.AreEqual(2, controller.PooledLineCount, "재바인드가 조건 행을 중복 생성하면 안 된다.");
             data.characters[0].level = 1;
@@ -75,6 +76,73 @@ namespace CharacterArchiveEditorTests
             Assert.IsFalse(first.transform.Find("sp_check/sp_checkOn").gameObject.activeSelf,
                 "풀 재사용 뒤 미충족 행의 체크 표시는 반드시 꺼진다.");
             Assert.IsTrue(complete.activeSelf, "영구 모집 자격은 현재 수치 후퇴와 분리된다.");
+            AssertRowOrder(content, template, complete, "1/10", "1/1");
+        }
+
+        [Test]
+        public void RebindAndRefresh_KeepPooledConditionOrderAcrossCharacterAndConditionCountChanges()
+        {
+            CharacterUnlockConditionDefinition twoConditions = CreateCondition("two",
+                ("level", "same", "MAX_OWNED_CHARACTER_LEVEL_AT_LEAST", 4),
+                ("count", "same", "OWNED_CHARACTER_COUNT_AT_LEAST", 2));
+            CharacterUnlockConditionDefinition oneCondition = CreateCondition("one",
+                ("count", "same", "OWNED_CHARACTER_COUNT_AT_LEAST", 3));
+            CharacterAcquisitionCatalog acquisitions = Create<CharacterAcquisitionCatalog>();
+            CharacterAcquisitionDefinition firstAcquisition = CreateAcquisition("First", "two");
+            CharacterAcquisitionDefinition secondAcquisition = CreateAcquisition("Second", "one");
+            Set(acquisitions, "acquisitions", new List<CharacterAcquisitionDefinition> { firstAcquisition, secondAcquisition }); acquisitions.MarkDirty();
+            CharacterUnlockConditionCatalog conditions = Create<CharacterUnlockConditionCatalog>();
+            Set(conditions, "conditions", new List<CharacterUnlockConditionDefinition> { twoConditions, oneCondition }); conditions.MarkDirty();
+
+            CharacterUnlockInfoController controller = CreateController(acquisitions, conditions, out RectTransform content,
+                out TMP_Text template, out GameObject complete);
+            CharacterDefinition first = Create<CharacterDefinition>(); Set(first, "characterId", "First");
+            CharacterDefinition second = Create<CharacterDefinition>(); Set(second, "characterId", "Second");
+            SaveData data = new SaveData { characters = new List<CharacterSaveState> { new CharacterSaveState { characterId = "Owned", level = 4 } } };
+
+            controller.BindCharacter(first, data);
+            AssertRowOrder(content, template, complete, "4/4", "1/2");
+            controller.Refresh();
+            AssertRowOrder(content, template, complete, "4/4", "1/2");
+            controller.BindCharacter(second, data);
+            Assert.AreEqual(1, controller.ActiveLineCount);
+            AssertRowOrder(content, template, complete, "1/3");
+            data.characters.Add(new CharacterSaveState { characterId = "OwnedTwo", level = 1 });
+            controller.BindCharacter(first, data);
+            AssertRowOrder(content, template, complete, "4/4", "2/2");
+            controller.Refresh();
+            AssertRowOrder(content, template, complete, "4/4", "2/2");
+        }
+
+        [Test]
+        public void CharacterArchivePrefab_RuntimeConditionRowsStayBeforeCompleteAfterRepeatedBind()
+        {
+            CharacterUnlockConditionDefinition condition = CreateCondition("prefab-two",
+                ("level", "same", "MAX_OWNED_CHARACTER_LEVEL_AT_LEAST", 4),
+                ("count", "same", "OWNED_CHARACTER_COUNT_AT_LEAST", 2));
+            CharacterAcquisitionCatalog acquisitions = Create<CharacterAcquisitionCatalog>();
+            Set(acquisitions, "acquisitions", new List<CharacterAcquisitionDefinition> { CreateAcquisition("PrefabCharacter", "prefab-two") }); acquisitions.MarkDirty();
+            CharacterUnlockConditionCatalog conditions = Create<CharacterUnlockConditionCatalog>();
+            Set(conditions, "conditions", new List<CharacterUnlockConditionDefinition> { condition }); conditions.MarkDirty();
+            GameObject root = PrefabUtility.LoadPrefabContents("Assets/Art/UI/Prefab/panel/pn_CharacterArchive.prefab");
+            try
+            {
+                CharacterUnlockInfoController controller = root.GetComponentInChildren<CharacterUnlockInfoController>(true);
+                Assert.NotNull(controller);
+                Set(controller, "acquisitionCatalog", acquisitions); Set(controller, "conditionCatalog", conditions);
+                RectTransform content = (RectTransform)Get(controller, "conditionContent");
+                TMP_Text template = (TMP_Text)Get(controller, "conditionTemplate");
+                GameObject complete = (GameObject)Get(controller, "completeRoot");
+                CharacterDefinition character = Create<CharacterDefinition>(); Set(character, "characterId", "PrefabCharacter");
+                SaveData data = new SaveData { characters = new List<CharacterSaveState> { new CharacterSaveState { characterId = "Owned", level = 4 } } };
+
+                controller.BindCharacter(character, data);
+                controller.Refresh();
+                AssertPrefabRowOrder(content, template, complete, 2);
+                controller.Refresh();
+                AssertPrefabRowOrder(content, template, complete, 2);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
         }
 
         private CharacterUnlockConditionDefinition CreateCondition(string id, params (string Id, string Group, string Type, int Value)[] entries)
@@ -99,8 +167,52 @@ namespace CharacterArchiveEditorTests
             GameObject value = Track(new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI)));
             value.transform.SetParent(parent, false); return value.GetComponent<TMP_Text>();
         }
+        private CharacterAcquisitionDefinition CreateAcquisition(string characterId, string conditionId)
+        {
+            CharacterAcquisitionDefinition value = Create<CharacterAcquisitionDefinition>();
+            Set(value, "characterId", characterId); Set(value, "conditionId", conditionId); Set(value, "enabled", true);
+            return value;
+        }
+        private CharacterUnlockInfoController CreateController(CharacterAcquisitionCatalog acquisitions,
+            CharacterUnlockConditionCatalog conditions, out RectTransform content, out TMP_Text template, out GameObject complete)
+        {
+            GameObject host = Track(new GameObject("unlock-info", typeof(RectTransform)));
+            CharacterUnlockInfoController controller = host.AddComponent<CharacterUnlockInfoController>();
+            TMP_Text title = NewText(host.transform, "title");
+            content = Track(new GameObject("content", typeof(RectTransform))).GetComponent<RectTransform>(); content.SetParent(host.transform, false);
+            template = NewText(content, "template"); template.gameObject.SetActive(false);
+            GameObject check = Track(new GameObject("sp_check", typeof(RectTransform))); check.transform.SetParent(template.transform, false);
+            GameObject checkOn = Track(new GameObject("sp_checkOn", typeof(RectTransform))); checkOn.transform.SetParent(check.transform, false); checkOn.SetActive(false);
+            complete = Track(new GameObject("complete")); complete.transform.SetParent(content, false);
+            Set(controller, "acquisitionCatalog", acquisitions); Set(controller, "conditionCatalog", conditions);
+            Set(controller, "titleText", title); Set(controller, "conditionContent", content); Set(controller, "conditionTemplate", template); Set(controller, "completeRoot", complete);
+            return controller;
+        }
+        private static void AssertRowOrder(RectTransform content, TMP_Text template, GameObject complete, params string[] expectedTexts)
+        {
+            Assert.AreSame(template.transform, content.GetChild(0));
+            for (int i = 0; i < expectedTexts.Length; i++)
+            {
+                TMP_Text line = content.GetChild(i + 1).GetComponent<TMP_Text>();
+                Assert.AreEqual(expectedTexts[i], line.text);
+                Assert.AreEqual(i + 1, line.transform.GetSiblingIndex());
+            }
+            Assert.AreSame(complete.transform, content.GetChild(content.childCount - 1));
+            Assert.AreEqual(content.childCount - 1, complete.transform.GetSiblingIndex());
+        }
+        private static void AssertPrefabRowOrder(RectTransform content, TMP_Text template, GameObject complete, int lineCount)
+        {
+            Assert.AreSame(template.transform, content.GetChild(0));
+            for (int i = 0; i < lineCount; i++)
+            {
+                Assert.AreNotSame(template.transform, content.GetChild(i + 1));
+                Assert.AreEqual(i + 1, content.GetChild(i + 1).GetSiblingIndex());
+            }
+            Assert.AreSame(complete.transform, content.GetChild(lineCount + 1));
+        }
         private GameObject Track(GameObject value) { created.Add(value); return value; }
         private T Create<T>() where T : ScriptableObject { T value = ScriptableObject.CreateInstance<T>(); created.Add(value); return value; }
         private static void Set(object target, string field, object value) => target.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic).SetValue(target, value);
+        private static object Get(object target, string field) => target.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(target);
     }
 }
