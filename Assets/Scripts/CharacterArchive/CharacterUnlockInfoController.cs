@@ -33,6 +33,7 @@ namespace CharacterArchive
         private sealed class Line
         {
             public TMP_Text Text;
+            public GameObject CheckOn;
             public FontStyles DefaultStyle;
             public Color DefaultColor;
         }
@@ -90,8 +91,11 @@ namespace CharacterArchive
                 Line line = GetOrCreateLine(i);
                 if (line == null) continue;
                 line.Text.text = ConditionText(progress);
-                line.Text.fontStyle = progress.IsSatisfied ? line.DefaultStyle | FontStyles.Strikethrough : line.DefaultStyle;
+                // 완료 상태는 취소선 대신 행 안에 저작된 체크 표시로 보여 준다. 템플릿에 체크가
+                // 없는 이전 프리팹도 텍스트 표시는 계속 할 수 있도록 CheckOn은 선택 참조다.
+                line.Text.fontStyle = line.DefaultStyle;
                 line.Text.color = progress.IsSatisfied ? CompletedColor : line.DefaultColor;
+                SetActive(line.CheckOn, progress.IsSatisfied);
                 SetActive(line.Text.gameObject, true);
             }
             SetLinesActive(snapshot.Conditions.Count);
@@ -107,9 +111,21 @@ namespace CharacterArchive
                 TMP_Text clone = Instantiate(conditionTemplate, conditionContent);
                 clone.name = conditionTemplate.name + "_Runtime";
                 clone.gameObject.SetActive(false);
-                linePool.Add(new Line { Text = clone, DefaultStyle = clone.fontStyle, DefaultColor = clone.color });
+                Transform check = clone.transform.Find("sp_check/sp_checkOn");
+                linePool.Add(new Line
+                {
+                    Text = clone,
+                    CheckOn = check != null ? check.gameObject : null,
+                    DefaultStyle = clone.fontStyle,
+                    DefaultColor = clone.color
+                });
             }
-            return linePool[index];
+            Line line = linePool[index];
+            // Instantiate는 부모의 마지막에 붙지만 완료 안내는 템플릿의 바로 다음 형제다.
+            // 풀에서 꺼낸 행도 매번 완료 안내 앞에 재배치해 조건 수와 재사용 순서에 무관하게
+            // title → 조건들 → 완료 안내를 보장한다.
+            if (completeRoot != null) line.Text.transform.SetSiblingIndex(completeRoot.transform.GetSiblingIndex());
+            return line;
         }
 
         private void SetLinesActive(int count)
@@ -123,6 +139,7 @@ namespace CharacterArchive
                 {
                     line.Text.fontStyle = line.DefaultStyle;
                     line.Text.color = line.DefaultColor;
+                    SetActive(line.CheckOn, false);
                 }
                 SetActive(line.Text.gameObject, i < ActiveLineCount);
             }

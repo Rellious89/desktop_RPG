@@ -40,7 +40,9 @@ namespace CharacterArchiveEditorTests
             TMP_Text title = NewText(host.transform, "title");
             RectTransform content = new GameObject("content", typeof(RectTransform)).GetComponent<RectTransform>(); Track(content.gameObject); content.SetParent(host.transform, false);
             TMP_Text template = NewText(content, "template"); template.fontStyle = FontStyles.Bold; template.color = Color.green; template.gameObject.SetActive(false);
-            GameObject complete = Track(new GameObject("complete")); complete.transform.SetParent(host.transform, false);
+            GameObject check = Track(new GameObject("sp_check", typeof(RectTransform))); check.transform.SetParent(template.transform, false);
+            GameObject checkOn = Track(new GameObject("sp_checkOn", typeof(RectTransform))); checkOn.transform.SetParent(check.transform, false); checkOn.SetActive(false);
+            GameObject complete = Track(new GameObject("complete")); complete.transform.SetParent(content, false);
             Set(controller, "acquisitionCatalog", acquisitions); Set(controller, "conditionCatalog", conditions);
             Set(controller, "titleText", title); Set(controller, "conditionContent", content); Set(controller, "conditionTemplate", template); Set(controller, "completeRoot", complete);
 
@@ -54,7 +56,12 @@ namespace CharacterArchiveEditorTests
             TMP_Text second = content.GetChild(2).GetComponent<TMP_Text>();
             Assert.AreEqual(FontStyles.Bold, first.fontStyle);
             Assert.AreEqual(Color.green, first.color);
-            Assert.AreEqual(FontStyles.Bold | FontStyles.Strikethrough, second.fontStyle);
+            Assert.AreEqual(FontStyles.Bold, second.fontStyle, "완료 행도 취소선 없이 템플릿 스타일을 유지한다.");
+            Assert.IsFalse(first.transform.Find("sp_check/sp_checkOn").gameObject.activeSelf);
+            Assert.IsTrue(second.transform.Find("sp_check/sp_checkOn").gameObject.activeSelf);
+            Assert.AreSame(first.transform, content.GetChild(1));
+            Assert.AreSame(second.transform, content.GetChild(2));
+            Assert.AreSame(complete.transform, content.GetChild(3), "완료 안내는 모든 조건 행 뒤에 남아야 한다.");
 
             data.characters[0].level = 10;
             controller.BindCharacter(character, data);
@@ -65,6 +72,8 @@ namespace CharacterArchiveEditorTests
             controller.BindCharacter(character, data);
             Assert.AreEqual(FontStyles.Bold, first.fontStyle, "미충족으로 돌아온 행은 템플릿 스타일을 복원한다.");
             Assert.AreEqual(Color.green, first.color);
+            Assert.IsFalse(first.transform.Find("sp_check/sp_checkOn").gameObject.activeSelf,
+                "풀 재사용 뒤 미충족 행의 체크 표시는 반드시 꺼진다.");
             Assert.IsTrue(complete.activeSelf, "영구 모집 자격은 현재 수치 후퇴와 분리된다.");
         }
 

@@ -84,6 +84,12 @@ namespace CharacterArchiveEditorTests
                     unlockSerialized.FindProperty("conditionContent").objectReferenceValue);
                 Assert.AreSame(Find(unlockInfo, "Viewport/Content/list_UnlockInfo/lb_complete").gameObject,
                     unlockSerialized.FindProperty("completeRoot").objectReferenceValue);
+                Transform unlockRows = Find(unlockInfo, "Viewport/Content/list_UnlockInfo");
+                Assert.AreSame(unlockTemplate.transform, unlockRows.GetChild(0));
+                Assert.AreSame(Find(unlockRows, "lb_complete"), unlockRows.GetChild(1),
+                    "프리팹은 템플릿 뒤에 완료 안내를 두고 런타임 행이 그 앞에 삽입된다.");
+                Transform checkOn = Find(unlockTemplate.transform, "sp_check/sp_checkOn");
+                Assert.IsFalse(checkOn.gameObject.activeSelf, "체크 표시는 조건을 충족한 런타임 행에서만 켠다.");
 
                 SerializedObject serialized = new SerializedObject(controller);
                 SkillListItemView template = (SkillListItemView)serialized.FindProperty("skillTemplate").objectReferenceValue;
