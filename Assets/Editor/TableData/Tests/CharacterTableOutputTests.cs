@@ -614,28 +614,59 @@ namespace TableDataEditor.Tests
         }
 
         [Test]
-        public void GeneratedSkillCatalogs_HoldCommittedCatKnightSample()
+        public void GeneratedSkillCatalogs_HoldCommittedContent()
         {
             var skills = AssetDatabase.LoadAssetAtPath<SkillCatalog>(TableDataPaths.SkillCatalogAssetPath);
             Assert.IsNotNull(skills,
                 $"'{TableDataPaths.SkillCatalogAssetPath}'가 없습니다 - Table Data Rebuild를 먼저 실행하세요.");
             skills.MarkDirty();
-            Assert.AreEqual(1, skills.Count);
-            Assert.AreEqual("catknight_skill_01", skills.Skills[0].SkillId);
-            Assert.AreEqual(10f, skills.Skills[0].CooldownSeconds);
-            Assert.IsNull(skills.Skills[0].Icon, "현재 샘플은 icon_key가 비어 있어야 한다.");
+            var expectedSkills = new[]
+            {
+                ("catknight_skill_01", 10f, "CatKnight_Skill_01", 10),
+                ("barbarian_skill_01", 14f, "Barbarian_attack", 20),
+                ("barbarian_skill_02", 27f, "Barbarian_attack", 30),
+                ("elfarcher_skill_01", 18f, "ElfArcher_attack", 40),
+                ("elfarcher_skill_02", 31f, "ElfArcher_Attack_t2_2", 50),
+            };
+            Assert.AreEqual(expectedSkills.Length, skills.Count);
+            for (int i = 0; i < expectedSkills.Length; i++)
+            {
+                SkillDefinition skill = skills.Skills[i];
+                Assert.AreEqual(expectedSkills[i].Item1, skill.SkillId);
+                Assert.AreEqual(expectedSkills[i].Item2, skill.CooldownSeconds);
+                Assert.AreEqual(expectedSkills[i].Item3, skill.AttackMotion.name);
+                Assert.AreEqual(expectedSkills[i].Item4, skill.DisplayOrder);
+                Assert.IsTrue(skill.HasLocalizedName);
+                Assert.IsTrue(skill.HasLocalizedDescription);
+                Assert.IsNull(skill.Icon, "승인된 스킬은 icon_key가 비어 있어야 한다.");
+            }
 
             var relations = AssetDatabase.LoadAssetAtPath<CharacterSkillCatalog>(
                 TableDataPaths.CharacterSkillCatalogAssetPath);
             Assert.IsNotNull(relations,
                 $"'{TableDataPaths.CharacterSkillCatalogAssetPath}'가 없습니다 - Table Data Rebuild를 먼저 실행하세요.");
             relations.MarkDirty();
-            Assert.AreEqual(1, relations.Count);
-            CharacterSkillDefinition relation = relations.Relations[0];
-            Assert.AreEqual("CatKnight", relation.CharacterId);
-            Assert.AreEqual("catknight_skill_01", relation.SkillId);
-            Assert.AreEqual(5, relation.RequiredCharacterLevel);
-            Assert.AreEqual(10, relation.DisplayOrder);
+            var expectedRelations = new[]
+            {
+                ("Barbarian", "barbarian_skill_01", 3, 10),
+                ("CatKnight", "catknight_skill_01", 5, 10),
+                ("ElfArcher", "elfarcher_skill_01", 4, 10),
+                ("Barbarian", "barbarian_skill_02", 6, 20),
+                ("ElfArcher", "elfarcher_skill_02", 6, 20),
+            };
+            Assert.AreEqual(expectedRelations.Length, relations.Count);
+            for (int i = 0; i < expectedRelations.Length; i++)
+            {
+                CharacterSkillDefinition relation = relations.Relations[i];
+                Assert.AreEqual(expectedRelations[i].Item1, relation.CharacterId);
+                Assert.AreEqual(expectedRelations[i].Item2, relation.SkillId);
+                Assert.AreEqual(expectedRelations[i].Item3, relation.RequiredCharacterLevel);
+                Assert.AreEqual(expectedRelations[i].Item4, relation.DisplayOrder);
+                Assert.IsNotNull(relation.Character);
+                Assert.AreEqual(relation.CharacterId, relation.Character.CharacterId);
+                Assert.IsNotNull(relation.Skill);
+                Assert.AreEqual(relation.SkillId, relation.Skill.SkillId);
+            }
         }
 
         /// <summary>

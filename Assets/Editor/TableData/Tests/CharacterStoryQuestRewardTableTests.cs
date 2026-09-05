@@ -20,7 +20,7 @@ namespace TableDataEditorTests
             BindingFlags.NonPublic | BindingFlags.Static);
 
         [Test]
-        public void LiveCsv_GeneratesExpectedRewardsForAllThreeQuests()
+        public void LiveCsv_GeneratesExpectedRewardsForAllCommittedQuests()
         {
             TableDataDiagnosticLog log = CharacterStoryQuestTablePipeline.ValidateOnly();
             Assert.IsFalse(log.HasErrors);
@@ -30,6 +30,52 @@ namespace TableDataEditorTests
             AssertRewards("CatKnight_10003",
                 (CharacterStoryQuestRewardType.Currency, "jewel", 200),
                 (CharacterStoryQuestRewardType.Item, "50001", 3));
+            AssertRewards("Barbarian_10001", (CharacterStoryQuestRewardType.Currency, "jewel", 100));
+            AssertRewards("Barbarian_10002", (CharacterStoryQuestRewardType.Currency, "jewel", 150));
+            AssertRewards("Barbarian_10003", (CharacterStoryQuestRewardType.Currency, "jewel", 200));
+            AssertRewards("ElfArcher_10001", (CharacterStoryQuestRewardType.Currency, "jewel", 100));
+            AssertRewards("ElfArcher_10002", (CharacterStoryQuestRewardType.Currency, "jewel", 150));
+            AssertRewards("ElfArcher_10003", (CharacterStoryQuestRewardType.Currency, "jewel", 200));
+        }
+
+        [Test]
+        public void GeneratedCatalogs_ContainTheApprovedCharacterQuestPilotChains()
+        {
+            var quests = AssetDatabase.LoadAssetAtPath<CharacterStoryQuestCatalog>(
+                CharacterStoryQuestTablePipeline.OutputFolder + "/CharacterStoryQuestCatalog.asset");
+            var objectives = AssetDatabase.LoadAssetAtPath<CharacterStoryQuestObjectiveCatalog>(
+                CharacterStoryQuestTablePipeline.ObjectiveOutputFolder + "/CharacterStoryQuestObjectiveCatalog.asset");
+            Assert.NotNull(quests);
+            Assert.NotNull(objectives);
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "Barbarian_10001", "CatKnight_10001", "ElfArcher_10001",
+                "Barbarian_10002", "CatKnight_10002", "ElfArcher_10002",
+                "Barbarian_10003", "CatKnight_10003", "ElfArcher_10003",
+            }, QuestIds(quests));
+
+            AssertQuest(quests.Find("Barbarian_10001"), "Barbarian", "", 10, false);
+            AssertQuest(quests.Find("Barbarian_10002"), "Barbarian", "Barbarian_10001", 20, false);
+            AssertQuest(quests.Find("Barbarian_10003"), "Barbarian", "Barbarian_10002", 30, true);
+            AssertQuest(quests.Find("ElfArcher_10001"), "ElfArcher", "", 10, false);
+            AssertQuest(quests.Find("ElfArcher_10002"), "ElfArcher", "ElfArcher_10001", 20, false);
+            AssertQuest(quests.Find("ElfArcher_10003"), "ElfArcher", "ElfArcher_10002", 30, true);
+
+            AssertObjectives(objectives, "Barbarian_10001",
+                ("Barbarian_10001_01", CharacterStoryQuestConditionType.CharacterLevelAtLeast, 3, 10));
+            AssertObjectives(objectives, "Barbarian_10002",
+                ("Barbarian_10002_01", CharacterStoryQuestConditionType.MonsterDefeatCount, 12, 10));
+            AssertObjectives(objectives, "Barbarian_10003",
+                ("Barbarian_10003_01", CharacterStoryQuestConditionType.CharacterLevelAtLeast, 6, 10),
+                ("Barbarian_10003_02", CharacterStoryQuestConditionType.StaminaSpent, 20, 20));
+            AssertObjectives(objectives, "ElfArcher_10001",
+                ("ElfArcher_10001_01", CharacterStoryQuestConditionType.DungeonEnterCount, 2, 10));
+            AssertObjectives(objectives, "ElfArcher_10002",
+                ("ElfArcher_10002_01", CharacterStoryQuestConditionType.CharacterLevelAtLeast, 4, 10));
+            AssertObjectives(objectives, "ElfArcher_10003",
+                ("ElfArcher_10003_01", CharacterStoryQuestConditionType.CharacterLevelAtLeast, 6, 10),
+                ("ElfArcher_10003_02", CharacterStoryQuestConditionType.MonsterDefeatCount, 10, 20));
         }
 
         [Test]
@@ -66,6 +112,44 @@ namespace TableDataEditorTests
                 Assert.AreEqual(expected[i].amount, reward.Amount);
                 Assert.AreEqual(expected[i].targetId, reward.RewardType == CharacterStoryQuestRewardType.Currency
                     ? reward.Currency.CurrencyId : reward.Item.ItemId);
+            }
+        }
+
+        private static string[] QuestIds(CharacterStoryQuestCatalog catalog)
+        {
+            var ids = new string[catalog.Quests.Count];
+            for (int i = 0; i < ids.Length; i++) ids[i] = catalog.Quests[i].QuestId;
+            return ids;
+        }
+
+        private static void AssertQuest(CharacterStoryQuestDefinition quest, string characterId,
+            string previousQuestId, int displayOrder, bool isFinal)
+        {
+            Assert.NotNull(quest);
+            Assert.AreEqual(characterId, quest.CharacterId);
+            Assert.AreEqual(previousQuestId, quest.PreviousQuestId);
+            Assert.AreEqual(displayOrder, quest.DisplayOrder);
+            Assert.AreEqual(isFinal, quest.IsFinal);
+            Assert.IsTrue(quest.Enabled);
+            Assert.IsTrue(quest.LocalizedTitle.HasReference);
+            Assert.IsTrue(quest.LocalizedDescription.HasReference);
+        }
+
+        private static void AssertObjectives(CharacterStoryQuestObjectiveCatalog catalog, string questId,
+            params (string id, CharacterStoryQuestConditionType condition, int required, int order)[] expected)
+        {
+            List<CharacterStoryQuestObjectiveDefinition> actual = catalog.ForQuest(questId);
+            Assert.AreEqual(expected.Length, actual.Count);
+            for (int i = 0; i < expected.Length; i++)
+            {
+                CharacterStoryQuestObjectiveDefinition objective = actual[i];
+                Assert.AreEqual(expected[i].id, objective.ObjectiveId);
+                Assert.AreEqual(questId, objective.QuestId);
+                Assert.AreEqual(expected[i].condition, objective.ConditionType);
+                Assert.AreEqual(expected[i].required, objective.RequiredValue);
+                Assert.AreEqual(expected[i].order, objective.DisplayOrder);
+                Assert.IsEmpty(objective.TargetIds);
+                Assert.IsTrue(objective.Enabled);
             }
         }
 

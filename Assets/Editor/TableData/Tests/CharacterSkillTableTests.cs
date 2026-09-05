@@ -270,19 +270,29 @@ namespace TableDataEditor.Tests
         // ---- 실제 프로젝트 데이터(읽기 전용) ----
 
         [Test]
-        public void LiveCsv_HasCommittedCatKnightSampleAndNoDiagnostics()
+        public void LiveCsv_HasCommittedCharacterSkillSetAndExpectedDisplayOrderWarnings()
         {
             TableDataSnapshot snapshot = Live().Snapshot;
             Assert.IsNotNull(snapshot, "여덟 표가 모두 읽혀야 스냅샷이 만들어진다: " + Live().Summary);
 
-            Assert.AreEqual(1, snapshot.CharacterSkills.Count,
-                "13D 입력으로 커밋된 CatKnight 샘플 관계 한 줄을 소비해야 한다.");
-            CharacterSkillRow row = snapshot.CharacterSkills[0];
-            Assert.AreEqual("CatKnight", row.CharacterId);
-            Assert.AreEqual("catknight_skill_01", row.SkillId);
-            Assert.AreEqual(5, row.RequiredCharacterLevel);
-            Assert.AreEqual(10, row.DisplayOrder);
-            Assert.IsTrue(row.Enabled);
+            var expected = new[]
+            {
+                ("CatKnight", "catknight_skill_01", 5, 10),
+                ("Barbarian", "barbarian_skill_01", 3, 10),
+                ("Barbarian", "barbarian_skill_02", 6, 20),
+                ("ElfArcher", "elfarcher_skill_01", 4, 10),
+                ("ElfArcher", "elfarcher_skill_02", 6, 20),
+            };
+            Assert.AreEqual(expected.Length, snapshot.CharacterSkills.Count);
+            for (int i = 0; i < expected.Length; i++)
+            {
+                CharacterSkillRow row = snapshot.CharacterSkills[i];
+                Assert.AreEqual(expected[i].Item1, row.CharacterId);
+                Assert.AreEqual(expected[i].Item2, row.SkillId);
+                Assert.AreEqual(expected[i].Item3, row.RequiredCharacterLevel);
+                Assert.AreEqual(expected[i].Item4, row.DisplayOrder);
+                Assert.IsTrue(row.Enabled);
+            }
 
             var messages = new List<string>();
             foreach (TableDataDiagnostic diagnostic in Live().Diagnostics)
@@ -290,8 +300,13 @@ namespace TableDataEditor.Tests
                 if (string.Equals(diagnostic.File, File, StringComparison.Ordinal)) messages.Add(diagnostic.ToString());
             }
 
-            Assert.AreEqual(0, messages.Count,
-                "커밋된 샘플 관계는 오류도 경고도 남기지 않아야 한다:\n" + string.Join("\n", messages));
+            Assert.AreEqual(3, messages.Count,
+                "승인된 캐릭터별 동일 display_order 중복 경고만 남아야 한다:\n" + string.Join("\n", messages));
+            foreach (string message in messages)
+            {
+                StringAssert.Contains("column 'display_order'", message);
+                StringAssert.Contains("display_order가", message);
+            }
         }
 
         // ---- 도우미 ----

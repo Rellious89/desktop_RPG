@@ -428,20 +428,31 @@ namespace TableDataEditor.Tests
         // ---- 실제 프로젝트 데이터(읽기 전용) ----
 
         [Test]
-        public void LiveCsv_HasCommittedCatKnightSampleWithExpectedIconWarning()
+        public void LiveCsv_HasCommittedSkillSetWithExpectedIconWarnings()
         {
             TableDataSnapshot snapshot = Live().Snapshot;
             Assert.IsNotNull(snapshot, "여덟 표가 모두 읽혀야 스냅샷이 만들어진다: " + Live().Summary);
 
-            Assert.AreEqual(1, snapshot.Skills.Count, "13D 입력으로 커밋된 스킬 한 줄을 소비해야 한다.");
-            SkillRow row = snapshot.Skills[0];
-            Assert.AreEqual("catknight_skill_01", row.Id);
-            Assert.AreEqual("active_attack", row.SkillType);
-            Assert.AreEqual("attack_motion", row.BehaviorKey);
-            Assert.AreEqual(10f, row.CooldownSeconds);
-            Assert.AreEqual("CatKnight_Skill_01", row.MotionKey);
-            Assert.AreEqual(10, row.DisplayOrder);
-            Assert.IsTrue(row.Enabled);
+            var expected = new[]
+            {
+                ("catknight_skill_01", 10f, "CatKnight_Skill_01", 10),
+                ("barbarian_skill_01", 14f, "Barbarian_attack", 20),
+                ("barbarian_skill_02", 27f, "Barbarian_attack", 30),
+                ("elfarcher_skill_01", 18f, "ElfArcher_attack", 40),
+                ("elfarcher_skill_02", 31f, "ElfArcher_Attack_t2_2", 50),
+            };
+            Assert.AreEqual(expected.Length, snapshot.Skills.Count);
+            for (int i = 0; i < expected.Length; i++)
+            {
+                SkillRow row = snapshot.Skills[i];
+                Assert.AreEqual(expected[i].Item1, row.Id);
+                Assert.AreEqual("active_attack", row.SkillType);
+                Assert.AreEqual("attack_motion", row.BehaviorKey);
+                Assert.AreEqual(expected[i].Item2, row.CooldownSeconds);
+                Assert.AreEqual(expected[i].Item3, row.MotionKey);
+                Assert.AreEqual(expected[i].Item4, row.DisplayOrder);
+                Assert.IsTrue(row.Enabled);
+            }
 
             var messages = new List<string>();
             foreach (TableDataDiagnostic diagnostic in Live().Diagnostics)
@@ -449,10 +460,13 @@ namespace TableDataEditor.Tests
                 if (string.Equals(diagnostic.File, File, StringComparison.Ordinal)) messages.Add(diagnostic.ToString());
             }
 
-            Assert.AreEqual(1, messages.Count,
-                "icon_key가 비어 있다는 선택 항목 경고만 남아야 한다:\n" + string.Join("\n", messages));
-            StringAssert.Contains("column 'icon_key'", messages[0]);
-            StringAssert.Contains("icon_key가 비어 있습니다", messages[0]);
+            Assert.AreEqual(expected.Length, messages.Count,
+                "승인된 다섯 스킬의 빈 icon_key 선택 항목 경고만 남아야 한다:\n" + string.Join("\n", messages));
+            foreach (string message in messages)
+            {
+                StringAssert.Contains("column 'icon_key'", message);
+                StringAssert.Contains("icon_key가 비어 있습니다", message);
+            }
         }
 
         // ---- 도우미 ----

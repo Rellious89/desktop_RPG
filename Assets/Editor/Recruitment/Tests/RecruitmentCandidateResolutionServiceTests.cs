@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Character;
 using Common;
 using NUnit.Framework;
+using Quest;
 using Recruitment;
 using UnityEditor;
 using UnityEngine;
@@ -17,6 +19,8 @@ namespace RecruitmentEditor.Tests
         private const string AccessId = "Inn_Normal_Access";
         private const string TypeId = "Inn_Normal";
         private static readonly DateTime CompleteAt = new DateTime(2026, 8, 20, 1, 2, 3, DateTimeKind.Utc);
+        private static readonly PropertyInfo QuestServiceInstanceProperty = typeof(CharacterStoryQuestService)
+            .GetProperty("Instance", BindingFlags.Public | BindingFlags.Static);
 
         private readonly List<Object> created = new List<Object>();
         private SaveData data;
@@ -57,6 +61,7 @@ namespace RecruitmentEditor.Tests
         {
             for (int i = 0; i < created.Count; i++) if (created[i] != null) Object.DestroyImmediate(created[i]);
             created.Clear();
+            SetQuestServiceInstance(null);
         }
 
         [Test]
@@ -203,6 +208,42 @@ namespace RecruitmentEditor.Tests
             Assert.AreEqual(0, saves);
         }
 
+        [TestCase("Barbarian", "Barbarian_10001")]
+        [TestCase("ElfArcher", "ElfArcher_10001")]
+        public void Acquire_ActivatesTheGeneratedCharacterStoryQuestRoot(string characterId, string rootQuestId)
+        {
+            CharacterCatalog generatedCharacters = AssetDatabase.LoadAssetAtPath<CharacterCatalog>(
+                TableDataEditor.TableDataPaths.CharacterCatalogAssetPath);
+            CharacterStoryQuestCatalog generatedQuests = AssetDatabase.LoadAssetAtPath<CharacterStoryQuestCatalog>(
+                TableDataEditor.CharacterStoryQuestTablePipeline.OutputFolder + "/CharacterStoryQuestCatalog.asset");
+            CharacterStoryQuestObjectiveCatalog generatedObjectives = AssetDatabase.LoadAssetAtPath<CharacterStoryQuestObjectiveCatalog>(
+                TableDataEditor.CharacterStoryQuestTablePipeline.ObjectiveOutputFolder + "/CharacterStoryQuestObjectiveCatalog.asset");
+            Assert.NotNull(generatedCharacters);
+            Assert.NotNull(generatedQuests);
+            Assert.NotNull(generatedObjectives);
+            generatedCharacters.MarkDirty();
+            generatedQuests.MarkDirty();
+            generatedObjectives.MarkDirty();
+
+            characters = generatedCharacters;
+            SetQuestServiceInstance(null);
+            var host = new GameObject("recruitment-story-quest-test");
+            created.Add(host);
+            CharacterStoryQuestService questService = host.AddComponent<CharacterStoryQuestService>();
+            SetObject(questService, "questCatalog", generatedQuests);
+            SetObject(questService, "objectiveCatalog", generatedObjectives);
+            SetQuestServiceInstance(questService);
+
+            AddCycle(now, characterId);
+            RecruitmentCandidateResolutionResult result = Service().TryAcquire(BuildingId);
+
+            Assert.IsTrue(result.Code == RecruitmentCandidateResolutionCode.Acquired, result.Code.ToString());
+            Assert.IsTrue(saves == 1, "영입 transaction은 저장을 한 번만 해야 합니다.");
+            Assert.IsTrue(data.characterStoryQuests.Count == 1, "영입과 루트 활성화는 같은 저장 문서에 남아야 합니다.");
+            Assert.AreEqual(characterId, data.characterStoryQuests[0].characterId);
+            Assert.AreEqual(rootQuestId, data.characterStoryQuests[0].activeQuestId);
+        }
+
         private RecruitmentCandidateResolutionService Service(Func<bool> save = null)
         {
             Func<bool> action = save ?? (() => { saves++; SaveData.MarkSaved(data, now); return true; });
@@ -217,6 +258,7 @@ namespace RecruitmentEditor.Tests
                 buildingId = BuildingId,
                 startedAtUtc = SaveData.FormatTimestamp(CompleteAt.AddHours(-1)),
                 completeAtUtc = SaveData.FormatTimestamp(CompleteAt),
+                completionNotified = true,
             });
             var state = new RecruitmentCycleSaveState
             {
@@ -279,6 +321,11 @@ namespace RecruitmentEditor.Tests
             var serialized = new SerializedObject(owner);
             serialized.FindProperty(field).objectReferenceValue = value;
             serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void SetQuestServiceInstance(CharacterStoryQuestService service)
+        {
+            QuestServiceInstanceProperty.GetSetMethod(true).Invoke(null, new object[] { service });
         }
     }
 }
