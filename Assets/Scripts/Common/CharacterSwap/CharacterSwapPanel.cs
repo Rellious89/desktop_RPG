@@ -265,7 +265,16 @@ namespace Common
                 return;
             }
 
-            Close();
+            RefreshAfterSuccessfulSwap();
+        }
+
+        /// <summary>성공한 runtime 교체 뒤에는 모달을 유지한 채 새 현재 상태를 즉시 반영한다.</summary>
+        private void RefreshAfterSuccessfulSwap()
+        {
+            // 교체는 runtime-only 상태 변경이다. 패널을 닫지 않고, 새 현재 캐릭터와 행의
+            // 선택/가능 상태를 다시 그려 pending 선택과 버튼을 확실히 비운다.
+            RefreshContents();
+            UpdateSwapButton();
         }
 
         /// <summary>교체 버튼은 "지금 이 선택으로 교체가 실제로 일어날 수 있을 때"만 켠다.</summary>
