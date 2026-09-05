@@ -1,2 +1,6 @@
 skill_id,name_category,name_key,$skill_name,description_category,description_key,$skill_description,icon_key,skill_type,behavior_key,cooldown_seconds,motion_key,display_order,enabled,memo
 catknight_skill_01,10,1,고양이어택,10,10001,날카로운 발톱과 함께 공격한다.,,active_attack,attack_motion,10,CatKnight_Skill_01,10,1,
+barbarian_skill_01,10,2,선봉의 일격,10,10002,거친 몸짓으로 적을 공격한다.,,active_attack,attack_motion,14,Barbarian_attack,20,1,
+barbarian_skill_02,10,3,결의의 일격,10,10003,투지를 담은 일격으로 적을 공격한다.,,active_attack,attack_motion,27,Barbarian_attack,30,1,
+elfarcher_skill_01,10,4,초심의 시위,10,10004,활을 당겨 적을 공격한다.,,active_attack,attack_motion,18,ElfArcher_attack,40,1,
+elfarcher_skill_02,10,5,사냥꾼의 시위,10,10005,사냥꾼의 몸짓으로 활을 당겨 적을 공격한다.,,active_attack,attack_motion,31,ElfArcher_Attack_t2_2,50,1,

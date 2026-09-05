@@ -26,6 +26,40 @@ MonoBehaviour:
     m_Localized: "\uB0A0\uCE74\uB85C\uC6B4 \uBC1C\uD1B1\uACFC \uD568\uAED8 \uACF5\uACA9\uD55C\uB2E4."
     m_Metadata:
       m_Items: []
+  - m_Id: 1678500665745408
+    m_Localized: "\uC120\uBD09\uC758 \uC77C\uACA9"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1678500686716928
+    m_Localized: "\uACB0\uC758\uC758 \uC77C\uACA9"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1678500690911232
+    m_Localized: "\uCD08\uC2EC\uC758 \uC2DC\uC704"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1678500690911233
+    m_Localized: "\uC0AC\uB0E5\uAFBC\uC758 \uC2DC\uC704"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1678500690911234
+    m_Localized: "\uAC70\uCE5C \uBAB8\uC9D3\uC73C\uB85C \uC801\uC744 \uACF5\uACA9\uD55C\uB2E4."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1678500690911235
+    m_Localized: "\uD22C\uC9C0\uB97C \uB2F4\uC740 \uC77C\uACA9\uC73C\uB85C \uC801\uC744
+      \uACF5\uACA9\uD55C\uB2E4."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1678500690911236
+    m_Localized: "\uD65C\uC744 \uB2F9\uACA8 \uC801\uC744 \uACF5\uACA9\uD55C\uB2E4."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 1678500690911237
+    m_Localized: "\uC0AC\uB0E5\uAFBC\uC758 \uBAB8\uC9D3\uC73C\uB85C \uD65C\uC744
+      \uB2F9\uACA8 \uC801\uC744 \uACF5\uACA9\uD55C\uB2E4."
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

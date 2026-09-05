@@ -1,2 +1,6 @@
 character_id,$character_name,skill_id,$skill_name,required_character_level,display_order,enabled,memo
 CatKnight,고양이기사,catknight_skill_01,고양이어택,5,10,1,
+Barbarian,바바리안,barbarian_skill_01,선봉의 일격,3,10,1,
+Barbarian,바바리안,barbarian_skill_02,결의의 일격,6,20,1,
+ElfArcher,엘프궁수,elfarcher_skill_01,초심의 시위,4,10,1,
+ElfArcher,엘프궁수,elfarcher_skill_02,사냥꾼의 시위,6,20,1,
