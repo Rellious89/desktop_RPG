@@ -52,8 +52,8 @@ namespace CommonEditor.Save
         private readonly Dictionary<SaveResetLocalization.CacheKey, string> localizedNameCache =
             new Dictionary<SaveResetLocalization.CacheKey, string>();
 
-        // 삭제하려고 체크한 캐릭터 id. Character 비트가 켜질 때 삭제 가능한 캐릭터 전체로 채우고,
-        // 개별 해제/재선택은 이 집합을 직접 고친다. 매 프레임 현재 삭제 가능 목록으로 걸러 낸다.
+        // Character 대상으로 명시적으로 고른 캐릭터 id. 기본 캐릭터는 초기화/복구, 비기본 캐릭터는
+        // 삭제한다. Character 비트가 켜질 때는 기존 UX대로 저장된 비기본 캐릭터만 자동 선택한다.
         private HashSet<string> selectedCharacterIds = new HashSet<string>(StringComparer.Ordinal);
 
         // Character 비트의 이전 상태. 꺼짐 -> 켜짐으로 바뀌는 순간에만 삭제 가능 캐릭터 전체를 고른다.
@@ -81,7 +81,7 @@ namespace CommonEditor.Save
 
             EditorGUILayout.LabelField("개발용 저장 데이터 초기화", EditorStyles.boldLabel);
             EditorGUILayout.LabelField(
-                "고른 항목만 초기화합니다. Character는 기본 캐릭터를 초기 상태로 복원하고 체크한 비기본 캐릭터를 삭제합니다.",
+                "고른 항목만 초기화합니다. Character는 체크한 기본 캐릭터만 초기화·복구하고 체크한 비기본 캐릭터만 삭제합니다.",
                 EditorStyles.wordWrappedMiniLabel);
 
             EditorGUILayout.Space();
@@ -97,6 +97,7 @@ namespace CommonEditor.Save
             // Character 비트 상태에 맞춰 체크 목록을 동기화한다(그리기 전에 한다).
             bool characterSelected = (selection & SaveResetTargets.Character) != 0;
             HashSet<string> deletable = GetDeletableIds(data);
+            HashSet<string> selectable = BuildSelectableCharacterIds(data, characterCatalog, charactersById);
             if (characterSelected && !prevCharacterSelected)
             {
                 // 꺼짐 -> 켜짐: 삭제 가능한 캐릭터를 모두 고른다.
@@ -107,8 +108,9 @@ namespace CommonEditor.Save
                 selectedCharacterIds.Clear();
             }
 
-            // 목록이 바뀌었을 수 있으니 지금 삭제 가능한 것만 남긴다(사라진 id는 자동으로 빠진다).
-            selectedCharacterIds.IntersectWith(deletable);
+            // 목록이 바뀌었을 수 있으니 현재 선택 가능한 것만 남긴다. catalog의 누락 기본 캐릭터도
+            // 여기에는 포함하므로 새로 고침으로 명시 선택이 사라지지 않는다.
+            selectedCharacterIds.IntersectWith(selectable);
             prevCharacterSelected = characterSelected;
 
             scroll = EditorGUILayout.BeginScrollView(scroll);
@@ -140,7 +142,8 @@ namespace CommonEditor.Save
                 bool anyNonCharacter =
                     (selection & (SaveResetTargets.Item | SaveResetTargets.Currency | SaveResetTargets.Construction |
                                   SaveResetTargets.Quest)) != 0;
-                bool canRun = anyNonCharacter || (selection & SaveResetTargets.Character) != 0;
+                bool canRun = anyNonCharacter || ((selection & SaveResetTargets.Character) != 0 &&
+                                                  selectedCharacterIds.Count > 0);
 
                 using (new EditorGUI.DisabledScope(!canRun || EditorApplication.isPlaying))
                 {
@@ -236,14 +239,14 @@ namespace CommonEditor.Save
                 if (!sectionActive)
                 {
                     EditorGUILayout.LabelField(
-                        "Character 선택 시 기본 캐릭터는 초기화·복구하고, 체크한 비기본 캐릭터는 삭제합니다.",
+                        "Character 선택 시 체크한 기본 캐릭터만 초기화·복구하고, 체크한 비기본 캐릭터만 삭제합니다.",
                         EditorStyles.wordWrappedMiniLabel);
                 }
                 else
                 {
                     EditorGUILayout.LabelField(
-                        "기본 캐릭터는 삭제할 수 없으며 레벨·EXP·행동력·오염·패시브 회복 진행이 초기값으로 돌아갑니다. " +
-                        "저장에 누락돼 있어도 Character Catalog에서 복구합니다.",
+                        "기본 캐릭터도 체크할 수 있으며, 체크한 경우에만 레벨·EXP·행동력·오염·패시브 회복 진행을 초기화합니다. " +
+                        "저장에 누락된 기본 캐릭터도 아래에서 명시 선택해 복구할 수 있습니다.",
                         EditorStyles.wordWrappedMiniLabel);
                 }
 
@@ -259,6 +262,14 @@ namespace CommonEditor.Save
                         DrawCharacterRow(character, sectionActive);
                     }
                 }
+
+                if (sectionActive)
+                {
+                    foreach (InitialCharacterResetSeed seed in BuildInitialCharacterSeeds(characterCatalog))
+                    {
+                        if (!ContainsCharacterId(characters, seed.CharacterId)) DrawMissingInitialCharacterRow(seed.CharacterId);
+                    }
+                }
             }
         }
 
@@ -267,7 +278,7 @@ namespace CommonEditor.Save
             string id = character.characterId ?? string.Empty;
             bool hasId = !string.IsNullOrEmpty(id);
             bool initiallyOwned = hasId && IsInitiallyOwned(id);
-            bool selectable = sectionActive && hasId && !initiallyOwned;
+            bool selectable = sectionActive && hasId;
 
             using (new EditorGUILayout.HorizontalScope())
             {
@@ -290,9 +301,26 @@ namespace CommonEditor.Save
                 if (initiallyOwned)
                 {
                     EditorGUILayout.LabelField(
-                        sectionActive ? "기본 · 상태 초기화" : "기본 · 삭제 불가",
+                        sectionActive ? "기본 · 체크 시 상태 초기화" : "기본 · 삭제 불가",
                         EditorStyles.miniBoldLabel, GUILayout.Width(120f));
                 }
+            }
+        }
+
+        private void DrawMissingInitialCharacterRow(string id)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                bool isChecked = selectedCharacterIds.Contains(id);
+                bool newChecked = EditorGUILayout.Toggle(isChecked, GUILayout.Width(18f));
+                if (newChecked != isChecked)
+                {
+                    if (newChecked) selectedCharacterIds.Add(id);
+                    else selectedCharacterIds.Remove(id);
+                }
+
+                EditorGUILayout.LabelField($"{DescribeCharacterName(id)}  ·  (저장에 없음 · 체크 시 초기 상태로 복구)");
+                EditorGUILayout.LabelField("기본 · 복구 가능", EditorStyles.miniBoldLabel, GUILayout.Width(120f));
             }
         }
 
@@ -369,11 +397,11 @@ namespace CommonEditor.Save
                 return;
             }
 
-            // Character 비트가 켜지면 저장 목록이 아니라 catalog 전체에서 InitiallyOwned 시드를 만든다.
+            // Character 선택은 기본 초기화/복구와 비기본 삭제 양쪽에 같은 명시 ID 집합을 전달한다.
             List<string> toRemove = null;
             List<InitialCharacterResetSeed> initialSeeds = null;
             int partySlotCount = 0;
-            if ((targets & SaveResetTargets.Character) != 0)
+            if ((targets & SaveResetTargets.Character) != 0 && selectedCharacterIds.Count > 0)
             {
                 toRemove = new List<string>(selectedCharacterIds);
                 initialSeeds = BuildInitialCharacterSeeds(characterCatalog);
@@ -392,25 +420,31 @@ namespace CommonEditor.Save
             bool anyNonCharacter =
                 (targets & (SaveResetTargets.Item | SaveResetTargets.Currency | SaveResetTargets.Construction |
                             SaveResetTargets.Quest)) != 0;
-            bool resetCharacters = (targets & SaveResetTargets.Character) != 0;
+            bool resetCharacters = (targets & SaveResetTargets.Character) != 0 && toRemove != null && toRemove.Count > 0;
             if (!anyNonCharacter && !resetCharacters) return;
 
-            string body = DescribeTargets(targets);
+            SaveResetTargets describedTargets = resetCharacters
+                ? targets
+                : targets & ~SaveResetTargets.Character;
+            string body = DescribeTargets(describedTargets);
             if (resetCharacters)
             {
                 body += "\n\n초기화·복구할 기본 캐릭터:\n" +
-                        DescribeCharacterList(ConvertSeedIds(initialSeeds));
+                        DescribeCharacterList(IntersectIds(toRemove, ConvertSeedIds(initialSeeds)));
             }
-            if (toRemove != null && toRemove.Count > 0)
+            List<string> nonInitialIds = SubtractIds(toRemove, ConvertSeedIds(initialSeeds));
+            if (nonInitialIds.Count > 0)
             {
-                body += "\n\n삭제할 캐릭터:\n" + DescribeCharacterList(toRemove);
+                body += "\n\n삭제할 캐릭터:\n" + DescribeCharacterList(nonInitialIds);
             }
 
             bool confirmed = EditorUtility.DisplayDialog(
                 "저장 데이터 초기화",
-                $"다음 항목을 초기화합니다:\n\n{body}\n\nCharacter 대상의 파티는 기본 편성으로 복원되고, " +
-                "초기화·삭제 캐릭터의 회복/정화 슬롯은 같은 인덱스에서 비워집니다. " +
-                "Quest를 선택하지 않으면 기본 캐릭터의 퀘스트 진행은 유지됩니다.\n계속할까요?",
+                $"다음 항목을 초기화합니다:\n\n{body}\n\n" +
+                (resetCharacters
+                    ? "실제 Character 변경이 있으므로 파티는 기본 편성으로 복원되고, 초기화·삭제 캐릭터의 회복/정화 슬롯은 같은 인덱스에서 비워집니다. "
+                    : string.Empty) +
+                "Quest를 선택하지 않으면 캐릭터 퀘스트 진행은 유지됩니다.\n계속할까요?",
                 "초기화",
                 "취소");
 
@@ -515,7 +549,7 @@ namespace CommonEditor.Save
             }
             if ((targets & SaveResetTargets.Character) != 0)
             {
-                lines.Add("• Character (기본 캐릭터 초기화·복구 + 선택한 비기본 캐릭터 삭제 + 초기 파티 복원)");
+                lines.Add("• Character (선택한 기본 캐릭터 초기화·복구 + 선택한 비기본 캐릭터 삭제 + 초기 파티 복원)");
             }
             if ((targets & SaveResetTargets.Quest) != 0)
             {
@@ -529,6 +563,13 @@ namespace CommonEditor.Save
         /// <summary>지금 삭제할 수 있는 캐릭터 id(저장에 존재하고 기본 보유가 아닌 것).</summary>
         private HashSet<string> GetDeletableIds(SaveData data)
         {
+            return BuildDefaultCharacterSelection(data, charactersById);
+        }
+
+        internal static HashSet<string> BuildDefaultCharacterSelection(
+            SaveData data,
+            IReadOnlyDictionary<string, CharacterDefinition> definitions)
+        {
             var set = new HashSet<string>(StringComparer.Ordinal);
             if (data.characters == null) return set;
 
@@ -537,11 +578,33 @@ namespace CommonEditor.Save
                 if (character == null) continue;
                 string id = character.characterId;
                 if (string.IsNullOrEmpty(id)) continue;
-                if (IsInitiallyOwned(id)) continue;
+                if (definitions != null && definitions.TryGetValue(id, out CharacterDefinition definition) &&
+                    definition != null && definition.InitiallyOwned) continue;
                 set.Add(id);
             }
 
             return set;
+        }
+
+        internal static HashSet<string> BuildSelectableCharacterIds(
+            SaveData data,
+            CharacterCatalog catalog,
+            IReadOnlyDictionary<string, CharacterDefinition> definitions)
+        {
+            var result = new HashSet<string>(StringComparer.Ordinal);
+            if (data.characters != null)
+            {
+                foreach (CharacterSaveState character in data.characters)
+                {
+                    string id = character?.characterId;
+                    if (string.IsNullOrEmpty(id)) continue;
+                    if (definitions != null && definitions.TryGetValue(id, out CharacterDefinition definition) &&
+                        definition != null && definition.InitiallyOwned) continue;
+                    result.Add(id);
+                }
+            }
+            foreach (InitialCharacterResetSeed seed in BuildInitialCharacterSeeds(catalog)) result.Add(seed.CharacterId);
+            return result;
         }
 
         internal static List<InitialCharacterResetSeed> BuildInitialCharacterSeeds(CharacterCatalog catalog)
@@ -568,6 +631,34 @@ namespace CommonEditor.Save
             if (seeds == null) return result;
             foreach (InitialCharacterResetSeed seed in seeds) result.Add(seed.CharacterId);
             return result;
+        }
+
+        internal static List<string> IntersectIds(IReadOnlyList<string> ids, IReadOnlyList<string> allowed)
+        {
+            var allowedSet = new HashSet<string>(allowed ?? Array.Empty<string>(), StringComparer.Ordinal);
+            var result = new List<string>();
+            if (ids == null) return result;
+            foreach (string id in ids) if (allowedSet.Contains(id)) result.Add(id);
+            return result;
+        }
+
+        internal static List<string> SubtractIds(IReadOnlyList<string> ids, IReadOnlyList<string> excluded)
+        {
+            var excludedSet = new HashSet<string>(excluded ?? Array.Empty<string>(), StringComparer.Ordinal);
+            var result = new List<string>();
+            if (ids == null) return result;
+            foreach (string id in ids) if (!excludedSet.Contains(id)) result.Add(id);
+            return result;
+        }
+
+        private static bool ContainsCharacterId(IReadOnlyList<CharacterSaveState> characters, string id)
+        {
+            if (characters == null) return false;
+            foreach (CharacterSaveState character in characters)
+            {
+                if (character != null && string.Equals(character.characterId, id, StringComparison.Ordinal)) return true;
+            }
+            return false;
         }
 
         private bool IsInitiallyOwned(string characterId)

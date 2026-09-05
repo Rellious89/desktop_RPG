@@ -13,8 +13,8 @@ namespace CommonEditor.Save
     /// 값은 <c>1 &lt;&lt; n</c>로 떨어뜨려 두어 <c>EnumFlagsField</c>가 항목별 토글로 그리고,
     /// <see cref="All"/>을 고른 뒤 하나만 해제하는 조합이 그대로 만들어지게 한다.
     ///
-    /// <see cref="Character"/>는 카탈로그의 기본 보유 캐릭터를 초기 상태로 복원하고, 고른 비기본
-    /// 캐릭터만 삭제하며, 파티를 기본 편성으로 되돌린다.
+    /// <see cref="Character"/>는 명시적으로 고른 기본 보유 캐릭터만 초기 상태로 복원하고, 고른 비기본
+    /// 캐릭터만 삭제하며, 실제 변경이 있을 때만 파티를 기본 편성으로 되돌린다.
     /// </summary>
     [Flags]
     public enum SaveResetTargets
@@ -143,13 +143,14 @@ namespace CommonEditor.Save
 
         /// <summary>
         /// Character 카탈로그에서 만든 초기 시드와 파티 고정 슬롯 계약을 함께 받아 선택 항목을 원자적으로
-        /// 초기화한다. Character 비트가 켜져 있으면 기본 캐릭터는 전부 초기 상태로 복원하고, 선택된
-        /// 비기본 캐릭터만 삭제하며, 파티는 카탈로그 시드 순서의 초기 편성으로 다시 만든다.
+        /// 초기화한다. <paramref name="selectedCharacterIds"/>는 Character 대상에서 명시적으로 고른
+        /// 전체 ID다. 기본 캐릭터는 초기 상태로 복원하고, 비기본 캐릭터만 삭제하며, 실제 변경이
+        /// 있을 때만 파티는 카탈로그 시드 순서의 초기 편성으로 다시 만든다.
         /// </summary>
         public static SaveResetResult Apply(
             SaveData data,
             SaveResetTargets targets,
-            IReadOnlyList<string> characterIdsToRemove,
+            IReadOnlyList<string> selectedCharacterIds,
             IReadOnlyList<InitialCharacterResetSeed> initialCharacterSeeds,
             int partySlotCount,
             IReadOnlyList<StoryQuestResetDefinition> questDefinitions,
@@ -168,9 +169,11 @@ namespace CommonEditor.Save
             bool resetStory = (effective & SaveResetTargets.Quest) != 0;
             bool resetCharacters = (effective & SaveResetTargets.Character) != 0;
 
+            bool hasCharacterSelection = selectedCharacterIds != null && selectedCharacterIds.Count > 0;
             List<InitialCharacterResetSeed> seeds = null;
             HashSet<string> initialIds = null;
-            if (resetCharacters && !TryNormalizeInitialSeeds(initialCharacterSeeds, partySlotCount, out seeds, out initialIds))
+            if (resetCharacters && hasCharacterSelection &&
+                !TryNormalizeInitialSeeds(initialCharacterSeeds, partySlotCount, out seeds, out initialIds))
             {
                 // Character reset 계약을 만족할 수 없으면 다른 선택 항목도 함께 적용하지 않는다.
                 return new SaveResetResult(
@@ -178,16 +181,23 @@ namespace CommonEditor.Save
             }
 
             // 실제로 지울 캐릭터 집합을 미리 확정한다 - 요청 ∩ 존재 ∖ catalog InitiallyOwned.
-            HashSet<string> removeSet = resetCharacters
-                ? ResolveRemovableIds(data.characters, characterIdsToRemove, initialIds)
+            HashSet<string> removeSet = resetCharacters && hasCharacterSelection
+                ? ResolveRemovableIds(data.characters, selectedCharacterIds, initialIds)
                 : null;
+            var selectedInitialIds = new HashSet<string>(StringComparer.Ordinal);
+            if (resetCharacters && hasCharacterSelection)
+            {
+                foreach (string id in selectedCharacterIds)
+                {
+                    if (!string.IsNullOrEmpty(id) && initialIds.Contains(id)) selectedInitialIds.Add(id);
+                }
+            }
 
             bool removeCharacters = removeSet != null && removeSet.Count > 0;
+            bool applyCharacterChanges = removeCharacters || selectedInitialIds.Count > 0;
             bool resetAllUnlocks = effective == SaveResetTargets.All && data.unlockedRecruitmentCharacterIds != null &&
                                    data.unlockedRecruitmentCharacterIds.Count > 0;
-            // Character는 삭제 대상이 없어도 기본 캐릭터 진행 초기화/누락 복구/초기 파티 복원이 있으므로
-            // 비트 자체가 실제 적용이다.
-            if (!resetItems && !resetCurrency && !resetConstruction && !resetStory && !resetCharacters &&
+            if (!resetItems && !resetCurrency && !resetConstruction && !resetStory && !applyCharacterChanges &&
                 !resetAllUnlocks)
             {
                 return new SaveResetResult(SaveResetOutcome.NothingSelected, SaveResetTargets.None, 0);
@@ -208,10 +218,10 @@ namespace CommonEditor.Save
             List<CharacterStoryQuestSaveState> oldCharacterStoryQuests =
                 (resetStory || removeCharacters) ? data.characterStoryQuests : null;
 
-            List<CharacterSaveState> oldCharacters = resetCharacters ? data.characters : null;
-            List<string> oldPartyCharacterIds = resetCharacters ? data.partyCharacterIds : null;
-            List<RecoverySlotSaveState> oldRecoverySlots = resetCharacters ? data.recoverySlots : null;
-            if (resetCharacters && !resetConstruction) oldPurificationSlots = data.purificationSlots;
+            List<CharacterSaveState> oldCharacters = applyCharacterChanges ? data.characters : null;
+            List<string> oldPartyCharacterIds = applyCharacterChanges ? data.partyCharacterIds : null;
+            List<RecoverySlotSaveState> oldRecoverySlots = applyCharacterChanges ? data.recoverySlots : null;
+            if (applyCharacterChanges && !resetConstruction) oldPurificationSlots = data.purificationSlots;
             int removedCount = 0;
 
             if (resetItems) data.items = new List<InventoryItemState>();
@@ -223,12 +233,12 @@ namespace CommonEditor.Save
                 data.purificationSlots = new List<PurificationSlotSaveState> { new PurificationSlotSaveState() };
             }
             if (resetAllUnlocks) data.unlockedRecruitmentCharacterIds = new List<string>();
-            if (resetCharacters)
+            if (applyCharacterChanges)
             {
                 if (!resetAllUnlocks) oldUnlockedRecruitmentCharacterIds = data.unlockedRecruitmentCharacterIds;
 
-                // 비기본 생존자는 객체와 순서를 보존한다. 기본 캐릭터는 현재 저장에 있으면 같은 위치에
-                // 초기 상태 객체로 교체하고, 누락된 시드는 catalog 순서대로 뒤에 복구한다.
+                // 선택하지 않은 캐릭터는 객체와 순서를 보존한다. 선택한 기본 캐릭터는 현재 저장에 있으면
+                // 같은 위치의 초기 상태 객체로 교체하고, 누락된 선택 시드는 catalog 순서대로 뒤에 복구한다.
                 var restored = new List<CharacterSaveState>(oldCharacters?.Count ?? seeds.Count);
                 var restoredInitialIds = new HashSet<string>(StringComparer.Ordinal);
                 if (oldCharacters != null)
@@ -242,7 +252,7 @@ namespace CommonEditor.Save
                             continue;
                         }
 
-                        if (!string.IsNullOrEmpty(id) && initialIds.Contains(id))
+                        if (!string.IsNullOrEmpty(id) && selectedInitialIds.Contains(id))
                         {
                             InitialCharacterResetSeed seed = FindSeed(seeds, id);
                             restored.Add(CreateInitialCharacterState(seed));
@@ -257,7 +267,7 @@ namespace CommonEditor.Save
 
                 foreach (InitialCharacterResetSeed seed in seeds)
                 {
-                    if (restoredInitialIds.Add(seed.CharacterId))
+                    if (selectedInitialIds.Contains(seed.CharacterId) && restoredInitialIds.Add(seed.CharacterId))
                     {
                         restored.Add(CreateInitialCharacterState(seed));
                     }
@@ -265,7 +275,7 @@ namespace CommonEditor.Save
 
                 data.characters = restored;
 
-                // Character reset은 초기 편성으로 돌아간다. 슬롯 길이는 PartyConfig 계약 그대로이고,
+                // 실제 Character 변경은 초기 편성으로 돌아간다. 슬롯 길이는 PartyConfig 계약 그대로이고,
                 // 여러 기본 캐릭터는 catalog 순서로 가능한 앞 슬롯부터 채운다.
                 var initialParty = new List<string>(partySlotCount);
                 for (int i = 0; i < partySlotCount; i++) initialParty.Add(string.Empty);
@@ -275,7 +285,7 @@ namespace CommonEditor.Save
                 }
                 data.partyCharacterIds = initialParty;
 
-                var affectedCharacterIds = new HashSet<string>(initialIds, StringComparer.Ordinal);
+                var affectedCharacterIds = new HashSet<string>(selectedInitialIds, StringComparer.Ordinal);
                 affectedCharacterIds.UnionWith(removeSet);
                 data.recoverySlots = CloneRecoverySlotsClearing(data.recoverySlots, affectedCharacterIds);
                 data.purificationSlots = ClonePurificationSlotsClearing(data.purificationSlots, affectedCharacterIds);
@@ -310,7 +320,7 @@ namespace CommonEditor.Save
                 // 대리자가 터져도 메모리는 원래대로 돌려놓고 예외는 그대로 올려보낸다 - 부분 초기화가
                 // 남는 것보다 호출부가 실패를 알아채는 편이 낫다.
                 Rollback(data, resetItems, oldItems, resetCurrency, oldCurrency, resetConstruction,
-                    oldConstructions, oldRecruitmentCycles, oldPurificationSlots, resetCharacters, oldCharacters,
+                    oldConstructions, oldRecruitmentCycles, oldPurificationSlots, applyCharacterChanges, oldCharacters,
                     oldPartyCharacterIds, oldRecoverySlots, oldUnlockedRecruitmentCharacterIds, resetAllUnlocks,
                     oldCharacterStoryQuests);
                 throw;
@@ -319,7 +329,7 @@ namespace CommonEditor.Save
             if (!saved)
             {
                 Rollback(data, resetItems, oldItems, resetCurrency, oldCurrency, resetConstruction,
-                    oldConstructions, oldRecruitmentCycles, oldPurificationSlots, resetCharacters, oldCharacters,
+                    oldConstructions, oldRecruitmentCycles, oldPurificationSlots, applyCharacterChanges, oldCharacters,
                     oldPartyCharacterIds, oldRecoverySlots, oldUnlockedRecruitmentCharacterIds, resetAllUnlocks,
                     oldCharacterStoryQuests);
                 return new SaveResetResult(SaveResetOutcome.SaveFailed, effective, 0);
@@ -329,11 +339,11 @@ namespace CommonEditor.Save
             if (resetItems) applied |= SaveResetTargets.Item;
             if (resetCurrency) applied |= SaveResetTargets.Currency;
             if (resetConstruction) applied |= SaveResetTargets.Construction;
-            if (resetCharacters) applied |= SaveResetTargets.Character;
+            if (applyCharacterChanges) applied |= SaveResetTargets.Character;
             if (resetStory) applied |= SaveResetTargets.Quest;
 
             return new SaveResetResult(
-                SaveResetOutcome.Success, applied, removedCount, resetCharacters ? seeds.Count : 0);
+                SaveResetOutcome.Success, applied, removedCount, selectedInitialIds.Count);
         }
 
         /// <summary>

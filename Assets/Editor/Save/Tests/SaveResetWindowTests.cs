@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Character;
+using Common;
 using CommonEditor.Save;
 using NUnit.Framework;
 using Party;
@@ -47,6 +48,46 @@ namespace CommonEditor.SaveTests
         {
             Assert.AreEqual(0, SaveResetWindow.BuildInitialCharacterSeeds(null).Count);
             Assert.AreEqual(0, SaveResetWindow.BuildInitialCharacterSeeds(CharacterCatalogOf()).Count);
+        }
+
+        [Test]
+        public void 확인_대상_분류는_선택한_기본과_비기본만_각각_표시한다()
+        {
+            var selected = new List<string> { "CatKnight", "ElfArcher", "Paladin" };
+            var initial = new List<string> { "CatKnight", "Paladin" };
+
+            CollectionAssert.AreEqual(
+                new[] { "CatKnight", "Paladin" }, SaveResetWindow.IntersectIds(selected, initial));
+            CollectionAssert.AreEqual(
+                new[] { "ElfArcher" }, SaveResetWindow.SubtractIds(selected, initial));
+        }
+
+        [Test]
+        public void Character_선택_목록은_기본을_선택_가능하게_제공하지만_초기_선택을_강제하지_않는다()
+        {
+            CharacterDefinition cat = CharacterDefinitionOf("CatKnight", initiallyOwned: true, baseCorruption: 0);
+            CharacterDefinition elf = CharacterDefinitionOf("ElfArcher", initiallyOwned: false, baseCorruption: 0);
+            CharacterCatalog catalog = CharacterCatalogOf(cat, elf);
+            var definitions = new Dictionary<string, CharacterDefinition>
+            {
+                ["CatKnight"] = cat,
+                ["ElfArcher"] = elf,
+            };
+            var data = new SaveData
+            {
+                characters = new List<CharacterSaveState>
+                {
+                    new CharacterSaveState { characterId = "CatKnight" },
+                    new CharacterSaveState { characterId = "ElfArcher" },
+                },
+            };
+
+            HashSet<string> selectable = SaveResetWindow.BuildSelectableCharacterIds(data, catalog, definitions);
+            HashSet<string> defaultSelection = SaveResetWindow.BuildDefaultCharacterSelection(data, definitions);
+
+            CollectionAssert.AreEquivalent(new[] { "CatKnight", "ElfArcher" }, selectable);
+            CollectionAssert.AreEquivalent(new[] { "ElfArcher" }, defaultSelection,
+                "Character 대상을 켤 때 기본 캐릭터는 사용자가 명시적으로 체크할 때까지 선택되지 않아야 합니다.");
         }
 
         [Test]

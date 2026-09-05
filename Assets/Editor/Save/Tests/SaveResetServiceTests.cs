@@ -380,6 +380,7 @@ namespace CommonEditor.SaveTests
         public void 선택한_캐릭터만_제거하고_나머지는_보존한다()
         {
             SaveData data = MakeCharacterFixture();
+            CharacterSaveState originalCat = data.characters[0];
 
             SaveResetResult result = ApplyCharacterReset(
                 data, SaveResetTargets.Character, new List<string> { "ElfArcher" },
@@ -392,6 +393,11 @@ namespace CommonEditor.SaveTests
 
             CollectionAssert.AreEqual(new[] { "CatKnight", "Barbarian" }, IdsOf(data.characters),
                 "고른 ElfArcher만 빠지고 나머지는 순서 그대로 남아야 합니다.");
+            Assert.AreEqual(5, data.characters[0].level,
+                "선택하지 않은 기본 캐릭터의 진행도는 그대로여야 합니다.");
+            Assert.AreSame(originalCat, data.characters[0]);
+            Assert.AreEqual(12, data.characters[0].currentExp);
+            Assert.AreEqual(8, data.characters[0].currentStamina);
             CollectionAssert.AreEqual(new[] { "CatKnight", string.Empty, string.Empty }, data.partyCharacterIds,
                 "Character reset은 고정 길이를 지키며 catalog 순서의 기본 편성으로 돌아가야 합니다.");
 
@@ -437,11 +443,10 @@ namespace CommonEditor.SaveTests
             // index1: 원래 빈 슬롯 그대로.
             Assert.IsFalse(data.recoverySlots[1].HasCharacter);
 
-            // index2: 초기화되는 기본 캐릭터 CatKnight 슬롯도 같은 자리에서 비운다.
-            Assert.IsFalse(data.recoverySlots[2].HasCharacter);
-            Assert.AreEqual(0, data.recoverySlots[2].startStamina);
-            Assert.IsTrue(string.IsNullOrEmpty(data.recoverySlots[2].startedAtUtc));
-            Assert.IsTrue(string.IsNullOrEmpty(data.recoverySlots[2].completeAtUtc));
+            // index2: 선택하지 않은 기본 캐릭터의 슬롯은 그대로다.
+            Assert.AreEqual("CatKnight", data.recoverySlots[2].characterId);
+            Assert.AreEqual(6, data.recoverySlots[2].startStamina);
+            Assert.AreEqual("cs", data.recoverySlots[2].startedAtUtc);
         }
 
         [Test]
@@ -458,10 +463,10 @@ namespace CommonEditor.SaveTests
             Assert.IsTrue(string.IsNullOrEmpty(data.purificationSlots[0].lastCalculatedAtUtc));
             Assert.AreEqual(0, data.purificationSlots[0].progressTicks);
             Assert.IsFalse(data.purificationSlots[1].HasCharacter);
-            Assert.IsFalse(data.purificationSlots[2].HasCharacter,
-                "초기화되는 기본 캐릭터의 정화 슬롯도 비워야 합니다.");
-            Assert.IsTrue(string.IsNullOrEmpty(data.purificationSlots[2].purificationTypeId));
-            Assert.AreEqual(0, data.purificationSlots[2].progressTicks);
+            Assert.AreEqual("CatKnight", data.purificationSlots[2].characterId,
+                "선택하지 않은 기본 캐릭터의 정화 슬롯은 보존해야 합니다.");
+            Assert.AreEqual("church_prayer", data.purificationSlots[2].purificationTypeId);
+            Assert.AreEqual(22, data.purificationSlots[2].progressTicks);
         }
 
         [Test]
@@ -478,8 +483,8 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(1, data.recruitmentCycles.Count, "모집 주기는 그대로입니다.");
             Assert.AreEqual(3, data.purificationSlots.Count, "기도 슬롯 목록은 그대로입니다.");
             Assert.IsFalse(data.purificationSlots[0].HasCharacter, "삭제한 캐릭터의 기도 슬롯만 비웁니다.");
-            Assert.IsFalse(data.purificationSlots[2].HasCharacter,
-                "초기화되는 기본 캐릭터의 기도 슬롯도 비웁니다.");
+            Assert.AreEqual("CatKnight", data.purificationSlots[2].characterId,
+                "선택하지 않은 기본 캐릭터의 기도 슬롯은 보존합니다.");
         }
 
         [Test]
@@ -488,7 +493,7 @@ namespace CommonEditor.SaveTests
             SaveData data = MakeCharacterFixture();
 
             SaveResetResult result = ApplyCharacterReset(
-                data, SaveResetTargets.All, new List<string> { "ElfArcher" },
+                data, SaveResetTargets.All, new List<string> { "CatKnight", "ElfArcher" },
                 Counting(out Box<int> calls), questDefinitions: MakeStoryDefinitions());
 
             Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
@@ -522,7 +527,7 @@ namespace CommonEditor.SaveTests
             List<CharacterStoryQuestSaveState> originalStories = data.characterStoryQuests;
 
             SaveResetResult result = ApplyCharacterReset(
-                data, SaveResetTargets.All, new List<string> { "ElfArcher" },
+                data, SaveResetTargets.All, new List<string> { "CatKnight", "ElfArcher" },
                 Counting(out Box<int> calls, succeeds: false), questDefinitions: MakeStoryDefinitions());
 
             Assert.AreEqual(SaveResetOutcome.SaveFailed, result.Outcome);
@@ -566,7 +571,7 @@ namespace CommonEditor.SaveTests
             List<CharacterStoryQuestSaveState> originalStories = data.characterStoryQuests;
 
             Assert.Throws<InvalidOperationException>(() => ApplyCharacterReset(
-                data, SaveResetTargets.Character, new List<string> { "ElfArcher" },
+                data, SaveResetTargets.Character, new List<string> { "CatKnight", "ElfArcher" },
                 () => { throw new InvalidOperationException("write failed"); }));
 
             Assert.AreSame(originalCharacters, data.characters);
@@ -582,7 +587,7 @@ namespace CommonEditor.SaveTests
         }
 
         [Test]
-        public void 기본_캐릭터만_있고_삭제_선택이_없어도_Character는_저장_한_번으로_적용된다()
+        public void 선택_0명의_Character_초기화는_저장하지_않고_파티도_보존한다()
         {
             SaveData data = new SaveData
             {
@@ -596,11 +601,12 @@ namespace CommonEditor.SaveTests
             SaveResetResult result = ApplyCharacterReset(
                 data, SaveResetTargets.Character, new List<string>(), Counting(out Box<int> calls));
 
-            Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
-            Assert.AreEqual(SaveResetTargets.Character, result.AppliedTargets);
-            Assert.AreEqual(1, result.ResetInitialCharacterCount);
+            Assert.AreEqual(SaveResetOutcome.NothingSelected, result.Outcome);
+            Assert.AreEqual(SaveResetTargets.None, result.AppliedTargets);
+            Assert.AreEqual(0, result.ResetInitialCharacterCount);
             Assert.AreEqual(0, result.RemovedCharacterCount);
-            Assert.AreEqual(1, calls.Value);
+            Assert.AreEqual(0, calls.Value);
+            CollectionAssert.AreEqual(new[] { "CatKnight", string.Empty, string.Empty }, data.partyCharacterIds);
         }
 
         [Test]
@@ -625,7 +631,7 @@ namespace CommonEditor.SaveTests
             };
 
             SaveResetResult result = ApplyCharacterReset(
-                data, SaveResetTargets.Character, null, Counting(out Box<int> calls),
+                data, SaveResetTargets.Character, new[] { "CatKnight" }, Counting(out Box<int> calls),
                 new[] { new InitialCharacterResetSeed("CatKnight", 12d) });
 
             Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
@@ -655,7 +661,7 @@ namespace CommonEditor.SaveTests
             };
 
             SaveResetResult result = ApplyCharacterReset(
-                data, SaveResetTargets.Character, null, Counting(out Box<int> calls));
+                data, SaveResetTargets.Character, new[] { "CatKnight" }, Counting(out Box<int> calls));
 
             Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
             Assert.AreEqual(1, calls.Value);
@@ -690,7 +696,7 @@ namespace CommonEditor.SaveTests
             };
 
             ApplyCharacterReset(
-                data, SaveResetTargets.Character, null, Counting(out Box<int> calls), seeds, partySlotCount: 3);
+                data, SaveResetTargets.Character, new[] { "CatKnight", "Paladin", "Priest", "Ranger" }, Counting(out Box<int> calls), seeds, partySlotCount: 3);
 
             Assert.AreEqual(1, calls.Value);
             CollectionAssert.AreEqual(new[] { "CatKnight", "Paladin", "Priest" }, data.partyCharacterIds,
@@ -706,7 +712,7 @@ namespace CommonEditor.SaveTests
             SaveData data = MakeCharacterFixture();
 
             SaveResetResult result = ApplyCharacterReset(
-                data, SaveResetTargets.Character, new[] { "ElfArcher" }, Counting(out Box<int> calls),
+                data, SaveResetTargets.Character, new[] { "CatKnight", "ElfArcher" }, Counting(out Box<int> calls),
                 new[] { new InitialCharacterResetSeed("CatKnight", 9d) });
 
             Assert.AreEqual(1, calls.Value);
@@ -813,7 +819,7 @@ namespace CommonEditor.SaveTests
             SaveData invalidSlots = MakeCharacterFixture();
             List<CharacterSaveState> original = invalidSlots.characters;
             SaveResetResult slotResult = SaveResetService.Apply(
-                invalidSlots, SaveResetTargets.Character, null, DefaultInitialSeeds(), 0, null,
+                invalidSlots, SaveResetTargets.Character, new[] { "CatKnight" }, DefaultInitialSeeds(), 0, null,
                 Counting(out Box<int> slotCalls));
             Assert.AreEqual(SaveResetOutcome.InvalidCharacterResetConfiguration, slotResult.Outcome);
             Assert.AreEqual(0, slotCalls.Value);
