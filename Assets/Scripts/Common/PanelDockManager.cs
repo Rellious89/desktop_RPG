@@ -47,6 +47,8 @@ namespace Common
             }
         }
 
+        private PopupPanelManager PopupManager => PopupPanelManager.Instance ?? PanelUi.GetComponent<PopupPanelManager>();
+
         private void Awake()
         {
             panelUi = transform as RectTransform;
@@ -128,6 +130,30 @@ namespace Common
         {
             DockLink link = FindLink(handle);
             if (link != null) FocusPair(link);
+        }
+
+        /// <summary>일반 패널 클릭이 도킹 링크를 발견했을 때 호출하는 그룹 포커스 경로다.</summary>
+        public bool TryFocusDockedPanel(ModalPanel clicked)
+        {
+            if (clicked == null) return false;
+
+            for (int i = 0; i < links.Count; i++)
+            {
+                DockLink link = links[i];
+                if (!IsLinkValid(link)) continue;
+                ModalPanel a = GetModal(link.a);
+                ModalPanel b = GetModal(link.b);
+                if (clicked != a && clicked != b) continue;
+
+                ModalPanel partner = clicked == a ? b : a;
+                if (partner == null) return false;
+                PopupPanelManager popupManager = PopupManager;
+                if (popupManager == null) return false;
+                popupManager.FocusDockedPanels(clicked, partner, link.anchor);
+                return true;
+            }
+
+            return false;
         }
 
         public void BeginDockHandleDrag(DockHandleDrag handle)
@@ -290,21 +316,24 @@ namespace Common
         {
             PanelDragHandle first = link.a.TargetPanel.GetSiblingIndex() <= link.b.TargetPanel.GetSiblingIndex() ? link.a : link.b;
             PanelDragHandle second = first == link.a ? link.b : link.a;
-            FocusPanel(first);
-            FocusPanel(second);
-            if (link.anchor != null) link.anchor.SetAsLastSibling();
-        }
-
-        private static void FocusPanel(PanelDragHandle handle)
-        {
-            ModalPanel modal = handle.TargetPanel.GetComponent<ModalPanel>();
-            if (modal != null && PopupPanelManager.Instance != null)
+            ModalPanel firstModal = GetModal(first);
+            ModalPanel secondModal = GetModal(second);
+            PopupPanelManager popupManager = PopupManager;
+            if (firstModal != null && secondModal != null && popupManager != null)
             {
-                PopupPanelManager.Instance.FocusPanel(modal);
+                // 핸들에는 '클릭한 패널'이 없으므로 기존에 앞이었던 패널을 top으로 보존한다.
+                popupManager.FocusDockedPanels(secondModal, firstModal, link.anchor);
                 return;
             }
 
-            handle.TargetPanel.SetAsLastSibling();
+            first.TargetPanel.SetAsLastSibling();
+            second.TargetPanel.SetAsLastSibling();
+            if (link.anchor != null) link.anchor.SetAsLastSibling();
+        }
+
+        private static ModalPanel GetModal(PanelDragHandle handle)
+        {
+            return handle != null && handle.TargetPanel != null ? handle.TargetPanel.GetComponent<ModalPanel>() : null;
         }
 
         // ---- Link lifetime / eligibility ----

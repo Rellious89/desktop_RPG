@@ -16,6 +16,7 @@ namespace CommonEditor.Tests
         private GameObject canvasObject;
         private RectTransform panelUi;
         private PanelDockManager manager;
+        private PopupPanelManager popupManager;
 
         [SetUp]
         public void SetUp()
@@ -31,6 +32,7 @@ namespace CommonEditor.Tests
             panelUi.offsetMin = Vector2.zero;
             panelUi.offsetMax = Vector2.zero;
             manager = panelUi.gameObject.AddComponent<PanelDockManager>();
+            popupManager = panelUi.gameObject.AddComponent<PopupPanelManager>();
         }
 
         [TearDown]
@@ -266,6 +268,53 @@ namespace CommonEditor.Tests
             Assert.Less(limited.x, 10000f, "기존 화면 이탈 제한은 도킹에서도 재사용된다.");
         }
 
+        [Test]
+        public void 도킹된_패널_클릭은_상대와_핸들을_함께_앞으로_올리고_ESC_대상도_클릭패널로_맞춘다()
+        {
+            PanelDragHandle a = CreateModalPanel("A", new Vector2(90f, 60f));
+            PanelDragHandle b = CreateModalPanel("B", new Vector2(200f, 0f));
+            PanelDragHandle c = CreateModalPanel("C", new Vector2(400f, 0f));
+            DragToEnd(a);
+            DockHandleDrag handle = panelUi.GetComponentInChildren<DockHandleDrag>();
+            ModalPanel aModal = a.TargetPanel.GetComponent<ModalPanel>();
+            ModalPanel bModal = b.TargetPanel.GetComponent<ModalPanel>();
+
+            popupManager.FocusPanel(aModal);
+
+            Assert.AreSame(aModal, popupManager.TopPanel);
+            Assert.Greater(a.TargetPanel.GetSiblingIndex(), c.TargetPanel.GetSiblingIndex());
+            Assert.Greater(b.TargetPanel.GetSiblingIndex(), c.TargetPanel.GetSiblingIndex());
+            Assert.Greater(handle.transform.parent.GetSiblingIndex(), a.TargetPanel.GetSiblingIndex());
+            Assert.Greater(handle.transform.parent.GetSiblingIndex(), b.TargetPanel.GetSiblingIndex());
+
+            popupManager.FocusPanel(bModal);
+
+            Assert.AreSame(bModal, popupManager.TopPanel, "클릭한 도킹 구성원이 ESC 대상이어야 한다.");
+            Assert.Greater(a.TargetPanel.GetSiblingIndex(), c.TargetPanel.GetSiblingIndex());
+            Assert.Greater(b.TargetPanel.GetSiblingIndex(), c.TargetPanel.GetSiblingIndex());
+            Assert.IsTrue(popupManager.CloseTopPanel());
+            Assert.IsFalse(b.gameObject.activeSelf);
+            // EditMode의 직접 Close는 PanelDragHandle.OnDisable 메시지를 즉시 돌리지 않을 수 있다.
+            // 런타임 닫기 경로가 전달하는 동일한 정리 신호를 명시적으로 재현한다.
+            manager.NotifyPanelUnavailable(b);
+            Assert.AreEqual(0, manager.LinkCount, "닫힌 구성원의 링크는 즉시 해제된다.");
+
+            popupManager.FocusPanel(aModal);
+            Assert.AreSame(aModal, popupManager.TopPanel, "링크 해제 뒤 남은 패널은 단일 포커스로 돌아간다.");
+        }
+
+        [Test]
+        public void 비도킹_패널_포커스는_기존처럼_단일_패널만_앞으로_올린다()
+        {
+            PanelDragHandle a = CreateModalPanel("A", Vector2.zero);
+            PanelDragHandle b = CreateModalPanel("B", new Vector2(300f, 0f));
+            popupManager.FocusPanel(a.TargetPanel.GetComponent<ModalPanel>());
+
+            Assert.AreSame(a.TargetPanel.GetComponent<ModalPanel>(), popupManager.TopPanel);
+            Assert.Greater(a.TargetPanel.GetSiblingIndex(), b.TargetPanel.GetSiblingIndex());
+            Assert.AreEqual(0, manager.LinkCount);
+        }
+
         private PanelDragHandle CreatePanel(string name, Vector2 position)
         {
             GameObject panel = Create(name, panelUi);
@@ -280,6 +329,18 @@ namespace CommonEditor.Tests
             serialized.FindProperty("keepInsideRect").objectReferenceValue = rect;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             return drag;
+        }
+
+        private PanelDragHandle CreateModalPanel(string name, Vector2 position)
+        {
+            PanelDragHandle drag = CreatePanel(name, position);
+            drag.gameObject.AddComponent<TestModalPanel>();
+            return drag;
+        }
+
+        private sealed class TestModalPanel : ModalPanel
+        {
+            protected override void RefreshContents() { }
         }
 
         private void DragToEnd(PanelDragHandle handle)

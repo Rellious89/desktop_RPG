@@ -112,6 +112,37 @@ namespace Common
         {
             if (panel == null) return;
 
+            PanelDockManager dockManager = panel.GetComponentInParent<PanelDockManager>();
+            if (dockManager != null && dockManager.TryFocusDockedPanel(panel)) return;
+
+            FocusSinglePanel(panel);
+        }
+
+        /// <summary>도킹 관리자가 재진입 없이 두 ModalPanel과 핸들 anchor를 하나의 전면 그룹으로 올린다.</summary>
+        public void FocusDockedPanels(ModalPanel clicked, ModalPanel partner, RectTransform handleAnchor)
+        {
+            if (clicked == null || partner == null)
+            {
+                FocusSinglePanel(clicked ?? partner);
+                return;
+            }
+
+            activePanels.Remove(partner);
+            activePanels.Remove(clicked);
+            activePanels.Add(partner);
+            activePanels.Add(clicked);
+
+            // sibling은 partner → clicked → handle 순서다. activePanels의 마지막과 화면상 최상위
+            // ModalPanel이 모두 clicked가 되어 ESC 대상과 클릭 결과가 일치한다.
+            partner.transform.SetAsLastSibling();
+            clicked.transform.SetAsLastSibling();
+            if (handleAnchor != null) handleAnchor.SetAsLastSibling();
+        }
+
+        private void FocusSinglePanel(ModalPanel panel)
+        {
+            if (panel == null) return;
+
             activePanels.Remove(panel);
             activePanels.Add(panel);
 
