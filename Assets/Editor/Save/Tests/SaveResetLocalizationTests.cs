@@ -80,6 +80,36 @@ namespace CommonEditor.SaveTests
             LogAssert.NoUnexpectedReceived();
         }
 
+        [Test]
+        public void 서로_다른_숫자_키는_같은_테이블에서도_독립적인_이름과_캐시_키를_쓴다()
+        {
+            StringTable table = MakeTable("cat_knight", "고양이기사", out long catKeyId);
+            StringTableEntry elfEntry = table.AddEntry("elf_archer", "엘프궁수");
+            var cat = new LocalizedString("06_Character", catKeyId);
+            var elf = new LocalizedString("06_Character", elfEntry.KeyId);
+            var locale = new LocaleIdentifier("ko-KR");
+
+            try
+            {
+                Assert.AreNotEqual(new SaveResetLocalization.CacheKey(cat, locale),
+                    new SaveResetLocalization.CacheKey(elf, locale),
+                    "숫자 Key ID가 다른 참조는 하나의 OnGUI 캐시 항목을 공유하면 안 됩니다.");
+                Assert.AreEqual("고양이기사", SaveResetLocalization.Resolve(cat, locale, (_, __) => table));
+                Assert.AreEqual("엘프궁수", SaveResetLocalization.Resolve(elf, locale, (_, __) => table));
+            }
+            finally { Destroy(table); }
+        }
+
+        [Test]
+        public void 같은_참조도_현재_Locale이_다르면_별도_캐시_키를_쓴다()
+        {
+            var reference = new LocalizedString("06_Character", 347070464L);
+
+            Assert.AreNotEqual(
+                new SaveResetLocalization.CacheKey(reference, new LocaleIdentifier("ko-KR")),
+                new SaveResetLocalization.CacheKey(reference, new LocaleIdentifier("en")));
+        }
+
         // ---- 3. 빈 참조 → null ----
 
         [Test]

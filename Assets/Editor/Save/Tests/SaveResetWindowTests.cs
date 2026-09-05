@@ -5,6 +5,7 @@ using NUnit.Framework;
 using Party;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Localization;
 
 namespace CommonEditor.SaveTests
 {
@@ -59,6 +60,38 @@ namespace CommonEditor.SaveTests
             Assert.AreEqual(0, SaveResetWindow.ResolvePartySlotCount(missingDefault));
         }
 
+        [Test]
+        public void Character와_Quest_행은_동일한_캐릭터별_이름_해석과_폴백을_쓴다()
+        {
+            CharacterDefinition cat = CharacterDefinitionOf("CatKnight", initiallyOwned: true, baseCorruption: 0);
+            CharacterDefinition elf = CharacterDefinitionOf("ElfArcher", initiallyOwned: false, baseCorruption: 0);
+            CharacterDefinition missing = CharacterDefinitionOf("NoTranslation", initiallyOwned: false, baseCorruption: 0);
+            cat.LocalizedName.SetReference("06_Character", 101L);
+            elf.LocalizedName.SetReference("06_Character", 102L);
+            SetDisplayName(missing, "Legacy Name");
+            var definitions = new Dictionary<string, CharacterDefinition>
+            {
+                [cat.CharacterId] = cat,
+                [elf.CharacterId] = elf,
+                [missing.CharacterId] = missing,
+            };
+
+            string Resolve(LocalizedString reference)
+            {
+                return reference.TableEntryReference.KeyId == 101L ? "고양이기사" :
+                    reference.TableEntryReference.KeyId == 102L ? "엘프궁수" : null;
+            }
+
+            // DrawCharacterRow와 DrawQuestSection 모두 이 같은 DescribeCharacterName 경로를 호출한다.
+            Assert.AreEqual("고양이기사 (CatKnight)",
+                SaveResetWindow.DescribeCharacterName("CatKnight", definitions, Resolve));
+            Assert.AreEqual("엘프궁수 (ElfArcher)",
+                SaveResetWindow.DescribeCharacterName("ElfArcher", definitions, Resolve));
+            Assert.AreEqual("Legacy Name (NoTranslation)",
+                SaveResetWindow.DescribeCharacterName("NoTranslation", definitions, Resolve));
+            Assert.AreEqual("Unknown", SaveResetWindow.DescribeCharacterName("Unknown", definitions, Resolve));
+        }
+
         private CharacterDefinition CharacterDefinitionOf(
             string id, bool initiallyOwned, int baseCorruption)
         {
@@ -70,6 +103,13 @@ namespace CommonEditor.SaveTests
             serialized.FindProperty("baseCorruption").intValue = baseCorruption;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             return definition;
+        }
+
+        private static void SetDisplayName(CharacterDefinition definition, string value)
+        {
+            var serialized = new SerializedObject(definition);
+            serialized.FindProperty("displayName").stringValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private CharacterCatalog CharacterCatalogOf(params CharacterDefinition[] definitions)

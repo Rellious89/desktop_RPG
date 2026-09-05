@@ -47,8 +47,10 @@ namespace CommonEditor.Save
         private MessageType questResetMessageType = MessageType.None;
 
         // 로컬라이징 이름 조회 캐시. OnGUI는 자주 호출되므로 매 프레임 같은 에디터 에셋을 다시 뒤지지 않는다.
-        // 키: 테이블 참조 + 엔트리 참조. 값: 확인된 문자열 또는 조회 실패(null). RefreshDefinitions에서 비운다.
-        private readonly Dictionary<string, string> localizedNameCache = new Dictionary<string, string>(StringComparer.Ordinal);
+        // 키: 테이블·엔트리 참조와 현재 Locale. 값: 확인된 문자열 또는 조회 실패(null).
+        // 숫자 Key ID도 키 자체로 보존해 같은 테이블의 캐릭터가 결과를 공유하지 않게 한다.
+        private readonly Dictionary<SaveResetLocalization.CacheKey, string> localizedNameCache =
+            new Dictionary<SaveResetLocalization.CacheKey, string>();
 
         // 삭제하려고 체크한 캐릭터 id. Character 비트가 켜질 때 삭제 가능한 캐릭터 전체로 채우고,
         // 개별 해제/재선택은 이 집합을 직접 고친다. 매 프레임 현재 삭제 가능 목록으로 걸러 낸다.
@@ -582,11 +584,21 @@ namespace CommonEditor.Save
 
         private string DescribeCharacterName(string characterId)
         {
+            return DescribeCharacterName(characterId, charactersById, ResolveLocalized);
+        }
+
+        /// <summary>Character 행과 Quest 행이 함께 쓰는 ID→표시 이름 경로.</summary>
+        internal static string DescribeCharacterName(
+            string characterId,
+            IReadOnlyDictionary<string, CharacterDefinition> definitions,
+            Func<LocalizedString, string> resolveLocalized)
+        {
             if (string.IsNullOrEmpty(characterId)) return "(빈 characterId)";
 
-            if (charactersById != null && charactersById.TryGetValue(characterId, out CharacterDefinition def) && def != null)
+            if (definitions != null && definitions.TryGetValue(characterId, out CharacterDefinition def) && def != null)
             {
-                string name = ResolveLocalized(def.LocalizedName) ?? def.DisplayName;
+                string name = resolveLocalized != null ? resolveLocalized(def.LocalizedName) : null;
+                name ??= def.DisplayName;
                 if (!string.IsNullOrEmpty(name) && !string.Equals(name, characterId, StringComparison.Ordinal))
                 {
                     return $"{name} ({characterId})";
@@ -738,18 +750,16 @@ namespace CommonEditor.Save
         {
             if (reference == null || reference.IsEmpty) return null;
 
-            string key = LocalizedCacheKey(reference);
+            var locale = SaveResetLocalization.GetCurrentLocale();
+            if (locale == null) return null;
+
+            var key = new SaveResetLocalization.CacheKey(reference, locale.Identifier);
             if (localizedNameCache.TryGetValue(key, out string cached)) return cached;
 
-            string value = SaveResetLocalization.Resolve(reference);
+            string value = SaveResetLocalization.Resolve(reference, locale.Identifier,
+                SaveResetLocalization.CurrentLocaleTableProvider);
             localizedNameCache[key] = value; // null(조회 실패)도 캐시해 매 프레임 재조회를 막는다.
             return value;
-        }
-
-        /// <summary>테이블 참조 + 엔트리 참조로 캐시 키를 만든다.</summary>
-        private static string LocalizedCacheKey(LocalizedString reference)
-        {
-            return reference.TableReference + "|" + reference.TableEntryReference;
         }
 
         // ---- 강조 스타일 ----
