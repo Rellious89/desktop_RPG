@@ -11,6 +11,10 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: af3bc83bb5c1d4611a476cfa5721f627, type: 3}
   m_Name: CharacterSkillCatalog
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier:
   relations:
+  - {fileID: 11400000, guid: 4972bc70ac28344f0885c5dd533c8521, type: 2}
   - {fileID: 11400000, guid: f8dba9a297fa34e28bcc6f167ff5223f, type: 2}
+  - {fileID: 11400000, guid: 062ad0b80ce144edba08a101305d0ef6, type: 2}
+  - {fileID: 11400000, guid: 1771027a734b343f398e2185a407bd40, type: 2}
+  - {fileID: 11400000, guid: 5b3eb3c683a2e4f1090ae7712dd314a8, type: 2}

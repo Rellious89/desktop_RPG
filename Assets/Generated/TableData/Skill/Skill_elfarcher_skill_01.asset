@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 072df9e0e5a97491986764f89b3a08e8, type: 3}
+  m_Name: Skill_elfarcher_skill_01
+  m_EditorClassIdentifier:
+  skillId: elfarcher_skill_01
+  localizedName:
+    m_TableReference:
+      m_TableCollectionName: GUID:ef851476db7ce4317937dab3f2073a73
+    m_TableEntryReference:
+      m_KeyId: 1678500690911232
+      m_Key:
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  localizedDescription:
+    m_TableReference:
+      m_TableCollectionName: GUID:ef851476db7ce4317937dab3f2073a73
+    m_TableEntryReference:
+      m_KeyId: 1678500690911236
+      m_Key:
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
+  icon: {fileID: 0}
+  skillType: active_attack
+  behaviorKey: attack_motion
+  cooldownSeconds: 18
+  attackMotion: {fileID: 11400000, guid: 7cdefd9f104bb4097a2d70a7683b731c, type: 2}
+  displayOrder: 40
+  references:
+    version: 2
+    RefIds: []

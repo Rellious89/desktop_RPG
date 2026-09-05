@@ -13,6 +13,12 @@ MonoBehaviour:
   m_Name: CharacterStoryQuestCatalog
   m_EditorClassIdentifier:
   quests:
+  - {fileID: 11400000, guid: 5a993a440216f44c5b2e3337203b4e75, type: 2}
   - {fileID: 11400000, guid: f2daf5a8faf5d4976bba6281f6e14e6d, type: 2}
+  - {fileID: 11400000, guid: d6f10a20bbb584a4eb61aeecc55473db, type: 2}
+  - {fileID: 11400000, guid: d5f6e3f57c2e74c68b2894a6f1f842de, type: 2}
   - {fileID: 11400000, guid: 79fa348a3ae6e453d85e6af1caa54026, type: 2}
+  - {fileID: 11400000, guid: ea9999d9cd8ca4945a752b33c71e9abe, type: 2}
+  - {fileID: 11400000, guid: 146974be463b8415998db3c0855aa0e4, type: 2}
   - {fileID: 11400000, guid: 48789999f149644c591b0be2542f480c, type: 2}
+  - {fileID: 11400000, guid: 4259c8b8f1cde40c8a63c5d64e21b8de, type: 2}

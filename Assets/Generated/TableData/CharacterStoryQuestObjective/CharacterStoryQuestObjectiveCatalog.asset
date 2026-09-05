@@ -13,7 +13,15 @@ MonoBehaviour:
   m_Name: CharacterStoryQuestObjectiveCatalog
   m_EditorClassIdentifier:
   objectives:
+  - {fileID: 11400000, guid: 001bd8304855d4f1cb82046f4b9a8f65, type: 2}
+  - {fileID: 11400000, guid: dae4f5eabc386451f88e1c978317b523, type: 2}
+  - {fileID: 11400000, guid: 737567569cbaa48e2897094521233fd5, type: 2}
   - {fileID: 11400000, guid: 2d35be1086459460a885fc22d1082f6c, type: 2}
+  - {fileID: 11400000, guid: 0637bca4fca424457b7776e47613f899, type: 2}
+  - {fileID: 11400000, guid: dcb91c4e78b2b403e82c35d95cb03932, type: 2}
+  - {fileID: 11400000, guid: 264f356c89eee422fb91b658888a81c1, type: 2}
+  - {fileID: 11400000, guid: 600b65541c37d450dbff79f4d7a30093, type: 2}
   - {fileID: 11400000, guid: 05bd497e41b49432f8e95fe6b99e7591, type: 2}
+  - {fileID: 11400000, guid: af018564c48c34e17a8ce367ff4d8745, type: 2}
   - {fileID: 11400000, guid: c77e6e707ce3a403ea4bd5ad8103edd2, type: 2}
   - {fileID: 11400000, guid: 4bbb6ee6a8dbb400cb41789e7bee60fe, type: 2}

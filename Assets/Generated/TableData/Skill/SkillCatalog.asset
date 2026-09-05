@@ -11,6 +11,10 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6331d54e27a55419b87dbf2af43d207b, type: 3}
   m_Name: SkillCatalog
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier:
   skills:
   - {fileID: 11400000, guid: 330e39a611aa64468ab5870814e8e752, type: 2}
+  - {fileID: 11400000, guid: 1716bfaba9d9043168b903d8094d7bc5, type: 2}
+  - {fileID: 11400000, guid: c3a44e68b819b46d180514f6d3db21aa, type: 2}
+  - {fileID: 11400000, guid: b86c91351e7124bf4b164c8e48d4e616, type: 2}
+  - {fileID: 11400000, guid: 14b4d1c051c174ae7a3c797feb3aef9e, type: 2}
