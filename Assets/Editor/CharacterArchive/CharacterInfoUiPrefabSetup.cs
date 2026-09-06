@@ -79,6 +79,17 @@ namespace CharacterArchiveEditor
                 if (template == null) throw new System.InvalidOperationException("list_Skill 템플릿에 SkillListItemView가 없습니다.");
                 template.gameObject.SetActive(false);
 
+                // 제목/카운트는 목록의 상태가 아니라 SkillInfo 자체의 고정 헤더다. Content의
+                // VerticalLayoutGroup에서 분리해 ScrollRect가 움직이는 영역에 포함되지 않게 한다.
+                title.SetParent(skillInfo, false);
+                RectTransform titleRect = title as RectTransform;
+                if (titleRect == null) throw new System.InvalidOperationException("스킬 제목 RectTransform이 없습니다.");
+                titleRect.anchorMin = new Vector2(0f, 1f);
+                titleRect.anchorMax = new Vector2(0f, 1f);
+                titleRect.pivot = new Vector2(0f, 1f);
+                titleRect.anchoredPosition = new Vector2(12f, -2f);
+                title.SetAsLastSibling();
+
                 ScrollRect scroll = skillInfo.GetComponent<ScrollRect>();
                 if (scroll == null) throw new System.InvalidOperationException("SkillInfo ScrollRect가 없습니다.");
                 scroll.horizontal = false;
@@ -90,6 +101,20 @@ namespace CharacterArchiveEditor
                 scroll.content = skillContent.parent as RectTransform;
                 if (scroll.content == null)
                     throw new System.InvalidOperationException("SkillInfo Content 부모 RectTransform이 없습니다.");
+
+                RectTransform viewport = scroll.viewport;
+                if (viewport == null) throw new System.InvalidOperationException("SkillInfo Viewport가 없습니다.");
+                // 고정 헤더(12)와 간격(4)을 비워 목록 viewport가 제목과 겹치지 않게 한다.
+                viewport.anchorMin = Vector2.zero;
+                viewport.anchorMax = Vector2.one;
+                viewport.pivot = new Vector2(.5f, .5f);
+                viewport.offsetMin = Vector2.zero;
+                viewport.offsetMax = new Vector2(0f, -16f);
+
+                // Viewport는 mask만 소유한다. 남아 있던 중첩 ScrollRect는 다른 content를
+                // 가리켜 pointer/scroll ownership을 혼동시키므로 제거한다.
+                ScrollRect nestedScroll = viewport.GetComponent<ScrollRect>();
+                if (nestedScroll != null) Object.DestroyImmediate(nestedScroll);
 
                 VerticalLayoutGroup layout = skillContent.GetComponent<VerticalLayoutGroup>();
                 if (layout == null) layout = skillContent.gameObject.AddComponent<VerticalLayoutGroup>();

@@ -124,7 +124,11 @@ namespace CharacterArchiveEditorTests
                 VerticalLayoutGroup rows = content.GetComponent<VerticalLayoutGroup>();
                 Assert.IsTrue(rows.childControlHeight,
                     "행 컨테이너는 list_Skill의 LayoutElement preferred height를 소비해야 합니다.");
-                ScrollRect scroll = Find(characterInfo, "SkillInfo").GetComponent<ScrollRect>();
+                TMP_Text title = FindDescendant(Find(characterInfo, "SkillInfo"), "lb_title").GetComponent<TMP_Text>();
+                TMP_Text count = (TMP_Text)serialized.FindProperty("skillCountText").objectReferenceValue;
+                GameObject empty = (GameObject)serialized.FindProperty("emptyState").objectReferenceValue;
+                Transform skillInfo = Find(characterInfo, "SkillInfo");
+                ScrollRect scroll = skillInfo.GetComponent<ScrollRect>();
                 Assert.IsTrue(scroll.vertical);
                 Assert.IsFalse(scroll.horizontal);
                 Assert.AreEqual(ScrollRect.MovementType.Clamped, scroll.movementType);
@@ -134,23 +138,36 @@ namespace CharacterArchiveEditorTests
                     "ScrollRect는 VerticalLayoutGroup이 배치하는 list_SkillInfo가 아니라 그 부모 Content를 움직여야 합니다.");
                 Assert.AreSame(scroll.viewport, scrollContent.parent,
                     "ScrollRect Content는 Viewport의 직접 자식이어야 합니다.");
+                Assert.AreSame(skillInfo, title.transform.parent,
+                    "스킬 제목은 ScrollRect Content가 아니라 SkillInfo의 고정 헤더여야 합니다.");
+                Assert.AreSame(title.transform, count.transform.parent,
+                    "동적 스킬 카운트는 고정 제목 헤더와 함께 움직여야 합니다.");
+                Assert.IsFalse(title.transform.IsChildOf(scroll.viewport),
+                    "고정 제목은 스크롤 viewport에 포함되면 안 됩니다.");
+                Assert.IsFalse(count.transform.IsChildOf(scroll.content),
+                    "고정 카운트는 스크롤 content에 포함되면 안 됩니다.");
+                Assert.AreSame(content, empty.transform.parent,
+                    "0개 상태 안내는 스킬 목록 content 안에 남아야 합니다.");
+                Assert.AreSame(content, template.transform.parent,
+                    "템플릿과 런타임 스킬 행은 스킬 목록 content 안에 있어야 합니다.");
+                Assert.IsNull(scroll.viewport.GetComponent<ScrollRect>(),
+                    "Viewport는 mask만 소유하고 ScrollRect는 SkillInfo 하나만 소유합니다.");
+                Assert.LessOrEqual(scroll.viewport.offsetMax.y, -title.rectTransform.rect.height,
+                    "목록 viewport는 고정 헤더 아래에서 시작해야 합니다.");
                 Assert.NotNull(scrollContent.GetComponent<VerticalLayoutGroup>());
                 Assert.AreEqual(ContentSizeFitter.FitMode.PreferredSize,
                     scrollContent.GetComponent<ContentSizeFitter>().verticalFit);
 
-                TMP_Text title = FindDescendant(Find(characterInfo, "SkillInfo"), "lb_title").GetComponent<TMP_Text>();
                 LocalizedTMPText titleLocalizer = title.GetComponent<LocalizedTMPText>();
                 Assert.NotNull(titleLocalizer);
                 Assert.IsTrue(titleLocalizer.enabled, "정적 01/95 제목은 프리팹 로컬라이저가 소유합니다.");
                 StringTable uiTable = AssetDatabase.LoadAssetAtPath<StringTable>(UiTablePath);
                 Assert.NotNull(uiTable);
                 Assert.AreEqual(uiTable.GetEntry("95").KeyId, titleLocalizer.TextReference.TableEntryReference.KeyId);
-                TMP_Text count = (TMP_Text)serialized.FindProperty("skillCountText").objectReferenceValue;
                 LocalizedTMPText countLocalizer = (LocalizedTMPText)serialized.FindProperty("skillCountLocalizer").objectReferenceValue;
                 Assert.AreSame(FindDescendant(Find(characterInfo, "SkillInfo"), "lb_count").GetComponent<TMP_Text>(), count);
                 Assert.IsFalse(countLocalizer.enabled, "동적 01/103 카운트는 컨트롤러가 포맷합니다.");
                 Assert.AreEqual(uiTable.GetEntry("103").KeyId, countLocalizer.TextReference.TableEntryReference.KeyId);
-                GameObject empty = (GameObject)serialized.FindProperty("emptyState").objectReferenceValue;
                 Assert.AreEqual(uiTable.GetEntry("96").KeyId,
                     empty.GetComponent<LocalizedTMPText>().TextReference.TableEntryReference.KeyId);
             }
