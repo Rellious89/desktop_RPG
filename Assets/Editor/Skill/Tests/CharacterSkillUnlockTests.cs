@@ -570,7 +570,7 @@ namespace SkillEditor.Tests
         [Test]
         public void 프로덕션의_생성된_CatKnight_샘플도_같은_레벨_해금_규칙을_쓴다()
         {
-            // 13C 기준 프로덕션 표에는 CatKnight 레벨 5 샘플 한 줄이 있다. 메모리 정의 시험과 똑같이
+            // 생성 표에 다른 스킬이 추가되어도 CatKnight의 이 관계는 메모리 정의 시험과 똑같이
             // Generated 직접 참조와 필요 레벨 경계를 통과해야 한다.
             var skills = AssetDatabase.LoadAssetAtPath<SkillCatalog>(TableDataPaths.SkillCatalogAssetPath);
             var relations = AssetDatabase.LoadAssetAtPath<CharacterSkillCatalog>(
@@ -580,8 +580,7 @@ namespace SkillEditor.Tests
             Assert.IsNotNull(relations, "생성된 관계 카탈로그가 없습니다.");
             skills.MarkDirty();
             relations.MarkDirty();
-            Assert.AreEqual(1, skills.Count, "전제 확인 - 현재 샘플 스킬 한 줄이다.");
-            Assert.AreEqual(1, relations.Count, "전제 확인 - 현재 CatKnight 관계 한 줄이다.");
+            Assert.IsNotNull(skills.Find("catknight_skill_01"), "CatKnight 샘플 스킬이 없습니다.");
 
             CharacterSaveState state = State("CatKnight", level: 4);
             var service = new CharacterSkillUnlockService(
