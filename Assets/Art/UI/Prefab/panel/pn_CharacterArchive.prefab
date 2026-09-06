@@ -8360,6 +8360,7 @@ GameObject:
   - component: {fileID: 8665399423473306995}
   - component: {fileID: 7476122827541384245}
   - component: {fileID: 939390536579145136}
+  - component: {fileID: 765432100000000001}
   m_Layer: 5
   m_Name: QuestInfo
   m_TagString: Untagged
@@ -8428,6 +8429,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_HorizontalFit: 0
   m_VerticalFit: 2
+--- !u!114 &765432100000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5047721984155329222}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d4a3f9ca5104c24a185f894dfd79f28, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  titleText: {fileID: 3264922195853417176}
+  questTypeText: {fileID: 38450546160225420}
+  titleLocalizer: {fileID: 8577456688302989784}
 --- !u!1 &5062120992564321027
 GameObject:
   m_ObjectHideFlags: 0
@@ -10181,6 +10197,11 @@ MonoBehaviour:
   completeButton: {fileID: 4000634981908462201}
   completeButtonText: {fileID: 3527886453458985811}
   objectiveScroll: {fileID: 3012345285097281181}
+  allQuestListRoot: {fileID: 2410242436980661079}
+  allQuestListScroll: {fileID: 8395118495532779771}
+  allQuestListContent: {fileID: 2845987377254730500}
+  allQuestListItemTemplate: {fileID: 765432100000000001}
+  allQuestSelection: {fileID: 4049044745229867928}
   rewardRoot: {fileID: 7869621813590004017}
   rewardCurrencyRoot: {fileID: 4855196224400742900}
   rewardCurrencyAmountText: {fileID: 9138765541559543502}

@@ -54,6 +54,19 @@ namespace CharacterArchiveEditorTests
                 Assert.AreSame(completeButtonText.GetComponent<TMP_Text>(),
                     controllerSerialized.FindProperty("completeButtonText").objectReferenceValue,
                     "완료 버튼 문구는 진행/완료 상태에 따라 컨트롤러가 갱신해야 합니다.");
+                Transform allList = Find(root.transform, "pn_right/QuestInfo/bg_AllList");
+                Transform allListScroll = Find(allList, "ObjectiveScroll");
+                Transform allListContent = Find(allListScroll, "Viewport/Content");
+                Transform allListTemplate = Find(allListContent, "QuestInfo");
+                CharacterStoryQuestListItemView allListItem = allListTemplate.GetComponent<CharacterStoryQuestListItemView>();
+                Assert.NotNull(allListItem);
+                Assert.IsTrue(allListItem.HasRequiredReferences);
+                Assert.AreSame(allList.gameObject, controllerSerialized.FindProperty("allQuestListRoot").objectReferenceValue);
+                Assert.AreSame(allListScroll.GetComponent<ScrollRect>(), controllerSerialized.FindProperty("allQuestListScroll").objectReferenceValue);
+                Assert.AreSame(allListContent.GetComponent<RectTransform>(), controllerSerialized.FindProperty("allQuestListContent").objectReferenceValue);
+                Assert.AreSame(allListItem, controllerSerialized.FindProperty("allQuestListItemTemplate").objectReferenceValue);
+                Assert.AreSame(Find(allListScroll, "Viewport/sp_selectAni").GetComponent<RectTransform>(),
+                    controllerSerialized.FindProperty("allQuestSelection").objectReferenceValue);
                 Transform content = Find(current, "ObjectiveScroll/Viewport/Content");
                 ScrollRect scroll = current.Find("ObjectiveScroll").GetComponent<ScrollRect>();
                 Assert.IsTrue(scroll.vertical); Assert.IsFalse(scroll.horizontal);

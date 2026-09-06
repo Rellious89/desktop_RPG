@@ -54,6 +54,13 @@ namespace CharacterArchive
         [SerializeField] private TMP_Text completeButtonText;
         [SerializeField] private ScrollRect objectiveScroll;
 
+        [Header("All Quest List")]
+        [SerializeField] private GameObject allQuestListRoot;
+        [SerializeField] private ScrollRect allQuestListScroll;
+        [SerializeField] private RectTransform allQuestListContent;
+        [SerializeField] private CharacterStoryQuestListItemView allQuestListItemTemplate;
+        [SerializeField] private RectTransform allQuestSelection;
+
         [Header("Quest Reward UI")]
         [SerializeField] private GameObject rewardRoot;
         [SerializeField] private GameObject rewardCurrencyRoot;
@@ -65,6 +72,7 @@ namespace CharacterArchive
 
         private readonly List<TMP_Text> typeLines = new List<TMP_Text>();
         private readonly List<TMP_Text> descriptionLines = new List<TMP_Text>();
+        private readonly List<CharacterStoryQuestListItemView> questListItems = new List<CharacterStoryQuestListItemView>();
         // 퀘스트 표 문구는 이 컨트롤러의 수명 동안 하나의 참조만 유지한다. Refresh마다 새
         // LocalizedString을 동기 조회하면 테이블 로드 전에는 Entry key가 화면에 보일 수 있다.
         private readonly Dictionary<int, LocalizedTextReference> questTextReferences = new Dictionary<int, LocalizedTextReference>();
@@ -83,6 +91,9 @@ namespace CharacterArchive
         private bool refreshQueued;
         private string displayedCharacterId;
         private string displayedQuestId;
+        private string selectedDetailQuestId;
+        private string selectedDetailCharacterId;
+        private CharacterStoryQuestListItemView selectedQuestListItem;
         private bool selectedOwned = true;
 
         public event Action CloseRequested;
@@ -94,6 +105,8 @@ namespace CharacterArchive
                                              currentProgressSlider != null && totalProgressSlider != null &&
                                              currentProgressPercentText != null && totalProgressPercentText != null && totalProgressText != null &&
                                              questTypeLineTemplate != null && questDescriptionLineTemplate != null && completeButtonText != null &&
+                                             allQuestListRoot != null && allQuestListScroll != null && allQuestListContent != null &&
+                                             allQuestListItemTemplate != null && allQuestSelection != null &&
                                              rewardRoot != null && rewardCurrencyRoot != null && rewardCurrencyAmountText != null &&
                                              rewardItemRoot != null && rewardItemSlot != null;
 
@@ -103,6 +116,7 @@ namespace CharacterArchive
             selected = definition;
             selectedOwned = isOwned;
             completionRequested = false;
+            ResetDetailSelection();
             SetActive(swapButton != null ? swapButton.gameObject : null, selected != null && selectedOwned);
             ShowPage(selectedOwned ? defaultRightPage : RightPage.CharacterInfo);
             Refresh();
@@ -116,6 +130,7 @@ namespace CharacterArchive
             selected = definition;
             selectedOwned = isOwned;
             completionRequested = false;
+            ResetDetailSelection();
             SetActive(swapButton != null ? swapButton.gameObject : null, selected != null && selectedOwned);
             ShowPage(selectedOwned ? RightPage.QuestInfo : RightPage.CharacterInfo);
             Refresh();
@@ -124,6 +139,9 @@ namespace CharacterArchive
         public void BindCharacter(CharacterDefinition definition, bool isOwned = true)
         {
             EnsureInitialized();
+            string nextCharacterId = definition != null ? definition.CharacterId : null;
+            if (!string.Equals(selectedDetailCharacterId, nextCharacterId, StringComparison.Ordinal))
+                ResetDetailSelection();
             selected = definition;
             selectedOwned = isOwned;
             completionRequested = false;
@@ -141,6 +159,8 @@ namespace CharacterArchive
             ClearRewardView();
             displayedCharacterId = null;
             displayedQuestId = null;
+            ResetDetailSelection();
+            HideAllQuestListItems();
             TearDown();
         }
 
@@ -175,6 +195,11 @@ namespace CharacterArchive
             if (swapButton != null) { swapButton.onClick.RemoveListener(TogglePage); swapButton.onClick.AddListener(TogglePage); }
             if (closeButton != null) { closeButton.onClick.RemoveListener(RequestClose); closeButton.onClick.AddListener(RequestClose); }
             if (completeButton != null) { completeButton.onClick.RemoveListener(ConfirmComplete); completeButton.onClick.AddListener(ConfirmComplete); }
+            if (allQuestListScroll != null)
+            {
+                allQuestListScroll.onValueChanged.RemoveListener(HandleAllQuestScroll);
+                allQuestListScroll.onValueChanged.AddListener(HandleAllQuestScroll);
+            }
         }
 
         private void UnbindButtons()
@@ -182,6 +207,7 @@ namespace CharacterArchive
             if (swapButton != null) swapButton.onClick.RemoveListener(TogglePage);
             if (closeButton != null) closeButton.onClick.RemoveListener(RequestClose);
             if (completeButton != null) completeButton.onClick.RemoveListener(ConfirmComplete);
+            if (allQuestListScroll != null) allQuestListScroll.onValueChanged.RemoveListener(HandleAllQuestScroll);
         }
 
         private void SubscribeLocalization()
@@ -295,7 +321,11 @@ namespace CharacterArchive
             completionRequested = true;
             bool completed = service.TryConfirmComplete(selected.CharacterId);
             completionRequested = false;
-            if (completed) Refresh();
+            if (completed)
+            {
+                ResetDetailSelection();
+                Refresh();
+            }
         }
 
         public void Refresh()
@@ -330,10 +360,14 @@ namespace CharacterArchive
             CharacterStoryQuestService service = CharacterStoryQuestService.Instance;
             CharacterStoryQuestSnapshot snapshot = service != null && selected != null
                 ? service.GetSnapshot(selected.CharacterId) : CharacterStoryQuestSnapshot.Empty(selected != null ? selected.CharacterId : string.Empty);
-            CharacterStoryQuestDefinition active = !string.IsNullOrEmpty(snapshot.ActiveQuestId) ? questCatalog.Find(snapshot.ActiveQuestId) : null;
-            List<CharacterStoryQuestObjectiveDefinition> objectives = active != null ? EnabledObjectives(active.QuestId) : new List<CharacterStoryQuestObjectiveDefinition>();
+            List<CharacterStoryQuestDefinition> orderedQuests = OrderedQuestsForSelectedCharacter();
+            EnsureDetailSelection(snapshot, orderedQuests);
+            CharacterStoryQuestDefinition detailQuest = FindQuest(orderedQuests, selectedDetailQuestId);
+            List<CharacterStoryQuestObjectiveDefinition> objectives = detailQuest != null ? EnabledObjectives(detailQuest.QuestId) : new List<CharacterStoryQuestObjectiveDefinition>();
+            bool detailIsActive = detailQuest != null && string.Equals(detailQuest.QuestId, snapshot.ActiveQuestId, StringComparison.Ordinal);
+            bool detailIsCompleted = detailQuest != null && IsCompleted(snapshot, detailQuest.QuestId);
 
-            float current = CalculateCurrentProgress(objectives, snapshot);
+            float current = detailIsCompleted ? 1f : detailIsActive ? CalculateCurrentProgress(objectives, snapshot) : 0f;
             float total = CalculateTotalProgress(questCatalog, selected != null ? selected.CharacterId : string.Empty, snapshot, out int currentNumber, out int completedCount, out int totalCount);
             SetSliderProgress(currentProgressSlider, current);
             SetSliderProgress(totalProgressSlider, total);
@@ -342,20 +376,22 @@ namespace CharacterArchive
             if (totalProgressText != null) totalProgressText.text = SafeFormat(totalProgressFormat, "{0}번 퀘스트 진행 중 ({1}/{2})", currentNumber, completedCount, totalCount);
 
             BindObjectiveTargetLocalization(objectives);
-            UpdateObjectiveLines(objectives, snapshot);
+            UpdateObjectiveLines(objectives, snapshot, detailIsCompleted, detailIsActive);
 
             SetActive(questTypeTitle != null ? questTypeTitle.gameObject : null, objectives.Count > 0);
             SetActive(questDescriptionTitle != null ? questDescriptionTitle.gameObject : null, objectives.Count > 0);
-            RefreshRewards(active);
-            bool readyToComplete = active != null && snapshot.ReadyToComplete;
+            RefreshRewards(detailQuest);
+            bool readyToComplete = detailIsActive && snapshot.ReadyToComplete;
             if (completeButton != null) completeButton.interactable = !completionRequested && readyToComplete;
             if (completeButtonText != null)
-                completeButtonText.text = readyToComplete
+                completeButtonText.text = detailIsCompleted || readyToComplete
                     ? TextOrFallback(completeButtonReadyText, "퀘스트 완료")
                     : TextOrFallback(completeButtonInProgressText, "진행중");
+            ApplyDetailTextColor(detailIsCompleted ? new Color32(0x95, 0x95, 0x95, 0xFF) : Color.white);
+            RefreshAllQuestList(orderedQuests, snapshot);
 
             string characterId = selected != null ? selected.CharacterId : null;
-            string questId = active != null ? active.QuestId : null;
+            string questId = detailQuest != null ? detailQuest.QuestId : null;
             bool selectionChanged = !string.Equals(displayedCharacterId, characterId, StringComparison.Ordinal) ||
                                   !string.Equals(displayedQuestId, questId, StringComparison.Ordinal);
             RefreshObjectiveLayout(selectionChanged);
@@ -419,14 +455,15 @@ namespace CharacterArchive
             return all;
         }
 
-        private void UpdateObjectiveLines(IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives, CharacterStoryQuestSnapshot snapshot)
+        private void UpdateObjectiveLines(IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives,
+            CharacterStoryQuestSnapshot snapshot, bool completed, bool active)
         {
             int count = objectives != null ? objectives.Count : 0;
             for (int i = 0; i < count; i++)
             {
                 CharacterStoryQuestObjectiveDefinition objective = objectives[i];
                 int required = objective.RequiredValue;
-                int progress = GetProgress(snapshot, objective.ObjectiveId, required);
+                int progress = completed ? required : active ? GetProgress(snapshot, objective.ObjectiveId, required) : 0;
                 TMP_Text type = GetOrCreateLine(questTypeLineTemplate, typeLines, i);
                 TMP_Text description = GetOrCreateLine(questDescriptionLineTemplate, descriptionLines, i);
                 if (type != null) type.text = ConditionTitle(objective.ConditionType);
@@ -484,6 +521,159 @@ namespace CharacterArchive
                 objectiveScroll.StopMovement();
                 objectiveScroll.verticalNormalizedPosition = 1f;
             }
+        }
+
+        private void ResetDetailSelection()
+        {
+            selectedDetailQuestId = null;
+            selectedDetailCharacterId = null;
+            selectedQuestListItem = null;
+        }
+
+        private List<CharacterStoryQuestDefinition> OrderedQuestsForSelectedCharacter()
+        {
+            var result = new List<CharacterStoryQuestDefinition>();
+            string characterId = selected != null ? selected.CharacterId : string.Empty;
+            if (questCatalog == null || string.IsNullOrEmpty(characterId)) return result;
+            foreach (CharacterStoryQuestDefinition quest in questCatalog.Quests)
+                if (quest != null && quest.Enabled && string.Equals(quest.CharacterId, characterId, StringComparison.Ordinal))
+                    result.Add(quest);
+            result.Sort((left, right) => left.DisplayOrder != right.DisplayOrder
+                ? left.DisplayOrder.CompareTo(right.DisplayOrder)
+                : string.CompareOrdinal(left.QuestId, right.QuestId));
+            return result;
+        }
+
+        private void EnsureDetailSelection(CharacterStoryQuestSnapshot snapshot, IReadOnlyList<CharacterStoryQuestDefinition> quests)
+        {
+            string characterId = selected != null ? selected.CharacterId : null;
+            bool characterChanged = !string.Equals(selectedDetailCharacterId, characterId, StringComparison.Ordinal);
+            if (!characterChanged && FindQuest(quests, selectedDetailQuestId) != null) return;
+
+            selectedDetailCharacterId = characterId;
+            selectedDetailQuestId = !string.IsNullOrEmpty(snapshot != null ? snapshot.ActiveQuestId : null)
+                ? snapshot.ActiveQuestId
+                : quests != null && quests.Count > 0 ? quests[quests.Count - 1].QuestId : null;
+        }
+
+        private void RefreshAllQuestList(IReadOnlyList<CharacterStoryQuestDefinition> quests, CharacterStoryQuestSnapshot snapshot)
+        {
+            int count = quests != null ? quests.Count : 0;
+            EnsureQuestListItemCount(count);
+            selectedQuestListItem = null;
+            for (int i = 0; i < count; i++)
+            {
+                CharacterStoryQuestDefinition quest = quests[i];
+                CharacterStoryQuestListItemView item = questListItems[i];
+                bool isSelected = string.Equals(quest.QuestId, selectedDetailQuestId, StringComparison.Ordinal);
+                item.Bind(quest, QuestTypeSummary(quest.QuestId), isSelected, IsCompleted(snapshot, quest.QuestId), SelectQuest);
+                if (!item.gameObject.activeSelf) item.gameObject.SetActive(true);
+                if (isSelected) selectedQuestListItem = item;
+            }
+            for (int i = count; i < questListItems.Count; i++)
+            {
+                questListItems[i].Unbind();
+                SetActive(questListItems[i].gameObject, false);
+            }
+
+            SetActive(allQuestListRoot, count > 0);
+            if (allQuestListItemTemplate != null) SetActive(allQuestListItemTemplate.gameObject, false);
+            RefreshAllQuestListLayout();
+        }
+
+        private void EnsureQuestListItemCount(int count)
+        {
+            if (allQuestListItemTemplate == null || allQuestListContent == null) return;
+            while (questListItems.Count < count)
+            {
+                CharacterStoryQuestListItemView item = Instantiate(allQuestListItemTemplate, allQuestListContent);
+                item.name = allQuestListItemTemplate.name + "_Runtime";
+                item.gameObject.SetActive(false);
+                questListItems.Add(item);
+            }
+        }
+
+        private void HideAllQuestListItems()
+        {
+            for (int i = 0; i < questListItems.Count; i++)
+            {
+                questListItems[i].Unbind();
+                SetActive(questListItems[i].gameObject, false);
+            }
+            SetActive(allQuestSelection != null ? allQuestSelection.gameObject : null, false);
+        }
+
+        private void SelectQuest(string questId)
+        {
+            if (string.IsNullOrEmpty(questId) || string.Equals(selectedDetailQuestId, questId, StringComparison.Ordinal)) return;
+            selectedDetailQuestId = questId;
+            Refresh();
+        }
+
+        private string QuestTypeSummary(string questId)
+        {
+            List<CharacterStoryQuestObjectiveDefinition> objectives = EnabledObjectives(questId);
+            var labels = new List<string>();
+            for (int i = 0; i < objectives.Count; i++)
+            {
+                string label = ConditionTitle(objectives[i].ConditionType);
+                if (!string.IsNullOrEmpty(label) && !labels.Contains(label)) labels.Add(label);
+            }
+            return string.Join(" / ", labels);
+        }
+
+        private void RefreshAllQuestListLayout()
+        {
+            if (allQuestListContent == null) return;
+            for (int i = 0; i < allQuestListContent.childCount; i++)
+            {
+                RectTransform child = allQuestListContent.GetChild(i) as RectTransform;
+                if (child != null && child.gameObject.activeInHierarchy)
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(child);
+            }
+            LayoutRebuilder.ForceRebuildLayoutImmediate(allQuestListContent);
+            Canvas.ForceUpdateCanvases();
+            UpdateQuestSelectionPosition();
+        }
+
+        private void HandleAllQuestScroll(Vector2 _) => UpdateQuestSelectionPosition();
+
+        private void UpdateQuestSelectionPosition()
+        {
+            RectTransform itemRect = selectedQuestListItem != null ? selectedQuestListItem.RectTransform : null;
+            bool visible = itemRect != null && allQuestSelection != null;
+            SetActive(allQuestSelection != null ? allQuestSelection.gameObject : null, visible);
+            if (!visible) return;
+            allQuestSelection.SetAsLastSibling();
+            Vector3 center = itemRect.TransformPoint(itemRect.rect.center);
+            allQuestSelection.position = new Vector3(center.x, center.y, allQuestSelection.position.z);
+            if (allQuestSelection.TryGetComponent(out Graphic graphic)) graphic.raycastTarget = false;
+        }
+
+        private void ApplyDetailTextColor(Color color)
+        {
+            if (currentProgressPercentText != null) currentProgressPercentText.color = color;
+            if (completeButtonText != null) completeButtonText.color = color;
+            RectTransform content = objectiveScroll != null ? objectiveScroll.content : null;
+            if (content == null) return;
+            TMP_Text[] texts = content.GetComponentsInChildren<TMP_Text>(true);
+            for (int i = 0; i < texts.Length; i++) texts[i].color = color;
+        }
+
+        private static CharacterStoryQuestDefinition FindQuest(IReadOnlyList<CharacterStoryQuestDefinition> quests, string questId)
+        {
+            if (quests == null || string.IsNullOrEmpty(questId)) return null;
+            for (int i = 0; i < quests.Count; i++)
+                if (quests[i] != null && string.Equals(quests[i].QuestId, questId, StringComparison.Ordinal)) return quests[i];
+            return null;
+        }
+
+        private static bool IsCompleted(CharacterStoryQuestSnapshot snapshot, string questId)
+        {
+            if (snapshot == null || snapshot.CompletedQuestIds == null || string.IsNullOrEmpty(questId)) return false;
+            for (int i = 0; i < snapshot.CompletedQuestIds.Count; i++)
+                if (string.Equals(snapshot.CompletedQuestIds[i], questId, StringComparison.Ordinal)) return true;
+            return false;
         }
 
         private string ObjectiveDescription(CharacterStoryQuestObjectiveDefinition objective, int current, int required)

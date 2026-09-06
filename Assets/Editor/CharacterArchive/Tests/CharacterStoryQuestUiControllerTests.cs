@@ -371,6 +371,36 @@ namespace CharacterArchiveEditorTests
             Assert.AreNotEqual(topY, content.anchoredPosition.y, "Content가 Viewport보다 길면 ScrollRect가 실제로 이동해야 합니다.");
         }
 
+        [Test]
+        public void AllQuestListItem_ExpandsOnlySelectedRow_AndUsesRequestedStateColors()
+        {
+            GameObject itemObject = new GameObject("quest item", typeof(RectTransform)); created.Add(itemObject);
+            CharacterStoryQuestListItemView item = itemObject.AddComponent<CharacterStoryQuestListItemView>();
+            GameObject titleObject = new GameObject("title", typeof(RectTransform), typeof(TextMeshProUGUI)); created.Add(titleObject);
+            GameObject typeObject = new GameObject("type", typeof(RectTransform), typeof(TextMeshProUGUI)); created.Add(typeObject);
+            titleObject.transform.SetParent(itemObject.transform, false);
+            typeObject.transform.SetParent(itemObject.transform, false);
+            TMP_Text title = titleObject.GetComponent<TMP_Text>();
+            TMP_Text type = typeObject.GetComponent<TMP_Text>();
+            Set(item, "titleText", title);
+            Set(item, "questTypeText", type);
+            CharacterStoryQuestDefinition quest = Quest("Q1", 10);
+            string clicked = null;
+
+            item.Bind(quest, "던전", false, true, id => clicked = id);
+            Assert.IsFalse(typeObject.activeSelf);
+            Assert.AreEqual(new Color32(0x95, 0x95, 0x95, 0xFF), (Color32)title.color);
+
+            item.Bind(quest, "던전", true, true, id => clicked = id);
+            Assert.IsTrue(typeObject.activeSelf);
+            Assert.AreEqual("던전", type.text);
+            Assert.AreEqual(new Color32(0x01, 0xDC, 0xFF, 0xFF), (Color32)title.color);
+            Assert.AreEqual((Color32)title.color, (Color32)type.color);
+            item.OnPointerClick(null);
+            Assert.AreEqual("Q1", clicked);
+            Assert.IsTrue(itemObject.GetComponent<Graphic>().raycastTarget);
+        }
+
         private CharacterStoryQuestObjectiveDefinition Objective(string id, int required)
         {
             CharacterStoryQuestObjectiveDefinition result = Create<CharacterStoryQuestObjectiveDefinition>();
@@ -397,7 +427,7 @@ namespace CharacterArchiveEditorTests
         private static void UpdateObjectiveLines(CharacterStoryQuestUiController controller,
             IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives, CharacterStoryQuestSnapshot snapshot) =>
             typeof(CharacterStoryQuestUiController).GetMethod("UpdateObjectiveLines", BindingFlags.Instance | BindingFlags.NonPublic)
-                .Invoke(controller, new object[] { objectives, snapshot });
+                .Invoke(controller, new object[] { objectives, snapshot, false, true });
 
         private static void AssertLinePool(CharacterStoryQuestUiController controller, string fieldName, int expectedPool, int expectedActive)
         {
