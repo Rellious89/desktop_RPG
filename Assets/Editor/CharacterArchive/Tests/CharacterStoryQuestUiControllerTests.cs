@@ -125,6 +125,8 @@ namespace CharacterArchiveEditorTests
             Assert.AreEqual("2번 퀘스트 진행 중 (1/3)", string.Format(ui.GetEntry("87").Value, 2, 1, 3));
             Assert.AreEqual("퀘스트 완료", ui.GetEntry("91").Value);
             Assert.AreEqual("진행중", ui.GetEntry("93").Value);
+            Assert.AreEqual("서사 퀘스트 2단계", string.Format(ui.GetEntry("106").Value, 2));
+            Assert.AreEqual("(완료)", ui.GetEntry("107").Value);
         }
 
         [TestCase(0f)]
@@ -150,15 +152,15 @@ namespace CharacterArchiveEditorTests
             GameObject host = new GameObject("story-quest-localization-lifecycle"); created.Add(host);
             var controller = host.AddComponent<CharacterStoryQuestUiController>();
             controller.OpenFor(null);
-            Assert.AreEqual(13, LocalizationSubscriptionCount(controller));
+            Assert.AreEqual(14, LocalizationSubscriptionCount(controller));
 
             controller.Close();
             Assert.AreEqual(0, LocalizationSubscriptionCount(controller));
 
             controller.OpenFor(null);
-            Assert.AreEqual(13, LocalizationSubscriptionCount(controller));
+            Assert.AreEqual(14, LocalizationSubscriptionCount(controller));
             controller.OpenFor(null);
-            Assert.AreEqual(13, LocalizationSubscriptionCount(controller));
+            Assert.AreEqual(14, LocalizationSubscriptionCount(controller));
         }
 
         [Test]
@@ -372,33 +374,73 @@ namespace CharacterArchiveEditorTests
         }
 
         [Test]
-        public void AllQuestListItem_ExpandsOnlySelectedRow_AndUsesRequestedStateColors()
+        public void AllQuestListItem_UsesStageTitle_ExpandsOnlySelectedRow_AndShowsCompleteOnlyWhenCompleted()
         {
             GameObject itemObject = new GameObject("quest item", typeof(RectTransform)); created.Add(itemObject);
             CharacterStoryQuestListItemView item = itemObject.AddComponent<CharacterStoryQuestListItemView>();
             GameObject titleObject = new GameObject("title", typeof(RectTransform), typeof(TextMeshProUGUI)); created.Add(titleObject);
             GameObject typeObject = new GameObject("type", typeof(RectTransform), typeof(TextMeshProUGUI)); created.Add(typeObject);
+            GameObject completeObject = new GameObject("complete", typeof(RectTransform), typeof(TextMeshProUGUI)); created.Add(completeObject);
             titleObject.transform.SetParent(itemObject.transform, false);
             typeObject.transform.SetParent(itemObject.transform, false);
+            completeObject.transform.SetParent(titleObject.transform, false);
             TMP_Text title = titleObject.GetComponent<TMP_Text>();
             TMP_Text type = typeObject.GetComponent<TMP_Text>();
             Set(item, "titleText", title);
             Set(item, "questTypeText", type);
+            Set(item, "completeLabel", completeObject);
             CharacterStoryQuestDefinition quest = Quest("Q1", 10);
             string clicked = null;
 
-            item.Bind(quest, "던전", false, true, id => clicked = id);
+            item.Bind(quest, "서사 퀘스트 1단계", "던전", false, false, id => clicked = id);
             Assert.IsFalse(typeObject.activeSelf);
+            Assert.IsFalse(completeObject.activeSelf);
+            Assert.AreEqual("서사 퀘스트 1단계", title.text, "실제 퀘스트 제목 대신 정렬된 단계 제목을 표시해야 합니다.");
+            Assert.AreEqual(Color.white, title.color);
+
+            item.Bind(quest, "서사 퀘스트 1단계", "던전", false, true, id => clicked = id);
+            Assert.IsTrue(completeObject.activeSelf);
             Assert.AreEqual(new Color32(0x95, 0x95, 0x95, 0xFF), (Color32)title.color);
 
-            item.Bind(quest, "던전", true, true, id => clicked = id);
+            item.Bind(quest, "서사 퀘스트 1단계", "던전", true, true, id => clicked = id);
             Assert.IsTrue(typeObject.activeSelf);
+            Assert.IsTrue(completeObject.activeSelf);
             Assert.AreEqual("던전", type.text);
             Assert.AreEqual(new Color32(0x01, 0xDC, 0xFF, 0xFF), (Color32)title.color);
             Assert.AreEqual((Color32)title.color, (Color32)type.color);
             item.OnPointerClick(null);
             Assert.AreEqual("Q1", clicked);
             Assert.IsTrue(itemObject.GetComponent<Graphic>().raycastTarget);
+        }
+
+        [Test]
+        public void AllQuestListOrder_UsesDisplayOrderThenQuestId_ForOneBasedStageNumbers()
+        {
+            GameObject host = new GameObject("story-quest-list-order"); created.Add(host);
+            CharacterStoryQuestUiController controller = host.AddComponent<CharacterStoryQuestUiController>();
+            CharacterDefinition character = Create<CharacterDefinition>();
+            Set(character, "characterId", "CatKnight");
+            CharacterStoryQuestDefinition later = Quest("Q-Z", 20);
+            CharacterStoryQuestDefinition tieSecond = Quest("Q-B", 10);
+            CharacterStoryQuestDefinition tieFirst = Quest("Q-A", 10);
+            CharacterStoryQuestDefinition otherCharacter = Quest("Q-Other", 1);
+            Set(otherCharacter, "characterId", "Other");
+            CharacterStoryQuestCatalog catalog = Create<CharacterStoryQuestCatalog>();
+            Set(catalog, "quests", new List<CharacterStoryQuestDefinition>
+            {
+                later, tieSecond, otherCharacter, tieFirst
+            });
+            Set(controller, "selected", character);
+            Set(controller, "questCatalog", catalog);
+
+            var ordered = (List<CharacterStoryQuestDefinition>)typeof(CharacterStoryQuestUiController)
+                .GetMethod("OrderedQuestsForSelectedCharacter", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(controller, null);
+
+            CollectionAssert.AreEqual(new[] { "Q-A", "Q-B", "Q-Z" },
+                new[] { ordered[0].QuestId, ordered[1].QuestId, ordered[2].QuestId });
+            Assert.AreEqual("서사 퀘스트 1단계", string.Format("서사 퀘스트 {0}단계", 1));
+            Assert.AreEqual("서사 퀘스트 3단계", string.Format("서사 퀘스트 {0}단계", ordered.Count));
         }
 
         private CharacterStoryQuestObjectiveDefinition Objective(string id, int required)

@@ -61,6 +61,20 @@ namespace CharacterArchiveEditorTests
                 CharacterStoryQuestListItemView allListItem = allListTemplate.GetComponent<CharacterStoryQuestListItemView>();
                 Assert.NotNull(allListItem);
                 Assert.IsTrue(allListItem.HasRequiredReferences);
+                SerializedObject listItemSerialized = new SerializedObject(allListItem);
+                Transform allListTitle = Find(allListTemplate, "lb_title");
+                Transform allListComplete = Find(allListTitle, "lb_complete");
+                Assert.AreSame(allListTitle.GetComponent<TMP_Text>(),
+                    listItemSerialized.FindProperty("titleText").objectReferenceValue);
+                Assert.AreSame(allListComplete.gameObject,
+                    listItemSerialized.FindProperty("completeLabel").objectReferenceValue,
+                    "새 완료 라벨은 목록 행의 직렬화 참조로 직접 연결되어야 합니다.");
+                Assert.AreEqual(14504778829651968L,
+                    allListTitle.GetComponent<LocalizedTMPText>().TextReference.TableEntryReference.KeyId,
+                    "lb_title은 UI 로컬라이즈 106번 엔트리를 유지해야 합니다.");
+                Assert.AreEqual(14505869390635008L,
+                    allListComplete.GetComponent<LocalizedTMPText>().TextReference.TableEntryReference.KeyId,
+                    "lb_complete는 UI 로컬라이즈 107번 엔트리를 유지해야 합니다.");
                 Assert.AreSame(allList.gameObject, controllerSerialized.FindProperty("allQuestListRoot").objectReferenceValue);
                 Assert.AreSame(allListScroll.GetComponent<ScrollRect>(), controllerSerialized.FindProperty("allQuestListScroll").objectReferenceValue);
                 Assert.AreSame(allListContent.GetComponent<RectTransform>(), controllerSerialized.FindProperty("allQuestListContent").objectReferenceValue);

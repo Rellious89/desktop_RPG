@@ -8445,6 +8445,7 @@ MonoBehaviour:
   titleText: {fileID: 3264922195853417176}
   questTypeText: {fileID: 38450546160225420}
   titleLocalizer: {fileID: 8577456688302989784}
+  completeLabel: {fileID: 7627276591216261313}
 --- !u!1 &5062120992564321027
 GameObject:
   m_ObjectHideFlags: 0

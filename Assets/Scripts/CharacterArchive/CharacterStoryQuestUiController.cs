@@ -25,6 +25,7 @@ namespace CharacterArchive
         private const int TotalProgressFormatKey = 87;
         private const int CompleteButtonReadyKey = 91;
         private const int CompleteButtonInProgressKey = 93;
+        private const int QuestListStageFormatKey = 106;
         private static readonly int[] QuestLocalizationKeys = { 1, 2, 3, 4, 10001, 10002, 10003, 10004, 100002, 100004 };
 
         [Header("Catalogs (Inspector에서만 연결)")]
@@ -84,6 +85,8 @@ namespace CharacterArchive
         private LocalizedTextReference completeButtonInProgressReference;
         private string completeButtonReadyText;
         private string completeButtonInProgressText;
+        private LocalizedTextReference questListStageFormatReference;
+        private string questListStageFormat;
         private CharacterDefinition selected;
         private bool completionRequested;
         private bool subscribed;
@@ -232,6 +235,12 @@ namespace CharacterArchive
                 completeButtonInProgressText = IsUsableLocalizedValue(value, CompleteButtonInProgressKey.ToString()) ? value : null;
                 Refresh();
             });
+            questListStageFormatReference = CreateLocalizedReference(UiTableGuid, QuestListStageFormatKey);
+            AddLocalization(questListStageFormatReference, value =>
+            {
+                questListStageFormat = IsUsableLocalizedValue(value, QuestListStageFormatKey.ToString()) ? value : null;
+                Refresh();
+            });
             subscribed = true;
         }
 
@@ -292,6 +301,8 @@ namespace CharacterArchive
             completeButtonInProgressReference = null;
             completeButtonReadyText = null;
             completeButtonInProgressText = null;
+            questListStageFormatReference = null;
+            questListStageFormat = null;
             subscribed = false;
         }
 
@@ -566,7 +577,9 @@ namespace CharacterArchive
                 CharacterStoryQuestDefinition quest = quests[i];
                 CharacterStoryQuestListItemView item = questListItems[i];
                 bool isSelected = string.Equals(quest.QuestId, selectedDetailQuestId, StringComparison.Ordinal);
-                item.Bind(quest, QuestTypeSummary(quest.QuestId), isSelected, IsCompleted(snapshot, quest.QuestId), SelectQuest);
+                string stageTitle = SafeFormat(questListStageFormat, "서사 퀘스트 {0}단계", i + 1);
+                item.Bind(quest, stageTitle, QuestTypeSummary(quest.QuestId), isSelected,
+                    IsCompleted(snapshot, quest.QuestId), SelectQuest);
                 if (!item.gameObject.activeSelf) item.gameObject.SetActive(true);
                 if (isSelected) selectedQuestListItem = item;
             }

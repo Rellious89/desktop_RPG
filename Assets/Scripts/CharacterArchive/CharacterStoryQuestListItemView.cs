@@ -18,31 +18,28 @@ namespace CharacterArchive
         [SerializeField] private TMP_Text titleText;
         [SerializeField] private TMP_Text questTypeText;
         [SerializeField] private LocalizedTMPText titleLocalizer;
+        [SerializeField] private GameObject completeLabel;
 
         private CharacterStoryQuestDefinition definition;
-        private LocalizedTextReference boundTitle;
         private Action<string> selectedCallback;
 
         public string QuestId => definition != null ? definition.QuestId : string.Empty;
         public RectTransform RectTransform => transform as RectTransform;
-        public bool HasRequiredReferences => titleText != null && questTypeText != null && titleLocalizer != null;
+        public bool HasRequiredReferences => titleText != null && questTypeText != null &&
+                                             titleLocalizer != null && completeLabel != null;
 
-        public void Bind(CharacterStoryQuestDefinition quest, string questType, bool selected, bool completed,
-            Action<string> onSelected)
+        public void Bind(CharacterStoryQuestDefinition quest, string stageTitle, string questType, bool selected,
+            bool completed, Action<string> onSelected)
         {
             Unbind();
             EnsureRaycastTarget();
-            // 제작용 샘플 문구의 정적 localizer가 실제 퀘스트 제목을 다시 덮어쓰지 않게 한다.
+            // {0} 인자가 필요한 제목은 컨트롤러가 현재 Locale과 정렬된 단계 번호로 조립한다.
             if (titleLocalizer != null) titleLocalizer.enabled = false;
             definition = quest;
             selectedCallback = onSelected;
 
-            ApplyTitle(definition != null ? definition.QuestId : string.Empty);
-            if (definition != null && definition.LocalizedTitle != null && definition.LocalizedTitle.HasReference)
-            {
-                boundTitle = definition.LocalizedTitle;
-                boundTitle.StringChanged += ApplyTitle;
-            }
+            if (titleText != null) titleText.text = stageTitle ?? string.Empty;
+            if (completeLabel != null) completeLabel.SetActive(completed);
 
             if (questTypeText != null)
             {
@@ -57,10 +54,9 @@ namespace CharacterArchive
 
         public void Unbind()
         {
-            if (boundTitle != null) boundTitle.StringChanged -= ApplyTitle;
-            boundTitle = null;
             definition = null;
             selectedCallback = null;
+            if (completeLabel != null) completeLabel.SetActive(false);
         }
 
         public void OnPointerClick(PointerEventData eventData)
@@ -69,14 +65,6 @@ namespace CharacterArchive
         }
 
         private void OnDestroy() => Unbind();
-
-        private void ApplyTitle(string value)
-        {
-            if (titleText == null) return;
-            titleText.text = string.IsNullOrWhiteSpace(value) && definition != null
-                ? definition.QuestId
-                : value ?? string.Empty;
-        }
 
         private void EnsureRaycastTarget()
         {
