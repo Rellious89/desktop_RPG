@@ -626,6 +626,12 @@ MonoBehaviour:
   nameText: {fileID: 3302875640252814963}
   descriptionText: {fileID: 832196801723228218}
   cooldownText: {fileID: 2758088810746822020}
+  unlockedNameRoot: {fileID: 7035591106136472417}
+  cooldownRoot: {fileID: 2009397402315525948}
+  lockedInfoRoot: {fileID: 5712786036942729770}
+  lockedNameText: {fileID: 1322131230949588611}
+  lockedDescriptionText: {fileID: 796117653084953121}
+  lockedDescriptionLocalizer: {fileID: 8902826145395122349}
   placeholderIcon: {fileID: 0}
 --- !u!114 &9036508472619347281
 MonoBehaviour:
@@ -1374,7 +1380,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7731163462007218425}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ac2fe041186f04abb8c0c248afb8f108, type: 3}
   m_Name: 

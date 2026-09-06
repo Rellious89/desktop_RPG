@@ -34,8 +34,24 @@ namespace CharacterArchiveEditorTests
                     serialized.FindProperty("nameText").objectReferenceValue);
                 Assert.AreSame(Find(root.transform, "sp_name/lb_SkillDescription").GetComponent<TMP_Text>(),
                     serialized.FindProperty("descriptionText").objectReferenceValue);
-                Assert.AreSame(Find(root.transform, "sp_cooldown/lb_level").GetComponent<TMP_Text>(),
+                Assert.AreSame(Find(root.transform, "sp_cooldown/lb_colldown").GetComponent<TMP_Text>(),
                     serialized.FindProperty("cooldownText").objectReferenceValue);
+                Assert.AreSame(Find(root.transform, "sp_name").gameObject,
+                    serialized.FindProperty("unlockedNameRoot").objectReferenceValue);
+                Assert.AreSame(Find(root.transform, "sp_cooldown").gameObject,
+                    serialized.FindProperty("cooldownRoot").objectReferenceValue);
+                Assert.AreSame(Find(root.transform, "LockInfo").gameObject,
+                    serialized.FindProperty("lockedInfoRoot").objectReferenceValue);
+                Assert.AreSame(Find(root.transform, "LockInfo/LockInfo/lb_SkillName_Lock").GetComponent<TMP_Text>(),
+                    serialized.FindProperty("lockedNameText").objectReferenceValue);
+                Assert.AreSame(Find(root.transform, "LockInfo/LockInfo/lb_SkillDescription_Lock").GetComponent<TMP_Text>(),
+                    serialized.FindProperty("lockedDescriptionText").objectReferenceValue);
+                LocalizedTMPText lockFormat = (LocalizedTMPText)serialized
+                    .FindProperty("lockedDescriptionLocalizer").objectReferenceValue;
+                Assert.AreSame(Find(root.transform, "LockInfo/LockInfo/lb_SkillDescription_Lock").GetComponent<LocalizedTMPText>(), lockFormat);
+                Assert.IsFalse(lockFormat.enabled, "동적 01/104 문구는 행이 레벨 인자로 포맷합니다.");
+                StringTable uiTable = AssetDatabase.LoadAssetAtPath<StringTable>(UiTablePath);
+                Assert.AreEqual(uiTable.GetEntry("104").KeyId, lockFormat.TextReference.TableEntryReference.KeyId);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
         }
@@ -122,13 +138,18 @@ namespace CharacterArchiveEditorTests
                 Assert.AreEqual(ContentSizeFitter.FitMode.PreferredSize,
                     scrollContent.GetComponent<ContentSizeFitter>().verticalFit);
 
-                TMP_Text title = (TMP_Text)serialized.FindProperty("skillTitleText").objectReferenceValue;
+                TMP_Text title = FindDescendant(Find(characterInfo, "SkillInfo"), "lb_title").GetComponent<TMP_Text>();
                 LocalizedTMPText titleLocalizer = title.GetComponent<LocalizedTMPText>();
                 Assert.NotNull(titleLocalizer);
-                Assert.IsFalse(titleLocalizer.enabled, "인자 문구는 컨트롤러만 갱신해야 합니다.");
+                Assert.IsTrue(titleLocalizer.enabled, "정적 01/95 제목은 프리팹 로컬라이저가 소유합니다.");
                 StringTable uiTable = AssetDatabase.LoadAssetAtPath<StringTable>(UiTablePath);
                 Assert.NotNull(uiTable);
                 Assert.AreEqual(uiTable.GetEntry("95").KeyId, titleLocalizer.TextReference.TableEntryReference.KeyId);
+                TMP_Text count = (TMP_Text)serialized.FindProperty("skillCountText").objectReferenceValue;
+                LocalizedTMPText countLocalizer = (LocalizedTMPText)serialized.FindProperty("skillCountLocalizer").objectReferenceValue;
+                Assert.AreSame(FindDescendant(Find(characterInfo, "SkillInfo"), "lb_count").GetComponent<TMP_Text>(), count);
+                Assert.IsFalse(countLocalizer.enabled, "동적 01/103 카운트는 컨트롤러가 포맷합니다.");
+                Assert.AreEqual(uiTable.GetEntry("103").KeyId, countLocalizer.TextReference.TableEntryReference.KeyId);
                 GameObject empty = (GameObject)serialized.FindProperty("emptyState").objectReferenceValue;
                 Assert.AreEqual(uiTable.GetEntry("96").KeyId,
                     empty.GetComponent<LocalizedTMPText>().TextReference.TableEntryReference.KeyId);
@@ -207,6 +228,29 @@ namespace CharacterArchiveEditorTests
             Transform result = root.Find(path);
             Assert.NotNull(result, path);
             return result;
+        }
+
+        private static Transform FindDescendant(Transform root, string name)
+        {
+            if (root.name == name) return root;
+            foreach (Transform child in root)
+            {
+                Transform found = FindDescendantOrNull(child, name);
+                if (found != null) return found;
+            }
+            Assert.Fail(name);
+            return null;
+        }
+
+        private static Transform FindDescendantOrNull(Transform root, string name)
+        {
+            if (root.name == name) return root;
+            foreach (Transform child in root)
+            {
+                Transform found = FindDescendantOrNull(child, name);
+                if (found != null) return found;
+            }
+            return null;
         }
     }
 }

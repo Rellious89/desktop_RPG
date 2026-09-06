@@ -37,7 +37,20 @@ namespace CharacterArchiveEditor
                 Set(serialized, "iconImage", icon);
                 Set(serialized, "nameText", Find(root.transform, "sp_name/lb_SkillName").GetComponent<TMP_Text>());
                 Set(serialized, "descriptionText", Find(root.transform, "sp_name/lb_SkillDescription").GetComponent<TMP_Text>());
-                Set(serialized, "cooldownText", Find(root.transform, "sp_cooldown/lb_level").GetComponent<TMP_Text>());
+                Set(serialized, "cooldownText", Find(root.transform, "sp_cooldown/lb_colldown").GetComponent<TMP_Text>());
+                Set(serialized, "unlockedNameRoot", Find(root.transform, "sp_name").gameObject);
+                Set(serialized, "cooldownRoot", Find(root.transform, "sp_cooldown").gameObject);
+                Transform lockInfo = Find(root.transform, "LockInfo");
+                Set(serialized, "lockedInfoRoot", lockInfo.gameObject);
+                Transform lockContent = Find(lockInfo, "LockInfo");
+                Set(serialized, "lockedNameText", Find(lockContent, "lb_SkillName_Lock").GetComponent<TMP_Text>());
+                Transform lockedDescription = Find(lockContent, "lb_SkillDescription_Lock");
+                Set(serialized, "lockedDescriptionText", lockedDescription.GetComponent<TMP_Text>());
+                LocalizedTMPText lockedDescriptionLocalizer = lockedDescription.GetComponent<LocalizedTMPText>();
+                if (lockedDescriptionLocalizer == null) lockedDescriptionLocalizer = lockedDescription.gameObject.AddComponent<LocalizedTMPText>();
+                SetLocalizedReference(lockedDescriptionLocalizer, "32fd067a20b754a50b20446b9c78d2ae", 14349990280290304);
+                lockedDescriptionLocalizer.enabled = false;
+                Set(serialized, "lockedDescriptionLocalizer", lockedDescriptionLocalizer);
                 Set(serialized, "placeholderIcon", icon.sprite);
                 serialized.ApplyModifiedPropertiesWithoutUndo();
                 PrefabUtility.SaveAsPrefabAsset(root, SkillPrefabPath);
@@ -61,6 +74,7 @@ namespace CharacterArchiveEditor
                 Transform skillContent = FindDescendant(skillInfo, "list_SkillInfo");
                 Transform empty = FindDescendant(skillContent, "lb_empty");
                 Transform title = FindDescendant(skillInfo, "lb_title");
+                Transform count = FindDescendant(skillInfo, "lb_count");
                 SkillListItemView template = skillContent.GetComponentInChildren<SkillListItemView>(true);
                 if (template == null) throw new System.InvalidOperationException("list_Skill 템플릿에 SkillListItemView가 없습니다.");
                 template.gameObject.SetActive(false);
@@ -101,8 +115,8 @@ namespace CharacterArchiveEditor
                 Set(serialized, "characterNameText", Find(baseFields, "lb_Name").GetComponent<TMP_Text>());
                 Set(serialized, "levelText", Find(baseFields, "lb_level").GetComponent<TMP_Text>());
                 Set(serialized, "originWorldText", Find(baseFields, "lb_originWorld").GetComponent<TMP_Text>());
-                Set(serialized, "skillTitleText", title.GetComponent<TMP_Text>());
-                Set(serialized, "skillTitleLocalizer", title.GetComponent<LocalizedTMPText>());
+                Set(serialized, "skillCountText", count.GetComponent<TMP_Text>());
+                Set(serialized, "skillCountLocalizer", count.GetComponent<LocalizedTMPText>());
                 Set(serialized, "emptyState", empty.gameObject);
                 Set(serialized, "skillContent", skillContent.GetComponent<RectTransform>());
                 Set(serialized, "skillTemplate", template);
@@ -110,7 +124,10 @@ namespace CharacterArchiveEditor
 
                 LocalizedTMPText titleLocalizer = title.GetComponent<LocalizedTMPText>();
                 if (titleLocalizer == null) throw new System.InvalidOperationException("스킬 제목의 LocalizedTMPText가 없습니다.");
-                titleLocalizer.enabled = false;
+                titleLocalizer.enabled = true;
+                LocalizedTMPText countLocalizer = count.GetComponent<LocalizedTMPText>();
+                if (countLocalizer == null) throw new System.InvalidOperationException("스킬 카운트의 LocalizedTMPText가 없습니다.");
+                countLocalizer.enabled = false;
 
                 SerializedObject panelSerialized = new SerializedObject(panel);
                 Set(panelSerialized, "characterInfoUi", controller);
@@ -154,6 +171,19 @@ namespace CharacterArchiveEditor
             SerializedProperty property = target.FindProperty(propertyName);
             if (property == null) throw new System.InvalidOperationException("직렬화 필드가 없습니다: " + propertyName);
             property.objectReferenceValue = value;
+        }
+
+        private static void SetLocalizedReference(LocalizedTMPText target, string tableGuid, long keyId)
+        {
+            SerializedObject serialized = new SerializedObject(target);
+            SerializedProperty text = serialized.FindProperty("text");
+            if (text == null) throw new System.InvalidOperationException("LocalizedTMPText.text가 없습니다.");
+            text.FindPropertyRelative("m_TableReference").FindPropertyRelative("m_TableCollectionName").stringValue =
+                "GUID:" + tableGuid;
+            SerializedProperty entry = text.FindPropertyRelative("m_TableEntryReference");
+            entry.FindPropertyRelative("m_KeyId").longValue = keyId;
+            entry.FindPropertyRelative("m_Key").stringValue = string.Empty;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
     }
 }

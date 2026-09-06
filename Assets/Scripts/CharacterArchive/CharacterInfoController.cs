@@ -39,8 +39,8 @@ namespace CharacterArchive
         [SerializeField] private TMP_Text originWorldText;
 
         [Header("Skill Info (Inspector에서만 연결)")]
-        [SerializeField] private TMP_Text skillTitleText;
-        [SerializeField] private LocalizedTMPText skillTitleLocalizer;
+        [SerializeField] private TMP_Text skillCountText;
+        [SerializeField] private LocalizedTMPText skillCountLocalizer;
         [SerializeField] private GameObject skillInfoRoot;
         [SerializeField] private GameObject emptyState;
         [SerializeField] private RectTransform skillContent;
@@ -51,7 +51,7 @@ namespace CharacterArchive
         private CharacterDefinition character;
         private SaveData document;
         private LocalizedTextReference originWorldName;
-        private LocalizedTextReference skillTitleFormat;
+        private LocalizedTextReference skillCountFormat;
         private Sprite[] previewFrames = Array.Empty<Sprite>();
         private float previewFps;
         private float previewElapsed;
@@ -64,14 +64,16 @@ namespace CharacterArchive
         public int ActiveItemCount { get; private set; }
         public int PooledItemCount => itemPool.Count;
         public bool HasOriginWorldSubscription => originWorldName != null;
-        public bool HasTitleSubscription => skillTitleFormat != null;
+        public bool HasCountSubscription => skillCountFormat != null;
+        // 기존 테스트/도구 호환용 별칭. 동적 구독의 대상은 제목이 아니라 별도 카운트 라벨이다.
+        public bool HasTitleSubscription => HasCountSubscription;
         public int PreviewFrameIndex => previewIndex;
         public bool IsPreviewPlaying => previewFrames.Length > 0 && characterModelImage != null && characterModelImage.enabled;
 
         public bool HasRequiredReferences => characterCatalog != null && skillCatalog != null
             && characterSkillCatalog != null && characterModelImage != null && characterNameText != null
-            && levelText != null && originWorldText != null && skillTitleText != null
-            && skillTitleLocalizer != null && emptyState != null && skillContent != null && skillTemplate != null;
+            && levelText != null && originWorldText != null && skillCountText != null
+            && skillCountLocalizer != null && emptyState != null && skillContent != null && skillTemplate != null;
 
         public void BindCharacter(CharacterDefinition value, SaveData data, bool isOwned = true)
         {
@@ -110,8 +112,8 @@ namespace CharacterArchive
             BindOriginWorld();
             RefreshSkills();
             // 카운트를 먼저 계산해야 이미 로드된 문자열이 구독 즉시 전달돼도 이전 캐릭터의
-            // 숫자로 포맷되지 않는다. 로컬라이즈 결과가 fallback에 다시 덮이는 일도 막는다.
-            BindSkillTitleFormat();
+            // 숫자로 포맷되지 않는다. 제목은 프리팹의 정적 01/95 LocalizedTMPText가 소유한다.
+            BindSkillCountFormat();
             BindPreview(resetPreview);
         }
 
@@ -123,20 +125,20 @@ namespace CharacterArchive
             originWorldName.StringChanged += ApplyOriginWorld;
         }
 
-        private void BindSkillTitleFormat()
+        private void BindSkillCountFormat()
         {
-            skillTitleFormat = skillTitleLocalizer != null ? skillTitleLocalizer.TextReference : null;
-            if (skillTitleFormat != null && skillTitleFormat.HasReference)
-                skillTitleFormat.StringChanged += ApplySkillTitleFormat;
+            skillCountFormat = skillCountLocalizer != null ? skillCountLocalizer.TextReference : null;
+            if (skillCountFormat != null && skillCountFormat.HasReference)
+                skillCountFormat.StringChanged += ApplySkillCountFormat;
         }
 
         private void UnbindLocalization()
         {
             nameBinding.Unbind();
             if (originWorldName != null) originWorldName.StringChanged -= ApplyOriginWorld;
-            if (skillTitleFormat != null) skillTitleFormat.StringChanged -= ApplySkillTitleFormat;
+            if (skillCountFormat != null) skillCountFormat.StringChanged -= ApplySkillCountFormat;
             originWorldName = null;
-            skillTitleFormat = null;
+            skillCountFormat = null;
         }
 
         private void RefreshSkills()
@@ -146,15 +148,14 @@ namespace CharacterArchive
             totalCount = rows.Count;
             unlockedCount = 0;
             for (int i = 0; i < rows.Count; i++) if (rows[i].Unlocked) unlockedCount++;
-            ApplySkillTitleFallback();
+            ApplySkillCountFallback();
 
-            EnsureItemCount(unlockedCount);
+            EnsureItemCount(totalCount);
             int visibleIndex = 0;
             for (int i = 0; i < rows.Count; i++)
             {
-                if (!rows[i].Unlocked) continue;
                 SkillListItemView item = itemPool[visibleIndex++];
-                item.Bind(rows[i].Skill);
+                item.Bind(rows[i].Relation, rows[i].Skill, rows[i].Unlocked);
                 if (!item.gameObject.activeSelf) item.gameObject.SetActive(true);
             }
             for (int i = visibleIndex; i < itemPool.Count; i++)
@@ -164,7 +165,8 @@ namespace CharacterArchive
             }
 
             ActiveItemCount = visibleIndex;
-            SetActive(emptyState, visibleIndex == 0);
+            SetActive(skillCountText != null ? skillCountText.gameObject : null, totalCount > 0);
+            SetActive(emptyState, totalCount == 0);
             if (skillTemplate != null && skillTemplate.gameObject.activeSelf) skillTemplate.gameObject.SetActive(false);
             if (skillContent != null) LayoutRebuilder.MarkLayoutForRebuild(skillContent);
         }
@@ -307,19 +309,19 @@ namespace CharacterArchive
             if (originWorldText != null) originWorldText.text = value ?? string.Empty;
         }
 
-        private void ApplySkillTitleFormat(string format)
+        private void ApplySkillCountFormat(string format)
         {
-            if (skillTitleText == null) return;
-            skillTitleText.text = string.IsNullOrEmpty(format)
+            if (skillCountText == null) return;
+            skillCountText.text = string.IsNullOrEmpty(format)
                 ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0}/{1}", unlockedCount, totalCount)
                 : string.Format(System.Globalization.CultureInfo.CurrentCulture, format, unlockedCount, totalCount);
         }
 
-        private void ApplySkillTitleFallback()
+        private void ApplySkillCountFallback()
         {
-            if (skillTitleText != null)
-                skillTitleText.text = string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                    "Skills ({0}/{1})", unlockedCount, totalCount);
+            if (skillCountText != null)
+                skillCountText.text = string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                    "({0}/{1})", unlockedCount, totalCount);
         }
 
         private static void SetActive(GameObject target, bool value)

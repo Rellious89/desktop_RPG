@@ -115,6 +115,54 @@ namespace CharacterArchiveEditorTests
         }
 
         [Test]
+        public void SkillItem_LockedStateShowsLockInfoAndCleansItsLocaleSubscription()
+        {
+            SkillDefinition definition = SkillAsset("locked_skill");
+            SetReference(definition, "localizedName", Reference(95));
+            CharacterDefinition character = CharacterAsset("CatKnight");
+            CharacterSkillDefinition relation = OrderedRelation(character, definition, 4, 0);
+            GameObject host = Track(new GameObject("locked-skill-row"));
+            SkillListItemView view = host.AddComponent<SkillListItemView>();
+            GameObject normal = Track(new GameObject("normal")); normal.transform.SetParent(host.transform);
+            GameObject cooldown = Track(new GameObject("cooldown")); cooldown.transform.SetParent(host.transform);
+            GameObject locked = Track(new GameObject("locked")); locked.transform.SetParent(host.transform);
+            TextMeshProUGUI lockedName = NewText(locked.transform, "locked-name");
+            TextMeshProUGUI lockedDescription = NewText(locked.transform, "locked-description");
+            LocalizedTMPText lockFormat = lockedDescription.gameObject.AddComponent<LocalizedTMPText>();
+            Set(lockFormat, "target", lockedDescription);
+            SetReference(lockFormat, "text", Reference(104));
+            lockFormat.enabled = false;
+            Set(view, "unlockedNameRoot", normal);
+            Set(view, "cooldownRoot", cooldown);
+            Set(view, "lockedInfoRoot", locked);
+            Set(view, "lockedNameText", lockedName);
+            Set(view, "lockedDescriptionText", lockedDescription);
+            Set(view, "lockedDescriptionLocalizer", lockFormat);
+
+            view.Bind(relation, definition, unlocked: false);
+
+            Assert.IsFalse(normal.activeSelf);
+            Assert.IsFalse(cooldown.activeSelf);
+            Assert.IsTrue(locked.activeSelf);
+            Assert.AreEqual("locked_skill", lockedName.text);
+            Assert.IsTrue(view.HasNameSubscription);
+            Assert.IsTrue(view.HasLockedDescriptionSubscription);
+            Deliver(view, "ApplyLockedDescription", "Lv. {0} 달성 시 해금");
+            Assert.AreEqual("Lv. 4 달성 시 해금", lockedDescription.text);
+
+            view.Unbind();
+            Assert.IsFalse(view.HasNameSubscription);
+            Assert.IsFalse(view.HasLockedDescriptionSubscription);
+
+            view.Bind(relation, definition, unlocked: true);
+            Assert.IsTrue(normal.activeSelf);
+            Assert.IsTrue(cooldown.activeSelf);
+            Assert.IsFalse(locked.activeSelf);
+            Assert.IsFalse(view.HasLockedDescriptionSubscription,
+                "풀에서 잠김 행을 해금 행으로 다시 쓰면 01/104 구독을 남기지 않습니다.");
+        }
+
+        [Test]
         public void Preview_AdvancesLoops_ResetsOnCharacterChange_AndHidesBrokenData()
         {
             Sprite first = NewSprite();
@@ -170,18 +218,33 @@ namespace CharacterArchiveEditorTests
             Assert.AreEqual(2, fixture.Controller.ActiveItemCount);
             Assert.AreEqual(2, fixture.Controller.PooledItemCount);
             Assert.IsFalse(fixture.Empty.activeSelf);
-            Assert.AreEqual("Skills (2/2)", fixture.Title.text);
+            Assert.AreEqual("(2/2)", fixture.Title.text);
 
             fixture.Controller.BindCharacter(character, Document(State("CatKnight", 3)));
             Assert.AreEqual(2, fixture.Controller.ActiveItemCount);
             Assert.AreEqual(2, fixture.Controller.PooledItemCount, "같은 내용을 다시 그려도 클론을 누적하지 않습니다.");
 
             fixture.Controller.BindCharacter(character, Document(State("CatKnight", 1)));
-            Assert.AreEqual(0, fixture.Controller.ActiveItemCount);
+            Assert.AreEqual(2, fixture.Controller.ActiveItemCount, "잠긴 스킬도 목록 행으로 유지합니다.");
             Assert.AreEqual(2, fixture.Controller.PooledItemCount);
-            Assert.IsTrue(fixture.Empty.activeSelf);
-            Assert.AreEqual("Skills (0/2)", fixture.Title.text);
+            Assert.IsFalse(fixture.Empty.activeSelf);
+            Assert.AreEqual("(0/2)", fixture.Title.text);
             Assert.IsFalse(fixture.Template.gameObject.activeSelf, "샘플은 런타임 한 건으로 집계하지 않습니다.");
+        }
+
+        [Test]
+        public void Rebinding_WithNoRegisteredSkills_HidesCountAndShowsEmpty()
+        {
+            CharacterDefinition character = CharacterAsset("CatKnight");
+            ControllerFixture fixture = NewControllerFixture(CharacterList(character),
+                SkillList(new SkillDefinition[0]), RelationList());
+
+            fixture.Root.SetActive(true);
+            fixture.Controller.BindCharacter(character, Document(State("CatKnight", 9)));
+
+            Assert.AreEqual(0, fixture.Controller.ActiveItemCount);
+            Assert.IsTrue(fixture.Empty.activeSelf);
+            Assert.IsFalse(fixture.Title.gameObject.activeSelf);
         }
 
         [Test]
@@ -200,25 +263,25 @@ namespace CharacterArchiveEditorTests
             fixture.Controller.BindCharacter(character, Document(State("CatKnight", 1)));
 
             Assert.IsTrue(fixture.Controller.HasOriginWorldSubscription);
-            Assert.IsTrue(fixture.Controller.HasTitleSubscription);
+            Assert.IsTrue(fixture.Controller.HasCountSubscription);
             SkillListItemView runtime = RuntimeRow(fixture.Controller);
             Assert.IsTrue(runtime.HasNameSubscription);
             Assert.IsTrue(runtime.HasDescriptionSubscription);
 
             Deliver(fixture.Controller, "ApplyOriginWorld", "갱신 소속");
-            Deliver(fixture.Controller, "ApplySkillTitleFormat", "스킬 정보 ({0}/{1})");
+            Deliver(fixture.Controller, "ApplySkillCountFormat", "스킬 정보 ({0}/{1})");
             Assert.AreEqual("갱신 소속", fixture.Origin.text);
             Assert.AreEqual("스킬 정보 (1/1)", fixture.Title.text);
 
             InvokeLifecycle(fixture.Controller, "OnDisable");
             Assert.IsFalse(fixture.Controller.HasOriginWorldSubscription);
-            Assert.IsFalse(fixture.Controller.HasTitleSubscription);
+            Assert.IsFalse(fixture.Controller.HasCountSubscription);
             Assert.IsFalse(runtime.HasNameSubscription);
             Assert.IsFalse(runtime.HasDescriptionSubscription);
 
             InvokeLifecycle(fixture.Controller, "OnEnable");
             Assert.IsTrue(fixture.Controller.HasOriginWorldSubscription);
-            Assert.IsTrue(fixture.Controller.HasTitleSubscription);
+            Assert.IsTrue(fixture.Controller.HasCountSubscription);
             Assert.AreEqual(1, fixture.Controller.ActiveItemCount);
             Assert.AreEqual(1, fixture.Controller.PooledItemCount);
         }
@@ -259,8 +322,8 @@ namespace CharacterArchiveEditorTests
             Set(controller, "characterNameText", characterName);
             Set(controller, "levelText", level);
             Set(controller, "originWorldText", origin);
-            Set(controller, "skillTitleText", title);
-            Set(controller, "skillTitleLocalizer", titleLocalizer);
+            Set(controller, "skillCountText", title);
+            Set(controller, "skillCountLocalizer", titleLocalizer);
             Set(controller, "emptyState", empty);
             Set(controller, "skillContent", content);
             Set(controller, "skillTemplate", template);
