@@ -38,17 +38,23 @@ namespace CharacterArchiveEditorTests
             GameObject host = Track(new GameObject("unlock-info", typeof(RectTransform)));
             CharacterUnlockInfoController controller = host.AddComponent<CharacterUnlockInfoController>();
             TMP_Text title = NewText(host.transform, "title");
+            LocalizedTMPText titleLocalizer = title.gameObject.AddComponent<LocalizedTMPText>();
+            TMP_Text count = NewText(host.transform, "count");
+            LocalizedTMPText countLocalizer = count.gameObject.AddComponent<LocalizedTMPText>(); countLocalizer.enabled = false;
             RectTransform content = new GameObject("content", typeof(RectTransform)).GetComponent<RectTransform>(); Track(content.gameObject); content.SetParent(host.transform, false);
             TMP_Text template = NewText(content, "template"); template.fontStyle = FontStyles.Bold; template.color = Color.green; template.gameObject.SetActive(false);
             GameObject check = Track(new GameObject("sp_check", typeof(RectTransform))); check.transform.SetParent(template.transform, false);
             GameObject checkOn = Track(new GameObject("sp_checkOn", typeof(RectTransform))); checkOn.transform.SetParent(check.transform, false); checkOn.SetActive(false);
             GameObject complete = Track(new GameObject("complete")); complete.transform.SetParent(content, false);
             Set(controller, "acquisitionCatalog", acquisitions); Set(controller, "conditionCatalog", conditions);
-            Set(controller, "titleText", title); Set(controller, "conditionContent", content); Set(controller, "conditionTemplate", template); Set(controller, "completeRoot", complete);
+            Set(controller, "titleText", title); Set(controller, "countText", count); Set(controller, "countLocalizer", countLocalizer);
+            Set(controller, "conditionContent", content); Set(controller, "conditionTemplate", template); Set(controller, "completeRoot", complete);
 
             CharacterDefinition character = Create<CharacterDefinition>(); Set(character, "characterId", "Barbarian");
             SaveData data = new SaveData { characters = new List<CharacterSaveState> { new CharacterSaveState { characterId = "CatKnight", level = 1 } } };
             controller.BindCharacter(character, data);
+            Assert.IsTrue(titleLocalizer.enabled, "정적 제목 로컬라이저는 컨트롤러가 끄면 안 된다.");
+            Assert.AreEqual("(1/2)", count.text, "진행 수치는 제목이 아니라 별도 카운트에 표시한다.");
             Assert.AreEqual(2, controller.ActiveLineCount);
             Assert.AreEqual(2, controller.PooledLineCount);
             Assert.IsFalse(complete.activeSelf);
@@ -145,6 +151,45 @@ namespace CharacterArchiveEditorTests
             finally { PrefabUtility.UnloadPrefabContents(root); }
         }
 
+        [Test]
+        public void ImmediateUnlock_KeepsStaticTitleAndFormatsZeroCountWithLocaleUpdates()
+        {
+            CharacterAcquisitionCatalog acquisitions = Create<CharacterAcquisitionCatalog>();
+            Set(acquisitions, "acquisitions", new List<CharacterAcquisitionDefinition>
+            {
+                CreateAcquisition("Immediate", string.Empty)
+            });
+            acquisitions.MarkDirty();
+            CharacterUnlockConditionCatalog conditions = Create<CharacterUnlockConditionCatalog>();
+            Set(conditions, "conditions", new List<CharacterUnlockConditionDefinition>()); conditions.MarkDirty();
+
+            CharacterUnlockInfoController controller = CreateController(acquisitions, conditions, out RectTransform content,
+                out TMP_Text template, out GameObject complete);
+            TMP_Text title = (TMP_Text)Get(controller, "titleText");
+            TMP_Text count = (TMP_Text)Get(controller, "countText");
+            LocalizedTMPText titleLocalizer = title.GetComponent<LocalizedTMPText>();
+            LocalizedTMPText countLocalizer = (LocalizedTMPText)Get(controller, "countLocalizer");
+            title.text = "등장 조건";
+            CharacterDefinition character = Create<CharacterDefinition>(); Set(character, "characterId", "Immediate");
+
+            controller.BindCharacter(character, new SaveData());
+            Assert.AreEqual("등장 조건", title.text, "정적 제목은 선택 해제/빈 조건에도 지우지 않는다.");
+            Assert.IsTrue(titleLocalizer.enabled, "정적 01/98 제목의 로컬라이저는 계속 활성 상태여야 한다.");
+            Assert.IsFalse(countLocalizer.enabled, "동적 카운트는 LocalizedTMPText와 중복 갱신하지 않는다.");
+            Assert.AreEqual("(0/0)", count.text);
+            Assert.AreEqual(0, controller.ActiveLineCount);
+            Assert.IsTrue(complete.activeSelf, "조건 없는 즉시 등장은 완료 안내를 유지한다.");
+
+            typeof(CharacterUnlockInfoController).GetMethod("ApplyCountFormat", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(controller, new object[] { "완료 {0} / 전체 {1}" });
+            Assert.AreEqual("완료 0 / 전체 0", count.text, "locale 변경 콜백도 01/103 포맷을 카운트에만 적용한다.");
+            Assert.AreSame(template.transform, content.GetChild(0));
+
+            controller.BindCharacter(null, new SaveData());
+            Assert.AreEqual("등장 조건", title.text, "character가 없어도 정적 제목은 지우지 않는다.");
+            Assert.AreEqual(string.Empty, count.text, "character가 없을 때는 동적 카운트만 비운다.");
+        }
+
         private CharacterUnlockConditionDefinition CreateCondition(string id, params (string Id, string Group, string Type, int Value)[] entries)
         {
             CharacterUnlockConditionDefinition value = Create<CharacterUnlockConditionDefinition>();
@@ -179,13 +224,17 @@ namespace CharacterArchiveEditorTests
             GameObject host = Track(new GameObject("unlock-info", typeof(RectTransform)));
             CharacterUnlockInfoController controller = host.AddComponent<CharacterUnlockInfoController>();
             TMP_Text title = NewText(host.transform, "title");
+            title.gameObject.AddComponent<LocalizedTMPText>();
+            TMP_Text count = NewText(host.transform, "count");
+            LocalizedTMPText countLocalizer = count.gameObject.AddComponent<LocalizedTMPText>(); countLocalizer.enabled = false;
             content = Track(new GameObject("content", typeof(RectTransform))).GetComponent<RectTransform>(); content.SetParent(host.transform, false);
             template = NewText(content, "template"); template.gameObject.SetActive(false);
             GameObject check = Track(new GameObject("sp_check", typeof(RectTransform))); check.transform.SetParent(template.transform, false);
             GameObject checkOn = Track(new GameObject("sp_checkOn", typeof(RectTransform))); checkOn.transform.SetParent(check.transform, false); checkOn.SetActive(false);
             complete = Track(new GameObject("complete")); complete.transform.SetParent(content, false);
             Set(controller, "acquisitionCatalog", acquisitions); Set(controller, "conditionCatalog", conditions);
-            Set(controller, "titleText", title); Set(controller, "conditionContent", content); Set(controller, "conditionTemplate", template); Set(controller, "completeRoot", complete);
+            Set(controller, "titleText", title); Set(controller, "countText", count); Set(controller, "countLocalizer", countLocalizer);
+            Set(controller, "conditionContent", content); Set(controller, "conditionTemplate", template); Set(controller, "completeRoot", complete);
             return controller;
         }
         private static void AssertRowOrder(RectTransform content, TMP_Text template, GameObject complete, params string[] expectedTexts)

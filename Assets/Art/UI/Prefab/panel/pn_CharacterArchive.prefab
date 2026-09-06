@@ -9839,6 +9839,8 @@ MonoBehaviour:
   acquisitionCatalog: {fileID: 11400000, guid: 96e8731f155dd4acb82f20a84660c9f0, type: 2}
   conditionCatalog: {fileID: 11400000, guid: b9bcf5f260294895aa0debd20f430529, type: 2}
   titleText: {fileID: 1197565615959449018}
+  countText: {fileID: 567813587230698906}
+  countLocalizer: {fileID: 6116261572206906885}
   conditionContent: {fileID: 8035664947602982043}
   conditionTemplate: {fileID: 3216702760150966532}
   completeRoot: {fileID: 1725949909851550714}

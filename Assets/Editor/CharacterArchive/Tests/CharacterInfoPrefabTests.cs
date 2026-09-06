@@ -94,6 +94,25 @@ namespace CharacterArchiveEditorTests
                 Assert.IsTrue(unlockController.HasRequiredReferences);
                 Assert.AreSame(unlockController, new SerializedObject(panel).FindProperty("characterUnlockInfoUi").objectReferenceValue);
                 SerializedObject unlockSerialized = new SerializedObject(unlockController);
+                TMP_Text unlockTitle = (TMP_Text)unlockSerialized.FindProperty("titleText").objectReferenceValue;
+                TMP_Text unlockCount = (TMP_Text)unlockSerialized.FindProperty("countText").objectReferenceValue;
+                LocalizedTMPText unlockCountLocalizer = (LocalizedTMPText)unlockSerialized.FindProperty("countLocalizer").objectReferenceValue;
+                Assert.AreSame(Find(unlockInfo, "lb_title").GetComponent<TMP_Text>(), unlockTitle);
+                Assert.AreSame(Find(unlockInfo, "lb_count (1)").GetComponent<TMP_Text>(), unlockCount);
+                LocalizedTMPText unlockTitleLocalizer = unlockTitle.GetComponent<LocalizedTMPText>();
+                Assert.NotNull(unlockTitleLocalizer);
+                Assert.IsTrue(unlockTitleLocalizer.enabled, "정적 등장 조건 제목은 프리팹 로컬라이저가 소유합니다.");
+                StringTable uiTable = AssetDatabase.LoadAssetAtPath<StringTable>(UiTablePath);
+                Assert.NotNull(uiTable);
+                Assert.AreEqual(uiTable.GetEntry("98").KeyId, unlockTitleLocalizer.TextReference.TableEntryReference.KeyId);
+                Assert.AreSame(unlockCount.GetComponent<LocalizedTMPText>(), unlockCountLocalizer);
+                Assert.IsFalse(unlockCountLocalizer.enabled, "동적 01/103 카운트는 컨트롤러가 포맷합니다.");
+                Assert.AreEqual(uiTable.GetEntry("103").KeyId, unlockCountLocalizer.TextReference.TableEntryReference.KeyId);
+                ScrollRect unlockScroll = unlockInfo.GetComponent<ScrollRect>();
+                Assert.AreSame(unlockInfo, unlockTitle.transform.parent);
+                Assert.AreSame(unlockInfo, unlockCount.transform.parent);
+                Assert.IsFalse(unlockTitle.transform.IsChildOf(unlockScroll.content), "정적 제목은 목록 content 밖의 고정 헤더여야 합니다.");
+                Assert.IsFalse(unlockCount.transform.IsChildOf(unlockScroll.content), "카운트는 목록 content 밖의 고정 헤더여야 합니다.");
                 TMP_Text unlockTemplate = (TMP_Text)unlockSerialized.FindProperty("conditionTemplate").objectReferenceValue;
                 Assert.IsFalse(unlockTemplate.gameObject.activeSelf, "lb_contents는 조건 행 템플릿으로만 남아야 합니다.");
                 Assert.AreSame(Find(unlockInfo, "Viewport/Content/list_UnlockInfo").GetComponent<RectTransform>(),
@@ -140,8 +159,8 @@ namespace CharacterArchiveEditorTests
                     "ScrollRect Content는 Viewport의 직접 자식이어야 합니다.");
                 Assert.AreSame(skillInfo, title.transform.parent,
                     "스킬 제목은 ScrollRect Content가 아니라 SkillInfo의 고정 헤더여야 합니다.");
-                Assert.AreSame(title.transform, count.transform.parent,
-                    "동적 스킬 카운트는 고정 제목 헤더와 함께 움직여야 합니다.");
+                Assert.AreSame(skillInfo, count.transform.parent,
+                    "동적 스킬 카운트는 목록 content 밖의 고정 헤더여야 합니다.");
                 Assert.IsFalse(title.transform.IsChildOf(scroll.viewport),
                     "고정 제목은 스크롤 viewport에 포함되면 안 됩니다.");
                 Assert.IsFalse(count.transform.IsChildOf(scroll.content),
@@ -161,8 +180,6 @@ namespace CharacterArchiveEditorTests
                 LocalizedTMPText titleLocalizer = title.GetComponent<LocalizedTMPText>();
                 Assert.NotNull(titleLocalizer);
                 Assert.IsTrue(titleLocalizer.enabled, "정적 01/95 제목은 프리팹 로컬라이저가 소유합니다.");
-                StringTable uiTable = AssetDatabase.LoadAssetAtPath<StringTable>(UiTablePath);
-                Assert.NotNull(uiTable);
                 Assert.AreEqual(uiTable.GetEntry("95").KeyId, titleLocalizer.TextReference.TableEntryReference.KeyId);
                 LocalizedTMPText countLocalizer = (LocalizedTMPText)serialized.FindProperty("skillCountLocalizer").objectReferenceValue;
                 Assert.AreSame(FindDescendant(Find(characterInfo, "SkillInfo"), "lb_count").GetComponent<TMP_Text>(), count);

@@ -16,7 +16,6 @@ namespace CharacterArchive
     public sealed class CharacterUnlockInfoController : MonoBehaviour
     {
         private const string UiTableGuid = "32fd067a20b754a50b20446b9c78d2ae";
-        private const int TitleKey = 98;
         private const int MaxLevelKey = 99;
         private const int OwnedCountKey = 100;
         private static readonly Color CompletedColor = new Color32(0x95, 0x95, 0x95, 0xff);
@@ -26,6 +25,8 @@ namespace CharacterArchive
         [SerializeField] private CharacterUnlockConditionCatalog conditionCatalog;
         [Header("Unlock Info (Inspector에서만 연결)")]
         [SerializeField] private TMP_Text titleText;
+        [SerializeField] private TMP_Text countText;
+        [SerializeField] private LocalizedTMPText countLocalizer;
         [SerializeField] private RectTransform conditionContent;
         [SerializeField] private TMP_Text conditionTemplate;
         [SerializeField] private GameObject completeRoot;
@@ -43,10 +44,12 @@ namespace CharacterArchive
         private readonly Dictionary<LocalizedTextReference, LocalizedString.ChangeHandler> handlers = new Dictionary<LocalizedTextReference, LocalizedString.ChangeHandler>();
         private CharacterDefinition character;
         private SaveData document;
+        private LocalizedTextReference countFormat;
 
         public int PooledLineCount => linePool.Count;
         public int ActiveLineCount { get; private set; }
         public bool HasRequiredReferences => acquisitionCatalog != null && conditionCatalog != null && titleText != null &&
+            countText != null && countLocalizer != null &&
             conditionContent != null && conditionTemplate != null && completeRoot != null;
 
         public void BindCharacter(CharacterDefinition value, SaveData data)
@@ -58,9 +61,9 @@ namespace CharacterArchive
 
         private void OnEnable()
         {
-            if (titleText != null && titleText.TryGetComponent(out LocalizedTMPText localizer)) localizer.enabled = false;
-            SubscribeLocalization();
+            DisableCountLocalizer();
             Refresh();
+            SubscribeLocalization();
         }
 
         private void OnDisable()
@@ -75,7 +78,8 @@ namespace CharacterArchive
         {
             if (!HasRequiredReferences || character == null)
             {
-                if (titleText != null) titleText.text = string.Empty;
+                DisableCountLocalizer();
+                if (countText != null) countText.text = string.Empty;
                 SetLinesActive(0);
                 SetActive(completeRoot, false);
                 return;
@@ -84,7 +88,7 @@ namespace CharacterArchive
             RecruitmentUnlockService.UnlockProgressSnapshot snapshot = RecruitmentUnlockService.EvaluateProgress(
                 acquisitionCatalog, conditionCatalog, document, character.CharacterId,
                 IsPermanentlyUnlocked(document, character.CharacterId));
-            titleText.text = SafeFormat(Text(TitleKey), "{0}/{1}", snapshot.SatisfiedConditionCount, snapshot.Conditions.Count);
+            ApplyCountFallback(snapshot.SatisfiedConditionCount, snapshot.Conditions.Count);
             for (int i = 0; i < snapshot.Conditions.Count; i++)
             {
                 RecruitmentUnlockService.UnlockConditionProgress progress = snapshot.Conditions[i];
@@ -165,10 +169,32 @@ namespace CharacterArchive
             return SafeFormat(Text(key), "{0}/{1}", progress.CurrentValue, progress.Entry.RequiredValue);
         }
 
+        private void ApplyCountFormat(string format)
+        {
+            if (countText == null || character == null) return;
+            RecruitmentUnlockService.UnlockProgressSnapshot snapshot = RecruitmentUnlockService.EvaluateProgress(
+                acquisitionCatalog, conditionCatalog, document, character.CharacterId,
+                IsPermanentlyUnlocked(document, character.CharacterId));
+            countText.text = SafeFormat(format, "({0}/{1})", snapshot.SatisfiedConditionCount, snapshot.Conditions.Count);
+        }
+
+        private void ApplyCountFallback(int satisfied, int total)
+        {
+            DisableCountLocalizer();
+            if (countText != null) countText.text = SafeFormat(null, "({0}/{1})", satisfied, total);
+        }
+
+        private void DisableCountLocalizer()
+        {
+            if (countLocalizer != null && countLocalizer.enabled) countLocalizer.enabled = false;
+        }
+
         private void SubscribeLocalization()
         {
             if (handlers.Count > 0) return;
-            AddLocalization(TitleKey); AddLocalization(MaxLevelKey); AddLocalization(OwnedCountKey);
+            AddLocalization(MaxLevelKey); AddLocalization(OwnedCountKey);
+            countFormat = countLocalizer != null ? countLocalizer.TextReference : null;
+            if (countFormat != null && countFormat.HasReference) countFormat.StringChanged += ApplyCountFormat;
         }
 
         private void AddLocalization(int key)
@@ -189,6 +215,8 @@ namespace CharacterArchive
                 pair.Key.StringChanged -= pair.Value;
             handlers.Clear();
             localized.Clear();
+            if (countFormat != null) countFormat.StringChanged -= ApplyCountFormat;
+            countFormat = null;
         }
 
         private string Text(int key) => localized.TryGetValue(key, out string value) ? value : null;
