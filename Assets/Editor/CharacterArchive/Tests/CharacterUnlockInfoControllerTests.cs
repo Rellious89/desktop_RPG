@@ -152,7 +152,7 @@ namespace CharacterArchiveEditorTests
         }
 
         [Test]
-        public void ImmediateUnlock_KeepsStaticTitleAndFormatsZeroCountWithLocaleUpdates()
+        public void ImmediateUnlock_KeepsStaticTitleHidesCountAndShowsCompletion()
         {
             CharacterAcquisitionCatalog acquisitions = Create<CharacterAcquisitionCatalog>();
             Set(acquisitions, "acquisitions", new List<CharacterAcquisitionDefinition>
@@ -176,18 +176,52 @@ namespace CharacterArchiveEditorTests
             Assert.AreEqual("등장 조건", title.text, "정적 제목은 선택 해제/빈 조건에도 지우지 않는다.");
             Assert.IsTrue(titleLocalizer.enabled, "정적 01/98 제목의 로컬라이저는 계속 활성 상태여야 한다.");
             Assert.IsFalse(countLocalizer.enabled, "동적 카운트는 LocalizedTMPText와 중복 갱신하지 않는다.");
-            Assert.AreEqual("(0/0)", count.text);
+            Assert.IsFalse(count.gameObject.activeSelf, "조건이 없으면 카운트 오브젝트를 숨긴다.");
+            Assert.AreEqual(string.Empty, count.text);
             Assert.AreEqual(0, controller.ActiveLineCount);
             Assert.IsTrue(complete.activeSelf, "조건 없는 즉시 등장은 완료 안내를 유지한다.");
 
             typeof(CharacterUnlockInfoController).GetMethod("ApplyCountFormat", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(controller, new object[] { "완료 {0} / 전체 {1}" });
-            Assert.AreEqual("완료 0 / 전체 0", count.text, "locale 변경 콜백도 01/103 포맷을 카운트에만 적용한다.");
+            Assert.IsFalse(count.gameObject.activeSelf, "locale 변경 콜백도 빈 조건 카운트를 다시 보이면 안 된다.");
+            Assert.AreEqual(string.Empty, count.text);
             Assert.AreSame(template.transform, content.GetChild(0));
 
             controller.BindCharacter(null, new SaveData());
             Assert.AreEqual("등장 조건", title.text, "character가 없어도 정적 제목은 지우지 않는다.");
             Assert.AreEqual(string.Empty, count.text, "character가 없을 때는 동적 카운트만 비운다.");
+            Assert.IsFalse(count.gameObject.activeSelf, "character가 없을 때 stale 카운트를 숨긴다.");
+        }
+
+        [Test]
+        public void Rebind_ConditionCountReactivatesAfterImmediateUnlockHidesIt()
+        {
+            CharacterUnlockConditionDefinition condition = CreateCondition("one",
+                ("count", "same", "OWNED_CHARACTER_COUNT_AT_LEAST", 1));
+            CharacterAcquisitionCatalog acquisitions = Create<CharacterAcquisitionCatalog>();
+            Set(acquisitions, "acquisitions", new List<CharacterAcquisitionDefinition>
+            {
+                CreateAcquisition("Conditional", "one"),
+                CreateAcquisition("Immediate", string.Empty)
+            });
+            acquisitions.MarkDirty();
+            CharacterUnlockConditionCatalog conditions = Create<CharacterUnlockConditionCatalog>();
+            Set(conditions, "conditions", new List<CharacterUnlockConditionDefinition> { condition }); conditions.MarkDirty();
+            CharacterUnlockInfoController controller = CreateController(acquisitions, conditions, out _, out _, out _);
+            TMP_Text count = (TMP_Text)Get(controller, "countText");
+            CharacterDefinition conditional = Create<CharacterDefinition>(); Set(conditional, "characterId", "Conditional");
+            CharacterDefinition immediate = Create<CharacterDefinition>(); Set(immediate, "characterId", "Immediate");
+            SaveData data = new SaveData();
+
+            controller.BindCharacter(conditional, data);
+            Assert.IsTrue(count.gameObject.activeSelf);
+            Assert.AreEqual("(0/1)", count.text);
+            controller.BindCharacter(immediate, data);
+            Assert.IsFalse(count.gameObject.activeSelf);
+            Assert.AreEqual(string.Empty, count.text);
+            controller.BindCharacter(conditional, data);
+            Assert.IsTrue(count.gameObject.activeSelf, "조건이 있는 캐릭터로 재바인드하면 카운트를 다시 보인다.");
+            Assert.AreEqual("(0/1)", count.text);
         }
 
         private CharacterUnlockConditionDefinition CreateCondition(string id, params (string Id, string Group, string Type, int Value)[] entries)

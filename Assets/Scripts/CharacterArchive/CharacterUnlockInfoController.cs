@@ -79,7 +79,7 @@ namespace CharacterArchive
             if (!HasRequiredReferences || character == null)
             {
                 DisableCountLocalizer();
-                if (countText != null) countText.text = string.Empty;
+                ClearAndHideCount();
                 SetLinesActive(0);
                 SetActive(completeRoot, false);
                 return;
@@ -175,13 +175,33 @@ namespace CharacterArchive
             RecruitmentUnlockService.UnlockProgressSnapshot snapshot = RecruitmentUnlockService.EvaluateProgress(
                 acquisitionCatalog, conditionCatalog, document, character.CharacterId,
                 IsPermanentlyUnlocked(document, character.CharacterId));
+            if (snapshot.Conditions.Count == 0)
+            {
+                ClearAndHideCount();
+                return;
+            }
+            SetActive(countText.gameObject, true);
             countText.text = SafeFormat(format, "({0}/{1})", snapshot.SatisfiedConditionCount, snapshot.Conditions.Count);
         }
 
         private void ApplyCountFallback(int satisfied, int total)
         {
             DisableCountLocalizer();
-            if (countText != null) countText.text = SafeFormat(null, "({0}/{1})", satisfied, total);
+            if (countText == null) return;
+            if (total == 0)
+            {
+                ClearAndHideCount();
+                return;
+            }
+            SetActive(countText.gameObject, true);
+            countText.text = SafeFormat(null, "({0}/{1})", satisfied, total);
+        }
+
+        private void ClearAndHideCount()
+        {
+            if (countText == null) return;
+            countText.text = string.Empty;
+            SetActive(countText.gameObject, false);
         }
 
         private void DisableCountLocalizer()
