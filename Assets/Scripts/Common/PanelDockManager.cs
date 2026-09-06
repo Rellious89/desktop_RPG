@@ -389,16 +389,13 @@ namespace Common
 
         private bool IsEligible(PanelDragHandle handle)
         {
-            return handle != null && handle.isActiveAndEnabled && handle.TargetPanel != null &&
+            return handle != null && handle.DockingEnabled && handle.isActiveAndEnabled && handle.TargetPanel != null &&
                 handle.TargetPanel.gameObject.activeInHierarchy && handle.TargetPanel.parent == transform;
         }
 
-        private static bool IsLinkValid(DockLink link)
+        private bool IsLinkValid(DockLink link)
         {
-            return link != null && link.a != null && link.b != null &&
-                link.a.isActiveAndEnabled && link.b.isActiveAndEnabled &&
-                link.a.TargetPanel != null && link.b.TargetPanel != null &&
-                link.a.TargetPanel.gameObject.activeInHierarchy && link.b.TargetPanel.gameObject.activeInHierarchy;
+            return link != null && IsEligible(link.a) && IsEligible(link.b);
         }
 
         private void GetRectInPanelUiSpace(RectTransform rect, out Vector2 min, out Vector2 max)

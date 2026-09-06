@@ -9720,6 +9720,7 @@ MonoBehaviour:
   targetPanel: {fileID: 8180441484297232630}
   keepInsideRect: {fileID: 0}
   snapBoundsRect: {fileID: 0}
+  dockingEnabled: 0
 --- !u!1 &6302161726332818146
 GameObject:
   m_ObjectHideFlags: 0

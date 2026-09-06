@@ -20,6 +20,21 @@ namespace CharacterArchiveEditorTests
         private const string UiTablePath = "Assets/Localization/Tables/01_UI/01_UI_ko-KR.asset";
 
         [Test]
+        public void CharacterArchive_DragHandleDisablesOnlyDocking()
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(PanelPath);
+            try
+            {
+                PanelDragHandle drag = root.GetComponentInChildren<PanelDragHandle>(true);
+                Assert.NotNull(drag);
+                Assert.IsTrue(drag.enabled, "일반 패널 드래그는 활성 상태를 유지해야 합니다.");
+                Assert.AreSame(root.transform, drag.TargetPanel);
+                Assert.IsFalse(drag.DockingEnabled, "용병명부만 공용 도킹에서 제외되어야 합니다.");
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        [Test]
         public void SkillPrefab_HasDedicatedViewAndExplicitReferences()
         {
             GameObject root = PrefabUtility.LoadPrefabContents(SkillPath);

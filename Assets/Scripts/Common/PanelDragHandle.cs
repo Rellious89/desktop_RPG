@@ -41,6 +41,10 @@ namespace Common
         [Tooltip("도킹할 때 패널의 시각 외곽으로 쓸 영역. 비워두면 Target Panel 자체를 사용한다.")]
         [SerializeField] private RectTransform snapBoundsRect;
 
+        [Tooltip("이 패널이 다른 패널과 도킹되는 것을 허용한다. 끄더라도 개별 드래그, 포커스, " +
+                 "화면 이탈 제한은 기존대로 유지된다.")]
+        [SerializeField] private bool dockingEnabled = true;
+
         // 패널의 좌표계 기준이 되는 부모. anchoredPosition의 변화량과 이 공간의 이동량이 1:1이라
         // 앵커 설정(점 앵커/스트레치)에 상관없이 같은 계산을 쓸 수 있다.
         private RectTransform parentRect;
@@ -63,6 +67,9 @@ namespace Common
 
         /// <summary>도킹의 좌우 외곽과 상단을 계산할 영역.</summary>
         public RectTransform SnapBoundsRect => snapBoundsRect != null ? snapBoundsRect : targetPanel;
+
+        /// <summary>이 패널이 움직이는 쪽이든 상대 후보쪽이든 도킹에 참여할 수 있는지.</summary>
+        public bool DockingEnabled => dockingEnabled;
 
         private void Awake()
         {

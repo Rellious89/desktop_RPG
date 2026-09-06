@@ -49,10 +49,68 @@ namespace CommonEditor.Tests
             PanelDragHandle a = CreatePanel("A", new Vector2(90f, 60f));
             PanelDragHandle b = CreatePanel("B", new Vector2(200f, 0f));
 
+            Assert.IsTrue(a.DockingEnabled);
+            Assert.IsTrue(b.DockingEnabled, "기존 패널은 별도 설정 없이 도킹을 계속 허용해야 한다.");
             DragToEnd(a);
 
             Assert.AreEqual(1, manager.LinkCount);
             AssertBoundsTouchAndTopAlign(a, b);
+        }
+
+        [Test]
+        public void 도킹_비활성_패널은_움직이는쪽과_상대후보쪽_모두에서_연결되지_않는다()
+        {
+            PanelDragHandle excluded = CreatePanel("Excluded", new Vector2(90f, 60f));
+            PanelDragHandle regular = CreatePanel("Regular", new Vector2(200f, 0f));
+            SetDockingEnabled(excluded, false);
+
+            DragToEnd(excluded);
+            Assert.AreEqual(0, manager.LinkCount, "비활성 패널이 움직일 때 연결하지 않는다.");
+
+            DragToEnd(regular);
+            Assert.AreEqual(0, manager.LinkCount, "비활성 패널을 상대 후보로도 사용하지 않는다.");
+            Assert.IsFalse(manager.IsDocked(excluded));
+            Assert.IsFalse(manager.IsDocked(regular));
+        }
+
+        [Test]
+        public void 도킹_비활성_패널도_개별_드래그_포커스_화면제한을_유지한다()
+        {
+            GameObject eventSystemObject = Create("EventSystem", null);
+            EventSystem eventSystem = eventSystemObject.AddComponent<EventSystem>();
+            eventSystemObject.AddComponent<StandaloneInputModule>();
+            PanelDragHandle excluded = CreatePanel("Excluded", Vector2.zero);
+            PanelDragHandle front = CreatePanel("Front", new Vector2(300f, 0f));
+            SetDockingEnabled(excluded, false);
+            var pointer = new PointerEventData(eventSystem) { position = new Vector2(500f, 400f) };
+
+            excluded.OnPointerDown(pointer);
+            excluded.OnBeginDrag(pointer);
+            pointer.position = new Vector2(540f, 420f);
+            excluded.OnDrag(pointer);
+            excluded.OnEndDrag(pointer);
+
+            Assert.AreEqual(new Vector2(40f, 20f), excluded.TargetPanel.anchoredPosition);
+            Assert.Greater(excluded.TargetPanel.GetSiblingIndex(), front.TargetPanel.GetSiblingIndex());
+            Assert.Less(excluded.ClampMoveDelta(new Vector2(10000f, 0f)).x, 10000f);
+            Assert.AreEqual(0, manager.LinkCount);
+        }
+
+        [Test]
+        public void 이미_연결된_패널의_도킹을_비활성하면_기존_링크를_정리한다()
+        {
+            PanelDragHandle a = CreatePanel("A", new Vector2(90f, 60f));
+            CreatePanel("B", new Vector2(200f, 0f));
+            DragToEnd(a);
+            Assert.AreEqual(1, manager.LinkCount);
+
+            SetDockingEnabled(a, false);
+            typeof(PanelDockManager).GetMethod("PruneUnavailableLinks",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                ?.Invoke(manager, null);
+
+            Assert.AreEqual(0, manager.LinkCount);
+            Assert.IsNull(panelUi.GetComponentInChildren<DockHandleDrag>());
         }
 
         [Test]
@@ -361,6 +419,13 @@ namespace CommonEditor.Tests
         {
             SerializedObject serialized = new SerializedObject(manager);
             serialized.FindProperty("dockHandlePrefab").objectReferenceValue = prefab;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void SetDockingEnabled(PanelDragHandle handle, bool enabled)
+        {
+            SerializedObject serialized = new SerializedObject(handle);
+            serialized.FindProperty("dockingEnabled").boolValue = enabled;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
