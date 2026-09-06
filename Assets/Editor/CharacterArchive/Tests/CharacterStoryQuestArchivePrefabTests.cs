@@ -1,6 +1,7 @@
 using CharacterArchive;
 using Common;
 using NUnit.Framework;
+using Quest;
 using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -117,6 +118,25 @@ namespace CharacterArchiveEditorTests
             Assert.AreEqual(1, controllers.Length, $"{scene.name}에 연결된 CharacterStoryQuestUiController가 하나 필요합니다.");
             Assert.IsTrue(controllers[0].HasRequiredReferences);
             Assert.AreEqual("QuestInfo", controllers[0].gameObject.name);
+        }
+
+        [Test]
+        public void QuestNotification_PrefabOwnsOnlyItsVisualAndClickReferences()
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents("Assets/Art/UI/Prefab/QuestNotification.prefab");
+            try
+            {
+                QuestNotificationController controller = root.GetComponent<QuestNotificationController>();
+                Assert.NotNull(controller);
+                Assert.IsTrue(controller.HasRequiredReferences);
+                Assert.IsFalse(controller.HasArchiveTarget,
+                    "프리팹은 씬 오브젝트를 전역 탐색하지 않고, scene instance가 좁은 딥링크 참조를 준다.");
+                Transform message = root.transform.Find("sp_messageBox");
+                Assert.NotNull(message);
+                Assert.NotNull(message.GetComponent<Button>());
+                Assert.NotNull(message.Find("sp_count/lb_count").GetComponent<TMP_Text>());
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
         }
 
         private static Transform Find(Transform root, string path)

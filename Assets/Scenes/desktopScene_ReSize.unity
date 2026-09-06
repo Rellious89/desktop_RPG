@@ -18397,8 +18397,12 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2129410653310032400, guid: f3f672131e59f48ed8bf0767381b9d55, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 8016784150171546602, guid: f3f672131e59f48ed8bf0767381b9d55, type: 3}
+      propertyPath: characterArchivePanel
+      value:
+      objectReference: {fileID: 6525342035292623680}
     - target: {fileID: 5506844545314883073, guid: f3f672131e59f48ed8bf0767381b9d55, type: 3}
       propertyPath: m_Pivot.x
       value: 1

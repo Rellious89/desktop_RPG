@@ -26,5 +26,17 @@ namespace QuestEditorTests
             Assert.AreEqual(1, services.Length, $"{scene.name}에는 CharacterStoryQuestService가 정확히 하나여야 합니다.");
             Assert.IsTrue(services[0].HasRequiredReferences, "Quest/Objective Catalog 및 CharacterRoster 참조가 모두 필요합니다.");
         }
+
+        [Test]
+        public void DesktopResize_HasLiveQuestNotificationWithArchiveDeepLink()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            QuestNotificationController[] controllers = Object.FindObjectsOfType<QuestNotificationController>(true);
+            Assert.AreEqual(1, controllers.Length, "HUD QuestNotification 전용 컨트롤러가 정확히 하나 필요합니다.");
+            Assert.IsTrue(controllers[0].gameObject.activeSelf,
+                "ready가 0이어도 컨트롤러 root는 살아 있어 상태 변경 이벤트를 받아야 합니다.");
+            Assert.IsTrue(controllers[0].HasRequiredReferences);
+            Assert.IsTrue(controllers[0].HasArchiveTarget, "씬 인스턴스는 CharacterArchivePanel 딥링크를 직접 참조해야 합니다.");
+        }
     }
 }

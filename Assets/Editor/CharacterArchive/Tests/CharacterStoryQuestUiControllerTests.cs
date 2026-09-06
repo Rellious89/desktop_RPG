@@ -207,6 +207,22 @@ namespace CharacterArchiveEditorTests
         }
 
         [Test]
+        public void OpenForQuestInfo_ExplicitlyShowsQuestPage_WithoutChangingDefaultOpenContract()
+        {
+            GameObject characterPage = new GameObject("character-page"); created.Add(characterPage);
+            GameObject questPage = new GameObject("quest-page"); created.Add(questPage);
+            GameObject host = new GameObject("quest-controller"); created.Add(host);
+            CharacterStoryQuestUiController controller = host.AddComponent<CharacterStoryQuestUiController>();
+            Set(controller, "characterInfoPage", characterPage);
+            Set(controller, "questInfoPage", questPage);
+
+            controller.OpenForQuestInfo(null);
+
+            Assert.IsFalse(characterPage.activeSelf);
+            Assert.IsTrue(questPage.activeSelf);
+        }
+
+        [Test]
         public void UnownedSelection_HidesSwapAndCannotEnterQuestUntilOwnedSelectionRestoresIt()
         {
             GameObject host = new GameObject("story-quest-ownership-test"); created.Add(host);

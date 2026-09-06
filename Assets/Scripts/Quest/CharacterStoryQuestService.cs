@@ -28,6 +28,10 @@ namespace Quest
         public static CharacterStoryQuestService Instance { get; private set; }
         public static event Action<string> QuestBecameReadyToComplete;
 
+        /// <summary>성공적으로 저장된 서사 퀘스트 상태 변경을 알린다. HUD처럼 현재 ready 목록을 다시
+        /// 조회하는 읽기 전용 표시는 이 알림만 구독하며, 실패하거나 롤백된 변경은 받지 않는다.</summary>
+        public static event Action<string> QuestStateChanged;
+
         /// <summary>씬 wiring 검사와 부트스트랩 실패 차단에 쓰는 최소 구성 계약.</summary>
         public bool HasRequiredReferences => questCatalog != null && objectiveCatalog != null &&
                                              roster != null && ResolveInventory() != null;
@@ -52,7 +56,8 @@ namespace Quest
                 enabled = false;
                 return;
             }
-            if (SaveSystem.TryGetLoadedData(out SaveData data) && EnsureRootsForOwned(data)) SaveSystem.Save();
+            if (SaveSystem.TryGetLoadedData(out SaveData data) && EnsureRootsForOwned(data) && SaveSystem.Save())
+                QuestStateChanged?.Invoke(string.Empty);
         }
 
         private void OnDisable()
@@ -104,6 +109,7 @@ namespace Quest
             {
                 inventory.NotifyRewardsAfterExternalSave(rewardReceipt);
                 ShowRewardToast(rewardReceipt.Result);
+                QuestStateChanged?.Invoke(characterId);
                 return true;
             }
             Rollback(receipt);
@@ -223,6 +229,7 @@ namespace Quest
             if (receipt == null || !receipt.TryConsumeReadyTransition(out string characterId)) return false;
 
             QuestBecameReadyToComplete?.Invoke(characterId);
+            QuestStateChanged?.Invoke(characterId);
             ShowReadyToast();
             return true;
         }

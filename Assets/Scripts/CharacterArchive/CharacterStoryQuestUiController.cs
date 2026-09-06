@@ -108,6 +108,19 @@ namespace CharacterArchive
             Refresh();
         }
 
+        /// <summary>명부의 일반 열기 기본 페이지는 바꾸지 않는다. HUD 딥링크처럼 명시한 호출자만
+        /// 선택한 보유 캐릭터의 QuestInfo를 바로 연다.</summary>
+        public void OpenForQuestInfo(CharacterDefinition definition, bool isOwned = true)
+        {
+            EnsureInitialized();
+            selected = definition;
+            selectedOwned = isOwned;
+            completionRequested = false;
+            SetActive(swapButton != null ? swapButton.gameObject : null, selected != null && selectedOwned);
+            ShowPage(selectedOwned ? RightPage.QuestInfo : RightPage.CharacterInfo);
+            Refresh();
+        }
+
         public void BindCharacter(CharacterDefinition definition, bool isOwned = true)
         {
             EnsureInitialized();

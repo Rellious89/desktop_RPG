@@ -63,6 +63,27 @@ namespace CharacterArchive
             if (openInstance != null) openInstance.RequestDeferredRefresh();
         }
 
+        /// <summary>HUD 완료 알림 전용 진입점. 기존 명부 열기의 CharacterInfo 기본값은 유지하고,
+        /// 이 경로에서만 exact CharacterId 선택과 QuestInfo 표시를 함께 요청한다.</summary>
+        public bool OpenForStoryQuest(string characterId)
+        {
+            if (string.IsNullOrEmpty(characterId) || !IsBuildingComplete(requiredBuildingId) || catalog == null) return false;
+            CharacterDefinition definition = catalog.Find(characterId);
+            var owned = new OwnedCharacterCollection(catalog, SaveSystem.Data);
+            if (definition == null || !owned.IsOwned(definition)) return false;
+
+            selected = definition;
+            selectedOwned = true;
+            rightPanelOpen = true;
+            Open();
+            if (!gameObject.activeInHierarchy) return false;
+
+            RefreshContents();
+            if (storyQuestUi == null) return false;
+            storyQuestUi.OpenForQuestInfo(definition, true);
+            return true;
+        }
+
         private void Update()
         {
             if (!pendingRefresh || CharacterArchiveDragPreview.HasActivePreview) return;

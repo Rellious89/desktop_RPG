@@ -28,6 +28,7 @@ namespace QuestEditorTests
         private int saveCount;
         private int changedCount;
         private int rewardAppliedCount;
+        private int questStateChangedCount;
 
         [SetUp]
         public void SetUp()
@@ -74,6 +75,7 @@ namespace QuestEditorTests
             rewardAppliedCount = 0;
             InventoryManager.InventoryChanged += CountChanged;
             inventory.RewardApplied += CountRewardApplied;
+            CharacterStoryQuestService.QuestStateChanged += CountQuestStateChanged;
         }
 
         [TearDown]
@@ -81,6 +83,7 @@ namespace QuestEditorTests
         {
             InventoryManager.InventoryChanged -= CountChanged;
             if (inventory != null) inventory.RewardApplied -= CountRewardApplied;
+            CharacterStoryQuestService.QuestStateChanged -= CountQuestStateChanged;
             if (serviceHost != null) UnityEngine.Object.DestroyImmediate(serviceHost);
             if (inventoryHost != null) UnityEngine.Object.DestroyImmediate(inventoryHost);
             foreach (UnityEngine.Object asset in created)
@@ -105,6 +108,7 @@ namespace QuestEditorTests
             Assert.AreEqual(1, saveCount);
             Assert.AreEqual(1, changedCount);
             Assert.AreEqual(1, rewardAppliedCount);
+            Assert.AreEqual(1, questStateChangedCount, "완료 확정 저장 뒤 HUD ready count가 즉시 갱신되어야 합니다.");
 
             Assert.IsFalse(service.TryConfirmComplete("CatKnight"));
             Assert.AreEqual(1, saveCount);
@@ -142,6 +146,7 @@ namespace QuestEditorTests
 
         private void CountChanged() => changedCount++;
         private void CountRewardApplied(InventoryRewardApplyResult _) => rewardAppliedCount++;
+        private void CountQuestStateChanged(string _) => questStateChangedCount++;
 
         private T NewCatalog<T>(string property, params UnityEngine.Object[] entries) where T : ScriptableObject
         {

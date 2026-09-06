@@ -81,9 +81,12 @@ namespace QuestEditorTests
             };
 
             int notifications = 0;
+            int stateChanges = 0;
             string notifiedCharacterId = null;
             System.Action<string> handler = id => { notifications++; notifiedCharacterId = id; };
             CharacterStoryQuestService.QuestBecameReadyToComplete += handler;
+            System.Action<string> stateHandler = _ => stateChanges++;
+            CharacterStoryQuestService.QuestStateChanged += stateHandler;
             try
             {
                 CharacterStoryQuestMutationReceipt first = service.ApplyDefeatWithoutSave(
@@ -96,13 +99,16 @@ namespace QuestEditorTests
                 Assert.AreEqual(0, notifications, "저장 성공 확정 전에는 알림을 발행하지 않습니다.");
                 Assert.IsTrue(service.NotifyReadyAfterExternalSave(completed));
                 Assert.AreEqual(1, notifications);
+                Assert.AreEqual(1, stateChanges, "저장 성공 뒤 HUD가 다시 조회할 상태 알림도 한 번 필요합니다.");
                 Assert.AreEqual("CatKnight", notifiedCharacterId);
                 Assert.IsFalse(service.NotifyReadyAfterExternalSave(completed), "같은 저장 영수증은 중복 알림을 만들지 않습니다.");
                 Assert.AreEqual(1, notifications);
+                Assert.AreEqual(1, stateChanges);
             }
             finally
             {
                 CharacterStoryQuestService.QuestBecameReadyToComplete -= handler;
+                CharacterStoryQuestService.QuestStateChanged -= stateHandler;
             }
         }
 
