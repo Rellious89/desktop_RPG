@@ -4,6 +4,7 @@ using Character;
 using Common;
 using Party;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Quest
 {
@@ -28,6 +29,8 @@ namespace Quest
         [Header("Fixed Party Slots")]
         [SerializeField] private FixedSlot[] slots = Array.Empty<FixedSlot>();
         [SerializeField] private CharacterStoryQuestDetailView detailView;
+        [SerializeField] private GameObject subPanel;
+        [SerializeField] private Button subPanelCloseButton;
 
         private readonly CharacterDefinition[] slotCharacters = new CharacterDefinition[3];
         private readonly CharacterStoryQuestDefinition[] slotQuests = new CharacterStoryQuestDefinition[3];
@@ -41,14 +44,17 @@ namespace Quest
         public int SlotCount => slots != null ? slots.Length : 0;
         public bool IsCompleting => completing;
         public CharacterStoryQuestDetailView DetailView => detailView;
+        public bool IsDetailOpen => subPanel != null && subPanel.activeSelf;
         public bool HasRequiredReferences => characterCatalog != null && questCatalog != null && objectiveCatalog != null &&
-                                             detailView != null && detailView.HasRequiredReferences && HasValidSlots();
+                                             detailView != null && detailView.HasRequiredReferences && subPanel != null &&
+                                             subPanelCloseButton != null && HasValidSlots();
 
-        /// <summary>알림 딥링크. 대상이 현재 고정 파티 슬롯의 활성 퀘스트라면 해당 카드를 선택한다.</summary>
+        /// <summary>알림 딥링크. 대상이 고정 파티 슬롯의 활성 퀘스트 또는 AllClear 카드라면 선택한다.</summary>
         public bool OpenForCharacter(string characterId)
         {
             requestedCharacterId = characterId;
             Open();
+            BindDetailCloseButton();
             if (gameObject.activeInHierarchy &&
                 !string.Equals(selectedCharacterId, characterId, StringComparison.Ordinal)) RefreshContents();
             return gameObject.activeInHierarchy &&
@@ -66,12 +72,15 @@ namespace Quest
             CharacterStoryQuestService.QuestStateChanged += HandleQuestStateChanged;
             PartyCompositionEvents.ChangedAfterSave -= HandlePartyChanged;
             PartyCompositionEvents.ChangedAfterSave += HandlePartyChanged;
+            BindDetailCloseButton();
+            OpenDetail();
         }
 
         protected override void OnModalClosed()
         {
             CharacterStoryQuestService.QuestStateChanged -= HandleQuestStateChanged;
             PartyCompositionEvents.ChangedAfterSave -= HandlePartyChanged;
+            if (subPanelCloseButton != null) subPanelCloseButton.onClick.RemoveListener(CloseDetail);
             completing = false;
             for (int i = 0; slots != null && i < slots.Length; i++) slots[i]?.card?.Clear();
             detailView?.Clear();
@@ -132,7 +141,7 @@ namespace Quest
                 List<CharacterStoryQuestObjectiveDefinition> objectives = EnabledObjectives(quest);
                 slotCharacters[i] = character;
                 slotQuests[i] = quest;
-                if (character != null && quest != null) validQuestCharacters.Add(characterId);
+                if (character != null && (quest != null || snapshot.Graduated)) validQuestCharacters.Add(characterId);
                 slot.card.Bind(character, level, quest, objectives, snapshot, completing, SelectCharacter, TryComplete);
             }
 
@@ -150,7 +159,7 @@ namespace Quest
             if (!string.IsNullOrEmpty(requestedCharacterId) && valid.Contains(requestedCharacterId)) return requestedCharacterId;
             if (!string.IsNullOrEmpty(selectedCharacterId) && valid.Contains(selectedCharacterId)) return selectedCharacterId;
             for (int i = 0; i < 3; i++)
-                if (slotCharacters[i] != null && slotQuests[i] != null) return slotCharacters[i].CharacterId;
+                if (slotCharacters[i] != null && valid.Contains(slotCharacters[i].CharacterId)) return slotCharacters[i].CharacterId;
             return string.Empty;
         }
 
@@ -176,6 +185,7 @@ namespace Quest
             if (completing || string.IsNullOrEmpty(characterId)) return;
             selectedCharacterId = characterId;
             requestedCharacterId = characterId;
+            OpenDetail();
             RefreshContents();
         }
 
@@ -206,6 +216,23 @@ namespace Quest
 
         private void HandleQuestStateChanged(string _) => RefreshContents();
         private void HandlePartyChanged() => RefreshContents();
+
+        private void CloseDetail()
+        {
+            if (subPanel != null) subPanel.SetActive(false);
+        }
+
+        private void BindDetailCloseButton()
+        {
+            if (subPanelCloseButton == null) return;
+            subPanelCloseButton.onClick.RemoveListener(CloseDetail);
+            subPanelCloseButton.onClick.AddListener(CloseDetail);
+        }
+
+        private void OpenDetail()
+        {
+            if (subPanel != null && !subPanel.activeSelf) subPanel.SetActive(true);
+        }
 
         private List<CharacterStoryQuestObjectiveDefinition> EnabledObjectives(CharacterStoryQuestDefinition quest)
         {

@@ -59,6 +59,7 @@ namespace QuestEditorTests
                 Assert.NotNull(panel);
                 Assert.IsTrue(panel.HasRequiredReferences);
                 Assert.AreEqual(3, panel.SlotCount);
+                Assert.IsTrue(panel.IsDetailOpen, "프리팹은 독립 상세 패널 참조를 직렬화해야 합니다.");
                 Assert.AreEqual(3, root.GetComponentsInChildren<CharacterQuestCardView>(true).Length);
                 Assert.AreEqual(1, root.GetComponentsInChildren<CharacterStoryQuestDetailView>(true).Length);
                 Assert.AreEqual(0, root.GetComponentsInChildren<CharacterStoryQuestUiController>(true).Length,
@@ -165,6 +166,104 @@ namespace QuestEditorTests
                 Assert.AreEqual("Lv. 7", FindDescendant(root.transform, "lb_Level").GetComponent<TMP_Text>().text);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        [Test]
+        public void Card_HidesQuestTitleAndUsesObjectiveTextForProgress()
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(CardPath);
+            CharacterStoryQuestDefinition quest = ScriptableObject.CreateInstance<CharacterStoryQuestDefinition>();
+            created.Add(quest);
+            CharacterStoryQuestObjectiveDefinition objective = Objective("objective", 10);
+            try
+            {
+                Set(quest, "questId", "Q");
+                CharacterQuestCardView card = root.GetComponent<CharacterQuestCardView>();
+                var snapshot = new CharacterStoryQuestSnapshot("CatKnight", "Q", false, false,
+                    new List<string>(), new Dictionary<string, int> { { "objective", 4 } });
+
+                card.Bind(null, 1, quest, new[] { objective }, snapshot, false, _ => { }, (_, __) => { });
+
+                Assert.IsFalse(FindDescendant(root.transform, "lb_QuestName").gameObject.activeSelf,
+                    "메인 카드에는 퀘스트 제목을 표시하지 않습니다.");
+                TMP_Text objectiveText = FindDescendant(root.transform, "lb_QuestName_Objective").GetComponent<TMP_Text>();
+                StringAssert.Contains("4/10", objectiveText.text);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        [Test]
+        public void Detail_AllClearHidesCurrentAndShowsConfiguredAllClearText()
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(PanelPath);
+            try
+            {
+                CharacterStoryQuestDetailView detail = root.GetComponentInChildren<CharacterStoryQuestDetailView>(true);
+                Assert.NotNull(detail);
+                var graduated = new CharacterStoryQuestSnapshot("CatKnight", string.Empty, false, true,
+                    new List<string>(), new Dictionary<string, int>());
+
+                detail.Bind("CatKnight", null, new List<CharacterStoryQuestObjectiveDefinition>(), graduated, false,
+                    (_, __) => { });
+
+                Transform current = root.transform.Find("Sub_Panel/QuestInfo/QuestInfo/Current");
+                Transform allClear = root.transform.Find("Sub_Panel/QuestInfo/QuestInfo/lb_AllClear");
+                Assert.NotNull(current); Assert.NotNull(allClear);
+                Assert.IsFalse(current.gameObject.activeSelf);
+                Assert.IsTrue(allClear.gameObject.activeSelf);
+                Assert.IsTrue(detail.IsAllClear);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        [Test]
+        public void AllClearCard_RemainsSelectableAndReopensOnlyItsClosedDetailPanel()
+        {
+            FieldInfo dataField = typeof(SaveSystem).GetField("data", BindingFlags.NonPublic | BindingFlags.Static);
+            FieldInfo instanceField = typeof(CharacterStoryQuestService).GetField("<Instance>k__BackingField",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            object originalData = dataField.GetValue(null);
+            object originalInstance = instanceField.GetValue(null);
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            QuestPanel panel = Object.FindObjectOfType<QuestPanel>(true);
+            CharacterStoryQuestService service = Object.FindObjectOfType<CharacterStoryQuestService>(true);
+            Assert.NotNull(panel); Assert.NotNull(service);
+            try
+            {
+                dataField.SetValue(null, new SaveData
+                {
+                    characters = new List<CharacterSaveState> { new CharacterSaveState { characterId = "CatKnight", level = 7 } },
+                    partyCharacterIds = new List<string> { "CatKnight", string.Empty, string.Empty },
+                    characterStoryQuests = new List<CharacterStoryQuestSaveState>
+                    {
+                        new CharacterStoryQuestSaveState { characterId = "CatKnight", graduated = true },
+                    },
+                });
+                instanceField.SetValue(null, service);
+
+                Assert.IsTrue(panel.OpenForCharacter("CatKnight"));
+                Assert.AreEqual("CatKnight", panel.SelectedCharacterId);
+                Assert.IsTrue(panel.DetailView.IsAllClear);
+
+                Button detailClose = FindDescendant(panel.transform.Find("Sub_Panel/QuestInfo"), "btn_close").GetComponent<Button>();
+                detailClose.onClick.Invoke();
+                Assert.IsTrue(panel.gameObject.activeSelf, "상세 닫기는 pn_Quest 자체를 닫지 않습니다.");
+                Assert.IsFalse(panel.IsDetailOpen);
+
+                CharacterQuestCardView card = null;
+                foreach (CharacterQuestCardView candidate in panel.GetComponentsInChildren<CharacterQuestCardView>(true))
+                    if (candidate.CharacterId == "CatKnight") { card = candidate; break; }
+                Assert.NotNull(card);
+                card.OnPointerClick(null);
+                Assert.IsTrue(panel.IsDetailOpen, "카드를 다시 고르면 Sub_Panel만 다시 열립니다.");
+                Assert.IsTrue(panel.DetailView.IsAllClear);
+            }
+            finally
+            {
+                if (panel != null && panel.gameObject.activeSelf) panel.Close();
+                instanceField.SetValue(null, originalInstance);
+                dataField.SetValue(null, originalData);
+            }
         }
 
         [Test]

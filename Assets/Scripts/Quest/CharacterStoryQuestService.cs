@@ -28,8 +28,8 @@ namespace Quest
         public static CharacterStoryQuestService Instance { get; private set; }
         public static event Action<string> QuestBecameReadyToComplete;
 
-        /// <summary>성공적으로 저장된 서사 퀘스트 상태 변경을 알린다. HUD처럼 현재 ready 목록을 다시
-        /// 조회하는 읽기 전용 표시는 이 알림만 구독하며, 실패하거나 롤백된 변경은 받지 않는다.</summary>
+        /// <summary>성공적으로 저장된 서사 퀘스트 상태 변경을 알린다. HUD와 열린 퀘스트 패널처럼
+        /// 현재 상태를 다시 읽는 표시는 이 알림만 구독하며, 실패하거나 롤백된 변경은 받지 않는다.</summary>
         public static event Action<string> QuestStateChanged;
 
         /// <summary>씬 wiring 검사와 부트스트랩 실패 차단에 쓰는 최소 구성 계약.</summary>
@@ -235,10 +235,13 @@ namespace Quest
         /// 표시한다.</summary>
         public bool NotifyReadyAfterExternalSave(CharacterStoryQuestMutationReceipt receipt)
         {
-            if (receipt == null || !receipt.TryConsumeReadyTransition(out string characterId)) return false;
+            if (receipt == null) return false;
+            bool stateChanged = receipt.TryConsumeStateChange(out string changedCharacterId);
+            bool becameReady = receipt.TryConsumeReadyTransition(out string readyCharacterId);
+            if (stateChanged) QuestStateChanged?.Invoke(changedCharacterId);
+            if (!becameReady) return false;
 
-            QuestBecameReadyToComplete?.Invoke(characterId);
-            QuestStateChanged?.Invoke(characterId);
+            QuestBecameReadyToComplete?.Invoke(readyCharacterId);
             ShowReadyToast();
             return true;
         }
@@ -417,6 +420,8 @@ namespace Quest
     {
         private readonly SaveData data; private readonly Dictionary<string, CharacterStoryQuestSaveState> before = new Dictionary<string, CharacterStoryQuestSaveState>(StringComparer.Ordinal);
         private bool readyTransitionConsumed;
+        private bool stateChangeConsumed;
+        private bool rolledBack;
         internal bool Changed;
         internal CharacterStoryQuestMutationReceipt(SaveData data) { this.data = data; }
         internal void Capture(string id, CharacterStoryQuestSaveState state) { if (!before.ContainsKey(id)) before[id] = Clone(state); }
@@ -438,8 +443,21 @@ namespace Quest
             }
             return false;
         }
+        internal bool TryConsumeStateChange(out string characterId)
+        {
+            characterId = string.Empty;
+            if (stateChangeConsumed || rolledBack || !Changed) return false;
+            stateChangeConsumed = true;
+            foreach (KeyValuePair<string, CharacterStoryQuestSaveState> pair in before)
+            {
+                characterId = pair.Key;
+                break;
+            }
+            return true;
+        }
         public void Restore()
         {
+            rolledBack = true;
             if (data == null) return;
             foreach (var pair in before)
             {

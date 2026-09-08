@@ -46,7 +46,6 @@ namespace Quest
 
         private readonly List<TMP_Text> objectiveLines = new List<TMP_Text>();
         private readonly CharacterNameBinding nameBinding = new CharacterNameBinding();
-        private LocalizedTextReference localizedTitle;
         private Action<string, string> completeRequested;
         private Action<string> selected;
         private string characterId;
@@ -92,7 +91,9 @@ namespace Quest
             if (levelText != null) levelText.text = character != null ? "Lv. " + Mathf.Max(1, level) : string.Empty;
             nameBinding.Bind(character, value => { if (nameText != null) nameText.text = value ?? string.Empty; });
 
-            SetActive(questTitleText != null ? questTitleText.gameObject : null, !allClear);
+            // lb_QuestName is intentionally not a card heading. The compact party card shows
+            // only objective detail/progress; objectiveLineTemplate owns those runtime lines.
+            SetActive(questTitleText != null ? questTitleText.gameObject : null, false);
             SetActive(allClearText != null ? allClearText.gameObject : null, allClear);
             if (allClear)
             {
@@ -101,7 +102,6 @@ namespace Quest
             }
             else
             {
-                BindQuestTitle(quest);
                 RefreshObjectives(objectives, snapshot);
                 RefreshRewards(quest);
             }
@@ -137,7 +137,7 @@ namespace Quest
             if (levelText != null) levelText.text = string.Empty;
             if (nameText != null) nameText.text = string.Empty;
             if (questTitleText != null) questTitleText.text = string.Empty;
-            SetActive(questTitleText != null ? questTitleText.gameObject : null, true);
+            SetActive(questTitleText != null ? questTitleText.gameObject : null, false);
             SetActive(allClearText != null ? allClearText.gameObject : null, false);
             SetLinesActive(0);
             ClearRewards();
@@ -155,20 +155,6 @@ namespace Quest
         {
             if (completeButton == null || !completeButton.interactable || string.IsNullOrEmpty(questId)) return;
             completeRequested?.Invoke(characterId, questId);
-        }
-
-        private void BindQuestTitle(CharacterStoryQuestDefinition quest)
-        {
-            if (questTitleText == null) return;
-            questTitleText.text = quest != null ? quest.QuestId : string.Empty;
-            if (quest == null || quest.LocalizedTitle == null || !quest.LocalizedTitle.HasReference) return;
-            localizedTitle = quest.LocalizedTitle;
-            localizedTitle.StringChanged += ApplyQuestTitle;
-        }
-
-        private void ApplyQuestTitle(string value)
-        {
-            if (questTitleText != null && !string.IsNullOrWhiteSpace(value)) questTitleText.text = value;
         }
 
         private void RefreshObjectives(IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives,
@@ -255,8 +241,6 @@ namespace Quest
         private void ClearBindings()
         {
             if (completeButton != null) completeButton.onClick.RemoveListener(RequestComplete);
-            if (localizedTitle != null) localizedTitle.StringChanged -= ApplyQuestTitle;
-            localizedTitle = null;
             nameBinding.Unbind();
             selected = null;
             completeRequested = null;

@@ -118,6 +118,9 @@ namespace QuestEditor
                 if (detail == null) detail = detailRoot.gameObject.AddComponent<CharacterStoryQuestDetailView>();
                 ConfigureDetail(detailRoot, detail);
                 Set(serialized, "detailView", detail);
+                Set(serialized, "subPanel", Find(root.transform, "Sub_Panel").gameObject);
+                Set(serialized, "subPanelCloseButton",
+                    FindDescendant(detailRoot, "btn_close").GetComponent<Button>());
                 serialized.ApplyModifiedPropertiesWithoutUndo();
                 PrefabUtility.SaveAsPrefabAsset(root, PanelPrefabPath);
             }
@@ -127,6 +130,7 @@ namespace QuestEditor
         private static void ConfigureDetail(Transform detailRoot, CharacterStoryQuestDetailView detail)
         {
             Transform current = Find(detailRoot, "QuestInfo/Current");
+            Transform allClear = Find(detailRoot, "QuestInfo/lb_AllClear");
             Transform scroll = Find(current, "ObjectiveScroll");
             Transform content = Find(scroll, "Viewport/Content");
             Transform type = FindDescendant(content, "QuestType");
@@ -142,6 +146,8 @@ namespace QuestEditor
             Transform complete = FindDescendant(detailRoot, "btn_QuestComplete");
 
             SerializedObject serialized = new SerializedObject(detail);
+            Set(serialized, "currentRoot", current.gameObject);
+            Set(serialized, "allClearText", allClear.GetComponent<TMP_Text>());
             Set(serialized, "questTitleText", typeText);
             Set(serialized, "questDescriptionText", descriptionText);
             Set(serialized, "objectiveTypeLineTemplate", typeText);

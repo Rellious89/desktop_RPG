@@ -93,17 +93,18 @@ namespace QuestEditorTests
                     data, "CatKnight", "Monster_1", 0);
                 Assert.IsFalse(service.NotifyReadyAfterExternalSave(first));
                 Assert.AreEqual(0, notifications, "목표 중간 진행에는 알림이 없어야 합니다.");
+                Assert.AreEqual(1, stateChanges, "저장 성공한 중간 진행은 열린 퀘스트 UI가 다시 그릴 수 있어야 합니다.");
 
                 CharacterStoryQuestMutationReceipt completed = service.ApplyDefeatWithoutSave(
                     data, "CatKnight", "Monster_1", 0);
                 Assert.AreEqual(0, notifications, "저장 성공 확정 전에는 알림을 발행하지 않습니다.");
                 Assert.IsTrue(service.NotifyReadyAfterExternalSave(completed));
                 Assert.AreEqual(1, notifications);
-                Assert.AreEqual(1, stateChanges, "저장 성공 뒤 HUD가 다시 조회할 상태 알림도 한 번 필요합니다.");
+                Assert.AreEqual(2, stateChanges, "각 저장 성공 뒤 HUD와 열린 패널이 다시 조회할 상태 알림이 필요합니다.");
                 Assert.AreEqual("CatKnight", notifiedCharacterId);
                 Assert.IsFalse(service.NotifyReadyAfterExternalSave(completed), "같은 저장 영수증은 중복 알림을 만들지 않습니다.");
                 Assert.AreEqual(1, notifications);
-                Assert.AreEqual(1, stateChanges);
+                Assert.AreEqual(2, stateChanges);
             }
             finally
             {

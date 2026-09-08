@@ -13,6 +13,10 @@ namespace Quest
     [DisallowMultipleComponent]
     public sealed class CharacterStoryQuestDetailView : MonoBehaviour
     {
+        [Header("Detail State")]
+        [SerializeField] private GameObject currentRoot;
+        [SerializeField] private TMP_Text allClearText;
+
         [SerializeField] private TMP_Text questTitleText;
         [SerializeField] private TMP_Text questDescriptionText;
         [SerializeField] private TMP_Text objectiveTypeLineTemplate;
@@ -55,7 +59,9 @@ namespace Quest
         public string QuestId => questId ?? string.Empty;
         public Button CompleteButton => completeButton;
         public InventorySlotView RewardItemSlot => rewardItemSlot;
-        public bool HasRequiredReferences => questTitleText != null && questDescriptionText != null &&
+        public bool IsAllClear => allClearText != null && allClearText.gameObject.activeSelf;
+        public bool HasRequiredReferences => currentRoot != null && allClearText != null &&
+                                             questTitleText != null && questDescriptionText != null &&
                                              objectiveTypeLineTemplate != null && objectiveDescriptionLineTemplate != null &&
                                              progressSlider != null && progressPercentText != null && objectiveScroll != null &&
                                              monsterCatalog != null && dungeonCatalog != null &&
@@ -77,6 +83,9 @@ namespace Quest
             completeRequested = onComplete;
             boundObjectives = objectives;
             boundSnapshot = snapshot;
+            bool allClear = quest == null && snapshot != null && snapshot.Graduated;
+            SetActive(currentRoot, !allClear);
+            SetActive(allClearText != null ? allClearText.gameObject : null, allClear);
             if (quest == null)
             {
                 ClearVisuals();
@@ -111,6 +120,8 @@ namespace Quest
             ClearBindings();
             characterId = string.Empty;
             questId = string.Empty;
+            SetActive(currentRoot, false);
+            SetActive(allClearText != null ? allClearText.gameObject : null, false);
             ClearVisuals();
         }
 
