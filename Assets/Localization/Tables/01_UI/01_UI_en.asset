@@ -473,6 +473,23 @@ MonoBehaviour:
     m_Localized: '  (Complete)'
     m_Metadata:
       m_Items: []
+  - m_Id: 14537362045394944
+    m_Localized: Total Quest {0}/{1}
+    m_Metadata:
+      m_Items: []
+  - m_Id: 14538803766091776
+    m_Localized: Quest
+    m_Metadata:
+      m_Items: []
+  - m_Id: 14890513319583744
+    m_Localized: Detail
+    m_Metadata:
+      m_Items: []
+  - m_Id: 14896368542801920
+    m_Localized: "\uD30C\uD2F0\uC5D0 \uD3B8\uC131\uB41C \uC6A9\uBCD1 \uC815\uBCF4\uB97C
+      \uD45C\uC2DC\uD569\uB2C8\uB2E4."
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
