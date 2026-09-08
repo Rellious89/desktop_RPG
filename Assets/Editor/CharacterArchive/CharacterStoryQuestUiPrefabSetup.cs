@@ -14,10 +14,12 @@ namespace CharacterArchiveEditor
     public static class CharacterStoryQuestUiPrefabSetup
     {
         private const string PrefabPath = "Assets/Art/UI/Prefab/panel/pn_CharacterArchive.prefab";
+        private const string SharedQuestInfoPrefabPath = "Assets/Art/UI/Prefab/Quest/QuestInfo.prefab";
 
         [MenuItem("Tools/Keybuddy/Character Archive/Setup Story Quest UI", priority = 120)]
         public static void Setup()
         {
+            SetupSharedQuestInfo();
             GameObject root = PrefabUtility.LoadPrefabContents(PrefabPath);
             try
             {
@@ -78,6 +80,7 @@ namespace CharacterArchiveEditor
                 Set(serialized, "questDescriptionTitle", Find(description, "lb_title").GetComponent<TMP_Text>());
                 Set(serialized, "questTypeLineTemplate", typeTemplate);
                 Set(serialized, "questDescriptionLineTemplate", descriptionTemplate);
+                Set(serialized, "allClearText", Find(root.transform, "pn_right/QuestInfo/QuestInfo/lb_AllClear").GetComponent<TMP_Text>());
                 Set(serialized, "completeButton", Find(root.transform, "pn_right/QuestInfo/QuestInfo/btn_QuestComplete").GetComponent<Button>());
                 Set(serialized, "completeButtonText", Find(root.transform, "pn_right/QuestInfo/QuestInfo/btn_QuestComplete/lb_QuestComplete").GetComponent<TMP_Text>());
                 Set(serialized, "objectiveScroll", scroll.GetComponent<ScrollRect>());
@@ -124,6 +127,21 @@ namespace CharacterArchiveEditor
                 Set(panelSerialized, "rightCloseButton", Find(root.transform, "pn_right/CharacterInfo/bg/top/btn_close").GetComponent<Button>());
                 panelSerialized.ApplyModifiedPropertiesWithoutUndo();
                 PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        private static void SetupSharedQuestInfo()
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(SharedQuestInfoPrefabPath);
+            try
+            {
+                CharacterStoryQuestUiController controller = root.GetComponent<CharacterStoryQuestUiController>();
+                if (controller == null) throw new System.InvalidOperationException("공용 QuestInfo 컨트롤러를 찾을 수 없습니다.");
+                SerializedObject serialized = new SerializedObject(controller);
+                Set(serialized, "allClearText", Find(root.transform, "QuestInfo/lb_AllClear").GetComponent<TMP_Text>());
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                PrefabUtility.SaveAsPrefabAsset(root, SharedQuestInfoPrefabPath);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
         }

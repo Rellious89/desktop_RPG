@@ -54,6 +54,10 @@ namespace CharacterArchiveEditorTests
                 Assert.AreSame(completeButtonText.GetComponent<TMP_Text>(),
                     controllerSerialized.FindProperty("completeButtonText").objectReferenceValue,
                     "완료 버튼 문구는 진행/완료 상태에 따라 컨트롤러가 갱신해야 합니다.");
+                Transform allClear = Find(root.transform, "pn_right/QuestInfo/QuestInfo/lb_AllClear");
+                Assert.AreSame(allClear.GetComponent<TMP_Text>(),
+                    controllerSerialized.FindProperty("allClearText").objectReferenceValue,
+                    "공용 QuestInfo의 lb_AllClear를 명부 상세 완료 상태에 직접 연결해야 합니다.");
                 Transform allList = Find(root.transform, "pn_right/QuestInfo/bg_AllList");
                 Transform allListScroll = Find(allList, "ObjectiveScroll");
                 Transform allListContent = Find(allListScroll, "Viewport/Content");
@@ -133,6 +137,21 @@ namespace CharacterArchiveEditorTests
                 Assert.IsFalse(descriptionTemplate.gameObject.activeSelf);
                 Assert.IsFalse(typeTemplate.raycastTarget);
                 Assert.IsFalse(descriptionTemplate.raycastTarget);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        [Test]
+        public void SharedQuestInfo_UsesItsExistingAllClearLabelForArchiveCompletionState()
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents("Assets/Art/UI/Prefab/Quest/QuestInfo.prefab");
+            try
+            {
+                CharacterStoryQuestUiController controller = root.GetComponent<CharacterStoryQuestUiController>();
+                Assert.NotNull(controller);
+                SerializedObject serialized = new SerializedObject(controller);
+                Assert.AreSame(Find(root.transform, "QuestInfo/lb_AllClear").GetComponent<TMP_Text>(),
+                    serialized.FindProperty("allClearText").objectReferenceValue);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
         }

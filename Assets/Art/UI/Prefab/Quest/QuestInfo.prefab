@@ -5616,6 +5616,7 @@ MonoBehaviour:
   questDescriptionTitle: {fileID: 9045982168241280162}
   questTypeLineTemplate: {fileID: 2799610178216805588}
   questDescriptionLineTemplate: {fileID: 716892276128326324}
+  allClearText: {fileID: 954082737409220910}
   completeButton: {fileID: 3752888375780892967}
   completeButtonText: {fileID: 3703223608943753229}
   objectiveScroll: {fileID: 3053418945411321283}

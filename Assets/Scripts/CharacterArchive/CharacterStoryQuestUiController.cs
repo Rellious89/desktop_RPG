@@ -51,6 +51,7 @@ namespace CharacterArchive
         [SerializeField] private TMP_Text questDescriptionTitle;
         [SerializeField] private TMP_Text questTypeLineTemplate;
         [SerializeField] private TMP_Text questDescriptionLineTemplate;
+        [SerializeField] private TMP_Text allClearText;
         [SerializeField] private Button completeButton;
         [SerializeField] private TMP_Text completeButtonText;
         [SerializeField] private ScrollRect objectiveScroll;
@@ -107,7 +108,8 @@ namespace CharacterArchive
                                              swapButton != null && closeButton != null && completeButton != null &&
                                              currentProgressSlider != null && totalProgressSlider != null &&
                                              currentProgressPercentText != null && totalProgressPercentText != null && totalProgressText != null &&
-                                             questTypeLineTemplate != null && questDescriptionLineTemplate != null && completeButtonText != null &&
+                                             questTypeLineTemplate != null && questDescriptionLineTemplate != null && allClearText != null &&
+                                             completeButtonText != null &&
                                              allQuestListRoot != null && allQuestListScroll != null && allQuestListContent != null &&
                                              allQuestListItemTemplate != null && allQuestSelection != null &&
                                              rewardRoot != null && rewardCurrencyRoot != null && rewardCurrencyAmountText != null &&
@@ -377,6 +379,7 @@ namespace CharacterArchive
             List<CharacterStoryQuestObjectiveDefinition> objectives = detailQuest != null ? EnabledObjectives(detailQuest.QuestId) : new List<CharacterStoryQuestObjectiveDefinition>();
             bool detailIsActive = detailQuest != null && string.Equals(detailQuest.QuestId, snapshot.ActiveQuestId, StringComparison.Ordinal);
             bool detailIsCompleted = detailQuest != null && IsCompleted(snapshot, detailQuest.QuestId);
+            bool allQuestsCompleted = AreAllStoryQuestsCompleted(snapshot, orderedQuests);
 
             float current = detailIsCompleted ? 1f : detailIsActive ? CalculateCurrentProgress(objectives, snapshot) : 0f;
             float total = CalculateTotalProgress(questCatalog, selected != null ? selected.CharacterId : string.Empty, snapshot, out int currentNumber, out int completedCount, out int totalCount);
@@ -393,7 +396,8 @@ namespace CharacterArchive
             SetActive(questDescriptionTitle != null ? questDescriptionTitle.gameObject : null, objectives.Count > 0);
             RefreshRewards(detailQuest);
             bool readyToComplete = detailIsActive && snapshot.ReadyToComplete;
-            if (completeButton != null) completeButton.interactable = !completionRequested && readyToComplete;
+            UpdateAllClearPresentation(allQuestsCompleted);
+            if (completeButton != null) completeButton.interactable = !allQuestsCompleted && !completionRequested && readyToComplete;
             if (completeButtonText != null)
                 completeButtonText.text = detailIsCompleted || readyToComplete
                     ? TextOrFallback(completeButtonReadyText, "퀘스트 완료")
@@ -671,6 +675,26 @@ namespace CharacterArchive
             if (content == null) return;
             TMP_Text[] texts = content.GetComponentsInChildren<TMP_Text>(true);
             for (int i = 0; i < texts.Length; i++) texts[i].color = color;
+        }
+
+        // The service commits Graduated only after its final quest succeeds.  The completed-id
+        // fallback keeps this presentation correct for an already-complete sequence while it is
+        // being read, without repairing or otherwise mutating legacy save state here.
+        private static bool AreAllStoryQuestsCompleted(
+            CharacterStoryQuestSnapshot snapshot,
+            IReadOnlyList<CharacterStoryQuestDefinition> quests)
+        {
+            if (snapshot == null || quests == null || quests.Count == 0) return false;
+            if (snapshot.Graduated) return true;
+            for (int i = 0; i < quests.Count; i++)
+                if (quests[i] == null || !IsCompleted(snapshot, quests[i].QuestId)) return false;
+            return true;
+        }
+
+        private void UpdateAllClearPresentation(bool allQuestsCompleted)
+        {
+            SetActive(allClearText != null ? allClearText.gameObject : null, allQuestsCompleted);
+            SetActive(completeButton != null ? completeButton.gameObject : null, !allQuestsCompleted);
         }
 
         private static CharacterStoryQuestDefinition FindQuest(IReadOnlyList<CharacterStoryQuestDefinition> quests, string questId)

@@ -236,6 +236,50 @@ namespace QuestEditorTests
         }
 
         [Test]
+        public void Detail_CompletedTextIsGreyAndAnActiveSelectionRestoresItsPrefabColors()
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(PanelPath);
+            try
+            {
+                CharacterStoryQuestDetailView detail = root.GetComponentInChildren<CharacterStoryQuestDetailView>(true);
+                CharacterStoryQuestCatalog catalog = AssetDatabase.LoadAssetAtPath<CharacterStoryQuestCatalog>(
+                    "Assets/Generated/TableData/CharacterStoryQuest/CharacterStoryQuestCatalog.asset");
+                CharacterStoryQuestObjectiveCatalog objectives = AssetDatabase.LoadAssetAtPath<CharacterStoryQuestObjectiveCatalog>(
+                    "Assets/Generated/TableData/CharacterStoryQuestObjective/CharacterStoryQuestObjectiveCatalog.asset");
+                CharacterStoryQuestDefinition quest = LastQuest(catalog, "CatKnight");
+                List<CharacterStoryQuestObjectiveDefinition> questObjectives = objectives.ForQuest(quest.QuestId);
+                Transform current = root.transform.Find("Sub_Panel/QuestInfo/QuestInfo/Current");
+                TMP_Text title = FindDescendant(FindDescendant(current, "QuestType"), "lb_contents").GetComponent<TMP_Text>();
+                TMP_Text description = FindDescendant(FindDescendant(current, "QuestDesctiption"), "lb_contents").GetComponent<TMP_Text>();
+                TMP_Text progress = FindDescendant(current, "lb_percent").GetComponent<TMP_Text>();
+                TMP_Text rewardAmount = FindDescendant(current, "lb_RewardValue").GetComponent<TMP_Text>();
+                TMP_Text allClear = root.transform.Find("Sub_Panel/QuestInfo/QuestInfo/lb_AllClear").GetComponent<TMP_Text>();
+                Color titleDefault = title.color;
+                Color descriptionDefault = description.color;
+                Color progressDefault = progress.color;
+                Color rewardDefault = rewardAmount.color;
+                Color allClearDefault = allClear.color;
+                var completed = new CharacterStoryQuestSnapshot("CatKnight", string.Empty, false, false,
+                    new List<string> { quest.QuestId }, new Dictionary<string, int>());
+
+                detail.Bind("CatKnight", quest, questObjectives, completed, false, (_, __) => { });
+                Assert.AreEqual(new Color32(0x95, 0x95, 0x95, 0xFF), (Color32)title.color);
+                Assert.AreEqual(new Color32(0x95, 0x95, 0x95, 0xFF), (Color32)description.color);
+                Assert.AreEqual(new Color32(0x95, 0x95, 0x95, 0xFF), (Color32)progress.color);
+                Assert.AreEqual(rewardDefault, rewardAmount.color, "보상 수량의 의도 색상은 상세 완료색으로 바꾸지 않습니다.");
+                Assert.AreEqual(allClearDefault, allClear.color, "lb_AllClear는 프리팹 자체의 의도 색상을 유지합니다.");
+
+                var active = new CharacterStoryQuestSnapshot("CatKnight", quest.QuestId, false, false,
+                    new List<string>(), new Dictionary<string, int>());
+                detail.Bind("CatKnight", quest, questObjectives, active, false, (_, __) => { });
+                Assert.AreEqual(titleDefault, title.color);
+                Assert.AreEqual(descriptionDefault, description.color);
+                Assert.AreEqual(progressDefault, progress.color);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        [Test]
         public void AllClearCard_RemainsSelectableAndReopensOnlyItsClosedDetailPanel()
         {
             FieldInfo dataField = typeof(SaveSystem).GetField("data", BindingFlags.NonPublic | BindingFlags.Static);

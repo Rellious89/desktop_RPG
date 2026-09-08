@@ -13,6 +13,8 @@ namespace Quest
     [DisallowMultipleComponent]
     public sealed class CharacterStoryQuestDetailView : MonoBehaviour
     {
+        private static readonly Color CompletedTextColor = new Color32(0x95, 0x95, 0x95, 0xFF);
+
         [Header("Detail State")]
         [SerializeField] private GameObject currentRoot;
         [SerializeField] private TMP_Text allClearText;
@@ -49,6 +51,9 @@ namespace Quest
         private readonly Dictionary<int, string> localizedObjectiveTexts = new Dictionary<int, string>();
         private readonly Dictionary<LocalizedTextReference, LocalizedString.ChangeHandler> objectiveLocalizationHandlers =
             new Dictionary<LocalizedTextReference, LocalizedString.ChangeHandler>();
+        // The independent panel has its own typography.  Remember each text's prefab color so a
+        // completed-detail selection never leaves a later active quest grey.
+        private readonly Dictionary<TMP_Text, Color> detailTextDefaultColors = new Dictionary<TMP_Text, Color>();
         private IReadOnlyList<CharacterStoryQuestObjectiveDefinition> boundObjectives;
         private CharacterStoryQuestSnapshot boundSnapshot;
         private Action<string, string> completeRequested;
@@ -109,6 +114,7 @@ namespace Quest
             completeButton.interactable = !allClear && !completing && ready;
             completeButton.gameObject.SetActive(!allClear);
             completeButtonText.text = ready ? "퀘스트 완료" : "진행중";
+            ApplyCompletionTextColor(allClear || IsCompleted(snapshot, quest.QuestId));
             RefreshLayout();
         }
 
@@ -166,6 +172,34 @@ namespace Quest
             }
             SetLinesActive(typeLines, count);
             SetLinesActive(descriptionLines, count);
+        }
+
+        private void ApplyCompletionTextColor(bool completed)
+        {
+            ApplyDetailTextColor(questTitleText, completed);
+            ApplyDetailTextColor(questDescriptionText, completed);
+            ApplyDetailTextColor(progressPercentText, completed);
+            for (int i = 0; i < typeLines.Count; i++) ApplyDetailTextColor(typeLines[i], completed);
+            for (int i = 0; i < descriptionLines.Count; i++) ApplyDetailTextColor(descriptionLines[i], completed);
+        }
+
+        private void ApplyDetailTextColor(TMP_Text text, bool completed)
+        {
+            if (text == null) return;
+            if (!detailTextDefaultColors.TryGetValue(text, out Color defaultColor))
+            {
+                defaultColor = text.color;
+                detailTextDefaultColors.Add(text, defaultColor);
+            }
+            text.color = completed ? CompletedTextColor : defaultColor;
+        }
+
+        private static bool IsCompleted(CharacterStoryQuestSnapshot snapshot, string id)
+        {
+            if (snapshot?.CompletedQuestIds == null || string.IsNullOrEmpty(id)) return false;
+            for (int i = 0; i < snapshot.CompletedQuestIds.Count; i++)
+                if (string.Equals(snapshot.CompletedQuestIds[i], id, StringComparison.Ordinal)) return true;
+            return false;
         }
 
         private static TMP_Text GetOrCreateLine(TMP_Text template, List<TMP_Text> pool, int index)

@@ -86,6 +86,32 @@ namespace CharacterArchiveEditorTests
             Assert.AreEqual(1f, result);
         }
 
+        [Test]
+        public void AllClearPresentation_RequiresEveryQuestAndOnlyHidesTheCompletionButtonWhenComplete()
+        {
+            GameObject host = new GameObject("story-quest-all-clear"); created.Add(host);
+            CharacterStoryQuestUiController controller = host.AddComponent<CharacterStoryQuestUiController>();
+            GameObject allClear = new GameObject("lb_AllClear", typeof(TextMeshProUGUI)); created.Add(allClear);
+            GameObject complete = new GameObject("btn_QuestComplete", typeof(Button)); created.Add(complete);
+            Set(controller, "allClearText", allClear.GetComponent<TMP_Text>());
+            Set(controller, "completeButton", complete.GetComponent<Button>());
+            List<CharacterStoryQuestDefinition> quests = new List<CharacterStoryQuestDefinition> { Quest("Q1", 1), Quest("Q2", 2) };
+            var partial = new CharacterStoryQuestSnapshot("CatKnight", "Q2", false, false,
+                new List<string> { "Q1" }, new Dictionary<string, int>());
+            var completeSnapshot = new CharacterStoryQuestSnapshot("CatKnight", string.Empty, false, false,
+                new List<string> { "Q1", "Q2" }, new Dictionary<string, int>());
+
+            Assert.IsFalse(AreAllStoryQuestsCompleted(partial, quests));
+            UpdateAllClearPresentation(controller, false);
+            Assert.IsFalse(allClear.activeSelf);
+            Assert.IsTrue(complete.activeSelf);
+
+            Assert.IsTrue(AreAllStoryQuestsCompleted(completeSnapshot, quests));
+            UpdateAllClearPresentation(controller, true);
+            Assert.IsTrue(allClear.activeSelf);
+            Assert.IsFalse(complete.activeSelf);
+        }
+
         [TestCase(0f, "0%")]
         [TestCase(.505f, "51%")]
         [TestCase(1f, "100%")]
@@ -526,6 +552,15 @@ namespace CharacterArchiveEditorTests
         private static int LocalizationSubscriptionCount(CharacterStoryQuestUiController controller) =>
             ((System.Collections.IDictionary)typeof(CharacterStoryQuestUiController).GetField("localizationHandlers", BindingFlags.Instance | BindingFlags.NonPublic)
                 .GetValue(controller)).Count;
+
+        private static bool AreAllStoryQuestsCompleted(CharacterStoryQuestSnapshot snapshot,
+            IReadOnlyList<CharacterStoryQuestDefinition> quests) =>
+            (bool)typeof(CharacterStoryQuestUiController).GetMethod("AreAllStoryQuestsCompleted", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { snapshot, quests });
+
+        private static void UpdateAllClearPresentation(CharacterStoryQuestUiController controller, bool allClear) =>
+            typeof(CharacterStoryQuestUiController).GetMethod("UpdateAllClearPresentation", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(controller, new object[] { allClear });
 
         private static void AssertTotal(CharacterStoryQuestCatalog catalog, CharacterStoryQuestSnapshot snapshot,
             int expectedCurrentNumber, int expectedCompleted, int expectedTotal, float expectedProgress)
