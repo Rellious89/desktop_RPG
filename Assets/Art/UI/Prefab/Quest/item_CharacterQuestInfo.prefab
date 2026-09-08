@@ -1421,6 +1421,7 @@ MonoBehaviour:
   defaultSprite: {fileID: 21300000, guid: 07bb7c6ed9cfa48d19114304e6098dcc, type: 3}
   selectedSprite: {fileID: 21300000, guid: 2d2302d4989be4d9cbb98f93c4be923f, type: 3}
   clearSprite: {fileID: 21300000, guid: ffc97a8a7308b4d40b3c9c2a6ef2d763, type: 3}
+  clearSelectedSprite: {fileID: 21300000, guid: e0c7845f80b884607b3a959916298dfb, type: 3}
   portrait: {fileID: 5939065760688387683}
   levelText: {fileID: 3006493019293859151}
   nameText: {fileID: 3562300110742190767}

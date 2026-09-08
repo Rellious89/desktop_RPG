@@ -83,8 +83,10 @@ namespace Quest
             completeRequested = onComplete;
             boundObjectives = objectives;
             boundSnapshot = snapshot;
-            bool allClear = quest == null && snapshot != null && snapshot.Graduated;
-            SetActive(currentRoot, !allClear);
+            // 졸업한 캐릭터도 독립 패널에서는 마지막 서사 퀘스트를 완료 상태로 다시 보여 준다.
+            // 이 뷰는 pn_Quest 전용이므로, 용병명부 QuestInfo의 과거 퀘스트 선택 계약에는 관여하지 않는다.
+            bool allClear = snapshot != null && snapshot.Graduated;
+            SetActive(currentRoot, quest != null);
             SetActive(allClearText != null ? allClearText.gameObject : null, allClear);
             if (quest == null)
             {
@@ -104,15 +106,16 @@ namespace Quest
                          string.Equals(snapshot.ActiveQuestId, quest.QuestId, StringComparison.Ordinal);
             completeButton.onClick.RemoveListener(RequestComplete);
             completeButton.onClick.AddListener(RequestComplete);
-            completeButton.interactable = !completing && ready;
-            completeButton.gameObject.SetActive(true);
+            completeButton.interactable = !allClear && !completing && ready;
+            completeButton.gameObject.SetActive(!allClear);
             completeButtonText.text = ready ? "퀘스트 완료" : "진행중";
             RefreshLayout();
         }
 
         public void SetCompletionInputEnabled(bool enabled)
         {
-            if (completeButton != null) completeButton.interactable = enabled && !string.IsNullOrEmpty(questId);
+            if (completeButton != null)
+                completeButton.interactable = enabled && !IsAllClear && !string.IsNullOrEmpty(questId);
         }
 
         public void Clear()

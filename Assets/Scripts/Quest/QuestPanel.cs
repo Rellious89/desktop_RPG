@@ -177,7 +177,64 @@ namespace Quest
                 ? questCatalog.Find(snapshot.ActiveQuestId)
                 : null;
             if (quest != null && !string.Equals(quest.CharacterId, characterId, StringComparison.Ordinal)) quest = null;
-            detailView.Bind(characterId, quest, EnabledObjectives(quest), snapshot, completing, TryComplete);
+            if (quest == null && snapshot.Graduated) quest = LastNarrativeQuest(characterId, snapshot);
+
+            List<CharacterStoryQuestObjectiveDefinition> objectives = EnabledObjectives(quest);
+            CharacterStoryQuestSnapshot displaySnapshot = snapshot.Graduated && quest != null
+                ? CompletedPresentationSnapshot(snapshot, objectives)
+                : snapshot;
+            detailView.Bind(characterId, quest, objectives, displaySnapshot, completing, TryComplete);
+        }
+
+        // Graduation is committed only after the final quest completes.  The UI intentionally
+        // resolves that final definition from the catalog instead of restoring an active quest
+        // into save data; this is a presentation-only read of the existing completion state.
+        private CharacterStoryQuestDefinition LastNarrativeQuest(string characterId, CharacterStoryQuestSnapshot snapshot)
+        {
+            CharacterStoryQuestDefinition result = null;
+            if (questCatalog?.Quests == null) return null;
+            IReadOnlyList<CharacterStoryQuestDefinition> quests = questCatalog.Quests;
+            for (int i = 0; i < quests.Count; i++)
+            {
+                CharacterStoryQuestDefinition candidate = quests[i];
+                if (candidate == null || !candidate.IsFinal ||
+                    !string.Equals(candidate.CharacterId, characterId, StringComparison.Ordinal)) continue;
+                if (result == null || candidate.DisplayOrder > result.DisplayOrder ||
+                    candidate.DisplayOrder == result.DisplayOrder &&
+                    string.CompareOrdinal(candidate.QuestId, result.QuestId) > 0)
+                    result = candidate;
+            }
+
+            // Keep a readable completed detail for legacy or incomplete table data that lacks a
+            // final marker, without mutating the quest sequence or its persisted progress.
+            if (result != null || snapshot?.CompletedQuestIds == null) return result;
+            for (int i = 0; i < snapshot.CompletedQuestIds.Count; i++)
+            {
+                CharacterStoryQuestDefinition candidate = questCatalog.Find(snapshot.CompletedQuestIds[i]);
+                if (candidate == null || !string.Equals(candidate.CharacterId, characterId, StringComparison.Ordinal)) continue;
+                if (result == null || candidate.DisplayOrder > result.DisplayOrder ||
+                    candidate.DisplayOrder == result.DisplayOrder &&
+                    string.CompareOrdinal(candidate.QuestId, result.QuestId) > 0)
+                    result = candidate;
+            }
+            return result;
+        }
+
+        private static CharacterStoryQuestSnapshot CompletedPresentationSnapshot(
+            CharacterStoryQuestSnapshot snapshot,
+            IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives)
+        {
+            var progress = new Dictionary<string, int>(StringComparer.Ordinal);
+            if (snapshot?.ObjectiveProgress != null)
+                foreach (KeyValuePair<string, int> pair in snapshot.ObjectiveProgress) progress[pair.Key] = pair.Value;
+            if (objectives != null)
+                for (int i = 0; i < objectives.Count; i++)
+                    if (objectives[i] != null) progress[objectives[i].ObjectiveId] = objectives[i].RequiredValue;
+            var completed = snapshot?.CompletedQuestIds != null
+                ? new List<string>(snapshot.CompletedQuestIds)
+                : new List<string>();
+            return new CharacterStoryQuestSnapshot(snapshot != null ? snapshot.CharacterId : string.Empty,
+                snapshot != null ? snapshot.ActiveQuestId : string.Empty, false, true, completed, progress);
         }
 
         private void SelectCharacter(string characterId)

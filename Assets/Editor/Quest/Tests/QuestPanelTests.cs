@@ -40,7 +40,9 @@ namespace QuestEditorTests
                 Assert.NotNull(card.DefaultSprite);
                 Assert.NotNull(card.SelectedSprite);
                 Assert.NotNull(card.ClearSprite);
+                Assert.NotNull(card.ClearSelectedSprite);
                 Assert.AreNotSame(card.DefaultSprite, card.SelectedSprite);
+                Assert.AreNotSame(card.ClearSprite, card.ClearSelectedSprite);
 
                 Image image = root.GetComponent<Image>();
                 card.SetSelected(false); Assert.AreSame(card.DefaultSprite, image.sprite);
@@ -155,10 +157,14 @@ namespace QuestEditorTests
                     new List<string>(), new Dictionary<string, int>());
 
                 card.Bind(character, 7, null, new List<CharacterStoryQuestObjectiveDefinition>(), graduated, false, _ => { }, (_, __) => { });
+                card.SetSelected(false);
+                Assert.AreSame(card.ClearSprite, root.GetComponent<Image>().sprite,
+                    "완료 카드의 미선택 상태는 기존 AllClear 외형을 유지한다.");
                 card.SetSelected(true);
 
                 Assert.IsTrue(card.IsAllClear);
-                Assert.AreSame(card.ClearSprite, root.GetComponent<Image>().sprite, "완료 카드는 선택 상태보다 clear 외형이 우선한다.");
+                Assert.AreSame(card.ClearSelectedSprite, root.GetComponent<Image>().sprite,
+                    "완료 카드도 선택 여부에 따라 전용 선택 외형을 사용한다.");
                 Assert.IsFalse(FindDescendant(root.transform, "lb_QuestName").gameObject.activeSelf);
                 Assert.IsTrue(FindDescendant(root.transform, "lb_QuestAllClear").gameObject.activeSelf);
                 Assert.IsFalse(FindDescendant(root.transform, "QuestReward").gameObject.activeSelf);
@@ -193,25 +199,38 @@ namespace QuestEditorTests
         }
 
         [Test]
-        public void Detail_AllClearHidesCurrentAndShowsConfiguredAllClearText()
+        public void Detail_AllClearShowsLastQuestAtFullProgressAndConfiguredAllClearText()
         {
             GameObject root = PrefabUtility.LoadPrefabContents(PanelPath);
             try
             {
                 CharacterStoryQuestDetailView detail = root.GetComponentInChildren<CharacterStoryQuestDetailView>(true);
                 Assert.NotNull(detail);
+                CharacterStoryQuestCatalog catalog = AssetDatabase.LoadAssetAtPath<CharacterStoryQuestCatalog>(
+                    "Assets/Generated/TableData/CharacterStoryQuest/CharacterStoryQuestCatalog.asset");
+                CharacterStoryQuestObjectiveCatalog objectives = AssetDatabase.LoadAssetAtPath<CharacterStoryQuestObjectiveCatalog>(
+                    "Assets/Generated/TableData/CharacterStoryQuestObjective/CharacterStoryQuestObjectiveCatalog.asset");
+                CharacterStoryQuestDefinition lastQuest = LastQuest(catalog, "CatKnight");
+                Assert.NotNull(lastQuest);
+                List<CharacterStoryQuestObjectiveDefinition> lastObjectives = objectives.ForQuest(lastQuest.QuestId);
+                var completedProgress = new Dictionary<string, int>();
+                for (int i = 0; i < lastObjectives.Count; i++)
+                    completedProgress[lastObjectives[i].ObjectiveId] = lastObjectives[i].RequiredValue;
                 var graduated = new CharacterStoryQuestSnapshot("CatKnight", string.Empty, false, true,
-                    new List<string>(), new Dictionary<string, int>());
+                    new List<string> { lastQuest.QuestId }, completedProgress);
 
-                detail.Bind("CatKnight", null, new List<CharacterStoryQuestObjectiveDefinition>(), graduated, false,
+                detail.Bind("CatKnight", lastQuest, lastObjectives, graduated, false,
                     (_, __) => { });
 
                 Transform current = root.transform.Find("Sub_Panel/QuestInfo/QuestInfo/Current");
                 Transform allClear = root.transform.Find("Sub_Panel/QuestInfo/QuestInfo/lb_AllClear");
                 Assert.NotNull(current); Assert.NotNull(allClear);
-                Assert.IsFalse(current.gameObject.activeSelf);
+                Assert.IsTrue(current.gameObject.activeSelf);
                 Assert.IsTrue(allClear.gameObject.activeSelf);
                 Assert.IsTrue(detail.IsAllClear);
+                Assert.AreEqual(lastQuest.QuestId, detail.QuestId);
+                Assert.AreEqual("100%", FindDescendant(current, "lb_percent").GetComponent<TMP_Text>().text);
+                Assert.IsFalse(FindDescendant(root.transform.Find("Sub_Panel/QuestInfo"), "btn_QuestComplete").gameObject.activeSelf);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
         }
@@ -244,6 +263,10 @@ namespace QuestEditorTests
                 Assert.IsTrue(panel.OpenForCharacter("CatKnight"));
                 Assert.AreEqual("CatKnight", panel.SelectedCharacterId);
                 Assert.IsTrue(panel.DetailView.IsAllClear);
+                Assert.IsNotEmpty(panel.DetailView.QuestId, "졸업한 캐릭터는 마지막 서사 퀘스트 상세를 계속 표시합니다.");
+                Transform current = panel.transform.Find("Sub_Panel/QuestInfo/QuestInfo/Current");
+                Assert.IsTrue(current.gameObject.activeSelf);
+                Assert.AreEqual("100%", FindDescendant(current, "lb_percent").GetComponent<TMP_Text>().text);
 
                 Button detailClose = FindDescendant(panel.transform.Find("Sub_Panel/QuestInfo"), "btn_close").GetComponent<Button>();
                 detailClose.onClick.Invoke();
@@ -387,6 +410,19 @@ namespace QuestEditorTests
                 if (all[i].name.StartsWith(name, System.StringComparison.Ordinal)) return all[i];
             Assert.Fail(root.name + " 아래에서 찾지 못했습니다: " + name);
             return null;
+        }
+
+        private static CharacterStoryQuestDefinition LastQuest(CharacterStoryQuestCatalog catalog, string characterId)
+        {
+            CharacterStoryQuestDefinition result = null;
+            foreach (CharacterStoryQuestDefinition quest in catalog.Quests)
+            {
+                if (quest == null || !quest.IsFinal || quest.CharacterId != characterId) continue;
+                if (result == null || quest.DisplayOrder > result.DisplayOrder ||
+                    quest.DisplayOrder == result.DisplayOrder && string.CompareOrdinal(quest.QuestId, result.QuestId) > 0)
+                    result = quest;
+            }
+            return result;
         }
     }
 }

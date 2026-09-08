@@ -18,6 +18,7 @@ namespace Quest
         [SerializeField] private Sprite defaultSprite;
         [SerializeField] private Sprite selectedSprite;
         [SerializeField] private Sprite clearSprite;
+        [SerializeField] private Sprite clearSelectedSprite;
 
         [Header("Character")]
         [SerializeField] private Image portrait;
@@ -58,8 +59,10 @@ namespace Quest
         public Sprite DefaultSprite => defaultSprite;
         public Sprite SelectedSprite => selectedSprite;
         public Sprite ClearSprite => clearSprite;
+        public Sprite ClearSelectedSprite => clearSelectedSprite;
         public bool IsAllClear => allClear;
         public bool HasRequiredReferences => selectionImage != null && defaultSprite != null && selectedSprite != null && clearSprite != null &&
+                                             clearSelectedSprite != null &&
                                              portrait != null && levelText != null && nameText != null &&
                                              questTitleText != null && allClearText != null && objectiveLineTemplate != null &&
                                              rewardRoot != null && rewardCurrencyRoot != null && rewardCurrencyAmountText != null &&
@@ -120,7 +123,9 @@ namespace Quest
 
         public void SetSelected(bool value)
         {
-            if (selectionImage != null) selectionImage.sprite = allClear ? clearSprite : value ? selectedSprite : defaultSprite;
+            if (selectionImage != null)
+                selectionImage.sprite = allClear ? (value ? clearSelectedSprite : clearSprite) :
+                    (value ? selectedSprite : defaultSprite);
         }
 
         public void SetCompletionInputEnabled(bool enabled)

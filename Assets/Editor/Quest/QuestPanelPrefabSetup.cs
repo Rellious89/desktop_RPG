@@ -25,6 +25,7 @@ namespace QuestEditor
         private const string DefaultSpritePath = "Assets/Art/UI/PixelDesign/Pixel UI & HUD/Sprites/Panels/Blue/GridPanelInactive.png";
         private const string SelectedSpritePath = "Assets/Art/UI/PixelDesign/Pixel UI & HUD/Sprites/Panels/Blue/GridPanelInactive_Select.png";
         private const string ClearSpritePath = "Assets/Art/UI/PixelDesign/Pixel UI & HUD/Sprites/Panels/Blue/GridPanelInactive_AllClear.png";
+        private const string ClearSelectedSpritePath = "Assets/Art/UI/PixelDesign/Pixel UI & HUD/Sprites/Panels/Blue/GridPanelInactive_AllClearSelect.png";
         private const string MonsterCatalogPath = "Assets/Generated/TableData/Monster/MonsterCatalog.asset";
         private const string DungeonCatalogPath = "Assets/Generated/TableData/Dungeon/DungeonCatalog.asset";
 
@@ -59,6 +60,7 @@ namespace QuestEditor
                 Set(serialized, "defaultSprite", AssetDatabase.LoadAssetAtPath<Sprite>(DefaultSpritePath));
                 Set(serialized, "selectedSprite", AssetDatabase.LoadAssetAtPath<Sprite>(SelectedSpritePath));
                 Set(serialized, "clearSprite", AssetDatabase.LoadAssetAtPath<Sprite>(ClearSpritePath));
+                Set(serialized, "clearSelectedSprite", AssetDatabase.LoadAssetAtPath<Sprite>(ClearSelectedSpritePath));
                 Set(serialized, "portrait", FindDescendant(root.transform, "sp_portrait").GetComponent<Image>());
                 Set(serialized, "levelText", FindDescendant(characterInfo, "lb_Level").GetComponent<TMP_Text>());
                 Set(serialized, "nameText", FindDescendant(characterInfo, "lb_Name").GetComponent<TMP_Text>());
