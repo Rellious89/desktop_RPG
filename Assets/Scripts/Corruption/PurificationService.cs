@@ -336,7 +336,11 @@ namespace Corruption
             data.partyCharacterIds = changedParty;
             try
             {
-                if (saveAction()) return Result(PurificationResultCode.Success, slotIndex, previousCharacterId, characterId, settledCount);
+                if (saveAction())
+                {
+                    if (!SameParty(originalParty, changedParty)) PartyCompositionEvents.NotifyChangedAfterSave();
+                    return Result(PurificationResultCode.Success, slotIndex, previousCharacterId, characterId, settledCount);
+                }
             }
             catch { }
             data.purificationSlots = originalSlots;
@@ -344,6 +348,15 @@ namespace Corruption
             if (changes != null) for (int i = 0; i < changes.Count; i++) changes[i].State.currentCorruption = changes[i].Old;
             SaveData.RestoreMetadata(data, metadata);
             return Result(PurificationResultCode.SaveFailed, slotIndex, previousCharacterId, characterId);
+        }
+
+        private static bool SameParty(IReadOnlyList<string> left, IReadOnlyList<string> right)
+        {
+            if (ReferenceEquals(left, right)) return true;
+            if (left == null || right == null || left.Count != right.Count) return false;
+            for (int i = 0; i < left.Count; i++)
+                if (!string.Equals(left[i], right[i], StringComparison.Ordinal)) return false;
+            return true;
         }
 
         private PurificationConfigDefinition ResolveConfig(string typeId, out PurificationResultCode failure)

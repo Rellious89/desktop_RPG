@@ -1,0 +1,233 @@
+using System;
+using System.Collections.Generic;
+using Common;
+using TMPro;
+using UnityEngine;
+using UnityEngine.Localization;
+using UnityEngine.UI;
+
+namespace Quest
+{
+    /// <summary>독립 pn_Quest의 Sub_Panel 전용 상세 뷰. 용병명부 페이지/전체목록 계약과 분리한다.</summary>
+    [DisallowMultipleComponent]
+    public sealed class CharacterStoryQuestDetailView : MonoBehaviour
+    {
+        [SerializeField] private TMP_Text questTitleText;
+        [SerializeField] private TMP_Text questDescriptionText;
+        [SerializeField] private TMP_Text objectiveTypeLineTemplate;
+        [SerializeField] private TMP_Text objectiveDescriptionLineTemplate;
+        [SerializeField] private Slider progressSlider;
+        [SerializeField] private TMP_Text progressPercentText;
+        [SerializeField] private ScrollRect objectiveScroll;
+
+        [Header("Reward")]
+        [SerializeField] private GameObject rewardRoot;
+        [SerializeField] private GameObject rewardCurrencyRoot;
+        [SerializeField] private TMP_Text rewardCurrencyAmountText;
+        [SerializeField] private Image rewardCurrencyIcon;
+        [SerializeField] private Animator rewardCurrencyAnimator;
+        [SerializeField] private GameObject rewardItemRoot;
+        [SerializeField] private InventorySlotView rewardItemSlot;
+
+        [Header("Complete")]
+        [SerializeField] private Button completeButton;
+        [SerializeField] private TMP_Text completeButtonText;
+
+        private readonly List<TMP_Text> typeLines = new List<TMP_Text>();
+        private readonly List<TMP_Text> descriptionLines = new List<TMP_Text>();
+        private LocalizedTextReference localizedTitle;
+        private LocalizedTextReference localizedDescription;
+        private Action<string, string> completeRequested;
+        private string characterId;
+        private string questId;
+
+        public string CharacterId => characterId ?? string.Empty;
+        public string QuestId => questId ?? string.Empty;
+        public Button CompleteButton => completeButton;
+        public InventorySlotView RewardItemSlot => rewardItemSlot;
+        public bool HasRequiredReferences => questTitleText != null && questDescriptionText != null &&
+                                             objectiveTypeLineTemplate != null && objectiveDescriptionLineTemplate != null &&
+                                             progressSlider != null && progressPercentText != null && objectiveScroll != null &&
+                                             rewardRoot != null && rewardCurrencyRoot != null && rewardCurrencyAmountText != null &&
+                                             rewardItemRoot != null && rewardItemSlot != null &&
+                                             completeButton != null && completeButtonText != null;
+
+        public void Bind(
+            string selectedCharacterId,
+            CharacterStoryQuestDefinition quest,
+            IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives,
+            CharacterStoryQuestSnapshot snapshot,
+            bool completing,
+            Action<string, string> onComplete)
+        {
+            ClearBindings();
+            characterId = selectedCharacterId ?? string.Empty;
+            questId = quest != null ? quest.QuestId : string.Empty;
+            completeRequested = onComplete;
+            if (quest == null)
+            {
+                ClearVisuals();
+                return;
+            }
+
+            BindLocalizedText(quest.LocalizedTitle, questTitleText, quest.QuestId, ApplyTitle, out localizedTitle);
+            BindLocalizedText(quest.LocalizedDescription, questDescriptionText, string.Empty, ApplyDescription, out localizedDescription);
+            RefreshObjectives(objectives, snapshot);
+            float progress = CharacterStoryQuestPresentation.OverallProgress(objectives, snapshot);
+            progressSlider.normalizedValue = progress;
+            progressPercentText.text = Mathf.RoundToInt(progress * 100f) + "%";
+            RefreshRewards(quest);
+
+            bool ready = snapshot != null && snapshot.ReadyToComplete &&
+                         string.Equals(snapshot.ActiveQuestId, quest.QuestId, StringComparison.Ordinal);
+            completeButton.onClick.RemoveListener(RequestComplete);
+            completeButton.onClick.AddListener(RequestComplete);
+            completeButton.interactable = !completing && ready;
+            completeButton.gameObject.SetActive(true);
+            completeButtonText.text = ready ? "퀘스트 완료" : "진행중";
+            RefreshLayout();
+        }
+
+        public void SetCompletionInputEnabled(bool enabled)
+        {
+            if (completeButton != null) completeButton.interactable = enabled && !string.IsNullOrEmpty(questId);
+        }
+
+        public void Clear()
+        {
+            ClearBindings();
+            characterId = string.Empty;
+            questId = string.Empty;
+            ClearVisuals();
+        }
+
+        private void ClearVisuals()
+        {
+            if (questTitleText != null) questTitleText.text = string.Empty;
+            if (questDescriptionText != null) questDescriptionText.text = string.Empty;
+            SetLinesActive(typeLines, 0);
+            SetLinesActive(descriptionLines, 0);
+            if (progressSlider != null) progressSlider.normalizedValue = 0f;
+            if (progressPercentText != null) progressPercentText.text = "0%";
+            SetActive(rewardRoot, false);
+            if (rewardItemSlot != null) rewardItemSlot.SetEmpty();
+            if (completeButton != null) { completeButton.interactable = false; completeButton.gameObject.SetActive(false); }
+        }
+
+        private void RefreshObjectives(IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives,
+            CharacterStoryQuestSnapshot snapshot)
+        {
+            int count = objectives != null ? objectives.Count : 0;
+            for (int i = 0; i < count; i++)
+            {
+                TMP_Text type = GetOrCreateLine(objectiveTypeLineTemplate, typeLines, i);
+                TMP_Text description = GetOrCreateLine(objectiveDescriptionLineTemplate, descriptionLines, i);
+                if (type != null) type.text = CharacterStoryQuestPresentation.ConditionTitle(objectives[i].ConditionType);
+                if (description != null) description.text = CharacterStoryQuestPresentation.ObjectiveText(objectives[i], snapshot);
+            }
+            SetLinesActive(typeLines, count);
+            SetLinesActive(descriptionLines, count);
+        }
+
+        private static TMP_Text GetOrCreateLine(TMP_Text template, List<TMP_Text> pool, int index)
+        {
+            while (pool.Count <= index)
+            {
+                TMP_Text line = Instantiate(template, template.transform.parent);
+                line.name = template.name + "_Runtime";
+                if (line.TryGetComponent(out LocalizedTMPText localizer)) localizer.enabled = false;
+                pool.Add(line);
+            }
+            TMP_Text result = pool[index];
+            result.gameObject.SetActive(true);
+            return result;
+        }
+
+        private static void SetLinesActive(List<TMP_Text> lines, int activeCount)
+        {
+            for (int i = 0; i < lines.Count; i++) lines[i].gameObject.SetActive(i < activeCount);
+        }
+
+        private void RefreshRewards(CharacterStoryQuestDefinition quest)
+        {
+            CharacterStoryQuestRewardDefinition currency = null;
+            CharacterStoryQuestRewardDefinition item = null;
+            IReadOnlyList<CharacterStoryQuestRewardDefinition> rewards = quest.Rewards;
+            for (int i = 0; i < rewards.Count; i++)
+            {
+                CharacterStoryQuestRewardDefinition reward = rewards[i];
+                if (reward == null || !reward.IsValid) continue;
+                if (reward.RewardType == CharacterStoryQuestRewardType.Currency && currency == null) currency = reward;
+                if (reward.RewardType == CharacterStoryQuestRewardType.Item && item == null) item = reward;
+            }
+            bool hasCurrency = currency != null;
+            bool hasItem = item != null;
+            SetActive(rewardRoot, hasCurrency || hasItem);
+            SetActive(rewardCurrencyRoot, hasCurrency);
+            SetActive(rewardItemRoot, hasItem);
+            if (hasCurrency)
+            {
+                rewardCurrencyAmountText.text = currency.Amount.ToString();
+                Sprite icon = currency.Currency != null ? currency.Currency.Icon : null;
+                if (icon != null && rewardCurrencyIcon != null)
+                {
+                    if (rewardCurrencyAnimator != null) rewardCurrencyAnimator.enabled = false;
+                    rewardCurrencyIcon.sprite = icon;
+                    rewardCurrencyIcon.enabled = true;
+                }
+                else if (rewardCurrencyAnimator != null) rewardCurrencyAnimator.enabled = true;
+            }
+            if (hasItem) rewardItemSlot.SetItem(item.Item, item.Amount);
+            else rewardItemSlot.SetEmpty();
+        }
+
+        private void RequestComplete()
+        {
+            if (completeButton == null || !completeButton.interactable || string.IsNullOrEmpty(questId)) return;
+            completeRequested?.Invoke(characterId, questId);
+        }
+
+        private static void BindLocalizedText(LocalizedTextReference reference, TMP_Text target, string fallback,
+            LocalizedString.ChangeHandler handler, out LocalizedTextReference bound)
+        {
+            bound = null;
+            if (target != null) target.text = fallback ?? string.Empty;
+            if (reference == null || !reference.HasReference) return;
+            bound = reference;
+            reference.StringChanged += handler;
+        }
+
+        private void ApplyTitle(string value)
+        {
+            if (questTitleText != null && !string.IsNullOrWhiteSpace(value)) questTitleText.text = value;
+        }
+
+        private void ApplyDescription(string value)
+        {
+            if (questDescriptionText != null && !string.IsNullOrWhiteSpace(value)) questDescriptionText.text = value;
+        }
+
+        private void ClearBindings()
+        {
+            if (completeButton != null) completeButton.onClick.RemoveListener(RequestComplete);
+            if (localizedTitle != null) localizedTitle.StringChanged -= ApplyTitle;
+            if (localizedDescription != null) localizedDescription.StringChanged -= ApplyDescription;
+            localizedTitle = null;
+            localizedDescription = null;
+            completeRequested = null;
+        }
+
+        private void RefreshLayout()
+        {
+            if (objectiveScroll == null || objectiveScroll.content == null) return;
+            LayoutRebuilder.ForceRebuildLayoutImmediate(objectiveScroll.content);
+        }
+
+        private void OnDisable() => ClearBindings();
+        private void OnDestroy() => ClearBindings();
+        private static void SetActive(GameObject target, bool value)
+        {
+            if (target != null && target.activeSelf != value) target.SetActive(value);
+        }
+    }
+}

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Character;
-using CharacterArchive;
 using Common;
+using Party;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -15,7 +15,7 @@ namespace Quest
     {
         [SerializeField] private CharacterCatalog characterCatalog;
         [SerializeField] private CharacterStoryQuestCatalog questCatalog;
-        [SerializeField] private CharacterArchivePanel characterArchivePanel;
+        [SerializeField] private QuestPanel questPanel;
         [SerializeField] private GameObject messageBox;
         [SerializeField] private TMP_Text countText;
         [SerializeField] private Button messageButton;
@@ -25,7 +25,7 @@ namespace Quest
 
         public bool HasRequiredReferences => characterCatalog != null && questCatalog != null &&
                                              messageBox != null && countText != null && messageButton != null;
-        public bool HasArchiveTarget => characterArchivePanel != null;
+        public bool HasQuestPanelTarget => questPanel != null;
         public int ReadyCount => readyCharacterIds.Count;
         public string CurrentTargetId => readyCharacterIds.Count > 0 ? readyCharacterIds[0] : string.Empty;
 
@@ -53,6 +53,7 @@ namespace Quest
             readyCharacterIds = SaveSystem.TryGetLoadedData(out data)
                 ? CharacterStoryQuestReadyQuery.GetReadyCharacterIds(data, characterCatalog, questCatalog)
                 : new List<string>();
+            KeepPartyCharacters(readyCharacterIds, data);
 
             bool visible = readyCharacterIds.Count > 0;
             if (countText != null) countText.text = readyCharacterIds.Count.ToString();
@@ -63,6 +64,7 @@ namespace Quest
         {
             if (subscribed) return;
             CharacterStoryQuestService.QuestStateChanged += HandleQuestStateChanged;
+            PartyCompositionEvents.ChangedAfterSave += HandlePartyChanged;
             if (messageButton != null)
             {
                 messageButton.onClick.RemoveListener(OpenCurrentReadyQuest);
@@ -75,19 +77,28 @@ namespace Quest
         {
             if (!subscribed) return;
             CharacterStoryQuestService.QuestStateChanged -= HandleQuestStateChanged;
+            PartyCompositionEvents.ChangedAfterSave -= HandlePartyChanged;
             if (messageButton != null) messageButton.onClick.RemoveListener(OpenCurrentReadyQuest);
             subscribed = false;
         }
 
         private void HandleQuestStateChanged(string _) => Refresh();
+        private void HandlePartyChanged() => Refresh();
 
         /// <summary>클릭 순간 다시 조회해 완료 처리된 stale 대상을 열지 않는다. 같은 상태에서는 항상
         /// 첫 Ordinal CharacterId를 선택하므로 반복 클릭이 다른 용병으로 순환하지 않는다.</summary>
         public void OpenCurrentReadyQuest()
         {
             Refresh();
-            if (readyCharacterIds.Count == 0 || characterArchivePanel == null) return;
-            characterArchivePanel.OpenForStoryQuest(readyCharacterIds[0]);
+            if (readyCharacterIds.Count == 0 || questPanel == null) return;
+            questPanel.OpenForCharacter(readyCharacterIds[0]);
+        }
+
+        private static void KeepPartyCharacters(List<string> ids, SaveData data)
+        {
+            if (ids == null) return;
+            for (int i = ids.Count - 1; i >= 0; i--)
+                if (PartySlotUtility.IndexOf(data != null ? data.partyCharacterIds : null, ids[i]) < 0) ids.RemoveAt(i);
         }
     }
 }

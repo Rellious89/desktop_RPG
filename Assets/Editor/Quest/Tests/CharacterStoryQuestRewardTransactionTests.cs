@@ -116,6 +116,52 @@ namespace QuestEditorTests
             Assert.AreEqual(1, rewardAppliedCount);
         }
 
+        [Test]
+        public void Completion_RejectsStaleExpectedQuestIdWithoutRewardOrSave()
+        {
+            SaveOverrideField.SetValue(null, new Func<bool>(() => { saveCount++; return true; }));
+
+            Assert.IsFalse(service.TryConfirmComplete("CatKnight", "Q0"));
+
+            Assert.AreEqual("Q1", SaveSystem.Data.characterStoryQuests[0].activeQuestId);
+            Assert.AreEqual(10, SaveSystem.Data.currency);
+            Assert.AreEqual(0, saveCount);
+            Assert.AreEqual(0, changedCount);
+            Assert.AreEqual(0, rewardAppliedCount);
+            Assert.AreEqual(0, questStateChangedCount);
+        }
+
+        [Test]
+        public void StaleFirstStageInputCannotCompleteImmediatelyReadyNextStage()
+        {
+            ItemDefinition item = NewItem("50002");
+            CurrencyDefinition jewel = NewCurrency("jewel-2");
+            CharacterStoryQuestDefinition first = NewQuest(item, jewel);
+            Set(first, "isFinal", false);
+            Set(first, "rewards", new List<CharacterStoryQuestRewardDefinition>());
+            var next = ScriptableObject.CreateInstance<CharacterStoryQuestDefinition>(); created.Add(next);
+            Set(next, "questId", "Q2"); Set(next, "characterId", "CatKnight"); Set(next, "previousQuestId", "Q1");
+            Set(next, "isFinal", true); Set(next, "enabled", true);
+            var level = ScriptableObject.CreateInstance<CharacterStoryQuestObjectiveDefinition>(); created.Add(level);
+            Set(level, "objectiveId", "Q2-level"); Set(level, "questId", "Q2");
+            Set(level, "conditionType", CharacterStoryQuestConditionType.CharacterLevelAtLeast);
+            Set(level, "requiredValue", 1); Set(level, "enabled", true);
+            Set(service, "questCatalog", NewCatalog<CharacterStoryQuestCatalog>("quests", first, next));
+            Set(service, "objectiveCatalog", NewCatalog<CharacterStoryQuestObjectiveCatalog>("objectives", level));
+            SaveSystem.Data.characters = new List<CharacterSaveState>
+            {
+                new CharacterSaveState { characterId = "CatKnight", level = 1 },
+            };
+            SaveOverrideField.SetValue(null, new Func<bool>(() => { saveCount++; return true; }));
+
+            Assert.IsTrue(service.TryConfirmComplete("CatKnight", "Q1"));
+            Assert.AreEqual("Q2", SaveSystem.Data.characterStoryQuests[0].activeQuestId);
+            Assert.IsTrue(SaveSystem.Data.characterStoryQuests[0].readyToComplete);
+            Assert.IsFalse(service.TryConfirmComplete("CatKnight", "Q1"));
+            Assert.AreEqual("Q2", SaveSystem.Data.characterStoryQuests[0].activeQuestId);
+            Assert.AreEqual(1, saveCount);
+        }
+
         [TestCase(false)]
         [TestCase(true)]
         public void SaveFailureOrException_RollsBackQuestAndInventoryWithoutNotifications(bool throws)

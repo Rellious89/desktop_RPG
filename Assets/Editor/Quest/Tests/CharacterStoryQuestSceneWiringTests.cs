@@ -28,15 +28,18 @@ namespace QuestEditorTests
         }
 
         [Test]
-        public void DesktopResize_HasLiveQuestNotificationWithArchiveDeepLink()
+        public void DesktopResize_HasLiveQuestNotificationWithIndependentQuestPanelDeepLink()
         {
             EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
             QuestNotificationController[] controllers = Object.FindObjectsOfType<QuestNotificationController>(true);
+            QuestPanel[] panels = Object.FindObjectsOfType<QuestPanel>(true);
             Assert.AreEqual(1, controllers.Length, "HUD QuestNotification 전용 컨트롤러가 정확히 하나 필요합니다.");
+            Assert.AreEqual(1, panels.Length, "독립 pn_Quest 컨트롤러가 정확히 하나 필요합니다.");
             Assert.IsTrue(controllers[0].gameObject.activeSelf,
                 "ready가 0이어도 컨트롤러 root는 살아 있어 상태 변경 이벤트를 받아야 합니다.");
             Assert.IsTrue(controllers[0].HasRequiredReferences);
-            Assert.IsTrue(controllers[0].HasArchiveTarget, "씬 인스턴스는 CharacterArchivePanel 딥링크를 직접 참조해야 합니다.");
+            Assert.IsTrue(controllers[0].HasQuestPanelTarget, "씬 인스턴스는 독립 QuestPanel 딥링크를 직접 참조해야 합니다.");
+            Assert.IsTrue(panels[0].HasRequiredReferences);
         }
     }
 }

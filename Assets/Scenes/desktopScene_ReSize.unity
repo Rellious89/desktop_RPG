@@ -18131,6 +18131,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 55049d45897a743d7b0f0414768fc431, type: 3}
+--- !u!114 &2686701087050204715 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2505216692142628575, guid: 55049d45897a743d7b0f0414768fc431, type: 3}
+  m_PrefabInstance: {fileID: 2686701087050204714}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e7b178084bb46aa9fe80d19ffea9657, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
 --- !u!114 &2727636538909919449
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -18610,9 +18621,9 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8016784150171546602, guid: f3f672131e59f48ed8bf0767381b9d55, type: 3}
-      propertyPath: characterArchivePanel
+      propertyPath: questPanel
       value: 
-      objectReference: {fileID: 6525342035292623680}
+      objectReference: {fileID: 2686701087050204715}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

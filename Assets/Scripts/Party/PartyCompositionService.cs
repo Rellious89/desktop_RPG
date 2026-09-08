@@ -264,6 +264,7 @@ namespace Party
                 return Result(PartyCompositionCode.SaveFailed, capacity, originalParty);
             }
 
+            PartyCompositionEvents.NotifyChangedAfterSave();
             return Result(PartyCompositionCode.Success, capacity, changedParty);
         }
 

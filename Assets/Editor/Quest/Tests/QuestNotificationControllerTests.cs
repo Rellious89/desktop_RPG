@@ -71,6 +71,7 @@ namespace QuestEditorTests
             var data = new SaveData
             {
                 characters = new List<CharacterSaveState> { Owned("A") },
+                partyCharacterIds = new List<string> { "A" },
                 characterStoryQuests = new List<CharacterStoryQuestSaveState> { Ready("A", "q-a") },
             };
             SaveDataField.SetValue(null, data);
@@ -92,6 +93,31 @@ namespace QuestEditorTests
 
             Invoke(controller, "OnDisable"); Invoke(controller, "OnEnable");
             Assert.AreEqual(1, ListenerCount(controller), "메시지 영역을 숨겼거나 재활성화해도 구독이 중복되면 안 됩니다.");
+        }
+
+        [Test]
+        public void Controller_OnlyCountsReadyCharactersThatHaveFixedPartyCards()
+        {
+            CharacterCatalog characters = CharacterCatalogWith("A", "B");
+            CharacterStoryQuestCatalog quests = QuestCatalogWith(Quest("q-a", "A"), Quest("q-b", "B"));
+            SaveDataField.SetValue(null, new SaveData
+            {
+                characters = new List<CharacterSaveState> { Owned("A"), Owned("B") },
+                partyCharacterIds = new List<string> { string.Empty, "B", string.Empty },
+                characterStoryQuests = new List<CharacterStoryQuestSaveState> { Ready("A", "q-a"), Ready("B", "q-b") },
+            });
+            GameObject root = new GameObject("QuestNotification"); created.Add(root);
+            GameObject message = new GameObject("sp_messageBox"); created.Add(message);
+            var count = new GameObject("lb_count", typeof(TextMeshProUGUI)).GetComponent<TMP_Text>(); created.Add(count.gameObject);
+            var button = message.AddComponent<Button>();
+            QuestNotificationController controller = root.AddComponent<QuestNotificationController>();
+            Set(controller, "characterCatalog", characters); Set(controller, "questCatalog", quests);
+            Set(controller, "messageBox", message); Set(controller, "countText", count); Set(controller, "messageButton", button);
+
+            controller.Refresh();
+
+            Assert.AreEqual(1, controller.ReadyCount);
+            Assert.AreEqual("B", controller.CurrentTargetId);
         }
 
         private CharacterCatalog CharacterCatalogWith(params string[] ids)

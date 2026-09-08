@@ -246,6 +246,30 @@ namespace PartyEditor.Tests
             Assert.AreEqual(1, saves);
         }
 
+        [Test]
+        public void SuccessfulChangesNotifyOnce_ButFailuresAndSaveFailuresDoNotNotify()
+        {
+            int notifications = 0;
+            Action handler = () => notifications++;
+            PartyCompositionEvents.ChangedAfterSave += handler;
+            try
+            {
+                Assert.IsFalse(Service().TryJoin("Unknown").Success);
+                Assert.AreEqual(0, notifications);
+                Assert.IsFalse(Service(() => false).TryJoin("ElfArcher").Success);
+                Assert.AreEqual(0, notifications);
+                Assert.IsTrue(Service().TryJoin("ElfArcher").Success);
+                Assert.AreEqual(1, notifications);
+                Assert.IsTrue(Service().TryMove("ElfArcher", 0).Success);
+                Assert.AreEqual(2, notifications);
+                Assert.IsTrue(Service().TryReplace("Barbarian", "CatMage").Success);
+                Assert.AreEqual(3, notifications);
+                Assert.IsTrue(Service().TryLeave("CatKnight").Success);
+                Assert.AreEqual(4, notifications);
+            }
+            finally { PartyCompositionEvents.ChangedAfterSave -= handler; }
+        }
+
         private PartyCompositionService Service(Func<bool> save = null, PartyConfigCatalog catalogOverride = null)
         {
             Func<bool> action = save ?? (() => { saves++; SaveData.MarkSaved(data, Now); return true; });

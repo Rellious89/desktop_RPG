@@ -212,6 +212,25 @@ namespace CorruptionEditor.Tests
             Assert.AreEqual(PartyCompositionCode.InPurification, party.TryJoin("C").Code);
         }
 
+        [Test]
+        public void PartyChangingPurificationTransactionsNotifyOnlyAfterSuccessfulSave()
+        {
+            int notifications = 0;
+            Action handler = () => notifications++;
+            PartyCompositionEvents.ChangedAfterSave += handler;
+            try
+            {
+                Assert.AreEqual(PurificationResultCode.SaveFailed,
+                    Service(() => false).TryRegister("prayer", "A", 0).Code);
+                Assert.AreEqual(0, notifications);
+                Assert.AreEqual(PurificationResultCode.Success, Service().TryRegister("prayer", "A", 0).Code);
+                Assert.AreEqual(1, notifications);
+                Assert.AreEqual(PurificationResultCode.Success, Service().TryStop(0).Code);
+                Assert.AreEqual(1, notifications, "정화 중단은 파티 슬롯을 바꾸지 않습니다.");
+            }
+            finally { PartyCompositionEvents.ChangedAfterSave -= handler; }
+        }
+
         private PurificationService Service(Func<bool> save = null)
         {
             return new PurificationService(() => data, save ?? (() => { saves++; SaveData.MarkSaved(data, now); return true; }),

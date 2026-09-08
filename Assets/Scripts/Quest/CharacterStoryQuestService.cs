@@ -76,11 +76,20 @@ namespace Quest
 
         public bool TryConfirmComplete(string characterId)
         {
+            return TryConfirmComplete(characterId, null);
+        }
+
+        /// <summary>UI가 그린 단계와 저장의 현재 단계가 같을 때만 완료한다. 같은 입력 프레임에서 첫 완료가
+        /// 다음 단계를 활성화해도 stale 버튼이 그 다음 단계까지 연속 확정하지 못하게 하는 관문이다.</summary>
+        public bool TryConfirmComplete(string characterId, string expectedQuestId)
+        {
             if (!SaveSystem.TryGetLoadedData(out SaveData data)) return false;
             CharacterStoryQuestSaveState state = FindState(data, characterId);
             CharacterStoryQuestDefinition current = state != null && questCatalog != null
                 ? questCatalog.Find(state.activeQuestId) : null;
             if (current == null || !state.readyToComplete) return false;
+            if (!string.IsNullOrEmpty(expectedQuestId) &&
+                !string.Equals(current.QuestId, expectedQuestId, StringComparison.Ordinal)) return false;
 
             InventoryManager inventory = ResolveInventory();
             if (inventory == null) return false;

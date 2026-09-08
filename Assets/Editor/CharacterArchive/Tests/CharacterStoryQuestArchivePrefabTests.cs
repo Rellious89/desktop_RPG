@@ -156,7 +156,7 @@ namespace CharacterArchiveEditorTests
                 QuestNotificationController controller = root.GetComponent<QuestNotificationController>();
                 Assert.NotNull(controller);
                 Assert.IsTrue(controller.HasRequiredReferences);
-                Assert.IsFalse(controller.HasArchiveTarget,
+                Assert.IsFalse(controller.HasQuestPanelTarget,
                     "프리팹은 씬 오브젝트를 전역 탐색하지 않고, scene instance가 좁은 딥링크 참조를 준다.");
                 Transform message = root.transform.Find("sp_messageBox");
                 Assert.NotNull(message);
