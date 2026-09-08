@@ -691,30 +691,14 @@ namespace CharacterArchive
 
         private string ObjectiveDescription(CharacterStoryQuestObjectiveDefinition objective, int current, int required)
         {
-            switch (objective.ConditionType)
-            {
-                case CharacterStoryQuestConditionType.CharacterLevelAtLeast:
-                    return SafeFormat(Quest(10001), "Level {0} ({1}/{2})", required, current, required);
-                case CharacterStoryQuestConditionType.MonsterDefeatCount:
-                    return SafeFormat(Quest(10002), "{0} {1} ({2}/{3})", TargetName(objective, true), required, current, required);
-                case CharacterStoryQuestConditionType.StaminaSpent:
-                    return SafeFormat(Quest(10003), "Stamina {0} ({1}/{2})", required, current, required);
-                case CharacterStoryQuestConditionType.DungeonEnterCount:
-                    return SafeFormat(Quest(10004), "{0} {1} ({2}/{3})", TargetName(objective, false), required, current, required);
-                default: return string.Format("{0}/{1}", current, required);
-            }
+            var snapshot = new CharacterStoryQuestSnapshot(string.Empty, string.Empty, false, false,
+                new List<string>(), new Dictionary<string, int> { { objective.ObjectiveId, current } });
+            return CharacterStoryQuestPresentation.ObjectiveText(objective, snapshot, monsterCatalog, dungeonCatalog, Quest);
         }
 
         private string ConditionTitle(CharacterStoryQuestConditionType type)
         {
-            switch (type)
-            {
-                case CharacterStoryQuestConditionType.CharacterLevelAtLeast: return TextOrFallback(Quest(1), "Level");
-                case CharacterStoryQuestConditionType.MonsterDefeatCount: return TextOrFallback(Quest(2), "Defeat");
-                case CharacterStoryQuestConditionType.StaminaSpent: return TextOrFallback(Quest(3), "Stamina");
-                case CharacterStoryQuestConditionType.DungeonEnterCount: return TextOrFallback(Quest(4), "Dungeon");
-                default: return string.Empty;
-            }
+            return CharacterStoryQuestPresentation.ConditionTitle(type, Quest);
         }
 
         private string TargetName(CharacterStoryQuestObjectiveDefinition objective, bool monster)

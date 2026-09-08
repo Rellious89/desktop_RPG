@@ -17,6 +17,7 @@ namespace Quest
         [SerializeField] private Image selectionImage;
         [SerializeField] private Sprite defaultSprite;
         [SerializeField] private Sprite selectedSprite;
+        [SerializeField] private Sprite clearSprite;
 
         [Header("Character")]
         [SerializeField] private Image portrait;
@@ -25,6 +26,7 @@ namespace Quest
 
         [Header("Quest")]
         [SerializeField] private TMP_Text questTitleText;
+        [SerializeField] private TMP_Text allClearText;
         [SerializeField] private TMP_Text objectiveLineTemplate;
         [SerializeField] private float objectiveLineSpacing = 16f;
 
@@ -36,6 +38,7 @@ namespace Quest
         [SerializeField] private Animator rewardCurrencyAnimator;
         [SerializeField] private GameObject rewardItemRoot;
         [SerializeField] private InventorySlotView rewardItemSlot;
+        [SerializeField] private TMP_Text rewardItemAmountText;
 
         [Header("Complete")]
         [SerializeField] private Button completeButton;
@@ -48,17 +51,20 @@ namespace Quest
         private Action<string> selected;
         private string characterId;
         private string questId;
+        private bool allClear;
 
         public string CharacterId => characterId ?? string.Empty;
         public string QuestId => questId ?? string.Empty;
         public Button CompleteButton => completeButton;
         public Sprite DefaultSprite => defaultSprite;
         public Sprite SelectedSprite => selectedSprite;
-        public bool HasRequiredReferences => selectionImage != null && defaultSprite != null && selectedSprite != null &&
+        public Sprite ClearSprite => clearSprite;
+        public bool IsAllClear => allClear;
+        public bool HasRequiredReferences => selectionImage != null && defaultSprite != null && selectedSprite != null && clearSprite != null &&
                                              portrait != null && levelText != null && nameText != null &&
-                                             questTitleText != null && objectiveLineTemplate != null &&
+                                             questTitleText != null && allClearText != null && objectiveLineTemplate != null &&
                                              rewardRoot != null && rewardCurrencyRoot != null && rewardCurrencyAmountText != null &&
-                                             rewardItemRoot != null && rewardItemSlot != null &&
+                                             rewardItemRoot != null && rewardItemSlot != null && rewardItemAmountText != null &&
                                              completeButton != null && completeButtonText != null;
 
         public void Bind(
@@ -76,6 +82,7 @@ namespace Quest
             questId = quest != null ? quest.QuestId : string.Empty;
             selected = onSelected;
             completeRequested = onComplete;
+            allClear = quest == null && snapshot != null && snapshot.Graduated;
 
             if (portrait != null)
             {
@@ -85,9 +92,19 @@ namespace Quest
             if (levelText != null) levelText.text = character != null ? "Lv. " + Mathf.Max(1, level) : string.Empty;
             nameBinding.Bind(character, value => { if (nameText != null) nameText.text = value ?? string.Empty; });
 
-            BindQuestTitle(quest);
-            RefreshObjectives(objectives, snapshot);
-            RefreshRewards(quest);
+            SetActive(questTitleText != null ? questTitleText.gameObject : null, !allClear);
+            SetActive(allClearText != null ? allClearText.gameObject : null, allClear);
+            if (allClear)
+            {
+                SetLinesActive(0);
+                ClearRewards();
+            }
+            else
+            {
+                BindQuestTitle(quest);
+                RefreshObjectives(objectives, snapshot);
+                RefreshRewards(quest);
+            }
             bool ready = quest != null && snapshot != null && snapshot.ReadyToComplete &&
                          string.Equals(snapshot.ActiveQuestId, quest.QuestId, StringComparison.Ordinal);
             if (completeButton != null)
@@ -95,14 +112,15 @@ namespace Quest
                 completeButton.onClick.RemoveListener(RequestComplete);
                 completeButton.onClick.AddListener(RequestComplete);
                 completeButton.interactable = !completing && ready;
-                completeButton.gameObject.SetActive(quest != null);
+                completeButton.gameObject.SetActive(quest != null && !allClear);
             }
             if (completeButtonText != null) completeButtonText.text = ready ? "퀘스트 완료" : "진행중";
+            SetSelected(false);
         }
 
         public void SetSelected(bool value)
         {
-            if (selectionImage != null) selectionImage.sprite = value ? selectedSprite : defaultSprite;
+            if (selectionImage != null) selectionImage.sprite = allClear ? clearSprite : value ? selectedSprite : defaultSprite;
         }
 
         public void SetCompletionInputEnabled(bool enabled)
@@ -119,15 +137,18 @@ namespace Quest
             if (levelText != null) levelText.text = string.Empty;
             if (nameText != null) nameText.text = string.Empty;
             if (questTitleText != null) questTitleText.text = string.Empty;
+            SetActive(questTitleText != null ? questTitleText.gameObject : null, true);
+            SetActive(allClearText != null ? allClearText.gameObject : null, false);
             SetLinesActive(0);
             ClearRewards();
             if (completeButton != null) { completeButton.interactable = false; completeButton.gameObject.SetActive(false); }
+            allClear = false;
             SetSelected(false);
         }
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            if (!string.IsNullOrEmpty(characterId) && !string.IsNullOrEmpty(questId)) selected?.Invoke(characterId);
+            if (!string.IsNullOrEmpty(characterId) && (!string.IsNullOrEmpty(questId) || allClear)) selected?.Invoke(characterId);
         }
 
         private void RequestComplete()
@@ -188,7 +209,7 @@ namespace Quest
         private void RefreshRewards(CharacterStoryQuestDefinition quest)
         {
             CharacterStoryQuestRewardDefinition currency = null;
-            CharacterStoryQuestRewardDefinition item = null;
+            var distinctItemIds = new HashSet<string>(StringComparer.Ordinal);
             if (quest != null)
             {
                 IReadOnlyList<CharacterStoryQuestRewardDefinition> rewards = quest.Rewards;
@@ -197,11 +218,12 @@ namespace Quest
                     CharacterStoryQuestRewardDefinition reward = rewards[i];
                     if (reward == null || !reward.IsValid) continue;
                     if (reward.RewardType == CharacterStoryQuestRewardType.Currency && currency == null) currency = reward;
-                    if (reward.RewardType == CharacterStoryQuestRewardType.Item && item == null) item = reward;
+                    if (reward.RewardType == CharacterStoryQuestRewardType.Item && reward.Item != null &&
+                        !string.IsNullOrWhiteSpace(reward.Item.ItemId)) distinctItemIds.Add(reward.Item.ItemId);
                 }
             }
             bool hasCurrency = currency != null;
-            bool hasItem = item != null;
+            bool hasItem = distinctItemIds.Count > 0;
             SetActive(rewardRoot, hasCurrency || hasItem);
             SetActive(rewardCurrencyRoot, hasCurrency);
             SetActive(rewardItemRoot, hasItem);
@@ -217,14 +239,17 @@ namespace Quest
                 }
                 else if (rewardCurrencyAnimator != null) rewardCurrencyAnimator.enabled = true;
             }
-            if (hasItem) rewardItemSlot.SetItem(item.Item, item.Amount);
-            else if (rewardItemSlot != null) rewardItemSlot.SetEmpty();
+            // 이 카드는 보상 종류 수만 요약하고, 프리팹에 연결된 상징 아이콘을 그대로 보존한다.
+            // InventorySlotView를 비활성화하면 실제 아이템 bind 및 hover tooltip 경로도 함께 차단된다.
+            if (rewardItemSlot != null) rewardItemSlot.enabled = false;
+            if (rewardItemAmountText != null) rewardItemAmountText.text = hasItem ? distinctItemIds.Count.ToString() : string.Empty;
         }
 
         private void ClearRewards()
         {
             SetActive(rewardRoot, false);
-            if (rewardItemSlot != null) rewardItemSlot.SetEmpty();
+            if (rewardItemSlot != null) rewardItemSlot.enabled = false;
+            if (rewardItemAmountText != null) rewardItemAmountText.text = string.Empty;
         }
 
         private void ClearBindings()

@@ -1345,10 +1345,12 @@ MonoBehaviour:
   selectionImage: {fileID: 6208255980714884324}
   defaultSprite: {fileID: 21300000, guid: 07bb7c6ed9cfa48d19114304e6098dcc, type: 3}
   selectedSprite: {fileID: 21300000, guid: 2d2302d4989be4d9cbb98f93c4be923f, type: 3}
+  clearSprite: {fileID: 21300000, guid: ffc97a8a7308b4d40b3c9c2a6ef2d763, type: 3}
   portrait: {fileID: 5939065760688387683}
   levelText: {fileID: 3006493019293859151}
   nameText: {fileID: 3562300110742190767}
   questTitleText: {fileID: 6516212408045215855}
+  allClearText: {fileID: 6541361918347824742}
   objectiveLineTemplate: {fileID: 6516212408045215855}
   objectiveLineSpacing: 16
   rewardRoot: {fileID: 2896810753595361804}
@@ -1358,6 +1360,7 @@ MonoBehaviour:
   rewardCurrencyAnimator: {fileID: 9065795405862420560}
   rewardItemRoot: {fileID: 8096763497808654625}
   rewardItemSlot: {fileID: 4092371034145810908}
+  rewardItemAmountText: {fileID: 3255712978759322364}
   completeButton: {fileID: 2312530669099134451}
   completeButtonText: {fileID: 8735511921820338894}
 --- !u!1 &6485448431117015195

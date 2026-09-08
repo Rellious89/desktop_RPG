@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Common;
+using Dungeon;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Localization;
@@ -33,10 +34,19 @@ namespace Quest
         [SerializeField] private Button completeButton;
         [SerializeField] private TMP_Text completeButtonText;
 
+        [Header("Objective Localization")]
+        [SerializeField] private MonsterCatalog monsterCatalog;
+        [SerializeField] private DungeonCatalog dungeonCatalog;
+
         private readonly List<TMP_Text> typeLines = new List<TMP_Text>();
         private readonly List<TMP_Text> descriptionLines = new List<TMP_Text>();
         private LocalizedTextReference localizedTitle;
         private LocalizedTextReference localizedDescription;
+        private readonly Dictionary<int, string> localizedObjectiveTexts = new Dictionary<int, string>();
+        private readonly Dictionary<LocalizedTextReference, LocalizedString.ChangeHandler> objectiveLocalizationHandlers =
+            new Dictionary<LocalizedTextReference, LocalizedString.ChangeHandler>();
+        private IReadOnlyList<CharacterStoryQuestObjectiveDefinition> boundObjectives;
+        private CharacterStoryQuestSnapshot boundSnapshot;
         private Action<string, string> completeRequested;
         private string characterId;
         private string questId;
@@ -48,6 +58,7 @@ namespace Quest
         public bool HasRequiredReferences => questTitleText != null && questDescriptionText != null &&
                                              objectiveTypeLineTemplate != null && objectiveDescriptionLineTemplate != null &&
                                              progressSlider != null && progressPercentText != null && objectiveScroll != null &&
+                                             monsterCatalog != null && dungeonCatalog != null &&
                                              rewardRoot != null && rewardCurrencyRoot != null && rewardCurrencyAmountText != null &&
                                              rewardItemRoot != null && rewardItemSlot != null &&
                                              completeButton != null && completeButtonText != null;
@@ -64,6 +75,8 @@ namespace Quest
             characterId = selectedCharacterId ?? string.Empty;
             questId = quest != null ? quest.QuestId : string.Empty;
             completeRequested = onComplete;
+            boundObjectives = objectives;
+            boundSnapshot = snapshot;
             if (quest == null)
             {
                 ClearVisuals();
@@ -112,9 +125,20 @@ namespace Quest
             SetActive(rewardRoot, false);
             if (rewardItemSlot != null) rewardItemSlot.SetEmpty();
             if (completeButton != null) { completeButton.interactable = false; completeButton.gameObject.SetActive(false); }
+            boundObjectives = null;
+            boundSnapshot = null;
         }
 
         private void RefreshObjectives(IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives,
+            CharacterStoryQuestSnapshot snapshot)
+        {
+            boundObjectives = objectives;
+            boundSnapshot = snapshot;
+            BindObjectiveLocalization(objectives);
+            RenderObjectives(objectives, snapshot);
+        }
+
+        private void RenderObjectives(IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives,
             CharacterStoryQuestSnapshot snapshot)
         {
             int count = objectives != null ? objectives.Count : 0;
@@ -122,8 +146,9 @@ namespace Quest
             {
                 TMP_Text type = GetOrCreateLine(objectiveTypeLineTemplate, typeLines, i);
                 TMP_Text description = GetOrCreateLine(objectiveDescriptionLineTemplate, descriptionLines, i);
-                if (type != null) type.text = CharacterStoryQuestPresentation.ConditionTitle(objectives[i].ConditionType);
-                if (description != null) description.text = CharacterStoryQuestPresentation.ObjectiveText(objectives[i], snapshot);
+                if (type != null) type.text = CharacterStoryQuestPresentation.ConditionTitle(objectives[i].ConditionType, QuestText);
+                if (description != null) description.text = CharacterStoryQuestPresentation.ObjectiveText(
+                    objectives[i], snapshot, monsterCatalog, dungeonCatalog, QuestText);
             }
             SetLinesActive(typeLines, count);
             SetLinesActive(descriptionLines, count);
@@ -214,8 +239,50 @@ namespace Quest
             if (localizedDescription != null) localizedDescription.StringChanged -= ApplyDescription;
             localizedTitle = null;
             localizedDescription = null;
+            foreach (KeyValuePair<LocalizedTextReference, LocalizedString.ChangeHandler> pair in objectiveLocalizationHandlers)
+                pair.Key.StringChanged -= pair.Value;
+            objectiveLocalizationHandlers.Clear();
+            localizedObjectiveTexts.Clear();
             completeRequested = null;
         }
+
+        private void BindObjectiveLocalization(IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives)
+        {
+            foreach (LocalizedTextReference reference in CharacterStoryQuestPresentation.ObjectiveTextReferences(
+                objectives, monsterCatalog, dungeonCatalog))
+            {
+                if (reference == null || !reference.HasReference || objectiveLocalizationHandlers.ContainsKey(reference)) continue;
+                LocalizedString.ChangeHandler handler = value =>
+                {
+                    int key = ReferenceKey(reference);
+                    if (key != 0)
+                    {
+                        if (IsUsableLocalizedValue(value, key)) localizedObjectiveTexts[key] = value;
+                        else localizedObjectiveTexts.Remove(key);
+                    }
+                    if (boundObjectives != null)
+                    {
+                        RenderObjectives(boundObjectives, boundSnapshot);
+                        RefreshLayout();
+                    }
+                };
+                objectiveLocalizationHandlers.Add(reference, handler);
+                reference.StringChanged += handler;
+            }
+        }
+
+        private string QuestText(int key) => localizedObjectiveTexts.TryGetValue(key, out string value) ? value : null;
+
+        private static int ReferenceKey(LocalizedTextReference reference)
+        {
+            if (reference == null || !int.TryParse(reference.TableEntryReference.Key, out int key)) return 0;
+            foreach (int candidate in CharacterStoryQuestPresentation.ObjectiveLocalizationKeys)
+                if (candidate == key) return key;
+            return 0;
+        }
+
+        private static bool IsUsableLocalizedValue(string value, int key) => !string.IsNullOrWhiteSpace(value) &&
+            !string.Equals(value, key.ToString(), StringComparison.Ordinal) && !value.StartsWith("No translation found", StringComparison.Ordinal);
 
         private void RefreshLayout()
         {

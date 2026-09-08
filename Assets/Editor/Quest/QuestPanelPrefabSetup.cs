@@ -1,6 +1,7 @@
 using Character;
 using CharacterArchive;
 using Common;
+using Dungeon;
 using Quest;
 using TMPro;
 using UnityEditor;
@@ -23,6 +24,9 @@ namespace QuestEditor
         private const string ObjectiveCatalogPath = "Assets/Generated/TableData/CharacterStoryQuestObjective/CharacterStoryQuestObjectiveCatalog.asset";
         private const string DefaultSpritePath = "Assets/Art/UI/PixelDesign/Pixel UI & HUD/Sprites/Panels/Blue/GridPanelInactive.png";
         private const string SelectedSpritePath = "Assets/Art/UI/PixelDesign/Pixel UI & HUD/Sprites/Panels/Blue/GridPanelInactive_Select.png";
+        private const string ClearSpritePath = "Assets/Art/UI/PixelDesign/Pixel UI & HUD/Sprites/Panels/Blue/GridPanelInactive_AllClear.png";
+        private const string MonsterCatalogPath = "Assets/Generated/TableData/Monster/MonsterCatalog.asset";
+        private const string DungeonCatalogPath = "Assets/Generated/TableData/Dungeon/DungeonCatalog.asset";
 
         [MenuItem("Tools/Keybuddy/Quest/Setup Independent Quest Panel", priority = 130)]
         public static void Setup()
@@ -54,10 +58,12 @@ namespace QuestEditor
                 Set(serialized, "selectionImage", root.GetComponent<Image>());
                 Set(serialized, "defaultSprite", AssetDatabase.LoadAssetAtPath<Sprite>(DefaultSpritePath));
                 Set(serialized, "selectedSprite", AssetDatabase.LoadAssetAtPath<Sprite>(SelectedSpritePath));
+                Set(serialized, "clearSprite", AssetDatabase.LoadAssetAtPath<Sprite>(ClearSpritePath));
                 Set(serialized, "portrait", FindDescendant(root.transform, "sp_portrait").GetComponent<Image>());
                 Set(serialized, "levelText", FindDescendant(characterInfo, "lb_Level").GetComponent<TMP_Text>());
                 Set(serialized, "nameText", FindDescendant(characterInfo, "lb_Name").GetComponent<TMP_Text>());
                 Set(serialized, "questTitleText", questTitle);
+                Set(serialized, "allClearText", FindDescendant(questInfo, "lb_QuestAllClear").GetComponent<TMP_Text>());
                 Set(serialized, "objectiveLineTemplate", questTitle);
                 Set(serialized, "rewardRoot", reward.gameObject);
                 Set(serialized, "rewardCurrencyRoot", currency.gameObject);
@@ -67,6 +73,7 @@ namespace QuestEditor
                 Set(serialized, "rewardCurrencyAnimator", currencyIcon.GetComponent<Animator>());
                 Set(serialized, "rewardItemRoot", item.gameObject);
                 Set(serialized, "rewardItemSlot", item.GetComponentInChildren<InventorySlotView>(true));
+                Set(serialized, "rewardItemAmountText", FindDescendant(item, "lb_RewardValue").GetComponent<TMP_Text>());
                 Set(serialized, "completeButton", complete.GetComponent<Button>());
                 Set(serialized, "completeButtonText", FindDescendant(complete, "lb_QuestComplete").GetComponent<TMP_Text>());
                 serialized.ApplyModifiedPropertiesWithoutUndo();
@@ -142,6 +149,8 @@ namespace QuestEditor
             Set(serialized, "progressSlider", progress.GetComponent<Slider>());
             Set(serialized, "progressPercentText", FindDescendant(progress, "lb_percent").GetComponent<TMP_Text>());
             Set(serialized, "objectiveScroll", scroll.GetComponent<ScrollRect>());
+            Set(serialized, "monsterCatalog", AssetDatabase.LoadAssetAtPath<MonsterCatalog>(MonsterCatalogPath));
+            Set(serialized, "dungeonCatalog", AssetDatabase.LoadAssetAtPath<DungeonCatalog>(DungeonCatalogPath));
             Set(serialized, "rewardRoot", reward.gameObject);
             Set(serialized, "rewardCurrencyRoot", currency.gameObject);
             Set(serialized, "rewardCurrencyAmountText", FindDescendant(currency, "lb_RewardValue").GetComponent<TMP_Text>());

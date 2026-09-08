@@ -3,8 +3,10 @@ using System.Reflection;
 using Character;
 using CharacterArchive;
 using Common;
+using Inventory;
 using NUnit.Framework;
 using Quest;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -37,6 +39,7 @@ namespace QuestEditorTests
                 Assert.IsTrue(card.HasRequiredReferences);
                 Assert.NotNull(card.DefaultSprite);
                 Assert.NotNull(card.SelectedSprite);
+                Assert.NotNull(card.ClearSprite);
                 Assert.AreNotSame(card.DefaultSprite, card.SelectedSprite);
 
                 Image image = root.GetComponent<Image>();
@@ -136,6 +139,66 @@ namespace QuestEditorTests
         }
 
         [Test]
+        public void Card_AllClearPreservesCharacterInfoAndClearAppearanceWhileHidingQuestControls()
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(CardPath);
+            CharacterDefinition character = ScriptableObject.CreateInstance<CharacterDefinition>();
+            created.Add(character);
+            try
+            {
+                SerializedObject characterSerialized = new SerializedObject(character);
+                characterSerialized.FindProperty("characterId").stringValue = "CatKnight";
+                characterSerialized.ApplyModifiedPropertiesWithoutUndo();
+                CharacterQuestCardView card = root.GetComponent<CharacterQuestCardView>();
+                CharacterStoryQuestSnapshot graduated = new CharacterStoryQuestSnapshot("CatKnight", string.Empty, false, true,
+                    new List<string>(), new Dictionary<string, int>());
+
+                card.Bind(character, 7, null, new List<CharacterStoryQuestObjectiveDefinition>(), graduated, false, _ => { }, (_, __) => { });
+                card.SetSelected(true);
+
+                Assert.IsTrue(card.IsAllClear);
+                Assert.AreSame(card.ClearSprite, root.GetComponent<Image>().sprite, "완료 카드는 선택 상태보다 clear 외형이 우선한다.");
+                Assert.IsFalse(FindDescendant(root.transform, "lb_QuestName").gameObject.activeSelf);
+                Assert.IsTrue(FindDescendant(root.transform, "lb_QuestAllClear").gameObject.activeSelf);
+                Assert.IsFalse(FindDescendant(root.transform, "QuestReward").gameObject.activeSelf);
+                Assert.IsFalse(FindDescendant(root.transform, "btn_QuestComplete").gameObject.activeSelf);
+                Assert.AreEqual("Lv. 7", FindDescendant(root.transform, "lb_Level").GetComponent<TMP_Text>().text);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        [Test]
+        public void Card_ItemRewardShowsDistinctValidItemKindsWithoutBindingTheTooltipSlot()
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(CardPath);
+            ItemDefinition first = ScriptableObject.CreateInstance<ItemDefinition>(); created.Add(first);
+            ItemDefinition second = ScriptableObject.CreateInstance<ItemDefinition>(); created.Add(second);
+            CharacterStoryQuestDefinition quest = ScriptableObject.CreateInstance<CharacterStoryQuestDefinition>(); created.Add(quest);
+            try
+            {
+                Set(first, "itemId", "A"); Set(second, "itemId", "B");
+                Set(quest, "questId", "Q");
+                Set(quest, "rewards", new List<CharacterStoryQuestRewardDefinition>
+                {
+                    Reward(first, 2), Reward(second, 5), Reward(first, 9), new CharacterStoryQuestRewardDefinition(),
+                });
+                CharacterQuestCardView card = root.GetComponent<CharacterQuestCardView>();
+                Transform reward = FindDescendant(root.transform, "Reward_Item");
+                Image fixedIcon = FindDescendant(reward, "sp_ItemIcon").GetComponent<Image>();
+                Sprite configuredIcon = fixedIcon.sprite;
+                card.Bind(null, 1, quest, new List<CharacterStoryQuestObjectiveDefinition>(),
+                    CharacterStoryQuestSnapshot.Empty(string.Empty), false, _ => { }, (_, __) => { });
+
+                InventorySlotView slot = reward.GetComponentInChildren<InventorySlotView>(true);
+                Assert.AreEqual("2", FindDescendant(reward, "lb_RewardValue").GetComponent<TMP_Text>().text);
+                Assert.IsFalse(slot.enabled, "카드는 실제 아이템 bind 및 hover tooltip을 사용하지 않는다.");
+                Assert.IsNull(slot.Definition);
+                Assert.AreSame(configuredIcon, fixedIcon.sprite, "프리팹의 상징 아이콘은 보상 아이템 아이콘으로 바꾸지 않는다.");
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        [Test]
         public void Presentation_AveragesMultipleObjectiveProgress()
         {
             CharacterStoryQuestObjectiveDefinition first = Objective("o1", 10);
@@ -147,6 +210,12 @@ namespace QuestEditorTests
                 CharacterStoryQuestPresentation.OverallProgress(new[] { first, second }, snapshot), .0001f);
             StringAssert.Contains("5/10", CharacterStoryQuestPresentation.ObjectiveText(first, snapshot));
             StringAssert.Contains("20/20", CharacterStoryQuestPresentation.ObjectiveText(second, snapshot));
+
+            CharacterStoryQuestObjectiveDefinition monster = Objective("monster", 30);
+            Set(monster, "conditionType", CharacterStoryQuestConditionType.MonsterDefeatCount);
+            string cardText = CharacterStoryQuestPresentation.ObjectiveText(monster, snapshot);
+            StringAssert.Contains("30", cardText);
+            StringAssert.DoesNotContain("Defeat", cardText);
         }
 
         private CharacterStoryQuestObjectiveDefinition Objective(string id, int required)
@@ -161,6 +230,38 @@ namespace QuestEditorTests
             serialized.FindProperty("enabled").boolValue = true;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             return result;
+        }
+
+        private static CharacterStoryQuestRewardDefinition Reward(ItemDefinition item, int amount)
+        {
+            var reward = new CharacterStoryQuestRewardDefinition();
+            Set(reward, "rewardType", CharacterStoryQuestRewardType.Item);
+            Set(reward, "item", item);
+            Set(reward, "amount", amount);
+            return reward;
+        }
+
+        private static void Set(object target, string property, object value)
+        {
+            if (target is CharacterStoryQuestRewardDefinition)
+            {
+                typeof(CharacterStoryQuestRewardDefinition).GetField(property,
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SetValue(target, value);
+                return;
+            }
+            var serialized = new SerializedObject((Object)target);
+            SerializedProperty field = serialized.FindProperty(property);
+            if (field.propertyType == SerializedPropertyType.String) field.stringValue = value as string;
+            else if (field.propertyType == SerializedPropertyType.Integer) field.intValue = (int)value;
+            else if (field.propertyType == SerializedPropertyType.Enum) field.enumValueIndex = (int)value;
+            else if (field.propertyType == SerializedPropertyType.Generic)
+            {
+                target.GetType().GetField(property,
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SetValue(target, value);
+                return;
+            }
+            else field.objectReferenceValue = value as Object;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static void AssertFixedSlot(Transform characterQuest, int oneBasedIndex, bool hasCharacter)
