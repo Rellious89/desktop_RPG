@@ -610,8 +610,62 @@ namespace CharacterEditor.Tests
             GrantInitialCharacters(roster);
 
             Assert.AreEqual(6, document.characters.Count, "새 게임에서는 표의 시작 캐릭터를 지급한다.");
+            CollectionAssert.AreEqual(new[] { "CatKnight" }, document.partyCharacterIds,
+                "새 문서의 빈 파티에는 첫 기본 보유 캐릭터를 배치해야 즉시 전투를 시작할 수 있다.");
             Assert.AreEqual(0, storage.WriteCalls,
                 "초기 지급은 저장을 직접 부르지 않는다 - 시험 저장 경계 밖의 파일에 닿을 이유도 없다.");
+        }
+
+        [Test]
+        public void NewGame_DefaultCharacterIsPersistedAsOwnedPartyAndStartCandidate()
+        {
+            var storage = new PersistentMemoryStorage();
+            ConfigureMethod.Invoke(null, new object[] { storage, null, null });
+            Assert.AreEqual(SaveLoadStatus.NewGame, SaveSystem.LoadStatus, "비어 있는 격리 저장소는 새 게임이어야 한다.");
+
+            CharacterDefinition catKnight = Definition("CatKnight", maxStamina: 30);
+            CharacterDefinition other = Definition("ElfArcher", maxStamina: 20);
+            SetInitiallyOwned(other, false);
+            CharacterRoster roster = Roster(Catalog(catKnight, other));
+            SetPrivate(roster, "defaultCharacter", catKnight);
+
+            GrantInitialCharacters(roster);
+
+            Assert.AreEqual(1, SaveSystem.Data.characters.Count);
+            CharacterSaveState initial = SaveSystem.Data.characters[0];
+            Assert.AreEqual("CatKnight", initial.characterId);
+            Assert.AreEqual(1, initial.level);
+            Assert.AreEqual(0, initial.currentExp);
+            Assert.AreEqual(-1, initial.currentStamina, "로스터가 정의의 최대 행동력으로 확정하기 전의 초기 표식이다.");
+            Assert.AreEqual(0d, initial.currentCorruption);
+            CollectionAssert.AreEqual(new[] { "CatKnight" }, SaveSystem.Data.partyCharacterIds);
+
+            BuildUsableEntries(roster);
+            Invoke(roster, "NormalizeOwnedStamina");
+            Assert.AreEqual(30, initial.currentStamina);
+            Assert.AreSame(catKnight, ResolveStartCharacter(roster),
+                "기본 파티와 현재 소환 후보가 모두 CatKnight여야 한다.");
+
+            Assert.IsTrue(SaveSystem.Save(), "격리 저장소에 첫 진행 문서를 기록할 수 있어야 한다.");
+            initial.level = 7;
+            initial.currentExp = 9;
+            initial.currentStamina = 4;
+            initial.currentCorruption = 11.5d;
+            Assert.IsTrue(SaveSystem.Save());
+
+            ConfigureMethod.Invoke(null, new object[] { storage, null, null });
+            Assert.AreEqual(SaveLoadStatus.Loaded, SaveSystem.LoadStatus);
+            CharacterRoster reloadedRoster = Roster(Catalog(catKnight, other));
+            SetPrivate(reloadedRoster, "defaultCharacter", catKnight);
+            GrantInitialCharacters(reloadedRoster);
+
+            CharacterSaveState reloaded = SaveSystem.Data.characters[0];
+            Assert.AreEqual(7, reloaded.level);
+            Assert.AreEqual(9, reloaded.currentExp);
+            Assert.AreEqual(4, reloaded.currentStamina);
+            Assert.AreEqual(11.5d, reloaded.currentCorruption);
+            CollectionAssert.AreEqual(new[] { "CatKnight" }, SaveSystem.Data.partyCharacterIds,
+                "정상 기존 저장의 보유·파티는 새 게임 초기화가 덮어쓰면 안 된다.");
         }
 
         [Test]
@@ -625,6 +679,8 @@ namespace CharacterEditor.Tests
 
             Assert.AreEqual(0, document.characters.Count,
                 "v2에서 빈 보유 목록은 정상이다 - 불러온 문서를 다시 채우면 안 된다.");
+            Assert.AreEqual(0, document.partyCharacterIds.Count,
+                "정상적으로 불러온 빈 파티도 새 게임 복구 대상으로 보면 안 된다.");
         }
 
         [Test]
@@ -646,6 +702,8 @@ namespace CharacterEditor.Tests
 
                 Assert.AreEqual(0, document.characters.Count,
                     $"{result.Status}에서는 한 항목도 만들지 않아야 한다.");
+                Assert.AreEqual(0, document.partyCharacterIds.Count,
+                    $"{result.Status}에서는 빈 파티도 새 게임 기본 파티로 바꾸면 안 된다.");
             }
         }
 
@@ -1257,7 +1315,7 @@ namespace CharacterEditor.Tests
         private static void GrantInitialCharacters(CharacterRoster roster)
         {
             SetPrivate(roster, "owned", NewOwnedCollection(roster));
-            Invoke(roster, "GrantInitialCharactersOnNewGameOnly");
+            Invoke(roster, "InitializeNewGameCharactersAndParty");
         }
 
         private static CharacterDefinition ResolveStartCharacter(CharacterRoster roster)
@@ -1423,6 +1481,39 @@ namespace CharacterEditor.Tests
         private static CharacterSaveState State(string id, int level = 1, int stamina = 10)
         {
             return new CharacterSaveState { characterId = id, level = level, currentStamina = stamina };
+        }
+
+        private static void SetInitiallyOwned(CharacterDefinition definition, bool value)
+        {
+            var serialized = new SerializedObject(definition);
+            serialized.FindProperty("initiallyOwned").boolValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private sealed class PersistentMemoryStorage : ISaveStorage
+        {
+            private string text;
+
+            public bool WritesBlocked => false;
+            public string BlockedReason => null;
+
+            public SaveReadResult ReadPrimary() => text == null
+                ? SaveReadResult.Missing("memory://primary")
+                : SaveReadResult.Loaded("memory://primary", text);
+
+            public SaveReadResult ReadBackup() => SaveReadResult.Missing("memory://backup");
+
+            public SaveWriteResult Write(string value)
+            {
+                text = value;
+                return SaveWriteResult.Written(backupKept: false);
+            }
+
+            public SaveQuarantineResult QuarantinePrimary(string reason)
+            {
+                text = null;
+                return SaveQuarantineResult.Moved("memory://quarantine");
+            }
         }
 
         private static string Describe(SaveData document)

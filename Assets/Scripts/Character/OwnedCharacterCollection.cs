@@ -192,7 +192,10 @@ namespace Character
                 {
                     characterId = id,
                     level = 1,
+                    currentExp = 0,
                     currentStamina = -1,
+                    passiveStaminaLastCalculatedUtc = string.Empty,
+                    passiveStaminaProgress = 0,
                     currentCorruption = definition.BaseCorruption,
                 });
 

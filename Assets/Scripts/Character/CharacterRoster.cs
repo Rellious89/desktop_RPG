@@ -241,7 +241,7 @@ namespace Character
             Instance = this;
 
             owned = UsesCatalog ? new OwnedCharacterCollection(catalog, SaveSystem.Data) : null;
-            GrantInitialCharactersOnNewGameOnly();
+            InitializeNewGameCharactersAndParty();
 
             BuildUsableEntries();
             if (usableEntries.Count == 0)
@@ -274,7 +274,8 @@ namespace Character
         }
 
         /// <summary>
-        /// <b>새 게임일 때만</b> 표의 initially_owned 캐릭터를 지급한다.
+        /// <b>새 게임일 때만</b> 표의 initially_owned 캐릭터를 지급하고, 비어 있는 새 게임 파티에는
+        /// 시작 캐릭터 한 명을 배치한다.
         ///
         /// 판단의 근거는 <see cref="SaveSystem.LoadStatus"/> 하나뿐이며 "목록이 비어 있다"가 아니다 -
         /// v2에서 <b>빈 보유 목록은 정상적인 상태</b>라서, 비었다고 채우면 플레이어가 스스로 비운 목록이
@@ -282,18 +283,51 @@ namespace Character
         /// CorruptFallback / FutureVersionBlocked / MigrationFailed에서는 <b>한 항목도 만들지 않는다</b>.
         ///
         /// 여기서 저장하지 않는다 - 새 게임의 첫 저장은 기존 저장 경로가 알아서 하며, 저장되기 전에
-        /// 종료해도 다음 실행이 다시 새 게임이라 같은 결과가 된다(지급은 여러 번 해도 같다).
+        /// 종료해도 다음 실행이 다시 새 게임이라 같은 결과가 된다(지급과 기본 파티 배치는 여러 번 해도
+        /// 같다). 이미 로드·마이그레이션한 문서와 비어 있지 않은 파티는 절대 고치지 않는다.
         /// </summary>
-        private void GrantInitialCharactersOnNewGameOnly()
+        private void InitializeNewGameCharactersAndParty()
         {
             if (owned == null) return;
             if (SaveSystem.LoadStatus != SaveLoadStatus.NewGame) return;
 
             int granted = owned.InitializeNewGame();
+            SeedInitialPartyWhenEmpty();
             if (granted > 0)
             {
                 Debug.Log($"[CharacterRoster] 새 게임이라 시작 캐릭터 {granted}명을 지급했습니다.", this);
             }
+        }
+
+        /// <summary>
+        /// 새 저장 문서에는 파티 슬롯도 아직 없으므로, 기본 캐릭터를 첫 슬롯에 둔다. 카탈로그가 제공한
+        /// 기본 보유 캐릭터와 현재 씬의 Default Character가 모두 유효할 때만 배치하며, 그 밖의 저장
+        /// 상태나 이미 작성된 슬롯은 복구라는 명목으로 바꾸지 않는다.
+        /// </summary>
+        private void SeedInitialPartyWhenEmpty()
+        {
+            SaveData document = owned.Document;
+            if (document == null || document.partyCharacterIds == null || document.partyCharacterIds.Count != 0) return;
+
+            CharacterDefinition seed = ResolveInitialPartySeed();
+            if (seed == null) return;
+
+            document.partyCharacterIds.Add(seed.CharacterId);
+        }
+
+        private CharacterDefinition ResolveInitialPartySeed()
+        {
+            CharacterDefinition preferred = catalog != null ? catalog.Find(defaultCharacter != null ? defaultCharacter.CharacterId : null) : null;
+            if (preferred != null && preferred.InitiallyOwned && owned.IsOwned(preferred)) return preferred;
+
+            IReadOnlyList<CharacterDefinition> all = owned.AllCharacters;
+            for (int i = 0; i < all.Count; i++)
+            {
+                CharacterDefinition candidate = all[i];
+                if (candidate != null && candidate.InitiallyOwned && owned.IsOwned(candidate)) return candidate;
+            }
+
+            return null;
         }
 
         private void OnEnable()
