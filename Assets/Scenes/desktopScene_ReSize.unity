@@ -7168,6 +7168,7 @@ GameObject:
   - component: {fileID: 892780515}
   - component: {fileID: 892780514}
   - component: {fileID: 892780513}
+  - component: {fileID: 892780521}
   m_Layer: 5
   m_Name: btn_KeyInput
   m_TagString: Untagged
@@ -7369,6 +7370,19 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 892780511}
   m_CullTransparentMesh: 1
+--- !u!114 &892780521
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 892780511}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9c06ac5905244d7a2c7219986aa2ad6, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  panel: {fileID: 1742144736952819520}
 --- !u!1 &896281496
 GameObject:
   m_ObjectHideFlags: 0
@@ -12566,6 +12580,12 @@ MonoBehaviour:
     showInDungeon: 1
     panelToCloseWhenHidden: {fileID: 0}
     requiredBuildingId: 
+  - label: Key Input
+    buttonRoot: {fileID: 892780511}
+    showInTown: 0
+    showInDungeon: 1
+    panelToCloseWhenHidden: {fileID: 1742144736952819520}
+    requiredBuildingId:
 --- !u!4 &1452980433 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4371201966070470695, guid: 8cc938fe21b426a4daedf2f6c7e34c80, type: 3}
@@ -18103,6 +18123,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: ee0932e31453b4ff98de77bbaa8d50a8, type: 3}
+--- !u!114 &1742144736952819520 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6089606926139906341, guid: ee0932e31453b4ff98de77bbaa8d50a8, type: 3}
+  m_PrefabInstance: {fileID: 1742144736952819519}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a87ce8ad1df489aa90a0425b9560a21, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
 --- !u!1001 &1816820195239382877
 PrefabInstance:
   m_ObjectHideFlags: 0
