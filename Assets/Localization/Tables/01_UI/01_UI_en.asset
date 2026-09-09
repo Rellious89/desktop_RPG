@@ -506,6 +506,24 @@ MonoBehaviour:
     m_Localized: "ESC : \uC785\uB825 \uC885\uB8CC / ENTER : \uC785\uB825 \uC0C8\uB85C\uACE0\uCE68"
     m_Metadata:
       m_Items: []
+  - m_Id: 15506584506458112
+    m_Localized: "\uD589\uB3D9\uB825\uC774 \uCD5C\uB300\uCE58\uC785\uB2C8\uB2E4."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 15506584523235328
+    m_Localized: "\uD574\uB2F9 \uC6A9\uBCD1\uC5D0\uAC90 \uC544\uC774\uD15C\uC744
+      \uC0AC\uC6A9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 15508011979104256
+    m_Localized: Item Use
+    m_Metadata:
+      m_Items: []
+  - m_Id: 15512555899314176
+    m_Localized: "<color=#FFD54A>{0}</color> \uC544\uC774\uD15C\uC744 \uC0AC\uC6A9\uD560
+      \uB300\uC0C1\uC744 \uC120\uD0DD\uD558\uC138\uC694."
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
