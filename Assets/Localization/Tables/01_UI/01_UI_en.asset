@@ -498,6 +498,14 @@ MonoBehaviour:
     m_Localized: Quest
     m_Metadata:
       m_Items: []
+  - m_Id: 15476734177566720
+    m_Localized: Key Input
+    m_Metadata:
+      m_Items: []
+  - m_Id: 15480499135832064
+    m_Localized: "ESC : \uC785\uB825 \uC885\uB8CC / ENTER : \uC785\uB825 \uC0C8\uB85C\uACE0\uCE68"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
