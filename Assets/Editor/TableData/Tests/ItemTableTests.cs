@@ -26,7 +26,7 @@ namespace TableDataEditor.Tests
         private static readonly MethodInfo ValidateItemsMethod =
             typeof(TableDataValidator).GetMethod("ValidateItems", BindingFlags.NonPublic | BindingFlags.Static);
 
-        /// <summary>Item.csv에 실제로 적혀 있는 다섯 행. 이름 키와 설명 키의 관계가 눈에 보이도록 짝으로 둔다.</summary>
+        /// <summary>Item.csv에 실제로 적혀 있는 행. 이름 키와 설명 키의 관계가 눈에 보이도록 짝으로 둔다.</summary>
         private static readonly (string ItemId, int NameKey, string IconKey)[] LiveRows =
         {
             ("50000", 1, "item_ico_1"),
@@ -34,6 +34,9 @@ namespace TableDataEditor.Tests
             ("50002", 3, "item_ico_3"),
             ("50003", 4, "item_ico_4"),
             ("50004", 5, "item_ico_5"),
+            ("50005", 6, "item_ico_1"),
+            ("50006", 7, "item_ico_1"),
+            ("50007", 8, "item_ico_1"),
         };
 
         /// <summary>
@@ -72,6 +75,9 @@ namespace TableDataEditor.Tests
             ("Item/Item_50002.asset", "7f57e18d4d07d440590e07db76470d0d"),
             ("Item/Item_50003.asset", "77309d45b7b2343be8d600751716d1ae"),
             ("Item/Item_50004.asset", "c8030cc5dbcc24f638d72ed351c46977"),
+            ("Item/Item_50005.asset", "d266e6c99ad534f71a393afc54ec9537"),
+            ("Item/Item_50006.asset", "2d48799d18ae449aea34cff355a45c4e"),
+            ("Item/Item_50007.asset", "30c982dc4e82c4fc2ac201c7689b47de"),
             ("Item/ItemCatalog.asset", "749d57bd062ae47619e6dc1de90453fd"),
             ("Monster/Monster_1.asset", "6bc803a7b22e2422fb670082a75ff443"),
             ("Monster/Monster_2.asset", "750a5bed3166f44abb02d9f8c7920c9a"),
@@ -112,7 +118,7 @@ namespace TableDataEditor.Tests
                 new[]
                 {
                     "item_id", "name_category", "name_key", "description_category", "description_key",
-                    "icon_key", "display_order", "enabled", "memo",
+                    "icon_key", "use_effect_type", "use_effect_value", "display_order", "enabled", "memo",
                 },
                 TableDataColumns.Item,
                 "Item.csv의 필수 컬럼과 순서가 약속과 달라졌습니다.");
@@ -128,6 +134,29 @@ namespace TableDataEditor.Tests
                 Assert.IsTrue(TableDataCsvReader.IsReferenceOnlyColumn(column),
                     $"{column}은 참조 컬럼 정책으로 통과해야 한다.");
             }
+        }
+
+        [TestCase("restore_stamina", "10", ItemUseEffectType.RestoreStamina, 10)]
+        [TestCase("none", "0", ItemUseEffectType.None, 0)]
+        public void UseEffect_ValidValuesArePreserved(
+            string effectType, string effectValue, ItemUseEffectType expectedType, int expectedValue)
+        {
+            TableDataSnapshot snapshot = Validate(out TableDataDiagnosticLog log,
+                Row("50000", "4", "1", "4", "10001", effectType: effectType, effectValue: effectValue));
+
+            Assert.AreEqual(0, log.ErrorCount, Describe(log));
+            Assert.AreEqual(expectedType, snapshot.Items[0].UseEffectType);
+            Assert.AreEqual(expectedValue, snapshot.Items[0].UseEffectValue);
+        }
+
+        [TestCase("restore_stamina", "0")]
+        [TestCase("none", "10")]
+        [TestCase("unknown", "10")]
+        public void UseEffect_InvalidContractsAreRejected(string effectType, string effectValue)
+        {
+            Validate(out TableDataDiagnosticLog log,
+                Row("50000", "4", "1", "4", "10001", effectType: effectType, effectValue: effectValue));
+            Assert.Greater(log.ErrorCount, 0, Describe(log));
         }
 
         [Test]
@@ -376,6 +405,19 @@ namespace TableDataEditor.Tests
             }
         }
 
+        [TestCase("50005", ItemUseEffectType.RestoreStamina, 10)]
+        [TestCase("50006", ItemUseEffectType.RestoreStamina, 20)]
+        [TestCase("50007", ItemUseEffectType.RestoreStamina, 30)]
+        public void GeneratedStaminaItems_CarryTheirUseEffect(
+            string itemId, ItemUseEffectType expectedType, int expectedValue)
+        {
+            ItemDefinition definition = AssetDatabase.LoadAssetAtPath<ItemDefinition>(TableDataPaths.ItemAssetPath(itemId));
+            Assert.IsNotNull(definition);
+            Assert.AreEqual(expectedType, definition.UseEffectType);
+            Assert.AreEqual(expectedValue, definition.UseEffectValue);
+            Assert.IsTrue(definition.CanTargetCharacter);
+        }
+
         [Test]
         public void GeneratedItemCatalog_KeepsTheCsvOrder()
         {
@@ -471,6 +513,7 @@ namespace TableDataEditor.Tests
         {
             TableDataColumns.ItemId, TableDataColumns.NameCategory, TableDataColumns.NameKey,
             TableDataColumns.DescriptionCategory, TableDataColumns.DescriptionKey, TableDataColumns.IconKey,
+            TableDataColumns.UseEffectType, TableDataColumns.UseEffectValue,
             TableDataColumns.Sellable, TableDataColumns.SellCurrencyId, TableDataColumns.SellPrice,
             TableDataColumns.DisplayOrder, TableDataColumns.Enabled, TableDataColumns.Memo,
         };
@@ -481,7 +524,7 @@ namespace TableDataEditor.Tests
         {
             return new[]
             {
-                id, "4", "1", "4", "10001", string.Empty,
+                id, "4", "1", "4", "10001", string.Empty, "none", "0",
                 sellable, currency, price, displayOrder, enabled, string.Empty,
             };
         }
@@ -490,11 +533,13 @@ namespace TableDataEditor.Tests
         /// 아이콘 판정은 이 시험의 관심사가 아니고, 빈 값은 경고 한 건으로 끝난다.</summary>
         private static string[] Row(
             string id, string nameCategory, string nameKey, string descriptionCategory, string descriptionKey,
-            string displayOrder = "10", string enabled = "1")
+            string displayOrder = "10", string enabled = "1",
+            string effectType = "none", string effectValue = "0")
         {
             return new[]
             {
                 id, nameCategory, nameKey, descriptionCategory, descriptionKey, string.Empty,
+                effectType, effectValue,
                 displayOrder, enabled, string.Empty,
             };
         }

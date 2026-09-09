@@ -442,6 +442,8 @@ namespace TableDataEditor
                     if (row.SellPrice < 0 || (row.Sellable && (string.IsNullOrEmpty(row.SellCurrencyId) || row.SellPrice <= 0))) log.Error(file, line, TableDataColumns.SellPrice, row.SellPrice.ToString(), "판매 가능 아이템에는 양수 가격과 재화가 필요합니다.");
                 }
 
+                ReadItemUseEffect(table, record, file, line, row, log);
+
                 if (TableDataFieldRules.TryReadInt(
                         file, line, TableDataColumns.DisplayOrder, table.Get(record, TableDataColumns.DisplayOrder), log, out int order))
                 {
@@ -457,6 +459,44 @@ namespace TableDataEditor
 
                 snapshot.Items.Add(row);
                 snapshot.ItemsById[row.Id] = row;
+            }
+        }
+
+        private static void ReadItemUseEffect(
+            CsvTable table, CsvRecord record, string file, int line, ItemRow row, TableDataDiagnosticLog log)
+        {
+            string typeRaw = table.Get(record, TableDataColumns.UseEffectType);
+            string valueRaw = table.Get(record, TableDataColumns.UseEffectValue);
+
+            switch (typeRaw)
+            {
+                case "none":
+                    row.UseEffectType = ItemUseEffectType.None;
+                    break;
+                case "restore_stamina":
+                    row.UseEffectType = ItemUseEffectType.RestoreStamina;
+                    break;
+                default:
+                    log.Error(file, line, TableDataColumns.UseEffectType, typeRaw,
+                        "사용 효과는 none 또는 restore_stamina여야 합니다.");
+                    break;
+            }
+
+            if (TableDataFieldRules.TryReadInt(
+                    file, line, TableDataColumns.UseEffectValue, valueRaw, log, out int value))
+            {
+                row.UseEffectValue = value;
+            }
+
+            if (row.UseEffectType == ItemUseEffectType.None && row.UseEffectValue != 0)
+            {
+                log.Error(file, line, TableDataColumns.UseEffectValue, valueRaw,
+                    "use_effect_type이 none이면 효과 값은 0이어야 합니다.");
+            }
+            else if (row.UseEffectType == ItemUseEffectType.RestoreStamina && row.UseEffectValue <= 0)
+            {
+                log.Error(file, line, TableDataColumns.UseEffectValue, valueRaw,
+                    "행동력 회복 아이템의 효과 값은 1 이상이어야 합니다.");
             }
         }
 

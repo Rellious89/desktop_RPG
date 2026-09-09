@@ -3,14 +3,19 @@ using UnityEngine;
 
 namespace Inventory
 {
+    public enum ItemUseEffectType
+    {
+        None = 0,
+        RestoreStamina = 1,
+    }
+
     /// <summary>
     /// 아이템 한 종의 정의 - "이 아이템이 무엇인가"만 담는다(저장 키, 이름, 아이콘, 목록 순서).
     /// CharacterDefinition과 같은 역할 분담이며, <b>보유 수량은 여기에 없다</b>.
     /// 수량은 저장 데이터(SaveData.items)가 소유하고, 이 에셋은 그 수량을 화면에 그릴 때 필요한
     /// 표시 정보만 제공한다.
     ///
-    /// 사용 효과, 장착 슬롯, 가격, 등급 같은 값은 아직 넣지 않는다 - 이번 단계의 인벤토리는 보유
-    /// 목록 표시까지가 범위라, 쓰이지 않는 필드를 미리 만들어 두지 않는다.
+    /// 사용 효과는 아이템 정의가 소유하되, 실제 소비와 저장은 사용하는 서비스가 담당한다.
     ///
     /// <b>Item Id는 절대 다른 값으로 대체하지 않는다.</b> 비어 있으면 빈 문자열이며 에셋 파일 이름을
     /// 대신 쓰지 않는다 - 저장 파일의 유일한 키가 파일 이름을 바꾸는 것만으로 함께 바뀌는 경로를
@@ -54,6 +59,10 @@ namespace Inventory
         [SerializeField] private string sellCurrencyId;
         [SerializeField] private int sellPrice;
 
+        [Header("Use Effect")]
+        [SerializeField] private ItemUseEffectType useEffectType;
+        [Min(0)] [SerializeField] private int useEffectValue;
+
         /// <summary>저장 데이터가 이 아이템을 가리키는 키. 비어 있으면 빈 문자열을 돌려준다 -
         /// <b>에셋 이름으로 대체하지 않는다</b>. 앞뒤 공백은 제거해서, 공백만 적힌 값이 유효한 id처럼
         /// 보이지 않게 한다.</summary>
@@ -91,5 +100,8 @@ namespace Inventory
         public bool Sellable => sellable;
         public string SellCurrencyId => sellCurrencyId ?? string.Empty;
         public int SellPrice => sellPrice;
+        public ItemUseEffectType UseEffectType => useEffectType;
+        public int UseEffectValue => Mathf.Max(0, useEffectValue);
+        public bool CanTargetCharacter => useEffectType == ItemUseEffectType.RestoreStamina && UseEffectValue > 0;
     }
 }

@@ -36,10 +36,13 @@ namespace TableDataEditor
         public const string Sellable = "sellable";
         public const string SellCurrencyId = "sell_currency_id";
         public const string SellPrice = "sell_price";
+        public const string UseEffectType = "use_effect_type";
+        public const string UseEffectValue = "use_effect_value";
 
         public static readonly string[] Item =
         {
             ItemId, NameCategory, NameKey, DescriptionCategory, DescriptionKey, IconKey,
+            UseEffectType, UseEffectValue,
             DisplayOrder, Enabled, Memo,
         };
 

@@ -46,6 +46,12 @@ namespace Shop.UI
         [Tooltip("pn_Shop 직계의 실제 판매 확인 다이얼로그(dialog_ItemSell).")]
         [SerializeField] private RectTransform sellDialog;
 
+        [Header("List Contents")]
+        [Tooltip("구매 상품 행이 생성될 ScrollRect Content. 비어 있으면 bg_Buy/list의 ScrollRect.content를 자동으로 사용한다.")]
+        [SerializeField] private RectTransform buyListContent;
+        [Tooltip("판매 상품 행이 생성될 ScrollRect Content. 비어 있으면 bg_Sell/list의 ScrollRect.content를 자동으로 사용한다.")]
+        [SerializeField] private RectTransform sellListContent;
+
         [Header("Card Swap")]
         [Tooltip("구매/판매 카드가 서로 자리를 바꾸는 데 걸리는 시간(초). 0 이하면 즉시 전환한다.")]
         [SerializeField, Min(0f)] private float swapDuration = 0.22f;
@@ -179,6 +185,8 @@ namespace Shop.UI
             }
             buyListRoot = FindDeepChild(buyRoot != null ? buyRoot.transform : transform, "list") as RectTransform;
             sellListRoot = FindDeepChild(sellRoot != null ? sellRoot.transform : transform, "list") as RectTransform;
+            buyListContent = ResolveListContent(buyListRoot, buyListContent);
+            sellListContent = ResolveListContent(sellListRoot, sellListContent);
             currencyTexts = GetComponentsInChildren<TextMeshProUGUI>(true);
             swapButtons.AddRange(GetComponentsInChildren<Button>(true));
             for (int i = swapButtons.Count - 1; i >= 0; i--)
@@ -476,7 +484,7 @@ namespace Shop.UI
         {
             for (int i = 0; i < buyRows.Count; i++) if (buyRows[i] != null) Destroy(buyRows[i]);
             buyRows.Clear();
-            if (buyListRoot == null || itemRowPrefab == null || productCatalog == null || itemCatalog == null) return;
+            if (buyListContent == null || itemRowPrefab == null || productCatalog == null || itemCatalog == null) return;
             IReadOnlyList<ShopProductDefinition> products = productCatalog.GetActiveProducts(shopId);
             for (int i = 0; i < products.Count; i++)
             {
@@ -487,7 +495,7 @@ namespace Shop.UI
                     if (!warnedMissingItem) { warnedMissingItem = true; Debug.LogWarning("[ShopPanel] 상품의 ItemDefinition을 찾지 못해 해당 행을 생략합니다.", this); }
                     continue;
                 }
-                GameObject row = Instantiate(itemRowPrefab, buyListRoot);
+                GameObject row = Instantiate(itemRowPrefab, buyListContent);
                 row.name = itemRowPrefab.name + "_Runtime_" + item.ItemId;
                 BindRow(row, product, item);
                 buyRows.Add(row);
@@ -580,12 +588,12 @@ namespace Shop.UI
             sellRows.Clear();
 
             IReadOnlyList<ShopSellSession.Entry> entries = sellSession.Entries;
-            if (sellListRoot != null && itemRowPrefab != null)
+            if (sellListContent != null && itemRowPrefab != null)
             {
                 for (int i = 0; i < entries.Count; i++)
                 {
                     ShopSellSession.Entry entry = entries[i];
-                    GameObject row = Instantiate(itemRowPrefab, sellListRoot);
+                    GameObject row = Instantiate(itemRowPrefab, sellListContent);
                     row.name = itemRowPrefab.name + "_Sell_" + entry.Item.ItemId;
                     BindSellRow(row, entry);
                     sellRows.Add(row);
@@ -764,6 +772,18 @@ namespace Shop.UI
                 if (child.name == childName) return child;
             }
             return null;
+        }
+
+        private static RectTransform ResolveListContent(RectTransform listRoot, RectTransform configuredContent)
+        {
+            if (configuredContent != null) return configuredContent;
+            if (listRoot == null) return null;
+
+            ScrollRect scrollRect = listRoot.GetComponent<ScrollRect>();
+            if (scrollRect != null && scrollRect.content != null) return scrollRect.content;
+
+            // ScrollRect가 아직 없는 구형 프리팹도 기존 생성 위치를 유지한다.
+            return listRoot;
         }
 
         private static void BringDialogToFront(RectTransform dialog)

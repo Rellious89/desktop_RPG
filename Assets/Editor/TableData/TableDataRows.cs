@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Character;
 using Enemy;
+using Inventory;
 using UnityEngine;
 
 namespace TableDataEditor
@@ -76,6 +77,8 @@ namespace TableDataEditor
         public bool Sellable;
         public string SellCurrencyId = string.Empty;
         public int SellPrice;
+        public ItemUseEffectType UseEffectType;
+        public int UseEffectValue;
     }
 
     public sealed class ShopRow { public int Line; public string Id = string.Empty; public LocalizedEntryRef Name; public int RequiredBuildingId; public bool AcceptItemSales; public int DisplayOrder; public bool Enabled; }

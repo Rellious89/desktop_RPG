@@ -30,6 +30,22 @@ namespace TableSyncEditor.Tests
         }
 
         [Test]
+        public void ScansAdditiveSchemaChangeWithExistingAndNewRows()
+        {
+            var git = Fake.Modified(
+                "Assets/TableData/Game/Item.csv",
+                "item_id,item_type\n50000,consumable\n50001,consumable\n",
+                "item_id,item_type,use_effect_type,use_effect_value\n50000,consumable,none,0\n50001,consumable,restore_stamina,10\n50002,consumable,restore_stamina,20\n");
+
+            TableSyncProjectScanResult result = TableSyncProjectChangeScanner.Scan(git);
+
+            Assert.IsTrue(result.IsValid, Describe(result));
+            Assert.AreEqual(1, result.AddCount);
+            Assert.AreEqual(2, result.UpdateCount);
+            Assert.AreEqual(4, result.Tables[0].DisplayTable.Header.Length);
+        }
+
+        [Test]
         public void NewCsvTreatsEveryRowAsAdd()
         {
             var git = Fake.Added("Assets/TableData/Game/Skill.csv", "skill_id,value\na,1\nb,2\n");

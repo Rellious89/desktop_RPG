@@ -1557,6 +1557,8 @@ namespace TableDataEditor
             serialized.FindProperty("sellable").boolValue = row.Sellable;
             serialized.FindProperty("sellCurrencyId").stringValue = row.SellCurrencyId;
             serialized.FindProperty("sellPrice").intValue = row.SellPrice;
+            serialized.FindProperty("useEffectType").enumValueIndex = (int)row.UseEffectType;
+            serialized.FindProperty("useEffectValue").intValue = row.UseEffectValue;
             serialized.FindProperty("icon").objectReferenceValue = row.Icon;
             ApplyLocalizedName(serialized.FindProperty("localizedName"), row.Name);
             ApplyLocalizedName(serialized.FindProperty("localizedDescription"), row.Description);
@@ -1893,7 +1895,7 @@ namespace TableDataEditor
             ok &= VerifyFields<WorldDefinition>(log, "worldId", "localizedName", "displayOrder");
             ok &= VerifyFields<CurrencyDefinition>(log, "currencyId", "localizedName", "icon", "displayOrder");
             ok &= VerifyFields<ItemDefinition>(log, "itemId", "localizedName", "localizedDescription", "icon",
-                "displayOrder", "sellable", "sellCurrencyId", "sellPrice");
+                "displayOrder", "sellable", "sellCurrencyId", "sellPrice", "useEffectType", "useEffectValue");
             ok &= VerifyFields<ShopDefinition>(log, "shopId", "localizedName", "requiredBuildingId",
                 "acceptItemSales", "displayOrder", "enabled");
             ok &= VerifyFields<ShopProductDefinition>(log, "shopId", "itemId", "buyCurrencyId", "buyPrice",

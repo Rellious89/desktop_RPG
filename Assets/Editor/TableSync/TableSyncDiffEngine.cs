@@ -200,7 +200,7 @@ namespace TableSyncEditor
                     result.Diagnostics.Add(new TableSyncDiagnostic("MODIFIED", 1, primaryKey, "Primary Key 컬럼이 없습니다."));
             }
 
-            AddSchemaDifferences(masterColumns, modifiedColumns, result.Diagnostics);
+            AddRemovedColumnDiagnostics(masterColumns, modifiedColumns, result.Diagnostics);
             if (result.Diagnostics.Count > 0) return result;
 
             Dictionary<TableSyncRowIdentity, CsvRecord> masterRows = IndexRows(master, masterColumns, primaryKeys, result.Diagnostics, "MASTER");
@@ -217,7 +217,7 @@ namespace TableSyncEditor
                     continue;
                 }
 
-                List<TableSyncCellChange> cells = FindCellChanges(masterRow, modifiedRow, master.Header, masterColumns, modifiedColumns, primaryKeys);
+                List<TableSyncCellChange> cells = FindCellChanges(masterRow, modifiedRow, modified.Header, masterColumns, modifiedColumns, primaryKeys);
                 result.Changes.Add(cells.Count == 0
                     ? new TableSyncRowChange(TableSyncChangeKind.Unchanged, identity, masterRow.Line, modifiedRow.Line, cells,
                         ReadRowValues(modifiedRow, modified.Header))
@@ -230,7 +230,7 @@ namespace TableSyncEditor
                 TableSyncRowIdentity identity = ReadIdentity(masterRow, masterColumns, primaryKeys);
                 if (!modifiedRows.ContainsKey(identity))
                     result.Changes.Add(new TableSyncRowChange(TableSyncChangeKind.PossibleDelete, identity, masterRow.Line, 0, null,
-                        ReadRowValues(masterRow, master.Header)));
+                        ReadRowValues(masterRow, modified.Header, masterColumns)));
             }
 
             return result;
@@ -259,13 +259,11 @@ namespace TableSyncEditor
             return columns;
         }
 
-        private static void AddSchemaDifferences(Dictionary<string, int> master, Dictionary<string, int> modified,
+        private static void AddRemovedColumnDiagnostics(Dictionary<string, int> master, Dictionary<string, int> modified,
             List<TableSyncDiagnostic> diagnostics)
         {
             foreach (string column in master.Keys.Where(column => !modified.ContainsKey(column)))
                 diagnostics.Add(new TableSyncDiagnostic("Schema", 1, column, "MODIFIED에 없는 MASTER 컬럼입니다."));
-            foreach (string column in modified.Keys.Where(column => !master.ContainsKey(column)))
-                diagnostics.Add(new TableSyncDiagnostic("Schema", 1, column, "MASTER에 없는 MODIFIED 컬럼입니다."));
         }
 
         private static Dictionary<TableSyncRowIdentity, CsvRecord> IndexRows(TableSyncTable table,
@@ -298,14 +296,16 @@ namespace TableSyncEditor
             return indexed;
         }
 
-        private static List<TableSyncCellChange> FindCellChanges(CsvRecord master, CsvRecord modified, string[] masterHeader,
+        private static List<TableSyncCellChange> FindCellChanges(CsvRecord master, CsvRecord modified, string[] modifiedHeader,
             Dictionary<string, int> masterColumns, Dictionary<string, int> modifiedColumns, IList<string> primaryKeys)
         {
             var changes = new List<TableSyncCellChange>();
-            foreach (string column in masterHeader)
+            foreach (string column in modifiedHeader)
             {
                 if (primaryKeys.Contains(column)) continue;
-                string masterValue = master.Fields[masterColumns[column]] ?? string.Empty;
+                string masterValue = masterColumns.TryGetValue(column, out int masterIndex)
+                    ? master.Fields[masterIndex] ?? string.Empty
+                    : string.Empty;
                 string modifiedValue = modified.Fields[modifiedColumns[column]] ?? string.Empty;
                 if (!string.Equals(masterValue, modifiedValue, StringComparison.Ordinal))
                     changes.Add(new TableSyncCellChange(column, masterValue, modifiedValue));
@@ -325,6 +325,21 @@ namespace TableSyncEditor
         {
             var values = new List<TableSyncCellValue>();
             for (int i = 0; i < header.Length; i++) values.Add(new TableSyncCellValue(header[i], record.Fields[i] ?? string.Empty));
+            return values;
+        }
+
+        private static List<TableSyncCellValue> ReadRowValues(CsvRecord record, string[] targetHeader,
+            Dictionary<string, int> sourceColumns)
+        {
+            var values = new List<TableSyncCellValue>();
+            foreach (string column in targetHeader)
+            {
+                string value = sourceColumns.TryGetValue(column, out int sourceIndex)
+                    ? record.Fields[sourceIndex] ?? string.Empty
+                    : string.Empty;
+                values.Add(new TableSyncCellValue(column, value));
+            }
+
             return values;
         }
     }

@@ -82,8 +82,12 @@ namespace TableDataEditor.Tests
             var catalog = AssetDatabase.LoadAssetAtPath<ShopProductCatalog>(
                 TableDataPaths.ShopProductCatalogAssetPath);
             Assert.IsNotNull(catalog);
-            Assert.AreEqual(1, catalog.GetActiveProducts("general_shop").Count);
+            Assert.AreEqual(4, catalog.GetActiveProducts("general_shop").Count);
             Assert.AreSame(product, catalog.Find("general_shop", "50000"));
+
+            AssertProduct(catalog, "50005", 10, 20);
+            AssertProduct(catalog, "50006", 15, 30);
+            AssertProduct(catalog, "50007", 20, 40);
         }
 
         [Test]
@@ -118,6 +122,20 @@ namespace TableDataEditor.Tests
             Assert.AreEqual(sellable, item.Sellable, itemId);
             Assert.AreEqual(currencyId, item.SellCurrencyId, itemId);
             Assert.AreEqual(price, item.SellPrice, itemId);
+        }
+
+        private static void AssertProduct(ShopProductCatalog catalog, string itemId, int price, int displayOrder)
+        {
+            var product = AssetDatabase.LoadAssetAtPath<ShopProductDefinition>(
+                TableDataPaths.ShopProductAssetPath("general_shop", itemId));
+            Assert.IsNotNull(product, itemId + " shop product asset is missing.");
+            Assert.AreEqual("general_shop", product.ShopId, itemId);
+            Assert.AreEqual(itemId, product.ItemId, itemId);
+            Assert.AreEqual("jewel", product.BuyCurrencyId, itemId);
+            Assert.AreEqual(price, product.BuyPrice, itemId);
+            Assert.AreEqual(displayOrder, product.DisplayOrder, itemId);
+            Assert.IsTrue(product.Enabled, itemId);
+            Assert.AreSame(product, catalog.Find("general_shop", itemId), itemId);
         }
     }
 }

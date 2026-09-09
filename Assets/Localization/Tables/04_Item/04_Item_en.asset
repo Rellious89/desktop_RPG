@@ -58,6 +58,30 @@ MonoBehaviour:
     m_Localized: "\uB354\uBBF8\uC544\uC774\uD15C5\uC758 \uD234\uD301 \uC124\uBA85"
     m_Metadata:
       m_Items: []
+  - m_Id: 13106740273864704
+    m_Localized: Stamina Recovery (Small)
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13106740273864705
+    m_Localized: Stamina Recovery (Medium)
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13106740273864706
+    m_Localized: Stamina Recovery (Large)
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13106740278059008
+    m_Localized: Restores 10 stamina to the selected character.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13106740278059009
+    m_Localized: Restores 20 stamina to the selected character.
+    m_Metadata:
+      m_Items: []
+  - m_Id: 13106740278059010
+    m_Localized: Restores 30 stamina to the selected character.
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

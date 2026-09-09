@@ -441,7 +441,7 @@ namespace Inventory
     /// 지급한다.</b> 개발용 진입점은 아래에 별도로 있다.
     /// </summary>
     [DisallowMultipleComponent]
-    public class InventoryManager : MonoBehaviour
+    public class InventoryManager : MonoBehaviour, ICharacterItemUseInventory
     {
         /// <summary>
         /// 보상 한 건에 들어가는 아이템 한 칸(정의 + 수량). 여러 칸을 한 번에 넘겨 <b>처치 하나가

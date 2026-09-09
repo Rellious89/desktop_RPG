@@ -90,6 +90,17 @@ namespace Common
             SetRatio(ToRatio(current, max));
         }
 
+        /// <summary>Main Fill은 유지하고 Preview Fill만 지정한 값까지 늘린다.</summary>
+        public void SetPreviewValue(int preview, int max)
+        {
+            ResolveReferences();
+            if (previewFill == null) return;
+
+            Vector2 anchorMax = previewFill.anchorMax;
+            anchorMax.x = ToRatio(preview, max);
+            previewFill.anchorMax = anchorMax;
+        }
+
         /// <summary>0~1 진행률을 즉시 적용한다(연출 없음). 구간별 색상이 켜져 있으면 <b>같은 호출에서</b>
         /// 색까지 함께 갱신한다 - 값과 색이 서로 다른 시점에 갱신돼 어긋나는 상태가 생기지 않는다.</summary>
         public void SetRatio(float ratio)

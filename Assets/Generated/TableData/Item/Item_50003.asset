@@ -37,6 +37,8 @@ MonoBehaviour:
   sellable: 1
   sellCurrencyId: jewel
   sellPrice: 25
+  useEffectType: 0
+  useEffectValue: 0
   references:
     version: 2
     RefIds: []

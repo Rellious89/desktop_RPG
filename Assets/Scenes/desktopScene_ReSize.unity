@@ -18884,26 +18884,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &2033949039107233062
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7792743792288639106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 37b79a9b18c74f819beca8131b6b6edb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  closeButton: {fileID: 650621277320314992}
-  blockBackgroundInput: 0
-  inputBlocker: {fileID: 0}
-  inputBlockerColor: {r: 0, g: 0, b: 0, a: 0}
-  swapButton: {fileID: 0}
-  characterScrollRect: {fileID: 7549651697264045640}
-  content: {fileID: 1418542024704994381}
-  itemTemplate: {fileID: 4337863455760381406}
 --- !u!224 &2090398303977296976
 RectTransform:
   m_ObjectHideFlags: 0
@@ -19284,14 +19264,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: pn_Shop
       objectReference: {fileID: 0}
-    - target: {fileID: 5861508846987819771, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
-      propertyPath: purchaseSucceededMessage.m_TableEntryReference.m_Key
-      value: 
-      objectReference: {fileID: 0}
-    - target: {fileID: 5861508846987819771, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
-      propertyPath: purchaseSucceededMessage.m_TableEntryReference.m_KeyId
-      value: 11234239218442240
-      objectReference: {fileID: 0}
     - target: {fileID: 7405405773456425565, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -19373,9 +19345,7 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
-    m_RemovedGameObjects:
-    - {fileID: 8492197061186573253, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
-    - {fileID: 4133278104662532797, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
+    m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 3e0c08962025b4d4ab478562a9acc43c, type: 3}
@@ -20922,17 +20892,6 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 4037475334169207547, guid: ea6331abb4bb24d6a997818fb63b2666, type: 3}
   m_PrefabInstance: {fileID: 4337863455760381403}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &4337863455760381406 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 1275916956300756993, guid: ea6331abb4bb24d6a997818fb63b2666, type: 3}
-  m_PrefabInstance: {fileID: 4337863455760381403}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e5995fd9597940e19b164007f7682ec1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!114 &4393794205490126681
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -23580,8 +23539,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6774385079779214234}
-  - component: {fileID: 2033949039107233062}
   - component: {fileID: 6618312546172402626}
+  - component: {fileID: 7792743792288639107}
   m_Layer: 5
   m_Name: dialog_ItemUseTarget
   m_TagString: Untagged
@@ -23589,6 +23548,22 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 0
+--- !u!114 &7792743792288639107
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7792743792288639106}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4a804364c01d48db86af10dc6d02ad20, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  closeButton: {fileID: 0}
+  blockBackgroundInput: 0
+  inputBlocker: {fileID: 0}
+  inputBlockerColor: {r: 0, g: 0, b: 0, a: 0}
 --- !u!1 &7802848920280888918
 GameObject:
   m_ObjectHideFlags: 0

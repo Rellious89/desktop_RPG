@@ -142,11 +142,23 @@ namespace Common
             CancelTooltip();
         }
 
-        /// <summary>오른쪽 클릭은 현재 열린 등록 대상에만 전달한다. 평소 인벤토리에는 대상이 없어 아무 일도 없다.</summary>
+        /// <summary>상점 등록 문맥이 열려 있으면 기존 등록 동작을 우선하고, 평소 인벤토리에서는
+        /// 캐릭터 대상 사용 아이템의 대상 선택창을 연다.</summary>
         public void OnPointerClick(PointerEventData eventData)
         {
-            if (eventData != null && eventData.button == PointerEventData.InputButton.Right)
+            if (eventData == null || eventData.button != PointerEventData.InputButton.Right || definition == null) return;
+
+            if (InventoryItemRegistrationContext.ActiveTarget != null)
+            {
                 InventoryItemRegistrationContext.TryRegister(definition);
+                return;
+            }
+
+            if (definition.CanTargetCharacter)
+            {
+                CancelTooltip();
+                ItemUseTargetDialog.TryOpen(definition);
+            }
         }
 
         public void OnBeginDrag(PointerEventData eventData)

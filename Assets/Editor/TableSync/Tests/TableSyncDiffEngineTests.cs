@@ -88,12 +88,33 @@ namespace TableSyncEditor.Tests
         }
 
         [Test]
-        public void HeaderOrSchemaMismatch_BlocksDiff()
+        public void RemovedColumn_BlocksDiff()
         {
-            TableSyncDiffResult result = Compare("id,value\none,a\n", "id,other\none,a\n", "id");
+            TableSyncDiffResult result = Compare("id,value\none,a\n", "id\none\n", "id");
 
             Assert.IsFalse(result.IsValid);
-            StringAssert.Contains("없는", Describe(result));
+            StringAssert.Contains("MODIFIED에 없는 MASTER 컬럼", Describe(result));
+        }
+
+        [Test]
+        public void AddedColumns_AreAcceptedAndComparedAsEmptyMasterValues()
+        {
+            TableSyncDiffResult result = Compare(
+                "id,value\none,a\ntwo,b\n",
+                "id,value,effect_type,effect_value\none,a,none,0\ntwo,b,restore_stamina,10\nthree,c,restore_stamina,20\n",
+                "id");
+
+            Assert.IsTrue(result.IsValid, Describe(result));
+            Assert.AreEqual(1, result.AddCount);
+            Assert.AreEqual(2, result.UpdateCount);
+
+            TableSyncRowChange first = result.Changes.Find(change => change.PrimaryKey == "one");
+            Assert.AreEqual(2, first.CellChanges.Count);
+            Assert.AreEqual("effect_type", first.CellChanges[0].Column);
+            Assert.AreEqual(string.Empty, first.CellChanges[0].MasterValue);
+            Assert.AreEqual("none", first.CellChanges[0].ModifiedValue);
+            Assert.AreEqual("effect_value", first.CellChanges[1].Column);
+            Assert.AreEqual("0", first.CellChanges[1].ModifiedValue);
         }
 
         [Test]

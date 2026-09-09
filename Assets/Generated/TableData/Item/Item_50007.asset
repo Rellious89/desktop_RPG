@@ -10,15 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 28929260c8064ee6b8c6c56b3595f725, type: 3}
-  m_Name: Item_50004
+  m_Name: Item_50007
   m_EditorClassIdentifier: 
-  itemId: 50004
+  itemId: 50007
   displayName: 
   localizedName:
     m_TableReference:
       m_TableCollectionName: GUID:491e7b09eb9a34714b2294e2f3937670
     m_TableEntryReference:
-      m_KeyId: 681527205888
+      m_KeyId: 13106740273864706
       m_Key: 
     m_FallbackState: 0
     m_WaitForCompletion: 0
@@ -27,18 +27,18 @@ MonoBehaviour:
     m_TableReference:
       m_TableCollectionName: GUID:491e7b09eb9a34714b2294e2f3937670
     m_TableEntryReference:
-      m_KeyId: 6147560627494915
+      m_KeyId: 13106740278059010
       m_Key: 
     m_FallbackState: 0
     m_WaitForCompletion: 0
     m_LocalVariables: []
-  icon: {fileID: 21300000, guid: e0851b8ab38ac443b932d610222f6ee2, type: 3}
-  displayOrder: 50
+  icon: {fileID: 21300000, guid: ac0f051afe53f429798040e2b10521c6, type: 3}
+  displayOrder: 80
   sellable: 0
-  sellCurrencyId: jewel
-  sellPrice: 30
-  useEffectType: 0
-  useEffectValue: 0
+  sellCurrencyId: 
+  sellPrice: 0
+  useEffectType: 1
+  useEffectValue: 30
   references:
     version: 2
     RefIds: []

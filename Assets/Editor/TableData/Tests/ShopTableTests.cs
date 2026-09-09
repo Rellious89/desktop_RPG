@@ -16,6 +16,10 @@ namespace TableDataEditor.Tests
             Assert.IsFalse(result.HasErrors, string.Join("\n", result.Diagnostics));
             Assert.AreEqual("general_shop", result.Snapshot.Shops[0].Id);
             Assert.AreEqual("50000", result.Snapshot.ShopProducts[0].ItemId);
+            Assert.AreEqual(4, result.Snapshot.ShopProducts.Count);
+            Assert.AreEqual(10, result.Snapshot.ShopProductsByPair["general_shop\n50005"].BuyPrice);
+            Assert.AreEqual(15, result.Snapshot.ShopProductsByPair["general_shop\n50006"].BuyPrice);
+            Assert.AreEqual(20, result.Snapshot.ShopProductsByPair["general_shop\n50007"].BuyPrice);
         }
 
         [TestCase("", "50000", "jewel", "100")]

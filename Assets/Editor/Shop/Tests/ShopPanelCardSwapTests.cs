@@ -9,6 +9,7 @@ namespace ShopEditor.Tests
     /// <summary>카드 연출이 닫힘/중단 뒤에도 프리팹 기준 자세로 돌아가는 계약을 고정한다.</summary>
     public sealed class ShopPanelCardSwapTests
     {
+        private const string ShopPanelPrefabPath = "Assets/Art/UI/Prefab/panel/pn_Shop.prefab";
         private static readonly BindingFlags InstancePrivate = BindingFlags.Instance | BindingFlags.NonPublic;
         private GameObject host;
         private GameObject buy;
@@ -160,6 +161,53 @@ namespace ShopEditor.Tests
         }
 
         [Test]
+        public void ResolveReferences_UsesEachScrollRectContentAsRuntimeRowParent()
+        {
+            RectTransform buyList = CreateScrollList(buy.transform, out RectTransform buyContent);
+            RectTransform sellList = CreateScrollList(sell.transform, out RectTransform sellContent);
+
+            ShopPanel panel = host.AddComponent<ShopPanel>();
+            Invoke(panel, "ResolveReferences");
+
+            Assert.AreSame(buyList, Get(panel, "buyListRoot"));
+            Assert.AreSame(sellList, Get(panel, "sellListRoot"));
+            Assert.AreSame(buyContent, Get(panel, "buyListContent"));
+            Assert.AreSame(sellContent, Get(panel, "sellListContent"));
+        }
+
+        [Test]
+        public void ResolveReferences_PreservesExplicitListContentAssignment()
+        {
+            CreateScrollList(buy.transform, out _);
+            RectTransform configured = new GameObject("ConfiguredBuyContent", typeof(RectTransform)).GetComponent<RectTransform>();
+            configured.SetParent(buy.transform, false);
+
+            ShopPanel panel = host.AddComponent<ShopPanel>();
+            Set(panel, "buyListContent", configured);
+            Invoke(panel, "ResolveReferences");
+
+            Assert.AreSame(configured, Get(panel, "buyListContent"));
+        }
+
+        [Test]
+        public void ShopPrefab_ResolvesBuyAndSellRuntimeParentsToTheirScrollContents()
+        {
+            GameObject prefabRoot = PrefabUtility.LoadPrefabContents(ShopPanelPrefabPath);
+            try
+            {
+                ShopPanel panel = prefabRoot.GetComponent<ShopPanel>();
+                Invoke(panel, "ResolveReferences");
+
+                AssertScrollContent(panel, "buyListRoot", "buyListContent");
+                AssertScrollContent(panel, "sellListRoot", "sellListContent");
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(prefabRoot);
+            }
+        }
+
+        [Test]
         public void SwapLabelReferences_UseSellSwitchInBuyModeAndBuySwitchInSellMode()
         {
             ShopPanel panel = host.AddComponent<ShopPanel>();
@@ -211,6 +259,32 @@ namespace ShopEditor.Tests
 
         private static void Set(object target, string name, object value) =>
             target.GetType().GetField(name, InstancePrivate).SetValue(target, value);
+
+        private static RectTransform CreateScrollList(Transform parent, out RectTransform content)
+        {
+            RectTransform list = new GameObject("list", typeof(RectTransform), typeof(UnityEngine.UI.ScrollRect))
+                .GetComponent<RectTransform>();
+            list.SetParent(parent, false);
+            RectTransform viewport = new GameObject("Viewport", typeof(RectTransform)).GetComponent<RectTransform>();
+            viewport.SetParent(list, false);
+            content = new GameObject("Content", typeof(RectTransform)).GetComponent<RectTransform>();
+            content.SetParent(viewport, false);
+            UnityEngine.UI.ScrollRect scrollRect = list.GetComponent<UnityEngine.UI.ScrollRect>();
+            scrollRect.viewport = viewport;
+            scrollRect.content = content;
+            return list;
+        }
+
+        private static void AssertScrollContent(ShopPanel panel, string listField, string contentField)
+        {
+            RectTransform list = (RectTransform)Get(panel, listField);
+            RectTransform content = (RectTransform)Get(panel, contentField);
+            Assert.NotNull(list);
+            Assert.NotNull(content);
+            Assert.AreSame(list.GetComponent<UnityEngine.UI.ScrollRect>().content, content);
+            Assert.AreEqual("Viewport", content.parent.name);
+            Assert.AreEqual("Content", content.name);
+        }
 
         private static object Get(object target, string name) =>
             target.GetType().GetField(name, InstancePrivate).GetValue(target);
