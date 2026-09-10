@@ -11,14 +11,14 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ac3d15f00e9ec4e3eb33303a04698d4f, type: 3}
   m_Name: Shop_general_shop
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   shopId: general_shop
   localizedName:
     m_TableReference:
       m_TableCollectionName: GUID:24472ad8aa2bf4b34b07e7685383f17b
     m_TableEntryReference:
       m_KeyId: 25454174208
-      m_Key:
+      m_Key: 
     m_FallbackState: 0
     m_WaitForCompletion: 0
     m_LocalVariables: []

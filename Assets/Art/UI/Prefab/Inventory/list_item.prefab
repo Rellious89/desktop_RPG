@@ -331,6 +331,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   iconImage: {fileID: 1527952627365351001}
   countText: {fileID: 6584257244050631544}
+  hoverEffect: {fileID: 6279606014857111266}
   countFormat: '{0}'
 --- !u!1 &6279606014857111266
 GameObject:
@@ -418,9 +419,9 @@ Animator:
   m_GameObject: {fileID: 6279606014857111266}
   m_Enabled: 1
   m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: a3c3c84f756194a599a59202b7a3bde9, type: 2}
+  m_Controller: {fileID: 9100000, guid: 3db87fbcb4ba41c1b724bf62bc17d30c, type: 2}
   m_CullingMode: 0
-  m_UpdateMode: 0
+  m_UpdateMode: 2
   m_ApplyRootMotion: 0
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0

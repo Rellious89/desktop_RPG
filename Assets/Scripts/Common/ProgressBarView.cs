@@ -59,6 +59,9 @@ namespace Common
                  "Main Fill에만 칠한다.")]
         [SerializeField] private Image previewFillImage;
 
+        [Tooltip("선택 사항. 연결하면 Slider의 기존 Fill Rect 폭 조절과 별개로, 고정 Fill을 사선으로 클리핑한다.")]
+        [SerializeField] private SlantedProgressBar slantedProgressBar;
+
         [Tooltip("Low 구간 색. 원본 스프라이트에 곱해지므로 흰색 계열 스프라이트에서만 의도한 색이 나온다.")]
         [SerializeField] private Color lowColor = new Color(0.90f, 0.24f, 0.24f, 1f);
 
@@ -109,6 +112,7 @@ namespace Common
 
             float clamped = Mathf.Clamp01(ratio);
             if (fillSlider != null) fillSlider.SetValueWithoutNotify(clamped);
+            if (slantedProgressBar != null) slantedProgressBar.NormalizedValue = clamped;
 
             if (previewFill != null)
             {
@@ -183,6 +187,7 @@ namespace Common
             {
                 fillImage = fillSlider.fillRect.GetComponent<Image>();
             }
+            if (slantedProgressBar == null) slantedProgressBar = GetComponent<SlantedProgressBar>();
             if (previewFillImage == null && previewFill != null)
             {
                 previewFillImage = previewFill.GetComponent<Image>();

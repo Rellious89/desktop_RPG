@@ -16,9 +16,9 @@ MonoBehaviour:
   displayName: 
   originWorld: {fileID: 11400000, guid: 79144df9714ff41edad2ce9c6244bd91, type: 2}
   motionProfile: {fileID: 11400000, guid: 8adc502fe0c9542309b63d7e9bfa0944, type: 2}
-  portrait: {fileID: 0}
+  portrait: {fileID: 21300000, guid: 56316bb4ba67b4f7fb8594bc55851eb1, type: 3}
   maxStamina: 30
-  baseCorruption: 0
+  baseCorruption: 10
   initiallyOwned: 0
   localizedName:
     m_TableReference:

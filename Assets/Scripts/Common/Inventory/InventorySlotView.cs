@@ -33,10 +33,13 @@ namespace Common
     {
         private const string IconName = "sp_ItemIcon";
         private const string CountTextName = "lb_count";
+        private const string HoverEffectName = "sp_HoverEffect";
+        private static readonly int HoverStateHash = Animator.StringToHash("Base Layer.Reticle_Hover_UI");
 
         [Header("References (비워두면 프리팹 이름으로 자동 탐색)")]
         [SerializeField] private Image iconImage;
         [SerializeField] private TextMeshProUGUI countText;
+        [SerializeField] private GameObject hoverEffect;
 
         [Tooltip("수량 표시 형식. 이번 단계에서는 수량이 1이어도 그대로 표시한다.")]
         [SerializeField] private string countFormat = "{0}";
@@ -49,6 +52,7 @@ namespace Common
         private ItemTooltipController tooltipController;
         private bool tooltipControllerResolved;
         private bool isSellRegistrationDrag;
+        private Animator hoverAnimator;
 
         /// <summary>이 슬롯이 지금 그리고 있는 아이템. 빈 칸이면 null이다.</summary>
         public ItemDefinition Definition => definition;
@@ -84,6 +88,7 @@ namespace Common
             count = itemCount;
 
             if (changed) CancelTooltip();
+            if (changed) StopHoverEffect();
             if (changed) InventorySellDragPreview.End(this);
 
             Sprite icon = itemDefinition != null ? itemDefinition.Icon : null;
@@ -112,6 +117,7 @@ namespace Common
             definition = null;
             count = 0;
             CancelTooltip();
+            StopHoverEffect();
             InventorySellDragPreview.End(this);
 
             if (iconImage != null)
@@ -131,7 +137,13 @@ namespace Common
         /// <summary>빈 칸에서는 아무것도 하지 않는다 - 툴팁이 뜰 내용 자체가 없다.</summary>
         public void OnPointerEnter(PointerEventData eventData)
         {
-            if (definition == null) return;
+            if (definition == null)
+            {
+                StopHoverEffect();
+                return;
+            }
+
+            StartHoverEffect();
 
             ItemTooltipController controller = ResolveTooltipController();
             controller?.RequestShow(this, definition, count, transform as RectTransform);
@@ -139,6 +151,7 @@ namespace Common
 
         public void OnPointerExit(PointerEventData eventData)
         {
+            StopHoverEffect();
             CancelTooltip();
         }
 
@@ -189,6 +202,7 @@ namespace Common
         /// 이벤트가 오지 않으므로, 이 경로가 없으면 툴팁만 화면에 남는다.</summary>
         private void OnDisable()
         {
+            StopHoverEffect();
             CancelTooltip();
             isSellRegistrationDrag = false;
             InventorySellDragPreview.End(this);
@@ -217,6 +231,23 @@ namespace Common
             return tooltipController;
         }
 
+        private void StartHoverEffect()
+        {
+            if (hoverEffect == null) return;
+
+            hoverEffect.SetActive(true);
+            if (hoverAnimator == null || hoverAnimator.runtimeAnimatorController == null) return;
+
+            // 비활성화되어 있던 Animator의 이전 진행률을 재사용하지 않고 매번 첫 프레임부터 보인다.
+            hoverAnimator.Play(HoverStateHash, 0, 0f);
+            hoverAnimator.Update(0f);
+        }
+
+        private void StopHoverEffect()
+        {
+            if (hoverEffect != null) hoverEffect.SetActive(false);
+        }
+
         private void ResolveReferences()
         {
             if (resolved) return;
@@ -224,6 +255,17 @@ namespace Common
 
             if (iconImage == null) iconImage = FindChildComponent<Image>(IconName);
             if (countText == null) countText = FindChildComponent<TextMeshProUGUI>(CountTextName);
+            if (hoverEffect == null)
+            {
+                Transform found = FindDeepChild(transform, HoverEffectName);
+                if (found != null) hoverEffect = found.gameObject;
+            }
+            if (hoverEffect != null)
+            {
+                hoverAnimator = hoverEffect.GetComponent<Animator>();
+                Graphic[] hoverGraphics = hoverEffect.GetComponentsInChildren<Graphic>(true);
+                for (int i = 0; i < hoverGraphics.Length; i++) hoverGraphics[i].raycastTarget = false;
+            }
 
             if (iconImage == null)
             {

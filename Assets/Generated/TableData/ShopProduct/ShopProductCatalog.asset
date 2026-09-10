@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f0484b7efe040409381048429e5f6e18, type: 3}
   m_Name: ShopProductCatalog
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   products:
   - {fileID: 11400000, guid: 069ce54f4efb94a33a786115970c79dc, type: 2}
   - {fileID: 11400000, guid: 787486e73706440219ae9ed137dd9f10, type: 2}

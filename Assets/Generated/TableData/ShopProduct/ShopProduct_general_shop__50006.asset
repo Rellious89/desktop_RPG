@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d20e6efcd4b85423491ae981d5989407, type: 3}
   m_Name: ShopProduct_general_shop__50006
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   shopId: general_shop
   itemId: 50006
   buyCurrencyId: jewel

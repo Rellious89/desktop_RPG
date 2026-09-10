@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8c19e8808c64f48c4b53cdd5339434e0, type: 3}
   m_Name: CharacterSkill_Barbarian__barbarian_skill_02
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   characterId: Barbarian
   skillId: barbarian_skill_02
   character: {fileID: 11400000, guid: 248d14fc02c4142c49d3913832fb519e, type: 2}

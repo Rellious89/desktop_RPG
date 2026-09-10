@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 20627648ec65a422791921e2f7954ac8, type: 3}
   m_Name: CorruptionConfig_default
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   configId: default
   maxCorruption: 300
   warningThresholdPercent: 50

@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8c19e8808c64f48c4b53cdd5339434e0, type: 3}
   m_Name: CharacterSkill_ElfArcher__elfarcher_skill_01
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   characterId: ElfArcher
   skillId: elfarcher_skill_01
   character: {fileID: 11400000, guid: 26424a01213dc4878ba2d84e1fd898f7, type: 2}
