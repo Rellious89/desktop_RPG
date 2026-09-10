@@ -130,6 +130,9 @@ namespace Character
         /// 갱신하면 되도록 어떤 캐릭터인지 함께 보낸다.</summary>
         public static event Action<CharacterDefinition> CharacterStateChanged;
 
+        /// <summary>파티/보유 상태 변경으로 HUD가 다시 만들 표시 항목이 달라졌을 때 발생한다.</summary>
+        public static event Action RosterEntriesChanged;
+
         // 검증을 통과해 실제로 쓸 수 있는 항목만 남긴 목록. entries를 직접 순회하지 않는 이유는
         // 비어 있는 슬롯이 UI 인덱스나 순환 순서에 끼어들지 않게 하기 위함이다.
         private readonly List<Entry> usableEntries = new List<Entry>();
@@ -163,6 +166,7 @@ namespace Character
         {
             if (!UsesCatalog) return;
             BuildUsableEntries();
+            RosterEntriesChanged?.Invoke();
         }
 
         /// <summary>파티 저장이 성공한 뒤 출전 목록을 다시 읽는다. 저장하거나 자동 합류시키지 않는다.</summary>
@@ -171,6 +175,7 @@ namespace Character
             if (!UsesCatalog) return;
             CharacterDefinition previous = current;
             BuildUsableEntries();
+            RosterEntriesChanged?.Invoke();
             if (previous != null && ResolveUsable(previous) != null) return;
             // current만 바꾸면 화면의 Runtime Actor가 이전 캐릭터를 계속 연기한다. 일반 교체와 같은
             // 적용 경로를 써서 로스터와 화면을 원자적으로 맞춘다.
@@ -816,6 +821,21 @@ namespace Character
             if (owned == null) return definition != null ? definition.MaxStamina : 0;
 
             return TryGetOwnedState(definition, out CharacterDefinition canonical, out _) ? canonical.MaxStamina : 0;
+        }
+
+        /// <summary>보유 캐릭터의 현재 오염도. HUD 등 표시 계층은 이 읽기 전용 이음매만 사용한다.</summary>
+        public double GetCorruption(CharacterDefinition definition)
+        {
+            return TryGetOwnedState(definition, out _, out CharacterSaveState state) ? state.currentCorruption : 0d;
+        }
+
+        /// <summary>현재 오염도 UI가 쓰는 최대치. 정식 default 설정이 없을 때만 기존 정화 UI와 같은
+        /// 300을 폴백으로 사용해 표시가 예기치 않게 사라지지 않게 한다.</summary>
+        public int GetCorruptionDisplayMaximum()
+        {
+            CorruptionConfigDefinition config = corruptionConfigCatalog != null
+                ? corruptionConfigCatalog.Find("default") : null;
+            return config != null && config.IsValid ? config.MaxCorruption : 300;
         }
 
         /// <summary>이 캐릭터로 교체할 수 없는 이유. <see cref="SwapBlockReason.None"/>이면 교체 가능하다.</summary>

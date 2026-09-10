@@ -264,6 +264,12 @@ namespace Inventory
                 inventory.NotifyDefeatRewardsAfterExternalSave(inventoryReceipt);
                 progress.NotifyDefeatAfterExternalSave(progressReceipt);
                 roster.NotifyDefeatStaminaAfterExternalSave(staminaReceipt);
+                // 행동력 비용이 0인 던전에서도 오염도는 변할 수 있다. 그 경우에도 HUD/교체 UI가
+                // 같은 CharacterStateChanged 이음매로 최신 오염도를 다시 읽게 한다.
+                if (corruptionReceipt != null && corruptionReceipt.Changed)
+                {
+                    roster.RaiseCharacterStateChanged(defeatedCharacter);
+                }
                 questService?.NotifyReadyAfterExternalSave(questReceipt);
                 if (!inventoryReceipt.Result.IsEmpty) ShowRewardToast(inventoryReceipt.Result);
             }

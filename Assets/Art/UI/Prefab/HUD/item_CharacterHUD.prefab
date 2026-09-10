@@ -402,6 +402,7 @@ GameObject:
   - component: {fileID: 1931340103195572113}
   - component: {fileID: 7289912568276542069}
   - component: {fileID: 182284037721549091}
+  - component: {fileID: 900000000000000002}
   m_Layer: 5
   m_Name: Progress_Stamina
   m_TagString: Untagged
@@ -469,7 +470,7 @@ MonoBehaviour:
     m_PressedTrigger: Pressed
     m_SelectedTrigger: Selected
     m_DisabledTrigger: Disabled
-  m_Interactable: 1
+  m_Interactable: 0
   m_TargetGraphic: {fileID: 0}
   m_FillRect: {fileID: 0}
   m_HandleRect: {fileID: 429915246384373139}
@@ -502,6 +503,29 @@ MonoBehaviour:
   slantWidthPixels: 6
   pixelSnap: 1
   pixelWidthOverride: 71
+--- !u!114 &900000000000000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3837318711821229414}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3189693b10b740559a9015ba76c6c338, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  fillSlider: {fileID: 7289912568276542069}
+  previewFill: {fileID: 0}
+  useValueBandColors: 0
+  fillImage: {fileID: 7849199272216278838}
+  previewFillImage: {fileID: 0}
+  slantedProgressBar: {fileID: 182284037721549091}
+  lowColor: {r: 1, g: 1, b: 1, a: 1}
+  midColor: {r: 1, g: 1, b: 1, a: 1}
+  highColor: {r: 1, g: 1, b: 1, a: 1}
+  lowThreshold: 0.3
+  midThreshold: 0.8
 --- !u!1 &3927663137490009077
 GameObject:
   m_ObjectHideFlags: 0
@@ -514,6 +538,7 @@ GameObject:
   - component: {fileID: 4156223587393616070}
   - component: {fileID: 1289556910619911866}
   - component: {fileID: 4870976753829607860}
+  - component: {fileID: 900000000000000001}
   m_Layer: 5
   m_Name: item_CharacterHUD
   m_TagString: Untagged
@@ -613,6 +638,23 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &900000000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3927663137490009077}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 126618c2a0544cd29b36fd4dcfc3dd13, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  slotButton: {fileID: 4870976753829607860}
+  canvasGroup: {fileID: 1289556910619911866}
+  portraitImage: {fileID: 5858025399009647588}
+  staminaProgress: {fileID: 900000000000000002}
+  purificationCellsRoot: {fileID: 2953959710927620556}
 --- !u!1 &4018684869793019006
 GameObject:
   m_ObjectHideFlags: 0
