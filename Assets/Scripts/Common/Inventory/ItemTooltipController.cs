@@ -15,9 +15,9 @@ namespace Common
     /// <b>인스턴스는 하나뿐이다.</b> 프리팹을 매번 만들지 않고 처음 한 번 만들어 재사용하므로,
     /// 슬롯을 아무리 빠르게 오가도 화면에 툴팁이 둘 이상 뜨는 경로가 구조적으로 없다.
     ///
-    /// <b>인스턴스는 목록 밖에 붙는다.</b> 슬롯(list_item)과 슬롯 영역(list)에는 Mask가 걸려 있어서
-    /// 그 아래에 만들면 툴팁이 칸 크기로 잘린다. 그래서 패널의 부모(Panel_UI) 아래에 만들고 표시할
-    /// 때마다 형제 중 맨 뒤로 보내, 나중에 열린 다른 패널보다도 앞에 그려지게 한다.
+    /// <b>인스턴스는 목록 밖의 전용 레이어에 붙는다.</b> 슬롯(list_item)과 슬롯 영역(list)에는
+    /// Mask가 걸려 있어서 그 아래에 만들면 툴팁이 칸으로 잘린다. 씬의 Canvas 직속 TooltipLayer를
+    /// 사용해 Dialog_UI보다 위에 그리며, 표시할 때마다 그 레이어 안에서도 맨 뒤로 보낸다.
     ///
     /// <b>툴팁은 입력을 받지 않는다.</b> 만들 때 안쪽 모든 Graphic의 Raycast Target을 끄므로 슬롯과
     /// 겹쳐도 Hover가 끊기지 않고 클릭/스크롤을 가로채지 않는다. 같은 이유로 툴팁 프리팹에는
@@ -44,8 +44,8 @@ namespace Common
         [Tooltip("표시에 사용할 item_ToolTip 프리팹. 루트에 ItemTooltipView가 있어야 한다.")]
         [SerializeField] private GameObject tooltipPrefab;
 
-        [Tooltip("툴팁 인스턴스를 붙일 부모. 비워두면 이 패널의 부모(Panel_UI)를 쓴다 - 슬롯 영역의 " +
-                 "Mask 밖이어야 툴팁이 잘리지 않는다.")]
+        [Tooltip("툴팁 인스턴스를 붙일 전용 TooltipLayer. Canvas 직속이며 Dialog_UI보다 뒤(앞에 그려지는 " +
+                 "순서)에 있어야 한다.")]
         [SerializeField] private RectTransform tooltipRoot;
 
         [Tooltip("마우스를 올린 뒤 툴팁이 나타나기까지의 대기시간(초). 0이면 즉시 뜬다 - 인벤토리는 " +
@@ -211,9 +211,8 @@ namespace Common
         }
 
         /// <summary>
-        /// 떠 있는 툴팁을 형제 중 맨 뒤로 되돌린다. <see cref="PopupPanelManager.FocusPanel"/>이 클릭이나
-        /// 열기로 패널을 맨 뒤 형제로 보내면, 같은 부모(Panel_UI)에 붙어 있는 툴팁이 그 패널 <b>뒤로</b>
-        /// 밀려 가려지기 때문이다.
+        /// 떠 있는 툴팁을 TooltipLayer의 형제 중 맨 뒤로 되돌린다. <see cref="PopupPanelManager.FocusPanel"/>이
+        /// 클릭이나 열기로 패널을 앞으로 보내도 전용 레이어 자체가 Dialog_UI보다 앞에 있으므로 툴팁이 가려지지 않는다.
         ///
         /// <b>프레임의 끝에서 한 번만 본다.</b> 패널 순서를 바꾸는 쪽이 <c>Update</c>에서 도니, 같은
         /// 프레임의 <c>LateUpdate</c>에서 되돌리면 화면에 한 프레임도 가려진 모습이 나가지 않는다.
@@ -400,8 +399,8 @@ namespace Common
             }
         }
 
-        /// <summary>툴팁을 붙일 부모. 지정이 없으면 이 패널의 부모(Panel_UI)를 쓴다 - 패널 안쪽은
-        /// 어디든 Mask 아래라 툴팁이 잘린다.</summary>
+        /// <summary>툴팁을 붙일 전용 레이어. 씬 배선이 누락된 테스트/동적 UI에서는 기존 부모로
+        /// 안전하게 되돌아가지만, 실제 씬은 Canvas 직속 TooltipLayer를 명시적으로 연결한다.</summary>
         private RectTransform ResolveTooltipRoot()
         {
             if (tooltipRoot != null) return tooltipRoot;

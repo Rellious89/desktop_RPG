@@ -44,6 +44,7 @@ namespace CommonEditor.Tests
         private const string ScenePath = "Assets/Scenes/desktopScene_ReSize.unity";
 
         private const string PanelUiObjectName = "Panel_UI";
+        private const string TooltipLayerObjectName = "TooltipLayer";
 
         /// <summary>던전 상세의 대표 보상 한 칸과 정산 결과의 아이템 한 줄. 인벤토리 슬롯과 함께
         /// <b>같은</b> 컨트롤러를 쓰는 세 주인이다.</summary>
@@ -210,9 +211,9 @@ namespace CommonEditor.Tests
                     serialized.FindProperty("tooltipPrefab").objectReferenceValue,
                     "컨트롤러가 item_ToolTip 프리팹을 가리켜야 한다.");
                 Assert.AreSame(
-                    (RectTransform)controller.transform,
+                    FindChild(controller.transform.parent, TooltipLayerObjectName),
                     serialized.FindProperty("tooltipRoot").objectReferenceValue,
-                    "툴팁을 붙일 부모는 Panel_UI 자신이어야 한다 - 패널 안쪽은 Mask 아래라 잘린다.");
+                    "툴팁은 Canvas 직속 TooltipLayer에 붙어 Dialog_UI보다 앞에 그려져야 한다.");
                 Assert.AreEqual(0f, serialized.FindProperty("tooltipDelay").floatValue,
                     "아이템 툴팁의 기본 대기시간은 0(즉시)이다.");
             }
@@ -498,6 +499,34 @@ namespace CommonEditor.Tests
                 "툴팁은 Mask가 걸린 슬롯 영역 밖(Panel_UI)에 붙어야 잘리지 않는다.");
             Assert.AreEqual(tooltipParent.childCount - 1, instance.GetSiblingIndex(),
                 "툴팁은 형제 중 맨 뒤여야 다른 패널보다 앞에 그려진다.");
+        }
+
+        [Test]
+        public void Scene_TooltipLayerIsAfterDialogUi()
+        {
+            Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Additive);
+            try
+            {
+                Transform canvas = null;
+                foreach (GameObject root in scene.GetRootGameObjects())
+                {
+                    canvas = FindChild(root.transform, "Canvas");
+                    if (canvas != null) break;
+                }
+                Assert.IsNotNull(canvas);
+                Transform dialog = FindChild(canvas, "Dialog_UI");
+                Transform layer = FindChild(canvas, TooltipLayerObjectName);
+
+                Assert.IsNotNull(dialog);
+                Assert.IsNotNull(layer);
+                Assert.AreSame(canvas, layer.parent);
+                Assert.Greater(layer.GetSiblingIndex(), dialog.GetSiblingIndex(),
+                    "Canvas의 뒤쪽 형제가 앞에 렌더링되므로 TooltipLayer는 Dialog_UI 뒤에 있어야 한다.");
+            }
+            finally
+            {
+                EditorSceneManager.CloseScene(scene, true);
+            }
         }
 
         [Test]
@@ -963,8 +992,8 @@ namespace CommonEditor.Tests
 
             RectTransform instance = (RectTransform)controller.View.transform;
 
-            // PopupPanelManager.FocusPanel이 하는 일과 같다 - 패널을 Panel_UI 안에서 맨 뒤 형제로 보낸다.
-            panelRoot.SetAsLastSibling();
+            // 전용 레이어 안에서 다른 오브젝트가 앞으로 온 상황을 만든다.
+            NewStretchedChild(tooltipParent, "otherTooltip").SetAsLastSibling();
             Assert.AreNotEqual(tooltipParent.childCount - 1, instance.GetSiblingIndex(),
                 "이 시험의 전제: 패널이 앞으로 나오면 툴팁이 그 뒤로 밀린다.");
 
@@ -1048,12 +1077,13 @@ namespace CommonEditor.Tests
             canvasRect.sizeDelta = new Vector2(800f, 600f);
             canvasRect.position = Vector3.zero;
 
-            tooltipParent = NewStretchedChild(canvasRect, PanelUiObjectName);
-            panelRoot = NewStretchedChild(tooltipParent, "pn_Inventory");
+            RectTransform panelUi = NewStretchedChild(canvasRect, PanelUiObjectName);
+            panelRoot = NewStretchedChild(panelUi, "pn_Inventory");
+            tooltipParent = NewStretchedChild(canvasRect, TooltipLayerObjectName);
 
             // 실제 배선과 같은 자리다 - 컨트롤러는 패널이 아니라 Panel_UI가 소유하고, 세 화면은
             // 부모 탐색으로 이 하나에 닿는다.
-            controller = tooltipParent.gameObject.AddComponent<ItemTooltipController>();
+            controller = panelUi.gameObject.AddComponent<ItemTooltipController>();
             SetPrivate(controller, "tooltipPrefab", LoadPrefab(TooltipPrefabPath));
             SetPrivate(controller, "tooltipRoot", tooltipParent);
             controllers.Add(controller);

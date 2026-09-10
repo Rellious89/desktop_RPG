@@ -130,6 +130,57 @@ namespace CommonEditor.Tests
         }
 
         [Test]
+        public void Dialog_PositionNextTo_PrefersLowerRightOfSourceIcon()
+        {
+            BuildPlacementFixture(
+                new Vector2(800f, 600f), Vector2.zero,
+                out GameObject canvasRoot, out RectTransform source, out ItemUseTargetDialog dialog);
+
+            InvokePositionNextTo(dialog, source);
+
+            GetWorldBounds(source, out Vector2 sourceMin, out Vector2 sourceMax);
+            GetWorldBounds((RectTransform)dialog.transform, out Vector2 dialogMin, out Vector2 dialogMax);
+            Assert.AreEqual(sourceMax.x + 8f, dialogMin.x, 0.01f);
+            Assert.AreEqual(sourceMin.y - 8f, dialogMax.y, 0.01f);
+            AssertRectInside((RectTransform)dialog.transform, (RectTransform)canvasRoot.transform);
+        }
+
+        [Test]
+        public void Dialog_PositionNextTo_NearTopRightPrefersLowerRightInsideCanvas()
+        {
+            BuildPlacementFixture(
+                new Vector2(800f, 600f), new Vector2(370f, 270f),
+                out GameObject canvasRoot, out RectTransform source, out ItemUseTargetDialog dialog);
+
+            InvokePositionNextTo(dialog, source);
+
+            GetWorldBounds(source, out Vector2 sourceMin, out Vector2 sourceMax);
+            GetWorldBounds((RectTransform)dialog.transform, out Vector2 dialogMin, out Vector2 dialogMax);
+            Assert.AreEqual(sourceMax.x + 8f, dialogMin.x, 0.01f);
+            Assert.AreEqual(sourceMin.y - 8f, dialogMax.y, 0.01f);
+            AssertRectInside((RectTransform)dialog.transform, (RectTransform)canvasRoot.transform);
+        }
+
+        [Test]
+        public void Dialog_PositionNextTo_ReplacesPreviousDraggedPositionOnEveryUse()
+        {
+            BuildPlacementFixture(
+                new Vector2(800f, 600f), new Vector2(-250f, 100f),
+                out GameObject canvasRoot, out RectTransform source, out ItemUseTargetDialog dialog);
+            RectTransform dialogRect = (RectTransform)dialog.transform;
+            dialogRect.anchoredPosition = new Vector2(310f, -210f);
+
+            InvokePositionNextTo(dialog, source);
+
+            GetWorldBounds(source, out Vector2 sourceMin, out Vector2 sourceMax);
+            GetWorldBounds(dialogRect, out Vector2 dialogMin, out Vector2 dialogMax);
+            Assert.AreEqual(sourceMax.x + 8f, dialogMin.x, 0.01f,
+                "직전 드래그 위치가 아니라 새 아이콘의 우측을 기준으로 다시 배치해야 합니다.");
+            Assert.AreEqual(sourceMin.y - 8f, dialogMax.y, 0.01f);
+            AssertRectInside(dialogRect, (RectTransform)canvasRoot.transform);
+        }
+
+        [Test]
         public void CharacterItemUse_ConsumesOneItemAndRestoresStaminaWithOneSave()
         {
             CharacterDefinition character = NewCharacter();
@@ -217,6 +268,83 @@ namespace CommonEditor.Tests
             serialized.FindProperty("useEffectValue").intValue = value;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             return item;
+        }
+
+        private void BuildPlacementFixture(
+            Vector2 canvasSize, Vector2 sourcePosition,
+            out GameObject canvasRoot, out RectTransform source, out ItemUseTargetDialog dialog)
+        {
+            canvasRoot = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas));
+            created.Add(canvasRoot);
+            Canvas canvas = canvasRoot.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            RectTransform canvasRect = (RectTransform)canvasRoot.transform;
+            canvasRect.sizeDelta = canvasSize;
+            canvasRect.position = Vector3.zero;
+
+            RectTransform sourceParent = NewStretchedChild(canvasRect, "Panel_UI");
+            RectTransform dialogParent = NewStretchedChild(canvasRect, "Dialog_UI");
+
+            source = NewRect(sourceParent, "sp_ItemIcon", sourcePosition, new Vector2(40f, 40f));
+            RectTransform dialogRect = NewRect(
+                dialogParent, "dialog_ItemUseTarget", new Vector2(-123f, 77f), new Vector2(200f, 120f));
+            dialogRect.gameObject.SetActive(false);
+            dialog = dialogRect.gameObject.AddComponent<ItemUseTargetDialog>();
+        }
+
+        private static RectTransform NewStretchedChild(RectTransform parent, string name)
+        {
+            RectTransform rect = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            return rect;
+        }
+
+        private static RectTransform NewRect(
+            RectTransform parent, string name, Vector2 anchoredPosition, Vector2 size)
+        {
+            RectTransform rect = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = size;
+            rect.anchoredPosition = anchoredPosition;
+            return rect;
+        }
+
+        private static void InvokePositionNextTo(ItemUseTargetDialog dialog, RectTransform source)
+        {
+            MethodInfo method = typeof(ItemUseTargetDialog).GetMethod(
+                "PositionNextTo", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(method);
+            method.Invoke(dialog, new object[] { source });
+        }
+
+        private static void GetWorldBounds(RectTransform rect, out Vector2 min, out Vector2 max)
+        {
+            Vector3[] corners = new Vector3[4];
+            rect.GetWorldCorners(corners);
+            min = corners[0];
+            max = corners[0];
+            for (int i = 1; i < corners.Length; i++)
+            {
+                min = Vector2.Min(min, corners[i]);
+                max = Vector2.Max(max, corners[i]);
+            }
+        }
+
+        private static void AssertRectInside(RectTransform rect, RectTransform bounds)
+        {
+            GetWorldBounds(rect, out Vector2 rectMin, out Vector2 rectMax);
+            GetWorldBounds(bounds, out Vector2 boundsMin, out Vector2 boundsMax);
+            Assert.GreaterOrEqual(rectMin.x, boundsMin.x - 0.01f);
+            Assert.GreaterOrEqual(rectMin.y, boundsMin.y - 0.01f);
+            Assert.LessOrEqual(rectMax.x, boundsMax.x + 0.01f);
+            Assert.LessOrEqual(rectMax.y, boundsMax.y + 0.01f);
         }
 
         private sealed class FakeUseInventory : ICharacterItemUseInventory

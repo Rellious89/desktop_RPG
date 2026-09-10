@@ -157,7 +157,8 @@ namespace Common
             if (definition.CanTargetCharacter)
             {
                 CancelTooltip();
-                ItemUseTargetDialog.TryOpen(definition);
+                RectTransform sourceRect = iconImage != null ? iconImage.rectTransform : transform as RectTransform;
+                ItemUseTargetDialog.TryOpen(definition, sourceRect);
             }
         }
 

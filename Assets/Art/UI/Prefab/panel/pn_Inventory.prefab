@@ -846,7 +846,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &2586736142525909227
 RectTransform:
   m_ObjectHideFlags: 0
@@ -901,6 +901,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   targetPanel: {fileID: 2586736142525909227}
   keepInsideRect: {fileID: 0}
+  snapBoundsRect: {fileID: 0}
+  dockingEnabled: 1
 --- !u!114 &6991062175229860006
 MonoBehaviour:
   m_ObjectHideFlags: 0

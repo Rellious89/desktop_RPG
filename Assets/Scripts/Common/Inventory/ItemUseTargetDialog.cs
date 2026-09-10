@@ -16,8 +16,11 @@ namespace Common
         private const string DialogObjectName = "dialog_ItemUseTarget";
         private const string RowTemplateName = "list_Character";
         private const string GuideName = "lb_guide";
+        private const float SourceGap = 8f;
+        private const float BoundsTolerance = 0.01f;
 
         private readonly List<ItemUseTargetCharacterView> rows = new List<ItemUseTargetCharacterView>();
+        private readonly Vector3[] worldCorners = new Vector3[4];
         private readonly LocalizedTextReference guideFormat = new LocalizedTextReference
         {
             TableReference = "01_UI",
@@ -46,8 +49,8 @@ namespace Common
 
         public ItemDefinition Item => item;
 
-        /// <summary>씬에 비활성 배치된 팝업을 찾아 필요한 컴포넌트를 연결한 뒤 연다.</summary>
-        public static bool TryOpen(ItemDefinition definition)
+        /// <summary>씬에 비활성 배치된 팝업을 찾아 아이템 아이콘 옆에 새로 배치한 뒤 연다.</summary>
+        public static bool TryOpen(ItemDefinition definition, RectTransform sourceRect)
         {
             if (definition == null || !definition.CanTargetCharacter) return false;
 
@@ -63,6 +66,9 @@ namespace Common
             region.ReceiveMouseInput = true;
 
             dialog.SetItem(definition);
+            // 이 다이얼로그는 일반 패널처럼 직전 드래그 위치를 이어 쓰지 않는다. 이미 열려 있는
+            // 다이얼로그를 다른 슬롯에서 다시 대상으로 잡는 경우까지 매번 새 슬롯 기준으로 덮어쓴다.
+            dialog.PositionNextTo(sourceRect);
             // 이미 열린 상태에서 다른 아이템을 우클릭한 프레임에는 그 클릭을 외부 닫기로 다시
             // 해석하지 않는다. 이벤트 처리 순서와 무관하게 새 아이템 전환이 우선되어야 한다.
             dialog.openedOrRetargetedFrame = Time.frameCount;
@@ -106,6 +112,123 @@ namespace Common
             UnbindLocalization();
             item = definition;
             if (isActiveAndEnabled) BindLocalization();
+        }
+
+        /// <summary>
+        /// 아이콘과 다이얼로그를 모두 다이얼로그 부모 좌표계로 옮겨 비교한다. 우하단, 우상단,
+        /// 좌하단, 좌상단 순서로 완전히 Canvas 안에 드는 첫 위치를 사용한다. 네 방향 모두 경계를
+        /// 넘는 좁은 공간에서는 Canvas 안으로 보정한 후보 중 아이콘과 겹치지 않는 위치를 우선한다.
+        /// </summary>
+        private void PositionNextTo(RectTransform sourceRect)
+        {
+            RectTransform dialogRect = transform as RectTransform;
+            RectTransform parentRect = dialogRect != null ? dialogRect.parent as RectTransform : null;
+            Canvas canvas = dialogRect != null ? dialogRect.GetComponentInParent<Canvas>(true) : null;
+            RectTransform canvasRect = canvas != null ? canvas.rootCanvas.transform as RectTransform : null;
+            if (sourceRect == null || dialogRect == null || parentRect == null || canvasRect == null) return;
+
+            GetRectInParentSpace(sourceRect, parentRect, out Vector2 sourceMin, out Vector2 sourceMax);
+            GetRectInParentSpace(dialogRect, parentRect, out Vector2 dialogMin, out Vector2 dialogMax);
+            GetRectInParentSpace(canvasRect, parentRect, out Vector2 canvasMin, out Vector2 canvasMax);
+
+            Vector2[] candidates =
+            {
+                // 우하단: 다이얼로그 좌상단을 아이콘 우하단 바깥에 둔다.
+                new Vector2(sourceMax.x + SourceGap - dialogMin.x,
+                    sourceMin.y - SourceGap - dialogMax.y),
+                // 우상단: 다이얼로그 좌하단을 아이콘 우상단 바깥에 둔다.
+                new Vector2(sourceMax.x + SourceGap - dialogMin.x,
+                    sourceMax.y + SourceGap - dialogMin.y),
+                // 좌하단: 다이얼로그 우상단을 아이콘 좌하단 바깥에 둔다.
+                new Vector2(sourceMin.x - SourceGap - dialogMax.x,
+                    sourceMin.y - SourceGap - dialogMax.y),
+                // 좌상단: 다이얼로그 우하단을 아이콘 좌상단 바깥에 둔다.
+                new Vector2(sourceMin.x - SourceGap - dialogMax.x,
+                    sourceMax.y + SourceGap - dialogMin.y),
+            };
+
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                Vector2 candidateMin = dialogMin + candidates[i];
+                Vector2 candidateMax = dialogMax + candidates[i];
+                if (!FitsInside(candidateMin, candidateMax, canvasMin, canvasMax)) continue;
+
+                dialogRect.anchoredPosition += candidates[i];
+                return;
+            }
+
+            // 보통은 위 네 방향 중 하나가 그대로 들어간다. 작은 Canvas나 가장자리의 큰 아이콘처럼
+            // 그렇지 않은 경우에도 팝업 자체가 Canvas보다 작다면 완전히 안으로 넣고, 가능한 후보 중
+            // 아이콘을 가리지 않는 방향을 먼저 고른다.
+            Vector2 fallback = ClampIntoBounds(candidates[0], dialogMin, dialogMax, canvasMin, canvasMax);
+            bool hasContainedFallback = false;
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                Vector2 clamped = ClampIntoBounds(candidates[i], dialogMin, dialogMax, canvasMin, canvasMax);
+                Vector2 clampedMin = dialogMin + clamped;
+                Vector2 clampedMax = dialogMax + clamped;
+                if (!FitsInside(clampedMin, clampedMax, canvasMin, canvasMax)) continue;
+
+                if (!hasContainedFallback)
+                {
+                    fallback = clamped;
+                    hasContainedFallback = true;
+                }
+
+                if (Overlaps(clampedMin, clampedMax, sourceMin, sourceMax)) continue;
+                fallback = clamped;
+                break;
+            }
+
+            dialogRect.anchoredPosition += fallback;
+        }
+
+        private void GetRectInParentSpace(
+            RectTransform rect, RectTransform parentRect, out Vector2 min, out Vector2 max)
+        {
+            rect.GetWorldCorners(worldCorners);
+            Vector2 first = parentRect.InverseTransformPoint(worldCorners[0]);
+            min = first;
+            max = first;
+            for (int i = 1; i < worldCorners.Length; i++)
+            {
+                Vector2 corner = parentRect.InverseTransformPoint(worldCorners[i]);
+                min = Vector2.Min(min, corner);
+                max = Vector2.Max(max, corner);
+            }
+        }
+
+        private static bool FitsInside(Vector2 min, Vector2 max, Vector2 boundsMin, Vector2 boundsMax)
+        {
+            return min.x >= boundsMin.x - BoundsTolerance && min.y >= boundsMin.y - BoundsTolerance &&
+                   max.x <= boundsMax.x + BoundsTolerance && max.y <= boundsMax.y + BoundsTolerance;
+        }
+
+        private static bool Overlaps(Vector2 min, Vector2 max, Vector2 otherMin, Vector2 otherMax)
+        {
+            return min.x < otherMax.x && max.x > otherMin.x &&
+                   min.y < otherMax.y && max.y > otherMin.y;
+        }
+
+        private static Vector2 ClampIntoBounds(
+            Vector2 delta, Vector2 rectMin, Vector2 rectMax, Vector2 boundsMin, Vector2 boundsMax)
+        {
+            Vector2 min = rectMin + delta;
+            Vector2 max = rectMax + delta;
+
+            if (max.x - min.x <= boundsMax.x - boundsMin.x)
+            {
+                if (min.x < boundsMin.x) delta.x += boundsMin.x - min.x;
+                else if (max.x > boundsMax.x) delta.x -= max.x - boundsMax.x;
+            }
+
+            if (max.y - min.y <= boundsMax.y - boundsMin.y)
+            {
+                if (min.y < boundsMin.y) delta.y += boundsMin.y - min.y;
+                else if (max.y > boundsMax.y) delta.y -= max.y - boundsMax.y;
+            }
+
+            return delta;
         }
 
         protected override void OnModalOpened()
