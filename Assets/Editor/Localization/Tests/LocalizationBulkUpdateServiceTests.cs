@@ -87,6 +87,12 @@ namespace CommonEditor.Localization.Tests
         }
 
         [Test]
+        public void MenuPath_RegistersCommandAndAltShortcut()
+        {
+            Assert.AreEqual("Tools/Localize Update _%&l", LocalizationBulkUpdateService.MenuPath);
+        }
+
+        [Test]
         public void Scan_UnchangedCsv_ReportsNoNewOrChangedEntries()
         {
             WriteCsv($"existing,{existing.Id},old english,기존 한국어");

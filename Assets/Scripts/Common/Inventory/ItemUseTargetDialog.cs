@@ -28,6 +28,11 @@ namespace Common
             TableReference = "01_UI",
             TableEntryReference = "117",
         };
+        private readonly LocalizedTextReference usedMessage = new LocalizedTextReference
+        {
+            TableReference = "01_UI",
+            TableEntryReference = "120",
+        };
 
         private ItemDefinition item;
         private RectTransform content;
@@ -148,6 +153,7 @@ namespace Common
                 CharacterItemUseResult result = service.TryUse(item, character);
                 if (result.Success)
                 {
+                    ToastManager.Instance?.Show(usedMessage.GetLocalizedString());
                     Close();
                     return;
                 }

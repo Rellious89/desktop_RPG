@@ -67,6 +67,8 @@ namespace QuestEditor
                 Set(serialized, "questTitleText", questTitle);
                 Set(serialized, "allClearText", FindDescendant(questInfo, "lb_QuestAllClear").GetComponent<TMP_Text>());
                 Set(serialized, "objectiveLineTemplate", questTitle);
+                Set(serialized, "monsterCatalog", AssetDatabase.LoadAssetAtPath<MonsterCatalog>(MonsterCatalogPath));
+                Set(serialized, "dungeonCatalog", AssetDatabase.LoadAssetAtPath<DungeonCatalog>(DungeonCatalogPath));
                 Set(serialized, "rewardRoot", reward.gameObject);
                 Set(serialized, "rewardCurrencyRoot", currency.gameObject);
                 Set(serialized, "rewardCurrencyAmountText", FindDescendant(currency, "lb_RewardValue").GetComponent<TMP_Text>());

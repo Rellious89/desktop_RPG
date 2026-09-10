@@ -20,7 +20,9 @@ namespace CommonEditor.Localization
     /// </summary>
     internal static class LocalizationBulkUpdateService
     {
-        internal const string MenuPath = "Tools/Localize Update";
+        // Unity 메뉴 단축키 표기: % = Cmd(macOS)/Ctrl(Windows), & = Alt, 뒤의 l = L 키.
+        // 메뉴 항목 오른쪽에도 플랫폼에 맞는 조합이 자동으로 표시된다.
+        internal const string MenuPath = "Tools/Localize Update _%&l";
         private static readonly string[] RequiredLocaleCodes = { "en", "ko-KR" };
 
         internal sealed class ScanResult

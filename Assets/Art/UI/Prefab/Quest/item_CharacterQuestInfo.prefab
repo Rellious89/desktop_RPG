@@ -1429,6 +1429,8 @@ MonoBehaviour:
   allClearText: {fileID: 6541361918347824742}
   objectiveLineTemplate: {fileID: 6516212408045215855}
   objectiveLineSpacing: 16
+  monsterCatalog: {fileID: 11400000, guid: 0846229ba87f7442a8cabec60e64dd41, type: 2}
+  dungeonCatalog: {fileID: 11400000, guid: 5a3dc674fb40a445ba6d768b5775d116, type: 2}
   rewardRoot: {fileID: 2896810753595361804}
   rewardCurrencyRoot: {fileID: 880528307988140582}
   rewardCurrencyAmountText: {fileID: 5848292260333965197}
