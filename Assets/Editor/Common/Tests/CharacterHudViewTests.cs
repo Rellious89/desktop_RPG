@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using Character;
 using Common;
 using Field;
 using NUnit.Framework;
+using Recovery;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -35,6 +37,26 @@ namespace CommonEditor.Tests
             Assert.IsTrue(CharacterHudController.ShouldDisplayIn(FieldMode.Dungeon, false, true));
             Assert.IsFalse(CharacterHudController.ShouldDisplayIn(FieldMode.Town, false, false));
             Assert.IsFalse(CharacterHudController.ShouldDisplayIn(FieldMode.Dungeon, false, false));
+        }
+
+        [TestCase(CharacterRoster.SwapBlockReason.AlreadyCurrent, RecoveryCharacterState.Available,
+            CharacterSwapListItem.DisplayState.InUse)]
+        [TestCase(CharacterRoster.SwapBlockReason.None, RecoveryCharacterState.Available,
+            CharacterSwapListItem.DisplayState.Ready)]
+        [TestCase(CharacterRoster.SwapBlockReason.NoStamina, RecoveryCharacterState.Exhausted,
+            CharacterSwapListItem.DisplayState.Exhausted)]
+        [TestCase(CharacterRoster.SwapBlockReason.AlreadyCurrent, RecoveryCharacterState.Recovering,
+            CharacterSwapListItem.DisplayState.Recovering)]
+        [TestCase(CharacterRoster.SwapBlockReason.NoStamina, RecoveryCharacterState.RecoveryComplete,
+            CharacterSwapListItem.DisplayState.RecoveryComplete)]
+        [TestCase(CharacterRoster.SwapBlockReason.InRecovery, RecoveryCharacterState.Available,
+            CharacterSwapListItem.DisplayState.Recovering)]
+        public void CharacterCondition_UsesTheSameRecoveryFirstPriorityAsSwapList(
+            CharacterRoster.SwapBlockReason swapReason,
+            RecoveryCharacterState recoveryState,
+            CharacterSwapListItem.DisplayState expected)
+        {
+            Assert.AreEqual(expected, CharacterSwapListItem.ResolveDisplayState(swapReason, recoveryState));
         }
 
         [Test]
@@ -133,6 +155,64 @@ namespace CommonEditor.Tests
             Assert.AreEqual("12.1", CharacterHudTooltipView.FormatCorruption(12.05d));
             Assert.AreEqual("12", CharacterHudTooltipView.FormatCorruption(12d));
             Assert.AreEqual("0", CharacterHudTooltipView.FormatCorruption(double.NaN));
+        }
+
+        [Test]
+        public void HudTooltip_ShowsExactlyOneOfTheFivePreparedConditionObjects()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/Art/UI/Prefab/HUD/CharacterHUD_HoverTooltip.prefab");
+            Assert.NotNull(prefab);
+
+            GameObject instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            try
+            {
+                Assert.NotNull(instance);
+                CharacterHudTooltipView view = instance.GetComponent<CharacterHudTooltipView>();
+                Transform condition = FindDeepChild(instance.transform, "condition");
+                Assert.NotNull(view);
+                Assert.NotNull(condition);
+
+                GameObject[] objects =
+                {
+                    FindDeepChild(condition, "active")?.gameObject,
+                    FindDeepChild(condition, "Available")?.gameObject,
+                    FindDeepChild(condition, "Exhausted")?.gameObject,
+                    FindDeepChild(condition, "Recovering")?.gameObject,
+                    FindDeepChild(condition, "RecoveryComplete")?.gameObject,
+                };
+                CharacterSwapListItem.DisplayState[] states =
+                {
+                    CharacterSwapListItem.DisplayState.InUse,
+                    CharacterSwapListItem.DisplayState.Ready,
+                    CharacterSwapListItem.DisplayState.Exhausted,
+                    CharacterSwapListItem.DisplayState.Recovering,
+                    CharacterSwapListItem.DisplayState.RecoveryComplete,
+                };
+
+                var localizers = new LocalizedTMPText[objects.Length];
+                for (int i = 0; i < objects.Length; i++)
+                {
+                    Assert.NotNull(objects[i]);
+                    localizers[i] = objects[i].GetComponentInChildren<LocalizedTMPText>(true);
+                    Assert.NotNull(localizers[i], $"{objects[i].name} 상태 문구는 기존 LocalizedTMPText를 유지해야 한다.");
+                }
+                for (int stateIndex = 0; stateIndex < states.Length; stateIndex++)
+                {
+                    view.SetCondition(states[stateIndex]);
+                    for (int objectIndex = 0; objectIndex < objects.Length; objectIndex++)
+                    {
+                        Assert.AreEqual(stateIndex == objectIndex, objects[objectIndex].activeSelf,
+                            $"{states[stateIndex]} 상태에서는 대응 오브젝트 하나만 활성화되어야 한다.");
+                        Assert.AreEqual(stateIndex == objectIndex, localizers[objectIndex].isActiveAndEnabled,
+                            "활성 상태의 LocalizedTMPText만 구독 수명주기를 유지해야 한다.");
+                    }
+                }
+            }
+            finally
+            {
+                if (instance != null) UnityEngine.Object.DestroyImmediate(instance);
+            }
         }
 
         [Test]

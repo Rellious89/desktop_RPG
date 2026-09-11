@@ -2215,6 +2215,7 @@ GameObject:
   - component: {fileID: 4004303805443727547}
   - component: {fileID: 2904383967069558224}
   - component: {fileID: 1570908892693305594}
+  - component: {fileID: 7399459718594117362}
   m_Layer: 5
   m_Name: bg_AllList
   m_TagString: Untagged
@@ -2308,6 +2309,19 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
+--- !u!114 &7399459718594117362
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2513865043757924361}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e4ae5c234a9946e8bc38aa044486d79b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  receiveMouseInput: 1
 --- !u!1 &2671063680237331590
 GameObject:
   m_ObjectHideFlags: 0
@@ -5519,6 +5533,7 @@ GameObject:
   - component: {fileID: 8730647775996505965}
   - component: {fileID: 3858073112481235885}
   - component: {fileID: 3334218176506673105}
+  - component: {fileID: 4402917740777143558}
   m_Layer: 5
   m_Name: QuestInfo
   m_TagString: Untagged
@@ -5533,7 +5548,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6715505123224442081}
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -5632,6 +5647,19 @@ MonoBehaviour:
   rewardCurrencyAnimator: {fileID: 8771096421042276105}
   rewardItemRoot: {fileID: 5964888287532690186}
   rewardItemSlot: {fileID: 5619442034933749494}
+--- !u!114 &4402917740777143558
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6715505123224442081}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e4ae5c234a9946e8bc38aa044486d79b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  receiveMouseInput: 1
 --- !u!1 &6957864326344389162
 GameObject:
   m_ObjectHideFlags: 0

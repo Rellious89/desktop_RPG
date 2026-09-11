@@ -183,7 +183,8 @@ namespace Common
             // 회복소가 없는 씬/구성에서는 드래그 기능 자체가 없다.
             bool canDrag = station != null && station.CanRegister(character);
 
-            CharacterSwapListItem.DisplayState state = ResolveDisplayState(swapReason, recoveryState);
+            CharacterSwapListItem.DisplayState state =
+                CharacterSwapListItem.ResolveDisplayState(swapReason, recoveryState);
             // 상태 문구에는 상태만 담는다 - 남은 시간은 회복소 슬롯의 lb_time이 담당하며, 여기에
             // 섞으면 같은 값을 두 곳에서 서로 다른 주기로 갱신하게 된다.
             item.Refresh(
@@ -194,36 +195,6 @@ namespace Common
                 character == pendingCharacter,
                 canSwap,
                 canDrag);
-        }
-
-        /// <summary>표시 상태는 회복 상태를 먼저 본다 - 회복 중/합류 대기는 교체 차단 사유
-        /// (InRecovery)와 같은 사실을 가리키지만, 사용자에게는 "왜 못 고르는지"를 정확히 보여줘야 한다.
-        /// 1단계에서 임시로 쓰던 Exhausted 매핑을 이 판정이 대체한다.</summary>
-        private static CharacterSwapListItem.DisplayState ResolveDisplayState(
-            CharacterRoster.SwapBlockReason swapReason, RecoveryCharacterState recoveryState)
-        {
-            if (recoveryState == RecoveryCharacterState.Recovering)
-            {
-                return CharacterSwapListItem.DisplayState.Recovering;
-            }
-            if (recoveryState == RecoveryCharacterState.RecoveryComplete)
-            {
-                return CharacterSwapListItem.DisplayState.RecoveryComplete;
-            }
-
-            switch (swapReason)
-            {
-                case CharacterRoster.SwapBlockReason.AlreadyCurrent:
-                    return CharacterSwapListItem.DisplayState.InUse;
-                case CharacterRoster.SwapBlockReason.NoStamina:
-                    return CharacterSwapListItem.DisplayState.Exhausted;
-                case CharacterRoster.SwapBlockReason.InRecovery:
-                    // 로스터는 회복 중이라고 하는데 회복소가 그렇지 않다고 한 경우 - 회복소가 아직
-                    // 준비되지 않았을 때뿐이다. 고를 수 없다는 사실만은 정확히 보여준다.
-                    return CharacterSwapListItem.DisplayState.Recovering;
-                default:
-                    return CharacterSwapListItem.DisplayState.Ready;
-            }
         }
 
         private void HandleRecoverySlotsChanged()

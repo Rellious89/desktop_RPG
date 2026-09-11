@@ -334,6 +334,7 @@ GameObject:
   - component: {fileID: 8749117354838421933}
   - component: {fileID: 738635684452214259}
   - component: {fileID: 8585576985241639831}
+  - component: {fileID: 8526787482813942244}
   m_Layer: 5
   m_Name: btn_swap
   m_TagString: Untagged
@@ -443,6 +444,19 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &8526787482813942244
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7414733539189813246}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e4ae5c234a9946e8bc38aa044486d79b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  receiveMouseInput: 1
 --- !u!1001 &439806486257538997
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -749,11 +763,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 983879135562471164, guid: 9fb6292f552de4e5fac9b7d0d8a8b438, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 0
+      value: -170
       objectReference: {fileID: 0}
     - target: {fileID: 983879135562471164, guid: 9fb6292f552de4e5fac9b7d0d8a8b438, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 0
+      value: -196
       objectReference: {fileID: 0}
     - target: {fileID: 3295375144551885942, guid: 9fb6292f552de4e5fac9b7d0d8a8b438, type: 3}
       propertyPath: m_AnchorMax.y
@@ -782,6 +796,10 @@ PrefabInstance:
     - target: {fileID: 3810537081516054025, guid: 9fb6292f552de4e5fac9b7d0d8a8b438, type: 3}
       propertyPath: m_Name
       value: bg_Buy
+      objectReference: {fileID: 0}
+    - target: {fileID: 3810537081516054025, guid: 9fb6292f552de4e5fac9b7d0d8a8b438, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4301298377871726245, guid: 9fb6292f552de4e5fac9b7d0d8a8b438, type: 3}
       propertyPath: m_ChildForceExpandWidth

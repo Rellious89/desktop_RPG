@@ -238,6 +238,7 @@ GameObject:
   m_Component:
   - component: {fileID: 652325840961271820}
   - component: {fileID: 8176086010794436869}
+  - component: {fileID: 2937797336941543795}
   m_Layer: 5
   m_Name: Progress_purification
   m_TagString: Untagged
@@ -316,6 +317,19 @@ MonoBehaviour:
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &2937797336941543795
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2062702459060901103}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e4ae5c234a9946e8bc38aa044486d79b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  receiveMouseInput: 1
 --- !u!1 &2098632970159780383
 GameObject:
   m_ObjectHideFlags: 0
@@ -403,6 +417,7 @@ GameObject:
   - component: {fileID: 7289912568276542069}
   - component: {fileID: 182284037721549091}
   - component: {fileID: 900000000000000002}
+  - component: {fileID: 3647541121439418782}
   m_Layer: 5
   m_Name: Progress_Stamina
   m_TagString: Untagged
@@ -526,6 +541,19 @@ MonoBehaviour:
   highColor: {r: 1, g: 1, b: 1, a: 1}
   lowThreshold: 0.3
   midThreshold: 0.8
+--- !u!114 &3647541121439418782
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3837318711821229414}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e4ae5c234a9946e8bc38aa044486d79b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  receiveMouseInput: 1
 --- !u!1 &3927663137490009077
 GameObject:
   m_ObjectHideFlags: 0
@@ -905,6 +933,7 @@ GameObject:
   - component: {fileID: 2891488346638841830}
   - component: {fileID: 2780152342369969022}
   - component: {fileID: 8748667400941626282}
+  - component: {fileID: 8753805708962378230}
   m_Layer: 5
   m_Name: portrait
   m_TagString: Untagged
@@ -983,6 +1012,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_ShowMaskGraphic: 1
+--- !u!114 &8753805708962378230
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5811427463037067430}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e4ae5c234a9946e8bc38aa044486d79b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  receiveMouseInput: 1
 --- !u!1 &7368803009597226300
 GameObject:
   m_ObjectHideFlags: 0

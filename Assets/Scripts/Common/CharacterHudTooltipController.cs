@@ -1,6 +1,7 @@
 using System.Collections;
 using Character;
 using DesktopWindow;
+using Recovery;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -122,12 +123,20 @@ namespace Common
                 return;
             }
 
+            RecoveryStation station = RecoveryService.Station;
+            RecoveryCharacterState recoveryState = station != null
+                ? station.GetState(definition)
+                : RecoveryCharacterState.Available;
+            CharacterSwapListItem.DisplayState displayState = CharacterSwapListItem.ResolveDisplayState(
+                roster.GetSwapBlockReason(definition), recoveryState);
+
             view.Bind(definition,
                 roster.GetLevel(definition),
                 roster.GetStamina(definition),
                 roster.GetMaxStamina(definition),
                 roster.GetCorruption(definition),
-                roster.GetCorruptionDisplayMaximum());
+                roster.GetCorruptionDisplayMaximum(),
+                displayState);
             Place(visibleTarget);
         }
 

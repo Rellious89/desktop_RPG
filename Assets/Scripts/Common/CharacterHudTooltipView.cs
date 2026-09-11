@@ -9,7 +9,7 @@ namespace Common
     /// <summary>
     /// CharacterHUD_HoverTooltip 프리팹의 내용만 그린다. 표시 수명과 위치는
     /// <see cref="CharacterHudTooltipController"/>가 소유하고, 이 뷰는 로스터에서 읽어 온
-    /// 한 캐릭터의 레벨/행동력/오염도와 이름 구독만 유지한다.
+    /// 한 캐릭터의 레벨/행동력/오염도/컨디션과 이름 구독만 유지한다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class CharacterHudTooltipView : MonoBehaviour
@@ -19,6 +19,13 @@ namespace Common
         [SerializeField] private TextMeshProUGUI characterNameText;
         [SerializeField] private TextMeshProUGUI staminaValueText;
         [SerializeField] private TextMeshProUGUI purificationValueText;
+
+        [Header("Condition (비워두면 condition 자식 이름으로 자동 탐색)")]
+        [SerializeField] private GameObject activeCondition;
+        [SerializeField] private GameObject availableCondition;
+        [SerializeField] private GameObject exhaustedCondition;
+        [SerializeField] private GameObject recoveringCondition;
+        [SerializeField] private GameObject recoveryCompleteCondition;
 
         private readonly CharacterNameBinding characterName = new CharacterNameBinding();
         private LocalizedTextReference levelFormatReference;
@@ -54,10 +61,12 @@ namespace Common
 
         /// <summary>
         /// 프리팹의 레벨 형식과 캐릭터 이름의 Locale 변경 구독을 사용해 현재 로스터 상태를 그린다.
+        /// 컨디션 문구는 활성화된 상태 오브젝트의 LocalizedTMPText가 자기 구독 수명주기를 소유한다.
         /// 행동력/오염도 title은 프리팹의 LocalizedTMPText가 소유하므로 여기서 덮어쓰지 않는다.
         /// </summary>
         public void Bind(CharacterDefinition nextDefinition, int nextLevel, int currentStamina, int maximumStamina,
-                         double currentCorruption, int maximumCorruption)
+                         double currentCorruption, int maximumCorruption,
+                         CharacterSwapListItem.DisplayState condition)
         {
             ResolveReferences();
             CaptureStaticFormats();
@@ -75,7 +84,21 @@ namespace Common
 
             BindLevelFormat();
             characterName.Bind(definition, ApplyCharacterName);
+            SetCondition(condition);
             ApplyValues();
+        }
+
+        /// <summary>프리팹에 준비된 다섯 상태 중 현재 상태 하나만 표시한다.</summary>
+        public void SetCondition(CharacterSwapListItem.DisplayState condition)
+        {
+            ResolveReferences();
+
+            SetActive(activeCondition, condition == CharacterSwapListItem.DisplayState.InUse);
+            SetActive(availableCondition, condition == CharacterSwapListItem.DisplayState.Ready);
+            SetActive(exhaustedCondition, condition == CharacterSwapListItem.DisplayState.Exhausted);
+            SetActive(recoveringCondition, condition == CharacterSwapListItem.DisplayState.Recovering);
+            SetActive(recoveryCompleteCondition,
+                condition == CharacterSwapListItem.DisplayState.RecoveryComplete);
         }
 
         /// <summary>로컬라이즈 구독과 이전 캐릭터 참조를 끊는다. 숨긴 툴팁이 Locale 변경으로 갱신되지 않는다.</summary>
@@ -196,11 +219,21 @@ namespace Common
             Transform characterInfo = FindDeepChild(transform, "CharacterInfo");
             Transform staminaSection = FindDeepChild(transform, "Stamina");
             Transform purificationSection = FindDeepChild(transform, "Purification");
+            Transform conditionSection = FindDeepChild(transform, "condition") ?? FindDeepChild(transform, "Condition");
 
             if (levelText == null) levelText = FindDeepChild(characterInfo, "lb_CharacterLevel")?.GetComponent<TextMeshProUGUI>();
             if (characterNameText == null) characterNameText = FindDeepChild(characterInfo, "lb_CharacterName")?.GetComponent<TextMeshProUGUI>();
             if (staminaValueText == null) staminaValueText = FindDeepChild(staminaSection, "lb_value")?.GetComponent<TextMeshProUGUI>();
             if (purificationValueText == null) purificationValueText = FindDeepChild(purificationSection, "lb_value")?.GetComponent<TextMeshProUGUI>();
+
+            if (activeCondition == null) activeCondition = FindDirectChild(conditionSection, "active")?.gameObject;
+            if (availableCondition == null) availableCondition = FindDirectChild(conditionSection, "Available")?.gameObject;
+            if (exhaustedCondition == null) exhaustedCondition = FindDirectChild(conditionSection, "Exhausted")?.gameObject;
+            if (recoveringCondition == null) recoveringCondition = FindDirectChild(conditionSection, "Recovering")?.gameObject;
+            if (recoveryCompleteCondition == null)
+            {
+                recoveryCompleteCondition = FindDirectChild(conditionSection, "RecoveryComplete")?.gameObject;
+            }
         }
 
         private void CaptureStaticFormats()
@@ -222,6 +255,23 @@ namespace Common
             }
 
             return null;
+        }
+
+        private static Transform FindDirectChild(Transform root, string childName)
+        {
+            if (root == null) return null;
+            for (int i = 0; i < root.childCount; i++)
+            {
+                Transform child = root.GetChild(i);
+                if (child.name == childName) return child;
+            }
+
+            return null;
+        }
+
+        private static void SetActive(GameObject target, bool active)
+        {
+            if (target != null && target.activeSelf != active) target.SetActive(active);
         }
     }
 }

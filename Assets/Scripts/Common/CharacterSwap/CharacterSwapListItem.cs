@@ -49,6 +49,32 @@ namespace Common
             RecoveryComplete,
         }
 
+        /// <summary>
+        /// 교체 가능 여부와 회복소 상태를 사용자에게 보여 줄 다섯 가지 상태로 합친다.
+        /// 회복 중/완료는 같은 교체 차단 사유(<see cref="CharacterRoster.SwapBlockReason.InRecovery"/>)라도
+        /// 서로 다른 안내가 필요하므로 회복소 상태를 먼저 본다. 교체 패널과 HUD 툴팁이 이 판정 하나를
+        /// 공유해 같은 캐릭터를 서로 다르게 표시하지 않게 한다.
+        /// </summary>
+        public static DisplayState ResolveDisplayState(
+            CharacterRoster.SwapBlockReason swapReason, RecoveryCharacterState recoveryState)
+        {
+            if (recoveryState == RecoveryCharacterState.Recovering) return DisplayState.Recovering;
+            if (recoveryState == RecoveryCharacterState.RecoveryComplete) return DisplayState.RecoveryComplete;
+
+            switch (swapReason)
+            {
+                case CharacterRoster.SwapBlockReason.AlreadyCurrent:
+                    return DisplayState.InUse;
+                case CharacterRoster.SwapBlockReason.NoStamina:
+                    return DisplayState.Exhausted;
+                case CharacterRoster.SwapBlockReason.InRecovery:
+                    // 회복소가 아직 준비되지 않아 세부 상태를 못 읽어도 교체 불가 이유는 보존한다.
+                    return DisplayState.Recovering;
+                default:
+                    return DisplayState.Ready;
+            }
+        }
+
         [Header("References (비워두면 프리팹 이름으로 자동 탐색)")]
         [Tooltip("항목 클릭을 받는 Button. 비워두면 이 GameObject의 Button을 쓴다.")]
         [SerializeField] private Button selectButton;
