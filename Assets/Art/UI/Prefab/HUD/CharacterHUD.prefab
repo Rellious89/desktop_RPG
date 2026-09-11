@@ -93,6 +93,9 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   itemTemplate: {fileID: 900000000000000001, guid: e886a0901851a4acd88908420b953a91, type: 3}
   maxVisibleSlots: 3
+  fieldModeManager: {fileID: 0}
+  showInTown: 1
+  showInDungeon: 1
 --- !u!1001 &594280211065672331
 PrefabInstance:
   m_ObjectHideFlags: 0

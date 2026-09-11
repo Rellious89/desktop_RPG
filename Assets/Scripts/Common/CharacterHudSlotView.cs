@@ -44,6 +44,7 @@ namespace Common
         private bool fastBlink;
         private float blinkElapsed;
         private bool cellsBuilt;
+        private bool cellsSortedForVisualOrder;
 
         private readonly struct CellImage
         {
@@ -116,6 +117,10 @@ namespace Common
         public void RefreshCorruption(double currentCorruption, int maxCorruption)
         {
             BuildCells();
+            // 이 프리팹은 정화 UI를 회전/반전해 재사용한다. Awake 시점에는 상위 HUD 레이아웃이
+            // 확정되지 않아 좌표 정렬이 원본 계층 순서로 굳을 수 있으므로, 실제 표시 직전에
+            // 레이아웃을 확정하고 화면 x 좌표로 다시 정렬한다.
+            SortCellsByVisualX();
             CorruptionCellState state = CalculateCorruptionCellState(currentCorruption, maxCorruption);
             bool preserveBlinkPhase = state.BlinkingCellIndex >= 0 && state.BlinkingCellIndex == blinkingCell &&
                                       state.FastBlink == fastBlink;
@@ -179,7 +184,6 @@ namespace Common
                 Image image = images[i];
                 if (image != null && image.name.StartsWith("cell_fill_", StringComparison.Ordinal)) fillCells.Add(image);
             }
-            fillCells.Sort((left, right) => string.CompareOrdinal(left.name, right.name));
             for (int i = 0; i < fillCells.Count && cells.Count < CorruptionCellCount; i++)
             {
                 Image image = fillCells[i];
@@ -188,12 +192,61 @@ namespace Common
             }
         }
 
+        private void SortCellsByVisualX()
+        {
+            if (cellsSortedForVisualOrder || cells.Count < 2) return;
+            if (purificationCellsRoot is RectTransform cellsRect)
+            {
+                LayoutRebuilder.ForceRebuildLayoutImmediate(cellsRect);
+            }
+
+            // HUD의 오염도 막대는 원본 세로 정화 UI를 y=180/z=90으로 회전해 쓴다. 실제 x를
+            // 우선하되, 최초 Bind 프레임처럼 Layout이 아직 같은 좌표를 돌려줄 때는 VerticalLayout의
+            // local-down 진행 방향에서 결정한 sibling 순서를 fallback으로 쓴다. 현재 회전에서는
+            // sibling 증가가 화면 왼쪽 방향이므로 index를 역순으로 쓴다.
+            float layoutDownX = purificationCellsRoot != null
+                ? purificationCellsRoot.TransformVector(Vector3.down).x
+                : 0f;
+            cells.Sort((left, right) => CompareVisualCellOrder(left, right, layoutDownX));
+            cellsSortedForVisualOrder = true;
+        }
+
+        private int CompareVisualCellOrder(CellImage left, CellImage right, float layoutDownX)
+        {
+            float difference = GetVisualX(left.Image) - GetVisualX(right.Image);
+            if (Mathf.Abs(difference) > 0.001f) return difference < 0f ? -1 : 1;
+
+            int leftSibling = GetCellSiblingIndex(left.Image);
+            int rightSibling = GetCellSiblingIndex(right.Image);
+            // local down이 화면 왼쪽이면 나중 sibling이 더 왼쪽이다.
+            return layoutDownX < -0.001f
+                ? rightSibling.CompareTo(leftSibling)
+                : leftSibling.CompareTo(rightSibling);
+        }
+
+        private int GetCellSiblingIndex(Image image)
+        {
+            if (image == null) return int.MaxValue;
+            Transform cell = image.transform;
+            while (cell.parent != null && cell.parent != purificationCellsRoot) cell = cell.parent;
+            return cell.parent == purificationCellsRoot ? cell.GetSiblingIndex() : int.MaxValue;
+        }
+
         private void SetCellAlpha(int index, float alpha)
         {
             if (index < 0 || index >= cells.Count || cells[index].Image == null) return;
             Color color = cells[index].OriginalColor;
             color.a *= Mathf.Clamp01(alpha);
             cells[index].Image.color = color;
+        }
+
+        private static float GetVisualX(Image image)
+        {
+            if (image == null) return float.PositiveInfinity;
+
+            Vector3[] corners = new Vector3[4];
+            image.rectTransform.GetWorldCorners(corners);
+            return (corners[0].x + corners[1].x + corners[2].x + corners[3].x) * 0.25f;
         }
 
         private static Transform FindDeepChild(Transform root, string childName)
