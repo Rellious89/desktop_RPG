@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Character;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace Common
@@ -11,7 +12,7 @@ namespace Common
     /// 초상화, 행동력 막대, 오염도 10칸과 클릭만 표시한다.
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class CharacterHudSlotView : MonoBehaviour
+    public sealed class CharacterHudSlotView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
     {
         public const int CorruptionCellCount = 10;
 
@@ -45,6 +46,7 @@ namespace Common
         private float blinkElapsed;
         private bool cellsBuilt;
         private bool cellsSortedForVisualOrder;
+        private CharacterHudTooltipController tooltipController;
 
         private readonly struct CellImage
         {
@@ -69,6 +71,7 @@ namespace Common
         private void OnEnable()
         {
             ResolveReferences();
+            if (tooltipController == null) tooltipController = CharacterHudTooltipController.FindSharedController(this);
             if (slotButton != null)
             {
                 slotButton.onClick.RemoveListener(HandleClicked);
@@ -79,6 +82,7 @@ namespace Common
         private void OnDisable()
         {
             if (slotButton != null) slotButton.onClick.RemoveListener(HandleClicked);
+            tooltipController?.CancelShow(this);
         }
 
         private void Update()
@@ -96,6 +100,11 @@ namespace Common
             ResolveReferences();
             BuildCells();
 
+            // 같은 슬롯 인스턴스가 다른 캐릭터에 재사용될 수 있다. 그 경우 기존 캐릭터의 툴팁을
+            // 새 데이터로 바꿔 보여 주지 않고 즉시 거둔다. 새 캐릭터의 표시는 다음 Hover 진입이
+            // 명시적으로 소유한다.
+            tooltipController?.CancelShow(this);
+
             character = definition;
             selected = onSelected;
             if (portraitImage != null)
@@ -111,6 +120,7 @@ namespace Common
             if (canvasGroup != null) canvasGroup.alpha = isCurrent ? 1f : 0.2f;
             if (staminaProgress != null) staminaProgress.SetValue(currentStamina, maxStamina);
             RefreshCorruption(currentCorruption, maxCorruption);
+            tooltipController?.RefreshVisible(this);
         }
 
         /// <summary>PurificationSlotView와 동일한 10% 단위 규칙을 HUD에도 적용한다.</summary>
@@ -158,7 +168,22 @@ namespace Common
 
         private void HandleClicked()
         {
+            // 교체 확인창을 열기 전 이 슬롯의 Hover 툴팁을 먼저 거둔다. 남겨 두면 작은 HUD 위에
+            // 툴팁과 확인창이 겹치고, 클릭이 툴팁을 위한 것처럼 보인다.
+            tooltipController?.CancelShow(this);
             if (character != null) selected?.Invoke(character);
+        }
+
+        /// <summary>슬롯의 초상화·두 게이지를 포함한 전체 버튼 영역에 같은 캐릭터 상세 툴팁을 띄운다.</summary>
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            if (tooltipController == null) tooltipController = CharacterHudTooltipController.FindSharedController(this);
+            tooltipController?.RequestShow(this);
+        }
+
+        public void OnPointerExit(PointerEventData eventData)
+        {
+            tooltipController?.CancelShow(this);
         }
 
         private void ResolveReferences()

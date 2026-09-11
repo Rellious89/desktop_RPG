@@ -6,6 +6,7 @@ using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -70,6 +71,68 @@ namespace CommonEditor.Tests
             SerializedObject serializedController = new SerializedObject(controller);
             Assert.IsTrue(serializedController.FindProperty("showInTown").boolValue);
             Assert.IsTrue(serializedController.FindProperty("showInDungeon").boolValue);
+        }
+
+        [Test]
+        public void HudTooltip_UsesDedicatedPrefabControllerAndWholeSlotHoverHandlers()
+        {
+            GameObject hudPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Art/UI/Prefab/HUD/CharacterHUD.prefab");
+            GameObject slotPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Art/UI/Prefab/HUD/item_CharacterHUD.prefab");
+            GameObject tooltipPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Art/UI/Prefab/HUD/CharacterHUD_HoverTooltip.prefab");
+
+            CharacterHudTooltipController controller = hudPrefab != null
+                ? hudPrefab.GetComponent<CharacterHudTooltipController>() : null;
+            CharacterHudSlotView slot = slotPrefab != null ? slotPrefab.GetComponent<CharacterHudSlotView>() : null;
+            CharacterHudTooltipView tooltipView = tooltipPrefab != null
+                ? tooltipPrefab.GetComponent<CharacterHudTooltipView>() : null;
+
+            Assert.NotNull(controller);
+            Assert.NotNull(slot);
+            Assert.NotNull(tooltipView);
+            Assert.IsTrue(typeof(IPointerEnterHandler).IsAssignableFrom(typeof(CharacterHudSlotView)));
+            Assert.IsTrue(typeof(IPointerExitHandler).IsAssignableFrom(typeof(CharacterHudSlotView)));
+
+            SerializedObject serialized = new SerializedObject(controller);
+            Assert.AreEqual(tooltipPrefab, serialized.FindProperty("tooltipPrefab").objectReferenceValue,
+                "HUD controller는 CharacterHUD_HoverTooltip 프리팹 하나를 재사용해야 한다.");
+            Assert.AreEqual(10f, serialized.FindProperty("pointerOffsetX").floatValue, 0.0001f,
+                "SpeechBottom 꼬리의 실제 x 오프셋으로 슬롯 중앙을 맞춰야 한다.");
+            Assert.AreEqual(new Vector2(15f, 10f), serialized.FindProperty("placementOffset").vector2Value,
+                "HUD 툴팁은 기존 슬롯 기준 위치에서 오른쪽 15, 위쪽 10만큼 이동해야 한다.");
+
+            Graphic[] tooltipGraphics = tooltipPrefab.GetComponentsInChildren<Graphic>(true);
+            for (int i = 0; i < tooltipGraphics.Length; i++)
+            {
+                Assert.IsFalse(tooltipGraphics[i].raycastTarget,
+                    "HUD 툴팁 그래픽은 Hover/클릭을 가로채면 안 된다.");
+            }
+
+            LocalizedTMPText levelLocalizer = FindDeepChild(tooltipPrefab.transform, "lb_CharacterLevel")
+                ?.GetComponent<LocalizedTMPText>();
+            Assert.NotNull(levelLocalizer);
+            Assert.IsFalse(levelLocalizer.enabled,
+                "동적 레벨 값은 LocalizedTMPText가 아닌 TooltipView가 형식을 적용해야 한다.");
+
+            LocalizedTMPText staminaTitleLocalizer =
+                FindDeepChild(FindDeepChild(tooltipPrefab.transform, "Stamina"), "lb_title")
+                    ?.GetComponent<LocalizedTMPText>();
+            LocalizedTMPText purificationTitleLocalizer =
+                FindDeepChild(FindDeepChild(tooltipPrefab.transform, "Purification"), "lb_title")
+                    ?.GetComponent<LocalizedTMPText>();
+            Assert.NotNull(staminaTitleLocalizer);
+            Assert.NotNull(purificationTitleLocalizer);
+            Assert.IsTrue(staminaTitleLocalizer.enabled,
+                "행동력 제목의 정적 로컬라이징은 유지해야 한다.");
+            Assert.IsTrue(purificationTitleLocalizer.enabled,
+                "오염도 제목의 정적 로컬라이징은 유지해야 한다.");
+        }
+
+        [Test]
+        public void HudTooltip_CorruptionUsesConciseSingleDecimalFormat()
+        {
+            Assert.AreEqual("12.1", CharacterHudTooltipView.FormatCorruption(12.05d));
+            Assert.AreEqual("12", CharacterHudTooltipView.FormatCorruption(12d));
+            Assert.AreEqual("0", CharacterHudTooltipView.FormatCorruption(double.NaN));
         }
 
         [Test]

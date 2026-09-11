@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 7860607410751664033}
   - component: {fileID: 2632286461757875785}
   - component: {fileID: 900000000000000003}
+  - component: {fileID: 900000000000000004}
   m_Layer: 5
   m_Name: CharacterHUD
   m_TagString: Untagged
@@ -49,8 +50,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Padding:
     m_Left: 0
     m_Right: 0
@@ -96,6 +97,24 @@ MonoBehaviour:
   fieldModeManager: {fileID: 0}
   showInTown: 1
   showInDungeon: 1
+--- !u!114 &900000000000000004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4342456993724718831}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9cf5b752f817458b977cc22aa1ecb12e, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  tooltipPrefab: {fileID: 2813817419211413284, guid: 61a2914f5e29a4bdea9a3a20a60cfd40, type: 3}
+  tooltipRoot: {fileID: 0}
+  tooltipDelay: 0
+  verticalOffset: 8
+  pointerOffsetX: 10
+  placementOffset: {x: 15, y: 10}
 --- !u!1001 &594280211065672331
 PrefabInstance:
   m_ObjectHideFlags: 0
