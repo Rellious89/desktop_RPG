@@ -69,6 +69,7 @@ namespace Character
             /// <summary>회복소 슬롯에 들어가 있다(회복 중이거나, 회복이 끝나 합류를 기다리는 중).
             /// 행동력이 남아 있어도 교체할 수 없다 - 슬롯에서 합류시켜야 다시 쓸 수 있다.</summary>
             InRecovery,
+            TutorialLocked,
         }
 
         /// <summary>로스터 한 칸. 예전에는 정의와 "그 캐릭터의 씬 GameObject"를 짝지어 들고 있었지만,
@@ -891,6 +892,11 @@ namespace Character
         /// 사용하지 않으므로 튜토리얼의 수동 교체 목표가 잘못 진행되지 않는다.</summary>
         public bool TrySwitchToManual(CharacterDefinition definition, out SwapBlockReason reason)
         {
+            if (definition != null && !Quest.TutorialFlowPolicy.CanSwitchCharacter(definition.CharacterId))
+            {
+                reason = SwapBlockReason.TutorialLocked;
+                return false;
+            }
             if (!TrySwitchTo(definition, out reason)) return false;
             Quest.CharacterStoryQuestService.Instance?.TryRecordGlobalAction(
                 Quest.CharacterStoryQuestConditionType.ManualCharacterSwitchCount,

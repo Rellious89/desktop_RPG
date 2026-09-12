@@ -93,6 +93,10 @@ namespace Recruitment
 
         private RecruitmentCandidateResolutionResult AcquireInternal(string buildingId)
         {
+            if (TutorialFlowPolicy.IsTutorialActive &&
+                !TutorialFlowPolicy.IsCurrentStep(CharacterStoryQuestConditionType.CharacterOwned))
+                return Result(RecruitmentCandidateResolutionCode.Unreadable);
+
             if (!TryGetPending(buildingId, out SaveData data, out RecruitmentCycleSaveState state,
                     out string pendingId, out RecruitmentCandidateResolutionCode failure))
             {
@@ -157,6 +161,10 @@ namespace Recruitment
 
         private RecruitmentCandidateResolutionResult ReturnInternal(string buildingId)
         {
+            if (TutorialFlowPolicy.IsTutorialActive &&
+                TutorialFlowPolicy.IsCurrentStep(CharacterStoryQuestConditionType.CharacterOwned))
+                return Result(RecruitmentCandidateResolutionCode.Unreadable);
+
             if (!TryGetPending(buildingId, out SaveData data, out RecruitmentCycleSaveState state,
                     out string pendingId, out RecruitmentCandidateResolutionCode failure))
             {

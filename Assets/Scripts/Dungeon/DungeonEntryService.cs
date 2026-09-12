@@ -1,5 +1,6 @@
 using System;
 using Character;
+using Quest;
 using UnityEngine;
 
 namespace Dungeon
@@ -64,6 +65,13 @@ namespace Dungeon
             {
                 Debug.LogError($"[DungeonEntryService] 던전 '{dungeon.name}'에 Dungeon Id가 없어 입장 요청을 " +
                                "무시합니다 - 에셋에서 식별자를 지정하세요.", dungeon);
+                return false;
+            }
+
+            if (!TutorialFlowPolicy.Allows(
+                    CharacterStoryQuestConditionType.DungeonEnterCount, dungeon.DungeonId))
+            {
+                Debug.Log($"[DungeonEntryService] 튜토리얼 현재 단계에서는 던전 '{dungeon.DungeonId}'에 입장할 수 없습니다.");
                 return false;
             }
 

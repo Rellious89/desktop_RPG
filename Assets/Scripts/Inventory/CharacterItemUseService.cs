@@ -22,6 +22,7 @@ namespace Inventory
         StaminaFull = 3,
         ItemUnavailable = 4,
         SaveFailed = 5,
+        TutorialLocked = 6,
     }
 
     public readonly struct CharacterItemUseResult
@@ -65,6 +66,9 @@ namespace Inventory
 
             if (target == null || !roster.Contains(target))
                 return new CharacterItemUseResult(CharacterItemUseResultCode.TargetUnavailable);
+
+            if (!TutorialFlowPolicy.CanUseItem(item.ItemId, roster.GetCharacterId(target)))
+                return new CharacterItemUseResult(CharacterItemUseResultCode.TutorialLocked);
 
             int max = roster.GetMaxStamina(target);
             if (max <= 0) return new CharacterItemUseResult(CharacterItemUseResultCode.TargetUnavailable);

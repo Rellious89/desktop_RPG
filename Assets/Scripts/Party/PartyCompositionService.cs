@@ -26,6 +26,7 @@ namespace Party
         SaveFailed,
         Reentrant,
         InvalidPartyData,
+        TutorialLocked,
     }
 
     public readonly struct PartyCapacityResult
@@ -90,26 +91,31 @@ namespace Party
 
         public PartyCompositionResult TryJoin(string characterId)
         {
+            if (!TutorialFlowPolicy.CanEditParty(characterId)) return Result(PartyCompositionCode.TutorialLocked);
             return TryChange(() => JoinInternal(characterId, -1));
         }
 
         public PartyCompositionResult TryJoinAt(string characterId, int targetSlotIndex)
         {
+            if (!TutorialFlowPolicy.CanEditParty(characterId)) return Result(PartyCompositionCode.TutorialLocked);
             return TryChange(() => JoinInternal(characterId, targetSlotIndex));
         }
 
         public PartyCompositionResult TryLeave(string characterId)
         {
+            if (!TutorialFlowPolicy.CanEditParty(characterId)) return Result(PartyCompositionCode.TutorialLocked);
             return TryChange(() => LeaveInternal(characterId));
         }
 
         public PartyCompositionResult TryReplace(string outgoingCharacterId, string incomingCharacterId)
         {
+            if (!TutorialFlowPolicy.CanEditParty(incomingCharacterId)) return Result(PartyCompositionCode.TutorialLocked);
             return TryChange(() => ReplaceInternal(outgoingCharacterId, incomingCharacterId));
         }
 
         public PartyCompositionResult TryMove(string characterId, int targetIndex)
         {
+            if (!TutorialFlowPolicy.CanEditParty(characterId)) return Result(PartyCompositionCode.TutorialLocked);
             return TryChange(() => MoveInternal(characterId, targetIndex));
         }
 

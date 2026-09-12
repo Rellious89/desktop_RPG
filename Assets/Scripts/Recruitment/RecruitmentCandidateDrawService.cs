@@ -109,6 +109,10 @@ namespace Recruitment
 
         private RecruitmentCandidateDrawResult DrawInternal(string buildingId)
         {
+            if (TutorialFlowPolicy.IsTutorialActive &&
+                !TutorialFlowPolicy.IsCurrentStep(CharacterStoryQuestConditionType.CharacterOwned))
+                return Result(RecruitmentCandidateDrawCode.Locked);
+
             // 주기 서비스의 답이 READY 여부에 대한 권위다. 직접 시각을 다시 파싱하거나 상태를 추측하지
             // 않으므로, 9.3B의 Locked/Unreadable 경계와 정확히 같은 기준을 쓴다.
             RecruitmentCycleStatus status = cycleService.GetStatus(buildingId);

@@ -31,6 +31,8 @@ namespace Building
 
         /// <summary>저장에 실패했다 - 비용도 건설 기록도 <b>전부 되돌렸다</b>.</summary>
         SaveFailed,
+
+        TutorialLocked,
     }
 
     /// <summary>
@@ -157,6 +159,8 @@ namespace Building
 
         /// <summary>이미 이 서비스가 완성 처리를 도는 중이다.</summary>
         Reentrant,
+
+        TutorialLocked,
     }
 
     /// <summary>
@@ -345,6 +349,9 @@ namespace Building
         public BuildingConstructionCompleteCode TryNotifyCompletion(string buildingId)
         {
             if (completing) return BuildingConstructionCompleteCode.Reentrant;
+            if (!TutorialFlowPolicy.Allows(
+                    CharacterStoryQuestConditionType.BuildingCompleted, buildingId))
+                return BuildingConstructionCompleteCode.TutorialLocked;
 
             BuildingConstructionStatus status = GetStatus(buildingId);
             switch (status.Phase)
@@ -446,6 +453,10 @@ namespace Building
             {
                 return BuildingConstructionStartResult.Rejected(BuildingConstructionStartCode.InvalidBuilding);
             }
+
+            if (!TutorialFlowPolicy.Allows(
+                    CharacterStoryQuestConditionType.BuildingCompleted, building.BuildingId))
+                return BuildingConstructionStartResult.Rejected(BuildingConstructionStartCode.TutorialLocked);
 
             if (starting)
             {

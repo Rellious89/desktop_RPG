@@ -244,6 +244,8 @@ namespace Recovery
         {
             if (!balance.IsValid) return RecoveryRegisterBlockReason.InvalidBalance;
             if (definition == null || !roster.Contains(definition)) return RecoveryRegisterBlockReason.NotInRoster;
+            if (!TutorialFlowPolicy.CanUseRecovery(roster.GetCharacterId(definition)))
+                return RecoveryRegisterBlockReason.TutorialLocked;
             if (IndexOfRecoverySlot(definition) >= 0) return RecoveryRegisterBlockReason.AlreadyInRecovery;
             // Pending은 아직 재화도 슬롯도 건드리지 않는 UI 대기 상태다. 기도 중인 캐릭터도 여기에는
             // 올려 둘 수 있으며, 실제 시작 직전 ValidateForStart가 전환 가능 여부를 다시 확인한다.
@@ -664,6 +666,10 @@ namespace Recovery
             if (GetSlotState(slotIndex) != RecoveryCharacterState.RecoveryComplete) return false;
 
             CharacterDefinition character = roster.FindById(GetSlots()[slotIndex].characterId);
+            if (TutorialFlowPolicy.IsTutorialActive &&
+                (character == null || !TutorialFlowPolicy.Allows(
+                    CharacterStoryQuestConditionType.RecoveryJoined, roster.GetCharacterId(character))))
+                return false;
 
             joinSlotBuffer.Clear();
             joinSlotBuffer.Add(slotIndex);
@@ -684,7 +690,10 @@ namespace Recovery
             int savedSlotCount = GetSlots().Count;
             for (int i = 0; i < savedSlotCount; i++)
             {
-                if (GetSlotState(i) == RecoveryCharacterState.RecoveryComplete) joinSlotBuffer.Add(i);
+                if (GetSlotState(i) != RecoveryCharacterState.RecoveryComplete) continue;
+                if (TutorialFlowPolicy.IsTutorialActive && !TutorialFlowPolicy.Allows(
+                        CharacterStoryQuestConditionType.RecoveryJoined, GetSlots()[i].characterId)) continue;
+                joinSlotBuffer.Add(i);
             }
 
             return joinSlotBuffer.Count == 0 ? 0 : ApplyJoin(joinSlotBuffer);

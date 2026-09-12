@@ -99,6 +99,12 @@ namespace CharacterArchive
 
         protected override void OnEnable()
         {
+            if (!TutorialFlowPolicy.CanOpenCharacterArchive)
+            {
+                gameObject.SetActive(false);
+                return;
+            }
+
             // 하단 버튼 게이트를 우회해 직접 Open()을 호출해도 미완공 여관에서는 패널을 열지 않는다.
             // 미완공 상태에서 잠깐 보였다가 닫히는 프레임이 없도록 base.OnEnable 전에 막는다(기도 패널과 동일).
             if (!IsBuildingComplete(requiredBuildingId))

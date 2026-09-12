@@ -39,5 +39,7 @@ namespace Recovery
 
         /// <summary>지정한 슬롯 번호가 범위를 벗어났거나 이미 차 있다.</summary>
         SlotUnavailable,
+
+        TutorialLocked,
     }
 }

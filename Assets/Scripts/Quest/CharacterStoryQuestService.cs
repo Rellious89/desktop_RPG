@@ -75,6 +75,11 @@ namespace Quest
             if (Instance == this) Instance = null;
         }
 
+        private void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
+        }
+
         public CharacterStoryQuestSnapshot GetSnapshot(string characterId)
         {
             if (!SaveSystem.TryGetLoadedData(out SaveData data)) return CharacterStoryQuestSnapshot.Empty(characterId);
@@ -181,6 +186,42 @@ namespace Quest
                             TryFirstTarget(objective, out targetId)) return true;
                     }
                 }
+            }
+            return false;
+        }
+
+        public bool HasReachedTutorialObjective(
+            CharacterStoryQuestConditionType condition,
+            string targetId = null)
+        {
+            if (!SaveSystem.TryGetLoadedData(out SaveData data) || data.characterStoryQuests == null ||
+                questCatalog == null || objectiveCatalog == null) return false;
+
+            for (int stateIndex = 0; stateIndex < data.characterStoryQuests.Count; stateIndex++)
+            {
+                CharacterStoryQuestSaveState state = data.characterStoryQuests[stateIndex];
+                if (state == null) continue;
+                if (MatchesTutorialQuestObjective(state.activeQuestId, condition, targetId)) return true;
+                if (state.completedQuestIds == null) continue;
+                for (int questIndex = state.completedQuestIds.Count - 1; questIndex >= 0; questIndex--)
+                    if (MatchesTutorialQuestObjective(state.completedQuestIds[questIndex], condition, targetId))
+                        return true;
+            }
+            return false;
+        }
+
+        private bool MatchesTutorialQuestObjective(
+            string questId, CharacterStoryQuestConditionType condition, string targetId)
+        {
+            CharacterStoryQuestDefinition quest = questCatalog.Find(questId);
+            if (quest == null || !quest.TutorialStep) return false;
+            IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives = objectiveCatalog.ForQuest(questId);
+            for (int i = 0; i < objectives.Count; i++)
+            {
+                CharacterStoryQuestObjectiveDefinition objective = objectives[i];
+                if (objective == null || objective.ConditionType != condition) continue;
+                if (string.IsNullOrEmpty(targetId) || objective.TargetIds == null ||
+                    objective.TargetIds.Count == 0 || objective.Targets(targetId)) return true;
             }
             return false;
         }

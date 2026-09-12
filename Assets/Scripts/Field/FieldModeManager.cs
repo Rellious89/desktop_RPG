@@ -142,6 +142,12 @@ namespace Field
                 return false;
             }
 
+            if (!TutorialFlowPolicy.Allows(CharacterStoryQuestConditionType.TownReturnCount))
+            {
+                Debug.Log("[FieldModeManager] 튜토리얼 현재 단계에서는 마을로 복귀할 수 없습니다.", this);
+                return false;
+            }
+
             if (!CanBeginTransition("마을 복귀")) return false;
 
             ApplyMode(FieldMode.Town, null);

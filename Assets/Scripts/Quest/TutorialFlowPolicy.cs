@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace Quest
 {
@@ -12,13 +13,25 @@ namespace Quest
     {
         public const int FirstRecruitmentArrivalSeconds = 5;
 
+        private static CharacterStoryQuestService ActiveService
+        {
+            get
+            {
+                CharacterStoryQuestService service = CharacterStoryQuestService.Instance;
+                return Application.isPlaying && !Application.isBatchMode && service != null &&
+                       service.isActiveAndEnabled &&
+                       service.HasRequiredReferences
+                    ? service
+                    : null;
+            }
+        }
+
         public static bool IsTutorialActive =>
-            CharacterStoryQuestService.Instance != null &&
-            CharacterStoryQuestService.Instance.TryGetActiveTutorialStep(out _, out _);
+            ActiveService != null && ActiveService.TryGetActiveTutorialStep(out _, out _);
 
         public static bool Allows(CharacterStoryQuestConditionType condition, string targetId = null)
         {
-            CharacterStoryQuestService service = CharacterStoryQuestService.Instance;
+            CharacterStoryQuestService service = ActiveService;
             if (service == null || !service.TryGetActiveTutorialStep(out _, out _)) return true;
             if (!service.TryGetActiveTutorialObjective(condition, out CharacterStoryQuestObjectiveDefinition objective))
                 return false;
@@ -30,7 +43,7 @@ namespace Quest
             out string targetId)
         {
             targetId = string.Empty;
-            CharacterStoryQuestService service = CharacterStoryQuestService.Instance;
+            CharacterStoryQuestService service = ActiveService;
             if (service == null || !service.TryGetActiveTutorialObjective(condition, out var objective))
                 return false;
             IReadOnlyList<string> targets = objective.TargetIds;
@@ -58,7 +71,7 @@ namespace Quest
         public static bool ShouldPausePassiveRecovery(string characterId)
         {
             if (string.IsNullOrEmpty(characterId) || !IsTutorialActive) return false;
-            CharacterStoryQuestService service = CharacterStoryQuestService.Instance;
+            CharacterStoryQuestService service = ActiveService;
 
             // 최초 모집 캐릭터는 회복소에 직접 넣어 보는 단계 전까지 자연 회복시키지 않는다.
             if (service != null && service.TryGetTutorialTarget(
@@ -73,9 +86,48 @@ namespace Quest
 
         public static bool IsCurrentStep(CharacterStoryQuestConditionType condition)
         {
-            CharacterStoryQuestService service = CharacterStoryQuestService.Instance;
+            CharacterStoryQuestService service = ActiveService;
             return service != null && service.TryGetActiveTutorialObjective(condition, out _);
         }
+
+        public static bool HasReached(CharacterStoryQuestConditionType condition, string targetId = null)
+        {
+            CharacterStoryQuestService service = ActiveService;
+            return service != null && service.HasReachedTutorialObjective(condition, targetId);
+        }
+
+        public static bool CanOpenCharacterArchive =>
+            !IsTutorialActive || HasReached(CharacterStoryQuestConditionType.CharacterArchiveOpenCount);
+
+        public static bool CanEditParty(string characterId) =>
+            !IsTutorialActive ||
+            (IsCurrentStep(CharacterStoryQuestConditionType.PartyContainsCharacter)
+                ? Allows(CharacterStoryQuestConditionType.PartyContainsCharacter, characterId)
+                : HasReached(CharacterStoryQuestConditionType.PartyContainsCharacter));
+
+        public static bool CanUseRecovery(string characterId) =>
+            !IsTutorialActive ||
+            (IsCurrentStep(CharacterStoryQuestConditionType.RecoveryStarted)
+                ? Allows(CharacterStoryQuestConditionType.RecoveryStarted, characterId)
+                : HasReached(CharacterStoryQuestConditionType.RecoveryStarted));
+
+        public static bool CanTradeItem(string itemId) =>
+            !IsTutorialActive ||
+            (IsCurrentStep(CharacterStoryQuestConditionType.ItemPurchaseCount)
+                ? Allows(CharacterStoryQuestConditionType.ItemPurchaseCount, itemId)
+                : HasReached(CharacterStoryQuestConditionType.ItemPurchaseCount));
+
+        public static bool CanUseItem(string itemId, string characterId)
+        {
+            if (!IsTutorialActive) return true;
+            string composite = CharacterStoryQuestTarget.ItemUse(itemId, characterId);
+            return IsCurrentStep(CharacterStoryQuestConditionType.ItemUseCount)
+                ? Allows(CharacterStoryQuestConditionType.ItemUseCount, composite)
+                : HasReached(CharacterStoryQuestConditionType.ItemUseCount);
+        }
+
+        public static bool CanSwitchCharacter(string characterId) =>
+            !IsTutorialActive || HasReached(CharacterStoryQuestConditionType.PartyContainsCharacter);
 
         private static bool MatchesTarget(CharacterStoryQuestObjectiveDefinition objective, string targetId)
         {

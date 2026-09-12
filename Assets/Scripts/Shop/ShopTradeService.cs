@@ -32,6 +32,7 @@ namespace Shop
         SaveFailed,
         Reentrant,
         DuplicateItemId,
+        TutorialLocked,
     }
 
     /// <summary>상점 거래가 실제로 적용한 수량과 거래 전후 보유량을 담는 불변 결과다.</summary>
@@ -192,6 +193,11 @@ namespace Shop
                 SaveData data = dataProvider();
                 if (data == null) return BatchResult(ShopTradeResultCode.NoSaveData, shopId);
 
+                if (TutorialFlowPolicy.IsTutorialActive &&
+                    (!TutorialFlowPolicy.HasReached(CharacterStoryQuestConditionType.ItemPurchaseCount) ||
+                     !TutorialFlowPolicy.HasReached(CharacterStoryQuestConditionType.ItemUseCount)))
+                    return BatchResult(ShopTradeResultCode.TutorialLocked, shopId, data.currency);
+
                 ShopDefinition shop = shopCatalog.Find(shopId);
                 if (shop == null) return BatchResult(ShopTradeResultCode.UnknownShop, shopId, data.currency);
                 if (shop.RequiredBuildingId > 0 && !BuildingCompletionPolicy.IsConfirmedCompleted(
@@ -286,6 +292,11 @@ namespace Shop
 
                 SaveData data = dataProvider();
                 if (data == null) return Result(ShopTradeResultCode.NoSaveData, shopId, itemId, quantity);
+
+                if (!TutorialFlowPolicy.CanTradeItem(itemId) ||
+                    (!isPurchase && TutorialFlowPolicy.IsTutorialActive &&
+                     !TutorialFlowPolicy.HasReached(CharacterStoryQuestConditionType.ItemUseCount)))
+                    return Result(ShopTradeResultCode.TutorialLocked, shopId, itemId, quantity);
 
                 ShopDefinition shop = shopCatalog.Find(shopId);
                 if (shop == null) return Result(ShopTradeResultCode.UnknownShop, shopId, itemId, quantity);
