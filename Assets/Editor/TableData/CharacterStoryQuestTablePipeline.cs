@@ -23,7 +23,7 @@ namespace TableDataEditor
         private const string QuestCatalogPath = OutputFolder + "/CharacterStoryQuestCatalog.asset";
         private const string ObjectiveCatalogPath = ObjectiveOutputFolder + "/CharacterStoryQuestObjectiveCatalog.asset";
 
-        private static readonly string[] QuestColumns = { "quest_id", "character_id", "previous_quest_id", "title_category", "title_key", "description_category", "description_key", "display_order", "is_final", "reward_type1", "reward_target_id1", "reward_amount1", "reward_type2", "reward_target_id2", "reward_amount2", "enabled" };
+        private static readonly string[] QuestColumns = { "quest_id", "character_id", "previous_quest_id", "title_category", "title_key", "description_category", "description_key", "display_order", "tutorial_step", "is_final", "reward_type1", "reward_target_id1", "reward_amount1", "reward_type2", "reward_target_id2", "reward_amount2", "enabled" };
         private static readonly string[] ObjectiveColumns = { "objective_id", "quest_id", "condition_type", "target_ids", "required_value", "display_order", "enabled" };
 
         [MenuItem("Tools/Keybuddy/Table Data/Rebuild (Character Story Quest only)", priority = 110)]
@@ -148,7 +148,7 @@ namespace TableDataEditor
             CsvTable table = Read(QuestCsvPath, QuestColumns, log); var result = new List<QuestRow>(); if (table == null) return result;
             foreach (var record in table.Records)
             {
-                var row = new QuestRow { Line = record.Line, Id = table.Get(record, "quest_id"), CharacterId = table.Get(record, "character_id"), PreviousId = table.Get(record, "previous_quest_id"), DisplayOrder = ParseInt(table.Get(record, "display_order"), QuestCsvPath, record.Line, "display_order", log), IsFinal = ParseBool(table.Get(record, "is_final"), QuestCsvPath, record.Line, "is_final", log), Enabled = ParseBool(table.Get(record, "enabled"), QuestCsvPath, record.Line, "enabled", log) };
+                var row = new QuestRow { Line = record.Line, Id = table.Get(record, "quest_id"), CharacterId = table.Get(record, "character_id"), PreviousId = table.Get(record, "previous_quest_id"), DisplayOrder = ParseInt(table.Get(record, "display_order"), QuestCsvPath, record.Line, "display_order", log), TutorialStep = ParseBool(table.Get(record, "tutorial_step"), QuestCsvPath, record.Line, "tutorial_step", log), IsFinal = ParseBool(table.Get(record, "is_final"), QuestCsvPath, record.Line, "is_final", log), Enabled = ParseBool(table.Get(record, "enabled"), QuestCsvPath, record.Line, "enabled", log) };
                 row.Rewards.Add(ReadReward(table, record, 1, log));
                 row.Rewards.Add(ReadReward(table, record, 2, log));
                 TableDataFieldRules.TryResolveLocalizedEntry("CharacterStoryQuest.csv", record.Line, "title_category", table.Get(record, "title_category"), "title_key", table.Get(record, "title_key"), log, out row.Title);
@@ -176,7 +176,7 @@ namespace TableDataEditor
             return new CsvTable(Path.GetFileName(path), header.Fields, records.GetRange(1, records.Count - 1));
         }
         private static CharacterStoryQuestDefinition WriteQuest(QuestRow row)
-        { var asset = ResolveOrCreate<CharacterStoryQuestDefinition>(OutputFolder + "/Quest_" + row.Id + ".asset"); var o = new SerializedObject(asset); o.FindProperty("questId").stringValue = row.Id; o.FindProperty("characterId").stringValue = row.CharacterId; o.FindProperty("previousQuestId").stringValue = row.PreviousId; WriteLocalized(o.FindProperty("localizedTitle"), row.Title); WriteLocalized(o.FindProperty("localizedDescription"), row.Description); o.FindProperty("displayOrder").intValue = row.DisplayOrder; o.FindProperty("isFinal").boolValue = row.IsFinal; o.FindProperty("enabled").boolValue = row.Enabled; WriteRewards(o.FindProperty("rewards"), row.Rewards); o.ApplyModifiedPropertiesWithoutUndo(); EditorUtility.SetDirty(asset); return asset; }
+        { var asset = ResolveOrCreate<CharacterStoryQuestDefinition>(OutputFolder + "/Quest_" + row.Id + ".asset"); var o = new SerializedObject(asset); o.FindProperty("questId").stringValue = row.Id; o.FindProperty("characterId").stringValue = row.CharacterId; o.FindProperty("previousQuestId").stringValue = row.PreviousId; WriteLocalized(o.FindProperty("localizedTitle"), row.Title); WriteLocalized(o.FindProperty("localizedDescription"), row.Description); o.FindProperty("displayOrder").intValue = row.DisplayOrder; o.FindProperty("tutorialStep").boolValue = row.TutorialStep; o.FindProperty("isFinal").boolValue = row.IsFinal; o.FindProperty("enabled").boolValue = row.Enabled; WriteRewards(o.FindProperty("rewards"), row.Rewards); o.ApplyModifiedPropertiesWithoutUndo(); EditorUtility.SetDirty(asset); return asset; }
 
         private static void WriteRewards(SerializedProperty property, List<RewardRow> rewards)
         {
@@ -304,7 +304,7 @@ namespace TableDataEditor
         private static long ParseLong(string text,string file,int line,string column,TableDataDiagnosticLog log) { if (long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out long value)) return value; Error(log,file,line,column,text,"정수여야 합니다."); return 0; }
         private static bool ParseBool(string text,string file,int line,string column,TableDataDiagnosticLog log) { if (text == "0") return false; if (text == "1") return true; Error(log,file,line,column,text,"0 또는 1이어야 합니다."); return false; }
         private static void Error(TableDataDiagnosticLog log,string path,int line,string column,string value,string message) => log.Error(Path.GetFileName(path),line,column,value,message);
-        private sealed class QuestRow { public int Line,DisplayOrder; public string Id,CharacterId,PreviousId; public LocalizedEntryRef Title,Description; public bool IsFinal,Enabled; public readonly List<RewardRow> Rewards = new List<RewardRow>(); }
+        private sealed class QuestRow { public int Line,DisplayOrder; public string Id,CharacterId,PreviousId; public LocalizedEntryRef Title,Description; public bool TutorialStep,IsFinal,Enabled; public readonly List<RewardRow> Rewards = new List<RewardRow>(); }
         private sealed class RewardRow { public int Slot,Amount; public string TypeText,TargetId; public CharacterStoryQuestRewardType Type; }
         private sealed class ObjectiveRow { public int Line,RequiredValue,DisplayOrder; public string Id,QuestId,ConditionText; public CharacterStoryQuestConditionType? Condition; public List<string> TargetIds; public bool Enabled; }
     }

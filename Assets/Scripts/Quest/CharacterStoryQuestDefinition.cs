@@ -41,6 +41,7 @@ namespace Quest
         [SerializeField] private LocalizedTextReference localizedTitle = new LocalizedTextReference();
         [SerializeField] private LocalizedTextReference localizedDescription = new LocalizedTextReference();
         [SerializeField] private int displayOrder;
+        [SerializeField] private bool tutorialStep;
         [SerializeField] private bool isFinal;
         [SerializeField] private bool enabled;
         [SerializeField] private List<CharacterStoryQuestRewardDefinition> rewards =
@@ -52,6 +53,7 @@ namespace Quest
         public LocalizedTextReference LocalizedTitle => localizedTitle ?? (localizedTitle = new LocalizedTextReference());
         public LocalizedTextReference LocalizedDescription => localizedDescription ?? (localizedDescription = new LocalizedTextReference());
         public int DisplayOrder => displayOrder;
+        public bool TutorialStep => tutorialStep;
         public bool IsFinal => isFinal;
         public bool Enabled => enabled;
         public IReadOnlyList<CharacterStoryQuestRewardDefinition> Rewards =>

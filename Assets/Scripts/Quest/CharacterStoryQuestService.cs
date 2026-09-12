@@ -106,6 +106,51 @@ namespace Quest
             return false;
         }
 
+        /// <summary>현재 진행 중인 튜토리얼 단계를 반환한다. 튜토리얼 여부는 퀘스트 표의
+        /// tutorial_step 열만이 결정하며, 일반 서사 퀘스트에는 어떤 이용 제한도 만들지 않는다.</summary>
+        public bool TryGetActiveTutorialStep(
+            out CharacterStoryQuestDefinition quest,
+            out IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives)
+        {
+            quest = null;
+            objectives = Array.Empty<CharacterStoryQuestObjectiveDefinition>();
+            if (!SaveSystem.TryGetLoadedData(out SaveData data) ||
+                data.characterStoryQuests == null || questCatalog == null) return false;
+
+            for (int i = 0; i < data.characterStoryQuests.Count; i++)
+            {
+                CharacterStoryQuestSaveState state = data.characterStoryQuests[i];
+                if (state == null || string.IsNullOrEmpty(state.activeQuestId)) continue;
+                CharacterStoryQuestDefinition candidate = questCatalog.Find(state.activeQuestId);
+                if (candidate == null || !candidate.TutorialStep) continue;
+                quest = candidate;
+                objectives = objectiveCatalog != null
+                    ? objectiveCatalog.ForQuest(candidate.QuestId)
+                    : Array.Empty<CharacterStoryQuestObjectiveDefinition>();
+                return true;
+            }
+            return false;
+        }
+
+        public bool TryGetActiveTutorialObjective(
+            CharacterStoryQuestConditionType condition,
+            out CharacterStoryQuestObjectiveDefinition objective)
+        {
+            objective = null;
+            if (!TryGetActiveTutorialStep(out _, out IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives))
+                return false;
+            for (int i = 0; i < objectives.Count; i++)
+            {
+                CharacterStoryQuestObjectiveDefinition candidate = objectives[i];
+                if (candidate != null && candidate.ConditionType == condition)
+                {
+                    objective = candidate;
+                    return true;
+                }
+            }
+            return false;
+        }
+
         public bool TryConfirmComplete(string characterId)
         {
             return TryConfirmComplete(characterId, null);
