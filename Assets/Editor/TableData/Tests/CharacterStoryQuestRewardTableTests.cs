@@ -30,6 +30,10 @@ namespace TableDataEditorTests
             AssertRewards("CatKnight_10003",
                 (CharacterStoryQuestRewardType.Currency, "jewel", 200),
                 (CharacterStoryQuestRewardType.Item, "50001", 3));
+            AssertRewards("CatKnight_Tutorial_020", (CharacterStoryQuestRewardType.Currency, "jewel", 300));
+            AssertRewards("CatKnight_Tutorial_030", (CharacterStoryQuestRewardType.Currency, "jewel", 2000));
+            AssertRewards("CatKnight_Tutorial_150", (CharacterStoryQuestRewardType.Currency, "jewel", 500));
+            AssertRewards("CatKnight_Tutorial_200", (CharacterStoryQuestRewardType.Currency, "jewel", 500));
             AssertRewards("Barbarian_10001", (CharacterStoryQuestRewardType.Currency, "jewel", 100));
             AssertRewards("Barbarian_10002", (CharacterStoryQuestRewardType.Currency, "jewel", 150));
             AssertRewards("Barbarian_10003", (CharacterStoryQuestRewardType.Currency, "jewel", 200));
@@ -48,12 +52,19 @@ namespace TableDataEditorTests
             Assert.NotNull(quests);
             Assert.NotNull(objectives);
 
-            CollectionAssert.AreEqual(new[]
+            Assert.AreEqual(29, QuestIds(quests).Length);
+
+            string previous = string.Empty;
+            for (int step = 10; step <= 200; step += 10)
             {
-                "Barbarian_10001", "CatKnight_10001", "ElfArcher_10001",
-                "Barbarian_10002", "CatKnight_10002", "ElfArcher_10002",
-                "Barbarian_10003", "CatKnight_10003", "ElfArcher_10003",
-            }, QuestIds(quests));
+                string id = $"CatKnight_Tutorial_{step:000}";
+                CharacterStoryQuestDefinition tutorial = quests.Find(id);
+                AssertQuest(tutorial, "CatKnight", previous, step, false);
+                Assert.IsTrue(tutorial.TutorialStep, id);
+                previous = id;
+            }
+            Assert.AreEqual("CatKnight_Tutorial_200", quests.Find("CatKnight_10001").PreviousQuestId);
+            Assert.IsFalse(quests.Find("CatKnight_10001").TutorialStep);
 
             AssertQuest(quests.Find("Barbarian_10001"), "Barbarian", "", 10, false);
             AssertQuest(quests.Find("Barbarian_10002"), "Barbarian", "Barbarian_10001", 20, false);
@@ -76,6 +87,15 @@ namespace TableDataEditorTests
             AssertObjectives(objectives, "ElfArcher_10003",
                 ("ElfArcher_10003_01", CharacterStoryQuestConditionType.CharacterLevelAtLeast, 6, 10),
                 ("ElfArcher_10003_02", CharacterStoryQuestConditionType.MonsterDefeatCount, 10, 20));
+
+            Assert.AreEqual(CharacterStoryQuestConditionType.DungeonEnterCount,
+                objectives.ForQuest("CatKnight_Tutorial_010")[0].ConditionType);
+            CollectionAssert.AreEqual(new[] { "ElfArcher" },
+                objectives.ForQuest("CatKnight_Tutorial_060")[0].TargetIds);
+            CollectionAssert.AreEqual(new[] { "50007@CatKnight" },
+                objectives.ForQuest("CatKnight_Tutorial_120")[0].TargetIds);
+            Assert.AreEqual(CharacterStoryQuestConditionType.ManualCharacterSwitchCount,
+                objectives.ForQuest("CatKnight_Tutorial_200")[0].ConditionType);
         }
 
         [Test]
