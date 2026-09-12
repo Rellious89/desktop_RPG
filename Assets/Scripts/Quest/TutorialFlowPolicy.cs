@@ -39,6 +39,38 @@ namespace Quest
             return true;
         }
 
+        public static bool IsForcedRecruitmentTarget(string characterId)
+        {
+            return !string.IsNullOrEmpty(characterId) &&
+                   TryGetTarget(CharacterStoryQuestConditionType.CharacterOwned, out string targetId) &&
+                   string.Equals(characterId, targetId, StringComparison.Ordinal);
+        }
+
+        public static int RecruitmentArrivalSeconds(int defaultSeconds)
+        {
+            if (!IsTutorialActive) return defaultSeconds;
+            return IsCurrentStep(CharacterStoryQuestConditionType.BuildingCompleted) ||
+                   IsCurrentStep(CharacterStoryQuestConditionType.CharacterOwned)
+                ? FirstRecruitmentArrivalSeconds
+                : defaultSeconds;
+        }
+
+        public static bool ShouldPausePassiveRecovery(string characterId)
+        {
+            if (string.IsNullOrEmpty(characterId) || !IsTutorialActive) return false;
+            CharacterStoryQuestService service = CharacterStoryQuestService.Instance;
+
+            // 최초 모집 캐릭터는 회복소에 직접 넣어 보는 단계 전까지 자연 회복시키지 않는다.
+            if (service != null && service.TryGetTutorialTarget(
+                    CharacterStoryQuestConditionType.CharacterOwned, true, out string recruitedId) &&
+                string.Equals(characterId, recruitedId, StringComparison.Ordinal)) return true;
+
+            // 아이템 사용 단계가 끝나기 전에 목표 캐릭터가 자연 회복으로 먼저 가득 차는 것을 막는다.
+            if (!TryGetTarget(CharacterStoryQuestConditionType.ItemUseCount, out string itemUseTarget)) return false;
+            return CharacterStoryQuestTarget.TrySplitItemUse(itemUseTarget, out _, out string itemCharacterId) &&
+                   string.Equals(characterId, itemCharacterId, StringComparison.Ordinal);
+        }
+
         public static bool IsCurrentStep(CharacterStoryQuestConditionType condition)
         {
             CharacterStoryQuestService service = CharacterStoryQuestService.Instance;

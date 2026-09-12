@@ -113,7 +113,9 @@ namespace Recruitment
                 characterId = pendingId,
                 level = 1,
                 currentExp = 0,
-                currentStamina = definition.MaxStamina,
+                currentStamina = TutorialFlowPolicy.IsForcedRecruitmentTarget(pendingId)
+                    ? 0
+                    : definition.MaxStamina,
                 currentCorruption = definition.BaseCorruption,
             };
             string oldPending = state.pendingCharacterId;

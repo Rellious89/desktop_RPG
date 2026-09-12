@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Common;
+using Quest;
 
 namespace Recruitment
 {
@@ -234,7 +235,8 @@ namespace Recruitment
                 recruitmentAccessId = accessId,
                 startedAtUtc = SaveData.FormatTimestamp(initializedAtUtc),
                 readyAtUtc = SaveData.FormatTimestamp(
-                    AddSeconds(initializedAtUtc, access.Access.ArrivalIntervalSeconds)),
+                    AddSeconds(initializedAtUtc,
+                        TutorialFlowPolicy.RecruitmentArrivalSeconds(access.Access.ArrivalIntervalSeconds))),
             };
 
             List<RecruitmentCycleSaveState> originalCycles = data.recruitmentCycles;

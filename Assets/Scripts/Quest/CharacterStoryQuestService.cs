@@ -151,6 +151,49 @@ namespace Quest
             return false;
         }
 
+        /// <summary>현재 단계 또는 이미 확정한 튜토리얼 단계에서 조건의 첫 대상 ID를 찾는다.
+        /// 캐릭터처럼 뒤 단계에서도 같은 대상을 기억해야 하는 튜토리얼 규칙에 사용한다.</summary>
+        public bool TryGetTutorialTarget(
+            CharacterStoryQuestConditionType condition,
+            bool includeCompleted,
+            out string targetId)
+        {
+            targetId = string.Empty;
+            if (TryGetActiveTutorialObjective(condition, out CharacterStoryQuestObjectiveDefinition active) &&
+                TryFirstTarget(active, out targetId)) return true;
+            if (!includeCompleted || !SaveSystem.TryGetLoadedData(out SaveData data) ||
+                data.characterStoryQuests == null || questCatalog == null || objectiveCatalog == null) return false;
+
+            for (int stateIndex = 0; stateIndex < data.characterStoryQuests.Count; stateIndex++)
+            {
+                CharacterStoryQuestSaveState state = data.characterStoryQuests[stateIndex];
+                if (state?.completedQuestIds == null) continue;
+                for (int questIndex = state.completedQuestIds.Count - 1; questIndex >= 0; questIndex--)
+                {
+                    CharacterStoryQuestDefinition completed = questCatalog.Find(state.completedQuestIds[questIndex]);
+                    if (completed == null || !completed.TutorialStep) continue;
+                    IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives =
+                        objectiveCatalog.ForQuest(completed.QuestId);
+                    for (int objectiveIndex = 0; objectiveIndex < objectives.Count; objectiveIndex++)
+                    {
+                        CharacterStoryQuestObjectiveDefinition objective = objectives[objectiveIndex];
+                        if (objective != null && objective.ConditionType == condition &&
+                            TryFirstTarget(objective, out targetId)) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static bool TryFirstTarget(CharacterStoryQuestObjectiveDefinition objective, out string targetId)
+        {
+            targetId = string.Empty;
+            IReadOnlyList<string> targets = objective != null ? objective.TargetIds : null;
+            if (targets == null || targets.Count == 0 || string.IsNullOrEmpty(targets[0])) return false;
+            targetId = targets[0];
+            return true;
+        }
+
         public bool TryConfirmComplete(string characterId)
         {
             return TryConfirmComplete(characterId, null);

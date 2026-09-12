@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using Character;
 using Common;
+using Quest;
 
 namespace Recovery
 {
@@ -90,7 +91,8 @@ namespace Recovery
                 if (state == null) continue;
 
                 Track(state, character);
-                if (RecoveryStation.IsCharacterIdInSavedSlot(data, state.characterId))
+                if (RecoveryStation.IsCharacterIdInSavedSlot(data, state.characterId) ||
+                    TutorialFlowPolicy.ShouldPausePassiveRecovery(state.characterId))
                 {
                     ResetProgressAtNow(state, now);
                     continue;

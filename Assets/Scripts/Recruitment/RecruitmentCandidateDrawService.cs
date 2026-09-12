@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Common;
+using Quest;
 
 namespace Recruitment
 {
@@ -151,13 +152,16 @@ namespace Recruitment
             var unlocks = new RecruitmentUnlockService(dataProvider, saveAction, acquisitionCatalog, unlockConditionCatalog);
             if (!unlocks.TryPersistCurrentUnlocks()) return Result(RecruitmentCandidateDrawCode.SaveFailed);
 
-            RecruitmentSelection selection = RecruitmentCandidateSelector.Select(
-                access.RecruitmentTypeId,
-                poolCatalog,
-                acquisitionCatalog,
-                RecruitmentOwnership.Of(OwnedCharacterIds(data.characters)),
-                random,
-                unlocks.IsUnlocked);
+            RecruitmentSelection selection = TrySelectTutorialCandidate(
+                access.RecruitmentTypeId, data, out RecruitmentSelection forced)
+                ? forced
+                : RecruitmentCandidateSelector.Select(
+                    access.RecruitmentTypeId,
+                    poolCatalog,
+                    acquisitionCatalog,
+                    RecruitmentOwnership.Of(OwnedCharacterIds(data.characters)),
+                    random,
+                    unlocks.IsUnlocked);
 
             if (!selection.IsSelected || string.IsNullOrEmpty(selection.CharacterId))
             {
@@ -194,6 +198,45 @@ namespace Recruitment
 
             return new RecruitmentCandidateDrawResult(
                 RecruitmentCandidateDrawCode.Selected, selection.CharacterId, selection, state);
+        }
+
+        private bool TrySelectTutorialCandidate(
+            string recruitmentTypeId, SaveData data, out RecruitmentSelection selection)
+        {
+            selection = RecruitmentSelection.None;
+            if (!TutorialFlowPolicy.TryGetTarget(
+                    CharacterStoryQuestConditionType.CharacterOwned, out string targetId)) return false;
+
+            // 이미 보유했거나 표에서 실제 모집 가능한 캐릭터가 아니면 고정 후보도 만들지 않는다.
+            if (IsOwned(data.characters, targetId)) return true;
+            CharacterAcquisitionDefinition acquisition = acquisitionCatalog != null
+                ? acquisitionCatalog.FindByCharacterId(targetId) : null;
+            if (acquisition == null || !acquisition.Enabled || !acquisition.IsRecruitable) return true;
+
+            IReadOnlyList<RecruitmentPoolEntryDefinition> entries = poolCatalog != null
+                ? poolCatalog.EntriesFor(recruitmentTypeId) : null;
+            if (entries == null) return true;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                RecruitmentPoolEntryDefinition entry = entries[i];
+                if (entry == null || !entry.Enabled || !entry.IsValid ||
+                    !string.Equals(entry.CharacterId, targetId, StringComparison.Ordinal)) continue;
+                selection = RecruitmentSelection.Of(entry, entry.Weight, 0);
+                return true;
+            }
+            return true;
+        }
+
+        private static bool IsOwned(List<CharacterSaveState> characters, string characterId)
+        {
+            if (characters == null) return false;
+            for (int i = 0; i < characters.Count; i++)
+            {
+                CharacterSaveState state = characters[i];
+                if (state != null && string.Equals(state.characterId, characterId, StringComparison.Ordinal))
+                    return true;
+            }
+            return false;
         }
 
         private static IEnumerable<string> OwnedCharacterIds(List<CharacterSaveState> characters)
