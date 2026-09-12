@@ -10,6 +10,18 @@ namespace Quest
         MonsterDefeatCount,
         DungeonEnterCount,
         StaminaSpent,
+        TownReturnCount,
+        BuildingCompleted,
+        CharacterOwned,
+        CharacterArchiveOpenCount,
+        PartyContainsCharacter,
+        RecoveryStarted,
+        CharacterRecoveryComplete,
+        RecoveryJoined,
+        ItemPurchaseCount,
+        ItemUseCount,
+        CharacterStaminaFull,
+        ManualCharacterSwitchCount,
     }
 
     [CreateAssetMenu(fileName = "CharacterStoryQuestObjectiveDefinition", menuName = "Quest/Character Story Quest Objective Definition")]

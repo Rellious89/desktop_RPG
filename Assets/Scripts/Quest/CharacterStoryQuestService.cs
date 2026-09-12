@@ -24,6 +24,7 @@ namespace Quest
         [SerializeField] private string currencyOnlyToastFormat = "획득: +{0} 재화";
 
         private static Func<bool> saveOverride;
+        private static Func<DateTime> utcNowOverride;
 
         public static CharacterStoryQuestService Instance { get; private set; }
         public static event Action<string> QuestBecameReadyToComplete;
@@ -56,8 +57,15 @@ namespace Quest
                 enabled = false;
                 return;
             }
-            if (SaveSystem.TryGetLoadedData(out SaveData data) && EnsureRootsForOwned(data) && SaveSystem.Save())
-                QuestStateChanged?.Invoke(string.Empty);
+            if (!SaveSystem.TryGetLoadedData(out SaveData data)) return;
+            bool changed = EnsureRootsForOwned(data);
+            CharacterStoryQuestMutationReceipt stateReceipt = EvaluateStateObjectivesWithoutSave(data);
+            changed |= stateReceipt.Changed;
+            if (changed && SaveSystem.Save())
+            {
+                if (stateReceipt.Changed) NotifyReadyAfterExternalSave(stateReceipt);
+                else QuestStateChanged?.Invoke(string.Empty);
+            }
         }
 
         private void OnDisable()
@@ -72,6 +80,30 @@ namespace Quest
             if (!SaveSystem.TryGetLoadedData(out SaveData data)) return CharacterStoryQuestSnapshot.Empty(characterId);
             var state = FindState(data, characterId);
             return SnapshotOf(state);
+        }
+
+        public bool IsQuestActive(string questId)
+        {
+            if (string.IsNullOrEmpty(questId) || !SaveSystem.TryGetLoadedData(out SaveData data)) return false;
+            if (data.characterStoryQuests == null) return false;
+            for (int i = 0; i < data.characterStoryQuests.Count; i++)
+            {
+                CharacterStoryQuestSaveState state = data.characterStoryQuests[i];
+                if (state != null && string.Equals(state.activeQuestId, questId, StringComparison.Ordinal)) return true;
+            }
+            return false;
+        }
+
+        public bool IsQuestCompleted(string questId)
+        {
+            if (string.IsNullOrEmpty(questId) || !SaveSystem.TryGetLoadedData(out SaveData data)) return false;
+            if (data.characterStoryQuests == null) return false;
+            for (int i = 0; i < data.characterStoryQuests.Count; i++)
+            {
+                CharacterStoryQuestSaveState state = data.characterStoryQuests[i];
+                if (state?.completedQuestIds != null && state.completedQuestIds.Contains(questId)) return true;
+            }
+            return false;
         }
 
         public bool TryConfirmComplete(string characterId)
@@ -228,6 +260,67 @@ namespace Quest
             return receipt;
         }
 
+        /// <summary>건설·구매·패널 열기처럼 특정 캐릭터가 아니라 게임 전체에서 한 번 일어난 행동을
+        /// 현재 활성 서사 퀘스트들에 기록한다. 저장은 호출자가 소유하며, 실패하면 반환 영수증을
+        /// <see cref="Rollback"/>으로 되돌려야 한다.</summary>
+        public CharacterStoryQuestMutationReceipt ApplyGlobalActionWithoutSave(
+            SaveData data, CharacterStoryQuestConditionType condition, string targetId, int amount = 1)
+        {
+            var receipt = new CharacterStoryQuestMutationReceipt(data);
+            if (data?.characterStoryQuests == null || amount <= 0) return receipt;
+
+            for (int i = 0; i < data.characterStoryQuests.Count; i++)
+            {
+                CharacterStoryQuestSaveState state = data.characterStoryQuests[i];
+                if (state == null || string.IsNullOrEmpty(state.characterId)) continue;
+                receipt.Capture(state.characterId, state);
+                receipt.Changed |= AddForCondition(data, state.characterId, condition, targetId, amount);
+            }
+            return receipt;
+        }
+
+        /// <summary>자체 저장 트랜잭션이 없는 UI 열기·마을 복귀·수동 교체 성공을 기록한다.</summary>
+        public bool TryRecordGlobalAction(
+            CharacterStoryQuestConditionType condition, string targetId = null, int amount = 1)
+        {
+            if (!SaveSystem.TryGetLoadedData(out SaveData data)) return false;
+            CharacterStoryQuestMutationReceipt receipt = ApplyGlobalActionWithoutSave(data, condition, targetId, amount);
+            if (!receipt.Changed) return false;
+
+            bool saved;
+            try { saved = SaveNow(); }
+            catch { saved = false; }
+            if (!saved)
+            {
+                Rollback(receipt);
+                return false;
+            }
+
+            NotifyReadyAfterExternalSave(receipt);
+            return true;
+        }
+
+        /// <summary>재실행이나 단계 전환 뒤에도 영속 상태로 증명 가능한 목표를 다시 평가한다.</summary>
+        public CharacterStoryQuestMutationReceipt EvaluateStateObjectivesWithoutSave(SaveData data)
+        {
+            var receipt = new CharacterStoryQuestMutationReceipt(data);
+            if (data?.characterStoryQuests == null) return receipt;
+
+            for (int i = 0; i < data.characterStoryQuests.Count; i++)
+            {
+                CharacterStoryQuestSaveState state = data.characterStoryQuests[i];
+                if (state == null || state.readyToComplete || string.IsNullOrEmpty(state.activeQuestId)) continue;
+                receipt.Capture(state.characterId, state);
+                foreach (CharacterStoryQuestObjectiveDefinition objective in ObjectivesFor(state.activeQuestId))
+                {
+                    if (!IsStateCondition(objective.ConditionType)) continue;
+                    receipt.Changed |= SetProgress(state, objective, EvaluateStateProgress(data, state, objective));
+                }
+                receipt.Changed |= RefreshReady(state);
+            }
+            return receipt;
+        }
+
         public void Rollback(CharacterStoryQuestMutationReceipt receipt) => receipt?.Restore();
 
         /// <summary>호출자가 소유한 저장 트랜잭션이 성공한 뒤 완료 가능 전환을 확정한다. 동일 영수증은
@@ -270,13 +363,19 @@ namespace Quest
             if (definition == null || !SaveSystem.TryGetLoadedData(out SaveData data)) return;
             CharacterSaveState character = FindCharacter(data, definition.CharacterId);
             if (character == null) return;
-            CharacterStoryQuestMutationReceipt receipt = Capture(data, definition.CharacterId);
-            bool changed = EnsureRootWithoutSave(data, definition.CharacterId, character.level) |
-                           EvaluateLevelWithoutSave(data, definition.CharacterId, character.level);
-            receipt.Changed = changed;
+            CharacterStoryQuestMutationReceipt rootReceipt = Capture(data, definition.CharacterId);
+            rootReceipt.Changed = EnsureRootWithoutSave(data, definition.CharacterId, character.level);
+            CharacterStoryQuestMutationReceipt receipt = EvaluateStateObjectivesWithoutSave(data);
+            bool changed = rootReceipt.Changed | receipt.Changed;
             if (!changed) return;
-            if (!SaveSystem.Save()) Rollback(receipt);
-            else NotifyReadyAfterExternalSave(receipt);
+            if (!SaveSystem.Save())
+            {
+                Rollback(receipt);
+                Rollback(rootReceipt);
+                return;
+            }
+            if (rootReceipt.Changed) NotifyReadyAfterExternalSave(rootReceipt);
+            if (receipt.Changed) NotifyReadyAfterExternalSave(receipt);
         }
 
         private static void ShowReadyToast()
@@ -350,8 +449,110 @@ namespace Quest
             state.activeQuestId = next.QuestId;
             CharacterSaveState character = FindCharacter(data, characterId);
             EvaluateLevelWithoutSave(data, characterId, character != null ? character.level : 1);
+            EvaluateStateObjectivesWithoutSave(data);
             return true;
         }
+
+        private static bool IsStateCondition(CharacterStoryQuestConditionType condition)
+        {
+            return condition == CharacterStoryQuestConditionType.CharacterLevelAtLeast ||
+                   condition == CharacterStoryQuestConditionType.BuildingCompleted ||
+                   condition == CharacterStoryQuestConditionType.CharacterOwned ||
+                   condition == CharacterStoryQuestConditionType.PartyContainsCharacter ||
+                   condition == CharacterStoryQuestConditionType.RecoveryStarted ||
+                   condition == CharacterStoryQuestConditionType.CharacterRecoveryComplete ||
+                   condition == CharacterStoryQuestConditionType.CharacterStaminaFull;
+        }
+
+        private int EvaluateStateProgress(
+            SaveData data, CharacterStoryQuestSaveState owner, CharacterStoryQuestObjectiveDefinition objective)
+        {
+            if (objective.ConditionType == CharacterStoryQuestConditionType.CharacterLevelAtLeast)
+            {
+                CharacterSaveState character = FindCharacter(data, owner.characterId);
+                return character != null ? Mathf.Max(1, character.level) : 0;
+            }
+
+            IReadOnlyList<string> targets = objective.TargetIds;
+            if (targets == null || targets.Count == 0)
+                return EvaluateSingleStateTarget(data, owner.characterId, objective.ConditionType) ? 1 : 0;
+
+            int matched = 0;
+            for (int i = 0; i < targets.Count; i++)
+                if (EvaluateSingleStateTarget(data, targets[i], objective.ConditionType)) matched++;
+            return matched;
+        }
+
+        private bool EvaluateSingleStateTarget(
+            SaveData data, string targetId, CharacterStoryQuestConditionType condition)
+        {
+            switch (condition)
+            {
+                case CharacterStoryQuestConditionType.BuildingCompleted:
+                    if (data.buildingConstructions == null) return false;
+                    for (int i = 0; i < data.buildingConstructions.Count; i++)
+                    {
+                        BuildingConstructionSaveState building = data.buildingConstructions[i];
+                        if (building != null && building.completionNotified &&
+                            string.Equals(building.buildingId, targetId, StringComparison.Ordinal)) return true;
+                    }
+                    return false;
+
+                case CharacterStoryQuestConditionType.CharacterOwned:
+                    return FindCharacter(data, targetId) != null;
+
+                case CharacterStoryQuestConditionType.PartyContainsCharacter:
+                    return ContainsId(data.partyCharacterIds, targetId);
+
+                case CharacterStoryQuestConditionType.RecoveryStarted:
+                    return FindRecoverySlot(data, targetId) != null;
+
+                case CharacterStoryQuestConditionType.CharacterRecoveryComplete:
+                {
+                    RecoverySlotSaveState slot = FindRecoverySlot(data, targetId);
+                    if (slot == null) return false;
+                    CharacterSaveState character = FindCharacter(data, targetId);
+                    CharacterDefinition definition = roster != null ? roster.FindById(targetId) : null;
+                    if (character != null && definition != null && character.currentStamina >= definition.MaxStamina)
+                        return true;
+                    return SaveData.TryParseTimestamp(slot.completeAtUtc, out DateTime completeAt) &&
+                           UtcNow() >= completeAt;
+                }
+
+                case CharacterStoryQuestConditionType.CharacterStaminaFull:
+                {
+                    CharacterSaveState character = FindCharacter(data, targetId);
+                    CharacterDefinition definition = roster != null ? roster.FindById(targetId) : null;
+                    return character != null && definition != null &&
+                           character.currentStamina >= definition.MaxStamina;
+                }
+
+                default:
+                    return false;
+            }
+        }
+
+        private static RecoverySlotSaveState FindRecoverySlot(SaveData data, string characterId)
+        {
+            if (data?.recoverySlots == null || string.IsNullOrEmpty(characterId)) return null;
+            for (int i = 0; i < data.recoverySlots.Count; i++)
+            {
+                RecoverySlotSaveState slot = data.recoverySlots[i];
+                if (slot != null && string.Equals(slot.characterId, characterId, StringComparison.Ordinal)) return slot;
+            }
+            return null;
+        }
+
+        private static bool ContainsId(IReadOnlyList<string> values, string id)
+        {
+            if (values == null || string.IsNullOrEmpty(id)) return false;
+            for (int i = 0; i < values.Count; i++)
+                if (string.Equals(values[i], id, StringComparison.Ordinal)) return true;
+            return false;
+        }
+
+        private static DateTime UtcNow() =>
+            (utcNowOverride != null ? utcNowOverride() : DateTime.UtcNow).ToUniversalTime();
 
         private IEnumerable<CharacterStoryQuestObjectiveDefinition> ObjectivesFor(string questId) =>
             objectiveCatalog != null ? objectiveCatalog.ForQuest(questId) : new List<CharacterStoryQuestObjectiveDefinition>();

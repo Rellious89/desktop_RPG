@@ -147,6 +147,62 @@ namespace QuestEditorTests
             }
         }
 
+        [Test]
+        public void GlobalAction_OnlyAdvancesMatchingActiveObjective()
+        {
+            CharacterStoryQuestDefinition quest = Quest("Q1", "CatKnight", "", true);
+            CharacterStoryQuestObjectiveDefinition purchase = Objective(
+                "O1", "Q1", CharacterStoryQuestConditionType.ItemPurchaseCount, 2, "50005");
+            CharacterStoryQuestService service = Service(new[] { quest }, new[] { purchase });
+            var data = new SaveData
+            {
+                characterStoryQuests = new List<CharacterStoryQuestSaveState>
+                {
+                    new CharacterStoryQuestSaveState { characterId = "CatKnight", activeQuestId = "Q1" },
+                },
+            };
+
+            CharacterStoryQuestMutationReceipt ignored = service.ApplyGlobalActionWithoutSave(
+                data, CharacterStoryQuestConditionType.ItemPurchaseCount, "50006");
+            Assert.IsNotNull(ignored);
+            Assert.IsEmpty(data.characterStoryQuests[0].objectiveProgress);
+
+            service.ApplyGlobalActionWithoutSave(
+                data, CharacterStoryQuestConditionType.ItemPurchaseCount, "50005", 3);
+            CharacterStoryQuestSaveState state = data.characterStoryQuests[0];
+            Assert.AreEqual(2, state.objectiveProgress[0].progress, "목표값에서 포화해야 합니다.");
+            Assert.IsTrue(state.readyToComplete);
+        }
+
+        [Test]
+        public void StateEvaluation_RecoversCompletedBuildingAndPartyMembership()
+        {
+            CharacterStoryQuestDefinition quest = Quest("Q1", "CatKnight", "", true);
+            CharacterStoryQuestObjectiveDefinition building = Objective(
+                "O1", "Q1", CharacterStoryQuestConditionType.BuildingCompleted, 1, "1");
+            CharacterStoryQuestObjectiveDefinition party = Objective(
+                "O2", "Q1", CharacterStoryQuestConditionType.PartyContainsCharacter, 1, "ElfArcher");
+            CharacterStoryQuestService service = Service(new[] { quest }, new[] { building, party });
+            var data = new SaveData
+            {
+                buildingConstructions = new List<BuildingConstructionSaveState>
+                {
+                    new BuildingConstructionSaveState { buildingId = "1", completionNotified = true },
+                },
+                partyCharacterIds = new List<string> { "CatKnight", "ElfArcher" },
+                characterStoryQuests = new List<CharacterStoryQuestSaveState>
+                {
+                    new CharacterStoryQuestSaveState { characterId = "CatKnight", activeQuestId = "Q1" },
+                },
+            };
+
+            CharacterStoryQuestMutationReceipt receipt = service.EvaluateStateObjectivesWithoutSave(data);
+
+            Assert.IsNotNull(receipt);
+            Assert.IsTrue(data.characterStoryQuests[0].readyToComplete);
+            Assert.AreEqual(2, data.characterStoryQuests[0].objectiveProgress.Count);
+        }
+
         private CharacterStoryQuestService Service(
             CharacterStoryQuestDefinition[] quests, CharacterStoryQuestObjectiveDefinition[] objectives)
         {
@@ -165,9 +221,18 @@ namespace QuestEditorTests
             var result = Create<CharacterStoryQuestDefinition>(); Set(result, "questId", id); Set(result, "characterId", characterId); Set(result, "previousQuestId", previous); Set(result, "isFinal", final); Set(result, "enabled", true); return result;
         }
 
-        private CharacterStoryQuestObjectiveDefinition Objective(string id, string questId, CharacterStoryQuestConditionType type, int required)
+        private CharacterStoryQuestObjectiveDefinition Objective(
+            string id, string questId, CharacterStoryQuestConditionType type, int required,
+            params string[] targetIds)
         {
-            var result = Create<CharacterStoryQuestObjectiveDefinition>(); Set(result, "objectiveId", id); Set(result, "questId", questId); Set(result, "conditionType", type); Set(result, "requiredValue", required); Set(result, "enabled", true); return result;
+            var result = Create<CharacterStoryQuestObjectiveDefinition>();
+            Set(result, "objectiveId", id);
+            Set(result, "questId", questId);
+            Set(result, "conditionType", type);
+            Set(result, "requiredValue", required);
+            Set(result, "targetIds", new List<string>(targetIds ?? new string[0]));
+            Set(result, "enabled", true);
+            return result;
         }
 
         private T Create<T>() where T : ScriptableObject { T result = ScriptableObject.CreateInstance<T>(); created.Add(result); return result; }

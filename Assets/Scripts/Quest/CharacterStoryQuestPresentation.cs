@@ -69,6 +69,30 @@ namespace Quest
                         TargetName(objective, dungeonCatalog, false, questText), required, current, required);
                 case CharacterStoryQuestConditionType.StaminaSpent:
                     return Format(questText, 10003, "행동력 {0} ({1}/{2})", required, current, required);
+                case CharacterStoryQuestConditionType.TownReturnCount:
+                    return $"마을 복귀 ({current}/{required})";
+                case CharacterStoryQuestConditionType.BuildingCompleted:
+                    return $"건물 {FirstTargetOrDash(objective)} 완공 확인 ({current}/{required})";
+                case CharacterStoryQuestConditionType.CharacterOwned:
+                    return $"캐릭터 {FirstTargetOrDash(objective)} 영입 ({current}/{required})";
+                case CharacterStoryQuestConditionType.CharacterArchiveOpenCount:
+                    return $"용병 명부 확인 ({current}/{required})";
+                case CharacterStoryQuestConditionType.PartyContainsCharacter:
+                    return $"캐릭터 {FirstTargetOrDash(objective)} 파티 등록 ({current}/{required})";
+                case CharacterStoryQuestConditionType.RecoveryStarted:
+                    return $"캐릭터 {FirstTargetOrDash(objective)} 회복 시작 ({current}/{required})";
+                case CharacterStoryQuestConditionType.CharacterRecoveryComplete:
+                    return $"캐릭터 {FirstTargetOrDash(objective)} 회복 완료 ({current}/{required})";
+                case CharacterStoryQuestConditionType.RecoveryJoined:
+                    return $"캐릭터 {FirstTargetOrDash(objective)} 합류 ({current}/{required})";
+                case CharacterStoryQuestConditionType.ItemPurchaseCount:
+                    return $"아이템 {FirstTargetOrDash(objective)} 구매 ({current}/{required})";
+                case CharacterStoryQuestConditionType.ItemUseCount:
+                    return $"아이템 {FirstTargetOrDash(objective)} 사용 ({current}/{required})";
+                case CharacterStoryQuestConditionType.CharacterStaminaFull:
+                    return $"캐릭터 {FirstTargetOrDash(objective)} 행동력 최대 ({current}/{required})";
+                case CharacterStoryQuestConditionType.ManualCharacterSwitchCount:
+                    return $"캐릭터 {FirstTargetOrDash(objective)} 교체 ({current}/{required})";
                 default:
                     return string.Format("{0}/{1}", current, required);
             }
@@ -82,6 +106,18 @@ namespace Quest
                 case CharacterStoryQuestConditionType.MonsterDefeatCount: return "Defeat";
                 case CharacterStoryQuestConditionType.DungeonEnterCount: return "Dungeon";
                 case CharacterStoryQuestConditionType.StaminaSpent: return "Stamina";
+                case CharacterStoryQuestConditionType.TownReturnCount: return "Return";
+                case CharacterStoryQuestConditionType.BuildingCompleted: return "Building";
+                case CharacterStoryQuestConditionType.CharacterOwned: return "Recruit";
+                case CharacterStoryQuestConditionType.CharacterArchiveOpenCount: return "Archive";
+                case CharacterStoryQuestConditionType.PartyContainsCharacter: return "Party";
+                case CharacterStoryQuestConditionType.RecoveryStarted: return "Recovery";
+                case CharacterStoryQuestConditionType.CharacterRecoveryComplete: return "Recovery Complete";
+                case CharacterStoryQuestConditionType.RecoveryJoined: return "Join";
+                case CharacterStoryQuestConditionType.ItemPurchaseCount: return "Purchase";
+                case CharacterStoryQuestConditionType.ItemUseCount: return "Use Item";
+                case CharacterStoryQuestConditionType.CharacterStaminaFull: return "Stamina Full";
+                case CharacterStoryQuestConditionType.ManualCharacterSwitchCount: return "Switch";
                 default: return string.Empty;
             }
         }
@@ -94,6 +130,18 @@ namespace Quest
                 case CharacterStoryQuestConditionType.MonsterDefeatCount: return TextOrFallback(questText, 2, "몬스터 처치");
                 case CharacterStoryQuestConditionType.DungeonEnterCount: return TextOrFallback(questText, 4, "던전 입장");
                 case CharacterStoryQuestConditionType.StaminaSpent: return TextOrFallback(questText, 3, "행동력 소모");
+                case CharacterStoryQuestConditionType.TownReturnCount: return "마을 복귀";
+                case CharacterStoryQuestConditionType.BuildingCompleted: return "건물 완공";
+                case CharacterStoryQuestConditionType.CharacterOwned: return "용병 영입";
+                case CharacterStoryQuestConditionType.CharacterArchiveOpenCount: return "용병 명부";
+                case CharacterStoryQuestConditionType.PartyContainsCharacter: return "파티 등록";
+                case CharacterStoryQuestConditionType.RecoveryStarted: return "회복 시작";
+                case CharacterStoryQuestConditionType.CharacterRecoveryComplete: return "회복 완료";
+                case CharacterStoryQuestConditionType.RecoveryJoined: return "합류";
+                case CharacterStoryQuestConditionType.ItemPurchaseCount: return "아이템 구매";
+                case CharacterStoryQuestConditionType.ItemUseCount: return "아이템 사용";
+                case CharacterStoryQuestConditionType.CharacterStaminaFull: return "행동력 회복";
+                case CharacterStoryQuestConditionType.ManualCharacterSwitchCount: return "캐릭터 교체";
                 default: return string.Empty;
             }
         }
@@ -142,6 +190,14 @@ namespace Quest
                 values.Add(LocalizedOrId(catalog != null ? catalog.Find(id)?.LocalizedName : null, id));
             }
             return values.Count > 0 ? string.Join(", ", values) : TextOrFallback(questText, monster ? 100002 : 100004, monster ? "아무 몬스터" : "아무 던전");
+        }
+
+        private static string FirstTargetOrDash(CharacterStoryQuestObjectiveDefinition objective)
+        {
+            return objective?.TargetIds != null && objective.TargetIds.Count > 0 &&
+                   !string.IsNullOrWhiteSpace(objective.TargetIds[0])
+                ? objective.TargetIds[0]
+                : "-";
         }
 
         private static string TargetName(CharacterStoryQuestObjectiveDefinition objective, DungeonCatalog catalog,

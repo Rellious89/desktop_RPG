@@ -68,6 +68,7 @@ namespace TableDataEditor
             var characters = ReadIdSet(TableDataPaths.CharacterCsvPath, "character_id");
             var monsters = ReadIdSet(TableDataPaths.MonsterCsvPath, "monster_id");
             var dungeons = ReadIdSet(TableDataPaths.DungeonCsvPath, "dungeon_id");
+            var buildings = ReadIdSet(TableDataPaths.BuildingCsvPath, "building_id");
             var currencies = ReadIdSet(TableDataPaths.CurrencyCsvPath, "currency_id");
             var items = ReadIdSet(TableDataPaths.ItemCsvPath, "item_id");
             var byId = new Dictionary<string, QuestRow>(StringComparer.Ordinal);
@@ -100,14 +101,38 @@ namespace TableDataEditor
                 if (!byId.TryGetValue(row.QuestId, out QuestRow quest)) { Error(log, ObjectiveCsvPath, row.Line, "quest_id", row.QuestId, "Quest.csv에 없는 quest_id입니다."); continue; }
                 if (row.RequiredValue <= 0) Error(log, ObjectiveCsvPath, row.Line, "required_value", row.RequiredValue.ToString(CultureInfo.InvariantCulture), "required_value는 양수여야 합니다.");
                 if (row.Condition == null) { Error(log, ObjectiveCsvPath, row.Line, "condition_type", row.ConditionText, "허용되지 않는 condition_type입니다."); continue; }
-                if ((row.Condition == CharacterStoryQuestConditionType.CharacterLevelAtLeast || row.Condition == CharacterStoryQuestConditionType.StaminaSpent) && row.TargetIds.Count != 0)
+                if ((row.Condition == CharacterStoryQuestConditionType.CharacterLevelAtLeast ||
+                     row.Condition == CharacterStoryQuestConditionType.StaminaSpent ||
+                     row.Condition == CharacterStoryQuestConditionType.TownReturnCount ||
+                     row.Condition == CharacterStoryQuestConditionType.CharacterArchiveOpenCount) &&
+                    row.TargetIds.Count != 0)
                     Error(log, ObjectiveCsvPath, row.Line, "target_ids", string.Join("|", row.TargetIds), "이 조건은 target_ids를 사용하지 않습니다.");
                 foreach (string target in row.TargetIds)
                 {
                     if (row.Condition == CharacterStoryQuestConditionType.MonsterDefeatCount && !monsters.Contains(target)) Error(log, ObjectiveCsvPath, row.Line, "target_ids", target, "Monster.csv에 없는 대상입니다.");
                     if (row.Condition == CharacterStoryQuestConditionType.DungeonEnterCount && !dungeons.Contains(target)) Error(log, ObjectiveCsvPath, row.Line, "target_ids", target, "Dungeon.csv에 없는 대상입니다.");
+                    if (row.Condition == CharacterStoryQuestConditionType.BuildingCompleted && !buildings.Contains(target)) Error(log, ObjectiveCsvPath, row.Line, "target_ids", target, "Building.csv에 없는 대상입니다.");
+                    if (IsCharacterTargetCondition(row.Condition.Value) && !characters.Contains(target)) Error(log, ObjectiveCsvPath, row.Line, "target_ids", target, "Character.csv에 없는 대상입니다.");
+                    if (IsItemTargetCondition(row.Condition.Value) && !items.Contains(target)) Error(log, ObjectiveCsvPath, row.Line, "target_ids", target, "Item.csv에 없는 대상입니다.");
                 }
             }
+        }
+
+        private static bool IsCharacterTargetCondition(CharacterStoryQuestConditionType condition)
+        {
+            return condition == CharacterStoryQuestConditionType.CharacterOwned ||
+                   condition == CharacterStoryQuestConditionType.PartyContainsCharacter ||
+                   condition == CharacterStoryQuestConditionType.RecoveryStarted ||
+                   condition == CharacterStoryQuestConditionType.CharacterRecoveryComplete ||
+                   condition == CharacterStoryQuestConditionType.RecoveryJoined ||
+                   condition == CharacterStoryQuestConditionType.CharacterStaminaFull ||
+                   condition == CharacterStoryQuestConditionType.ManualCharacterSwitchCount;
+        }
+
+        private static bool IsItemTargetCondition(CharacterStoryQuestConditionType condition)
+        {
+            return condition == CharacterStoryQuestConditionType.ItemPurchaseCount ||
+                   condition == CharacterStoryQuestConditionType.ItemUseCount;
         }
 
         private static List<QuestRow> ReadQuests(TableDataDiagnosticLog log)
@@ -244,7 +269,29 @@ namespace TableDataEditor
         private static HashSet<string> ReadIdSet(string path, string column) { var values = new HashSet<string>(StringComparer.Ordinal); if (!File.Exists(path) || !CsvParser.TryParse(File.ReadAllText(path), out var rows, out _, out _) || rows.Count == 0) return values; var table = new CsvTable(Path.GetFileName(path), rows[0].Fields, rows.GetRange(1, rows.Count - 1)); foreach (var row in table.Records) values.Add(table.Get(row, column)); return values; }
         private static bool HasCycle(QuestRow row, Dictionary<string, QuestRow> byId) { var seen = new HashSet<string>(StringComparer.Ordinal); QuestRow cursor = row; while (!string.IsNullOrEmpty(cursor.PreviousId) && byId.TryGetValue(cursor.PreviousId, out cursor)) if (!seen.Add(cursor.Id)) return true; return false; }
         private static bool HasChild(string id, List<QuestRow> quests) { foreach (var quest in quests) if (quest.PreviousId == id) return true; return false; }
-        private static CharacterStoryQuestConditionType? ParseCondition(string text) { switch (text) { case "CHARACTER_LEVEL_AT_LEAST": return CharacterStoryQuestConditionType.CharacterLevelAtLeast; case "MONSTER_DEFEAT_COUNT": return CharacterStoryQuestConditionType.MonsterDefeatCount; case "DUNGEON_ENTER_COUNT": return CharacterStoryQuestConditionType.DungeonEnterCount; case "STAMINA_SPENT": return CharacterStoryQuestConditionType.StaminaSpent; default: return null; } }
+        private static CharacterStoryQuestConditionType? ParseCondition(string text)
+        {
+            switch (text)
+            {
+                case "CHARACTER_LEVEL_AT_LEAST": return CharacterStoryQuestConditionType.CharacterLevelAtLeast;
+                case "MONSTER_DEFEAT_COUNT": return CharacterStoryQuestConditionType.MonsterDefeatCount;
+                case "DUNGEON_ENTER_COUNT": return CharacterStoryQuestConditionType.DungeonEnterCount;
+                case "STAMINA_SPENT": return CharacterStoryQuestConditionType.StaminaSpent;
+                case "TOWN_RETURN_COUNT": return CharacterStoryQuestConditionType.TownReturnCount;
+                case "BUILDING_COMPLETED": return CharacterStoryQuestConditionType.BuildingCompleted;
+                case "CHARACTER_OWNED": return CharacterStoryQuestConditionType.CharacterOwned;
+                case "CHARACTER_ARCHIVE_OPEN_COUNT": return CharacterStoryQuestConditionType.CharacterArchiveOpenCount;
+                case "PARTY_CONTAINS_CHARACTER": return CharacterStoryQuestConditionType.PartyContainsCharacter;
+                case "RECOVERY_STARTED": return CharacterStoryQuestConditionType.RecoveryStarted;
+                case "CHARACTER_RECOVERY_COMPLETE": return CharacterStoryQuestConditionType.CharacterRecoveryComplete;
+                case "RECOVERY_JOINED": return CharacterStoryQuestConditionType.RecoveryJoined;
+                case "ITEM_PURCHASE_COUNT": return CharacterStoryQuestConditionType.ItemPurchaseCount;
+                case "ITEM_USE_COUNT": return CharacterStoryQuestConditionType.ItemUseCount;
+                case "CHARACTER_STAMINA_FULL": return CharacterStoryQuestConditionType.CharacterStaminaFull;
+                case "MANUAL_CHARACTER_SWITCH_COUNT": return CharacterStoryQuestConditionType.ManualCharacterSwitchCount;
+                default: return null;
+            }
+        }
         private static int ParseInt(string text,string file,int line,string column,TableDataDiagnosticLog log) { if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int value)) return value; Error(log,file,line,column,text,"정수여야 합니다."); return 0; }
         private static long ParseLong(string text,string file,int line,string column,TableDataDiagnosticLog log) { if (long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out long value)) return value; Error(log,file,line,column,text,"정수여야 합니다."); return 0; }
         private static bool ParseBool(string text,string file,int line,string column,TableDataDiagnosticLog log) { if (text == "0") return false; if (text == "1") return true; Error(log,file,line,column,text,"0 또는 1이어야 합니다."); return false; }
