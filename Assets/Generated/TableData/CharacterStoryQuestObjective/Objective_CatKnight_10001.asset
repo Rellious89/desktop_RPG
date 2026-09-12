@@ -11,11 +11,11 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4c992e16a67684862954f0e4d2e4ebf9, type: 3}
   m_Name: Objective_CatKnight_10001
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   objectiveId: CatKnight_10001
   questId: CatKnight_10001
   conditionType: 0
   targetIds: []
   requiredValue: 5
-  displayOrder: 10
+  displayOrder: 210
   enabled: 1

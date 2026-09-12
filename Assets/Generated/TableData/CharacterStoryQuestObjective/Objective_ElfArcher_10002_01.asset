@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4c992e16a67684862954f0e4d2e4ebf9, type: 3}
   m_Name: Objective_ElfArcher_10002_01
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   objectiveId: ElfArcher_10002_01
   questId: ElfArcher_10002
   conditionType: 0

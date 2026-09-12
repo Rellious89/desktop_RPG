@@ -11,16 +11,16 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 681a0c4d1a89d4799a561166f9a8e9cb, type: 3}
   m_Name: Quest_CatKnight_10001
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   questId: CatKnight_10001
   characterId: CatKnight
-  previousQuestId:
+  previousQuestId: CatKnight_Tutorial_200
   localizedTitle:
     m_TableReference:
       m_TableCollectionName: GUID:11805744adb144cd3bb37f325635e0d9
     m_TableEntryReference:
       m_KeyId: 22132285440
-      m_Key:
+      m_Key: 
     m_FallbackState: 0
     m_WaitForCompletion: 0
     m_LocalVariables: []
@@ -29,11 +29,12 @@ MonoBehaviour:
       m_TableCollectionName: GUID:11805744adb144cd3bb37f325635e0d9
     m_TableEntryReference:
       m_KeyId: 22136479746
-      m_Key:
+      m_Key: 
     m_FallbackState: 0
     m_WaitForCompletion: 0
     m_LocalVariables: []
-  displayOrder: 10
+  displayOrder: 210
+  tutorialStep: 0
   isFinal: 0
   enabled: 1
   rewards:
