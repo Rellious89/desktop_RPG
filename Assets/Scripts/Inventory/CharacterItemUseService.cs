@@ -1,5 +1,7 @@
 using System;
 using Character;
+using Common;
+using Quest;
 using Recovery;
 
 namespace Inventory
@@ -84,6 +86,12 @@ namespace Inventory
                 return new CharacterItemUseResult(CharacterItemUseResultCode.TargetUnavailable);
             }
 
+            CharacterStoryQuestMutationReceipt questReceipt = CharacterStoryQuestService.Instance != null
+                ? CharacterStoryQuestService.Instance.ApplyGlobalActionWithoutSave(
+                    SaveSystem.Data, CharacterStoryQuestConditionType.ItemUseCount,
+                    CharacterStoryQuestTarget.ItemUse(item.ItemId, roster.GetCharacterId(target)))
+                : null;
+
             bool saved;
             try
             {
@@ -96,12 +104,14 @@ namespace Inventory
 
             if (!saved)
             {
+                CharacterStoryQuestService.Instance?.Rollback(questReceipt);
                 roster.ApplyRecoveryStamina(target, before);
                 inventory.RefundCostWithoutSave(receipt);
                 return new CharacterItemUseResult(CharacterItemUseResultCode.SaveFailed);
             }
 
             inventory.NotifyChangedAfterExternalSave();
+            CharacterStoryQuestService.Instance?.NotifyReadyAfterExternalSave(questReceipt);
             roster.RaiseCharacterStateChanged(target);
             return new CharacterItemUseResult(CharacterItemUseResultCode.Used, recovered);
         }

@@ -4,6 +4,7 @@ using System.Globalization;
 using Character;
 using Common;
 using Corruption;
+using Quest;
 using UnityEngine;
 
 namespace Recovery
@@ -61,6 +62,8 @@ namespace Recovery
         private readonly List<int> startSlotBuffer = new List<int>();
         private readonly List<int> joinSlotBuffer = new List<int>();
         private readonly List<CharacterDefinition> joinChangedBuffer = new List<CharacterDefinition>();
+        private readonly List<CharacterStoryQuestMutationReceipt> joinQuestReceipts =
+            new List<CharacterStoryQuestMutationReceipt>();
 
         // Tick 중에 발생한 이벤트를 받은 쪽이 다시 Tick을 부르면 순회 중인 버퍼가 초기화된다.
         private bool ticking;
@@ -480,6 +483,10 @@ namespace Recovery
                 completionReported.Remove(slotIndex);
             }
 
+            CharacterStoryQuestMutationReceipt questReceipt = CharacterStoryQuestService.Instance != null
+                ? CharacterStoryQuestService.Instance.EvaluateStateObjectivesWithoutSave(dataProvider())
+                : null;
+
             // i. 저장 한 번. 실패하면 여기까지의 메모리 변경을 전부 되돌린다.
             SaveMetadataSnapshot metadata = SaveMetadataSnapshot.Capture(dataProvider());
             bool saved;
@@ -487,6 +494,7 @@ namespace Recovery
             catch { saved = false; }
             if (!saved)
             {
+                CharacterStoryQuestService.Instance?.Rollback(questReceipt);
                 for (int i = 0; i < startSlotBuffer.Count; i++)
                 {
                     slots[startSlotBuffer[i]].Clear();
@@ -507,6 +515,7 @@ namespace Recovery
             }
 
             wallet.NotifyChangedAfterExternalSave();
+            CharacterStoryQuestService.Instance?.NotifyReadyAfterExternalSave(questReceipt);
             for (int i = 0; i < startSlotBuffer.Count; i++)
             {
                 CharacterDefinition character = roster.FindById(slots[startSlotBuffer[i]].characterId);
@@ -717,10 +726,33 @@ namespace Recovery
 
             if (joinedCount == 0) return 0;
 
-            if (!saveAction())
+            joinQuestReceipts.Clear();
+            CharacterStoryQuestService questService = CharacterStoryQuestService.Instance;
+            if (questService != null)
             {
+                SaveData data = dataProvider();
+                for (int i = 0; i < joinChangedBuffer.Count; i++)
+                {
+                    CharacterDefinition character = joinChangedBuffer[i];
+                    joinQuestReceipts.Add(questService.ApplyGlobalActionWithoutSave(
+                        data, CharacterStoryQuestConditionType.RecoveryJoined,
+                        roster.GetCharacterId(character)));
+                }
+            }
+
+            bool saved = saveAction();
+            if (!saved)
+            {
+                if (questService != null)
+                    for (int i = joinQuestReceipts.Count - 1; i >= 0; i--)
+                        questService.Rollback(joinQuestReceipts[i]);
                 Debug.LogError("[RecoveryStation] 합류 결과를 저장하지 못했습니다 - 이번 실행에는 반영되지만 " +
                                "앱을 다시 켜면 회복 중 상태로 되돌아갑니다.");
+            }
+            else if (questService != null)
+            {
+                for (int i = 0; i < joinQuestReceipts.Count; i++)
+                    questService.NotifyReadyAfterExternalSave(joinQuestReceipts[i]);
             }
 
             for (int i = 0; i < joinChangedBuffer.Count; i++)

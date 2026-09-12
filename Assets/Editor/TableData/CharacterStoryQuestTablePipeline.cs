@@ -113,7 +113,15 @@ namespace TableDataEditor
                     if (row.Condition == CharacterStoryQuestConditionType.DungeonEnterCount && !dungeons.Contains(target)) Error(log, ObjectiveCsvPath, row.Line, "target_ids", target, "Dungeon.csv에 없는 대상입니다.");
                     if (row.Condition == CharacterStoryQuestConditionType.BuildingCompleted && !buildings.Contains(target)) Error(log, ObjectiveCsvPath, row.Line, "target_ids", target, "Building.csv에 없는 대상입니다.");
                     if (IsCharacterTargetCondition(row.Condition.Value) && !characters.Contains(target)) Error(log, ObjectiveCsvPath, row.Line, "target_ids", target, "Character.csv에 없는 대상입니다.");
-                    if (IsItemTargetCondition(row.Condition.Value) && !items.Contains(target)) Error(log, ObjectiveCsvPath, row.Line, "target_ids", target, "Item.csv에 없는 대상입니다.");
+                    if (IsItemTargetCondition(row.Condition.Value))
+                    {
+                        string itemTarget = target;
+                        string characterTarget = string.Empty;
+                        if (row.Condition == CharacterStoryQuestConditionType.ItemUseCount)
+                            CharacterStoryQuestTarget.TrySplitItemUse(target, out itemTarget, out characterTarget);
+                        if (!items.Contains(itemTarget)) Error(log, ObjectiveCsvPath, row.Line, "target_ids", target, "Item.csv에 없는 대상입니다.");
+                        if (!string.IsNullOrEmpty(characterTarget) && !characters.Contains(characterTarget)) Error(log, ObjectiveCsvPath, row.Line, "target_ids", target, "Character.csv에 없는 아이템 사용 대상입니다.");
+                    }
                 }
             }
         }

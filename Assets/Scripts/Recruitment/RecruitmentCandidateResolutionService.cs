@@ -126,11 +126,15 @@ namespace Recruitment
             CharacterStoryQuestMutationReceipt questReceipt = CharacterStoryQuestService.Instance != null
                 ? CharacterStoryQuestService.Instance.ActivateForCharacterWithoutSave(data, pendingId, granted.level)
                 : null;
+            CharacterStoryQuestMutationReceipt tutorialReceipt = CharacterStoryQuestService.Instance != null
+                ? CharacterStoryQuestService.Instance.EvaluateStateObjectivesWithoutSave(data)
+                : null;
 
             try
             {
                 if (!saveAction())
                 {
+                    tutorialReceipt?.Restore();
                     questReceipt?.Restore();
                     RollbackAcquire(data, originalCharacters, granted, state, oldPending, metadata);
                     return Result(RecruitmentCandidateResolutionCode.SaveFailed, pendingId, definition);
@@ -138,12 +142,14 @@ namespace Recruitment
             }
             catch
             {
+                tutorialReceipt?.Restore();
                 questReceipt?.Restore();
                 RollbackAcquire(data, originalCharacters, granted, state, oldPending, metadata);
                 throw;
             }
 
             CharacterStoryQuestService.Instance?.NotifyReadyAfterExternalSave(questReceipt);
+            CharacterStoryQuestService.Instance?.NotifyReadyAfterExternalSave(tutorialReceipt);
             return Result(RecruitmentCandidateResolutionCode.Acquired, pendingId, definition);
         }
 

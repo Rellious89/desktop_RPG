@@ -5,6 +5,7 @@ using System.Globalization;
 using Building;
 using Common;
 using Inventory;
+using Quest;
 
 namespace Shop
 {
@@ -316,10 +317,16 @@ namespace Shop
                     return FromMutation(MapMutationCode(mutation.Code), shopId, itemId, quantity, unitPrice, totalPrice, mutation);
                 }
 
+                CharacterStoryQuestMutationReceipt questReceipt = isPurchase && CharacterStoryQuestService.Instance != null
+                    ? CharacterStoryQuestService.Instance.ApplyGlobalActionWithoutSave(
+                        data, CharacterStoryQuestConditionType.ItemPurchaseCount, itemId, quantity)
+                    : null;
+
                 try
                 {
                     if (!saveAction())
                     {
+                        CharacterStoryQuestService.Instance?.Rollback(questReceipt);
                         inventory.RollbackTradeWithoutSave(receipt);
                         SaveData.RestoreMetadata(data, metadata);
                         return Result(ShopTradeResultCode.SaveFailed, shopId, itemId, quantity, unitPrice, totalPrice,
@@ -329,12 +336,14 @@ namespace Shop
                 }
                 catch
                 {
+                    CharacterStoryQuestService.Instance?.Rollback(questReceipt);
                     inventory.RollbackTradeWithoutSave(receipt);
                     SaveData.RestoreMetadata(data, metadata);
                     throw;
                 }
 
                 inventory.NotifyChangedAfterExternalSave();
+                CharacterStoryQuestService.Instance?.NotifyReadyAfterExternalSave(questReceipt);
                 return FromMutation(isPurchase ? ShopTradeResultCode.Purchased : ShopTradeResultCode.Sold,
                     shopId, itemId, quantity, unitPrice, totalPrice, mutation);
             }

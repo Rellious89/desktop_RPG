@@ -5,6 +5,7 @@ using Common;
 using Recovery;
 using Party;
 using Corruption;
+using Quest;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -110,6 +111,8 @@ namespace CharacterArchive
 
         protected override void OnModalOpened()
         {
+            CharacterStoryQuestService.Instance?.TryRecordGlobalAction(
+                CharacterStoryQuestConditionType.CharacterArchiveOpenCount);
             ValidateReferences();
             BindButtons();
             BindCountFormat();

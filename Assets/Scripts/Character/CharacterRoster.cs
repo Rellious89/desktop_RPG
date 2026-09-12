@@ -887,6 +887,17 @@ namespace Character
             return TrySwitchTo(definition, out _);
         }
 
+        /// <summary>사용자가 UI에서 확정한 수동 교체 경로. 자동 소진 교체와 초기 선택은 이 경로를
+        /// 사용하지 않으므로 튜토리얼의 수동 교체 목표가 잘못 진행되지 않는다.</summary>
+        public bool TrySwitchToManual(CharacterDefinition definition, out SwapBlockReason reason)
+        {
+            if (!TrySwitchTo(definition, out reason)) return false;
+            Quest.CharacterStoryQuestService.Instance?.TryRecordGlobalAction(
+                Quest.CharacterStoryQuestConditionType.ManualCharacterSwitchCount,
+                definition != null ? definition.CharacterId : null);
+            return true;
+        }
+
         // 순환 교체(SwitchToNext)는 ControlDock의 테스트 버튼이 유일한 호출부였는데, 그 버튼이
         // 행동력 전체 충전(StaminaRefillTestButton)으로 바뀌면서 호출부가 사라져 제거했다. 교체
         // 경로는 이제 캐릭터 교체 패널의 TrySwitchTo 하나뿐이다.

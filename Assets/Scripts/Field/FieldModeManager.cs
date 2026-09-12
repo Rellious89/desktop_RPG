@@ -1,5 +1,6 @@
 using System;
 using Dungeon;
+using Quest;
 using UnityEngine;
 
 namespace Field
@@ -144,6 +145,8 @@ namespace Field
             if (!CanBeginTransition("마을 복귀")) return false;
 
             ApplyMode(FieldMode.Town, null);
+            CharacterStoryQuestService.Instance?.TryRecordGlobalAction(
+                CharacterStoryQuestConditionType.TownReturnCount);
             return true;
         }
 

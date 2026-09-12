@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Common;
 using Corruption;
 using Recovery;
+using Quest;
 
 namespace Party
 {
@@ -248,10 +249,14 @@ namespace Party
         {
             SaveMetadataSnapshot metadata = SaveMetadataSnapshot.Capture(data);
             data.partyCharacterIds = changedParty;
+            CharacterStoryQuestMutationReceipt questReceipt = CharacterStoryQuestService.Instance != null
+                ? CharacterStoryQuestService.Instance.EvaluateStateObjectivesWithoutSave(data)
+                : null;
             try
             {
                 if (!saveAction())
                 {
+                    CharacterStoryQuestService.Instance?.Rollback(questReceipt);
                     data.partyCharacterIds = originalParty;
                     SaveData.RestoreMetadata(data, metadata);
                     return Result(PartyCompositionCode.SaveFailed, capacity, originalParty);
@@ -259,11 +264,13 @@ namespace Party
             }
             catch
             {
+                CharacterStoryQuestService.Instance?.Rollback(questReceipt);
                 data.partyCharacterIds = originalParty;
                 SaveData.RestoreMetadata(data, metadata);
                 return Result(PartyCompositionCode.SaveFailed, capacity, originalParty);
             }
 
+            CharacterStoryQuestService.Instance?.NotifyReadyAfterExternalSave(questReceipt);
             PartyCompositionEvents.NotifyChangedAfterSave();
             return Result(PartyCompositionCode.Success, capacity, changedParty);
         }

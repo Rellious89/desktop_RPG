@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Common;
 using Inventory;
+using Quest;
 using UnityEngine;
 
 namespace Building
@@ -367,6 +368,9 @@ namespace Building
                 SaveData data = dataProvider();
                 SaveMetadataSnapshot metadata = SaveMetadataSnapshot.Capture(data);
                 state.completionNotified = true;
+                CharacterStoryQuestMutationReceipt questReceipt = CharacterStoryQuestService.Instance != null
+                    ? CharacterStoryQuestService.Instance.EvaluateStateObjectivesWithoutSave(data)
+                    : null;
                 bool saved;
                 try { saved = saveAction(); }
                 catch { saved = false; }
@@ -374,6 +378,7 @@ namespace Building
                 {
                     // 표식만 되돌린다 - 시각도, 목록의 순서도, 다른 항목도 건드리지 않는다.
                     state.completionNotified = false;
+                    CharacterStoryQuestService.Instance?.Rollback(questReceipt);
                     SaveData.RestoreMetadata(data, metadata);
 
                     if (!completionSaveFailureLogged)
@@ -387,6 +392,7 @@ namespace Building
                 }
 
                 completionSaveFailureLogged = false;
+                CharacterStoryQuestService.Instance?.NotifyReadyAfterExternalSave(questReceipt);
             }
             finally
             {

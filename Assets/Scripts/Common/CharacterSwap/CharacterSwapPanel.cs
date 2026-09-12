@@ -225,7 +225,7 @@ namespace Common
             CharacterRoster roster = CharacterRoster.Instance;
             if (roster == null || pendingCharacter == null) return;
 
-            if (!roster.TrySwitchTo(pendingCharacter, out CharacterRoster.SwapBlockReason reason))
+            if (!roster.TrySwitchToManual(pendingCharacter, out CharacterRoster.SwapBlockReason reason))
             {
                 // 버튼을 누를 수 있었는데 막혔다면 그 사이 상태가 바뀐 것이다 - 리스트를 최신으로
                 // 되돌려 사용자가 이유를 볼 수 있게 하고, 패널은 닫지 않는다.

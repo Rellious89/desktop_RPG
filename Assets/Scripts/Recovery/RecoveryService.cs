@@ -4,6 +4,7 @@ using Character;
 using Common;
 using Corruption;
 using Inventory;
+using Quest;
 using UnityEngine;
 
 namespace Recovery
@@ -228,6 +229,7 @@ namespace Recovery
 
         private void HandleRecoveryCompleted(int slotIndex, CharacterDefinition character)
         {
+            CharacterStoryQuestService.Instance?.TryReconcileStateObjectives();
             RecoveryCompleted?.Invoke(slotIndex, character);
         }
 
@@ -237,6 +239,7 @@ namespace Recovery
             // 자연 회복도 회복소와 같은 CharacterStateChanged 경로를 써야 HUD, 교체 목록,
             // 회복소 목록, 명부가 각자 별도 연결 없이 즉시 다시 그려진다.
             recoveryRoster.RaiseCharacterStateChanged(character);
+            CharacterStoryQuestService.Instance?.TryReconcileStateObjectives();
             StaminaStepChanged?.Invoke(character, recoveryRoster.GetStamina(character), recoveryRoster.GetMaxStamina(character));
         }
 

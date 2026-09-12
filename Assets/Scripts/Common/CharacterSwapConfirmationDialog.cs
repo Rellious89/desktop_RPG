@@ -84,7 +84,7 @@ namespace Common
             if (roster == null || selectedCharacter == null) { RefreshContents(); return; }
 
             // 열려 있는 동안 행동력/회복 상태가 달라질 수 있으므로 반드시 다시 권한을 확인한다.
-            if (!roster.TrySwitchTo(selectedCharacter, out CharacterRoster.SwapBlockReason reason))
+            if (!roster.TrySwitchToManual(selectedCharacter, out CharacterRoster.SwapBlockReason reason))
             {
                 if (reason == CharacterRoster.SwapBlockReason.NoStamina)
                 {

@@ -300,6 +300,25 @@ namespace Quest
             return true;
         }
 
+        public bool TryReconcileStateObjectives()
+        {
+            if (!SaveSystem.TryGetLoadedData(out SaveData data)) return false;
+            CharacterStoryQuestMutationReceipt receipt = EvaluateStateObjectivesWithoutSave(data);
+            if (!receipt.Changed) return false;
+
+            bool saved;
+            try { saved = SaveNow(); }
+            catch { saved = false; }
+            if (!saved)
+            {
+                Rollback(receipt);
+                return false;
+            }
+
+            NotifyReadyAfterExternalSave(receipt);
+            return true;
+        }
+
         /// <summary>재실행이나 단계 전환 뒤에도 영속 상태로 증명 가능한 목표를 다시 평가한다.</summary>
         public CharacterStoryQuestMutationReceipt EvaluateStateObjectivesWithoutSave(SaveData data)
         {
@@ -512,7 +531,8 @@ namespace Quest
                     RecoverySlotSaveState slot = FindRecoverySlot(data, targetId);
                     if (slot == null) return false;
                     CharacterSaveState character = FindCharacter(data, targetId);
-                    CharacterDefinition definition = roster != null ? roster.FindById(targetId) : null;
+                    CharacterDefinition definition = roster != null && roster.Catalog != null
+                        ? roster.Catalog.Find(targetId) : null;
                     if (character != null && definition != null && character.currentStamina >= definition.MaxStamina)
                         return true;
                     return SaveData.TryParseTimestamp(slot.completeAtUtc, out DateTime completeAt) &&
@@ -522,7 +542,8 @@ namespace Quest
                 case CharacterStoryQuestConditionType.CharacterStaminaFull:
                 {
                     CharacterSaveState character = FindCharacter(data, targetId);
-                    CharacterDefinition definition = roster != null ? roster.FindById(targetId) : null;
+                    CharacterDefinition definition = roster != null && roster.Catalog != null
+                        ? roster.Catalog.Find(targetId) : null;
                     return character != null && definition != null &&
                            character.currentStamina >= definition.MaxStamina;
                 }
