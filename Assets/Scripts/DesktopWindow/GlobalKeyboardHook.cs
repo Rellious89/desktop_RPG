@@ -284,10 +284,25 @@ namespace DesktopWindow
                 anyExcludedDown |= down;
             }
 
-            // 제외 키가 눌린 프레임에는 공격 입력을 만들지 않는다. Input.anyKeyDown은 어떤 키가
-            // 눌렸는지 구분하지 못하므로, 제외 키와 일반 키를 같은 프레임에 누르면 둘 다 무시된다
-            // (기존 동작과 같은 한계다 - 훅 경로에서는 키별로 정확히 구분된다).
-            AnyKeyDownThisFrame = Input.anyKeyDown && !anyExcludedDown;
+            // Input.anyKeyDown에는 Mouse0~Mouse6도 포함된다. 그대로 쓰면 Companion 인터렉션 메뉴의
+            // 버튼을 누른 프레임에 공격이 먼저 시작되고, 캐릭터를 따라 움직이는 메뉴가 포인터에서
+            // 벗어나 Button의 클릭 완료가 취소된다. 실제 Windows 전역 훅은 키보드만 수집하므로,
+            // 폴백 경로도 마우스 버튼을 명시적으로 제외해 플랫폼별 입력 규칙을 같게 유지한다.
+            //
+            // 제외 키와 일반 키를 같은 프레임에 누르면 둘 다 무시되는 기존 한계는 유지된다 - 훅
+            // 경로에서는 키별로 정확히 구분된다.
+            AnyKeyDownThisFrame = Input.anyKeyDown && !anyExcludedDown && !IsAnyMouseButtonDown();
+        }
+
+        private static bool IsAnyMouseButtonDown()
+        {
+            // Unity의 레거시 입력에서 KeyCode.Mouse0~Mouse6까지 Input.anyKeyDown에 포함될 수 있다.
+            for (int button = 0; button <= 6; button++)
+            {
+                if (Input.GetMouseButtonDown(button)) return true;
+            }
+
+            return false;
         }
 
 #if UNITY_STANDALONE_WIN

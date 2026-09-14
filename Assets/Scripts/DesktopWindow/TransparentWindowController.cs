@@ -1112,7 +1112,7 @@ namespace DesktopWindow
         /// </summary>
         private void RecomputeControlDockScreenRect()
         {
-            if (controlDockRect == null)
+            if (controlDockRect == null || !controlDockRect.gameObject.activeInHierarchy)
             {
                 controlDockScreenRect = default;
                 return;

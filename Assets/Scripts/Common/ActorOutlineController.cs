@@ -6,10 +6,11 @@ namespace Common
     /// 캐릭터/몬스터 "본체" SpriteRenderer에 외곽선 Material을 적용하는 컴포넌트. 본체에만 붙인다 -
     /// AttackFrameOverlay(캐스팅/잔상), 발사체, 피격 이펙트, 데미지 숫자, UI에는 붙이지 않는다.
     ///
-    /// On/Off·색상·두께 값은 이 컴포넌트가 갖지 않는다 - 씬에 하나뿐인
+    /// On/Off·색상·두께 기본값은 이 컴포넌트가 갖지 않는다 - 씬에 하나뿐인
     /// <see cref="ActorOutlineSettings"/>에서 읽어온다. 캐릭터와 몬스터가 전부 같은 설정을 쓰므로
     /// 액터별로 값을 맞출 일이 없고, 전역 설정을 바꾸면 <see cref="ActorOutlineSettings.Changed"/>를
-    /// 통해 활성 상태인 모든 액터에 즉시 반영된다. 액터별 Override는 두지 않는다.
+    /// 통해 활성 상태인 모든 액터에 즉시 반영된다. 단, 드래그처럼 짧게 유지되는 런타임 피드백은
+    /// 색상만 액터별로 임시 덮어쓸 수 있으며 해제하면 즉시 전역 색상으로 돌아간다.
     ///
     /// Material 인스턴스를 늘리지 않는 것이 이 컴포넌트의 핵심 제약이다.
     /// - Material 자체는 <b>공유</b>한다(sharedMaterial 대입). renderer.material은 절대 쓰지 않는다 -
@@ -45,6 +46,8 @@ namespace Common
         private SpriteRenderer spriteRenderer;
         private MaterialPropertyBlock propertyBlock;
         private bool capturedOriginalChecked;
+        private bool hasOutlineColorOverride;
+        private Color outlineColorOverride;
 
         /// <summary>
         /// 캐시된 참조를 항상 사용 가능한 상태로 맞춘다. 에디터 재컴파일/도메인 리로드 뒤에는 직렬화되지
@@ -111,6 +114,7 @@ namespace Common
         private void OnDisable()
         {
             ActorOutlineSettings.Changed -= Apply;
+            hasOutlineColorOverride = false;
 
             if (spriteRenderer == null) return;
 
@@ -125,6 +129,26 @@ namespace Common
         /// 씬의 컨트롤러들을 직접 갱신할 때 쓰는 진입점이다(그때는 정적 이벤트 구독자가 없다).</summary>
         public void Refresh()
         {
+            Apply();
+        }
+
+        /// <summary>
+        /// 이 액터의 외곽선 색상만 런타임 동안 임시로 덮어쓴다. 공유 Material이나 전역
+        /// <see cref="ActorOutlineSettings"/> 값은 바꾸지 않으므로 다른 캐릭터와 몬스터에는 영향이 없다.
+        /// </summary>
+        public void SetOutlineColorOverride(Color color)
+        {
+            outlineColorOverride = color;
+            hasOutlineColorOverride = true;
+            Apply();
+        }
+
+        /// <summary>액터별 임시 색상을 해제하고 현재 전역 외곽선 색상으로 되돌린다.</summary>
+        public void ClearOutlineColorOverride()
+        {
+            if (!hasOutlineColorOverride) return;
+
+            hasOutlineColorOverride = false;
             Apply();
         }
 
@@ -155,7 +179,9 @@ namespace Common
 
             spriteRenderer.GetPropertyBlock(propertyBlock);
             propertyBlock.SetFloat(OutlineEnabledId, 1f);
-            propertyBlock.SetColor(OutlineColorId, settings.OutlineColor);
+            propertyBlock.SetColor(
+                OutlineColorId,
+                hasOutlineColorOverride ? outlineColorOverride : settings.OutlineColor);
             propertyBlock.SetFloat(OutlineWidthId, settings.OutlineWidth);
             spriteRenderer.SetPropertyBlock(propertyBlock);
         }
