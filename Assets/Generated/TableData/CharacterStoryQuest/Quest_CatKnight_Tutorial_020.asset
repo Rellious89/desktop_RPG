@@ -19,7 +19,7 @@ MonoBehaviour:
     m_TableReference:
       m_TableCollectionName: GUID:11805744adb144cd3bb37f325635e0d9
     m_TableEntryReference:
-      m_KeyId: 22136479744
+      m_KeyId: 30000200020
       m_Key: 
     m_FallbackState: 0
     m_WaitForCompletion: 0
@@ -28,7 +28,7 @@ MonoBehaviour:
     m_TableReference:
       m_TableCollectionName: GUID:11805744adb144cd3bb37f325635e0d9
     m_TableEntryReference:
-      m_KeyId: 22136479747
+      m_KeyId: 30000300020
       m_Key: 
     m_FallbackState: 0
     m_WaitForCompletion: 0
@@ -41,7 +41,7 @@ MonoBehaviour:
   - rewardType: 1
     currency: {fileID: 11400000, guid: 25530e3cfd6944ca4873f62520cd7d22, type: 2}
     item: {fileID: 0}
-    amount: 300
+    amount: 500
   references:
     version: 2
     RefIds: []

@@ -384,6 +384,25 @@ namespace QuestEditorTests
             StringAssert.DoesNotContain("Defeat", cardText);
         }
 
+        [Test]
+        public void Presentation_UsesLocalizationTableForTutorialObjectiveKinds()
+        {
+            CharacterStoryQuestObjectiveDefinition objective = Objective("return", 1);
+            Set(objective, "conditionType", CharacterStoryQuestConditionType.TownReturnCount);
+            var snapshot = new CharacterStoryQuestSnapshot("A", "q", false, false, new List<string>(),
+                new Dictionary<string, int> { { "return", 1 } });
+
+            string title = CharacterStoryQuestPresentation.ConditionTitle(
+                CharacterStoryQuestConditionType.TownReturnCount,
+                key => key == 5 ? "Localized Return" : null);
+            string description = CharacterStoryQuestPresentation.ObjectiveText(
+                objective, snapshot, null, null,
+                key => key == 10005 ? "Localized Progress {0}/{1}" : null);
+
+            Assert.AreEqual("Localized Return", title);
+            Assert.AreEqual("Localized Progress 1/1", description);
+        }
+
         private CharacterStoryQuestObjectiveDefinition Objective(string id, int required)
         {
             CharacterStoryQuestObjectiveDefinition result = ScriptableObject.CreateInstance<CharacterStoryQuestObjectiveDefinition>();

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using Recruitment;
@@ -230,11 +231,17 @@ namespace TableDataEditor.Tests
                 TableDataPaths.CharacterAcquisitionAssetPath("2"));
             CharacterAcquisitionDefinition barbarian = AssetDatabase.LoadAssetAtPath<CharacterAcquisitionDefinition>(
                 TableDataPaths.CharacterAcquisitionAssetPath("3"));
+            CharacterAcquisitionDefinition rabbit = AssetDatabase.LoadAssetAtPath<CharacterAcquisitionDefinition>(
+                TableDataPaths.CharacterAcquisitionAssetPath("5"));
 
             Assert.IsNotNull(elf);
             Assert.IsNotNull(barbarian);
+            Assert.IsNotNull(rabbit);
             Assert.AreEqual("unlock_elfarcher", elf.ConditionId);
             Assert.AreEqual("unlock_barbarian", barbarian.ConditionId);
+            Assert.AreEqual(string.Empty, rabbit.ConditionId,
+                "튜토리얼 고정 모집 대상은 일반 해금 조건으로 먼저 막히지 않아야 합니다.");
+            Assert.IsTrue(rabbit.Enabled);
         }
 
         [Test]
@@ -246,8 +253,22 @@ namespace TableDataEditor.Tests
                     TableDataPaths.RecruitmentPoolAssetPath(
                         RecruitmentPoolEntryDefinition.BuildPairId(LiveRecruitmentTypeId, entryId.ToString())));
                 Assert.IsNotNull(entry, $"pool entry {entryId} 생성 에셋이 없습니다.");
-                Assert.AreEqual(entryId <= 3, entry.Enabled, $"pool entry {entryId}의 enabled가 CSV와 다릅니다.");
+                bool expectedEnabled = entryId <= 3 || entryId == 5;
+                Assert.AreEqual(expectedEnabled, entry.Enabled, $"pool entry {entryId}의 enabled가 CSV와 다릅니다.");
             }
+        }
+
+        [Test]
+        public void GeneratedRecruitmentPoolCatalog_ContainsEveryEnabledAuthoredEntry()
+        {
+            RecruitmentPoolCatalog catalog = AssetDatabase.LoadAssetAtPath<RecruitmentPoolCatalog>(
+                TableDataPaths.RecruitmentPoolCatalogAssetPath);
+            Assert.IsNotNull(catalog);
+
+            CollectionAssert.AreEqual(
+                new[] { "CatKnight", "ElfArcher", "Barbarian", "RabbitHealer" },
+                catalog.Entries.Select(entry => entry.CharacterId).ToArray(),
+                "개별 풀 에셋이 활성화되어도 카탈로그 참조에 빠지면 런타임 모집 후보가 되지 못합니다.");
         }
 
         [Test]

@@ -30,8 +30,14 @@ namespace TableDataEditorTests
             AssertRewards("CatKnight_10003",
                 (CharacterStoryQuestRewardType.Currency, "jewel", 200),
                 (CharacterStoryQuestRewardType.Item, "50001", 3));
-            AssertRewards("CatKnight_Tutorial_020", (CharacterStoryQuestRewardType.Currency, "jewel", 300));
-            AssertRewards("CatKnight_Tutorial_030", (CharacterStoryQuestRewardType.Currency, "jewel", 2000));
+            AssertRewards("CatKnight_Tutorial_010", (CharacterStoryQuestRewardType.Currency, "jewel", 300));
+            AssertRewards("CatKnight_Tutorial_020", (CharacterStoryQuestRewardType.Currency, "jewel", 500));
+            AssertRewards("CatKnight_Tutorial_030", (CharacterStoryQuestRewardType.Currency, "jewel", 700));
+            AssertRewards("CatKnight_Tutorial_040", (CharacterStoryQuestRewardType.Currency, "jewel", 1000));
+            AssertRewards("CatKnight_Tutorial_050", (CharacterStoryQuestRewardType.Currency, "jewel", 500));
+            AssertRewards("CatKnight_Tutorial_060", (CharacterStoryQuestRewardType.Currency, "jewel", 700));
+            AssertRewards("CatKnight_Tutorial_070", (CharacterStoryQuestRewardType.Currency, "jewel", 800));
+            AssertRewards("CatKnight_Tutorial_080", (CharacterStoryQuestRewardType.Currency, "jewel", 1000));
             AssertRewards("CatKnight_Tutorial_150", (CharacterStoryQuestRewardType.Currency, "jewel", 500));
             AssertRewards("CatKnight_Tutorial_200", (CharacterStoryQuestRewardType.Currency, "jewel", 500));
             AssertRewards("Barbarian_10001", (CharacterStoryQuestRewardType.Currency, "jewel", 100));
@@ -61,6 +67,10 @@ namespace TableDataEditorTests
                 CharacterStoryQuestDefinition tutorial = quests.Find(id);
                 AssertQuest(tutorial, "CatKnight", previous, step, false);
                 Assert.IsTrue(tutorial.TutorialStep, id);
+                Assert.AreEqual(30000200000L + step,
+                    tutorial.LocalizedTitle.TableEntryReference.KeyId, id + " title");
+                Assert.AreEqual(30000300000L + step,
+                    tutorial.LocalizedDescription.TableEntryReference.KeyId, id + " description");
                 previous = id;
             }
             Assert.AreEqual("CatKnight_Tutorial_200", quests.Find("CatKnight_10001").PreviousQuestId);
@@ -90,8 +100,18 @@ namespace TableDataEditorTests
 
             Assert.AreEqual(CharacterStoryQuestConditionType.DungeonEnterCount,
                 objectives.ForQuest("CatKnight_Tutorial_010")[0].ConditionType);
-            CollectionAssert.AreEqual(new[] { "ElfArcher" },
+            CollectionAssert.AreEqual(new[] { "RabbitHealer" },
                 objectives.ForQuest("CatKnight_Tutorial_060")[0].TargetIds);
+            foreach (string questId in new[]
+                     {
+                         "CatKnight_Tutorial_080", "CatKnight_Tutorial_090",
+                         "CatKnight_Tutorial_180", "CatKnight_Tutorial_190",
+                         "CatKnight_Tutorial_200",
+                     })
+            {
+                CollectionAssert.AreEqual(new[] { "RabbitHealer" },
+                    objectives.ForQuest(questId)[0].TargetIds, questId);
+            }
             CollectionAssert.AreEqual(new[] { "50007@CatKnight" },
                 objectives.ForQuest("CatKnight_Tutorial_120")[0].TargetIds);
             Assert.AreEqual(CharacterStoryQuestConditionType.ManualCharacterSwitchCount,

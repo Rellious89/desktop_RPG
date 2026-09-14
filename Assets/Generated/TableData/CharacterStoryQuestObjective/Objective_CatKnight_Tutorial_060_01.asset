@@ -16,7 +16,7 @@ MonoBehaviour:
   questId: CatKnight_Tutorial_060
   conditionType: 6
   targetIds:
-  - ElfArcher
+  - RabbitHealer
   requiredValue: 1
   displayOrder: 60
   enabled: 1

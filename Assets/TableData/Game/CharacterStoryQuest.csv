@@ -1,24 +1,4 @@
 quest_id,character_id,$character_name,previous_quest_id,title_category,title_key,description_category,description_key,display_order,tutorial_step,is_final,reward_type1,reward_target_id1,$reward_name1,reward_amount1,reward_type2,reward_target_id2,$reward_name2,reward_amount2,enabled,memo
-CatKnight_Tutorial_010,CatKnight,고양이기사,,9,4,9,10004,10,1,0,,,,,,,,,1,튜토리얼: 던전 입장
-CatKnight_Tutorial_020,CatKnight,고양이기사,CatKnight_Tutorial_010,9,2,9,10002,20,1,0,Currency,jewel,주얼,300,,,,,1,튜토리얼: 몬스터 10마리 처치
-CatKnight_Tutorial_030,CatKnight,고양이기사,CatKnight_Tutorial_020,9,1,9,10001,30,1,0,Currency,jewel,주얼,2000,,,,,1,튜토리얼: 레벨 2 달성 및 여관 건설비 지급
-CatKnight_Tutorial_040,CatKnight,고양이기사,CatKnight_Tutorial_030,9,4,9,10004,40,1,0,,,,,,,,,1,튜토리얼: 마을 복귀
-CatKnight_Tutorial_050,CatKnight,고양이기사,CatKnight_Tutorial_040,9,4,9,10004,50,1,0,,,,,,,,,1,튜토리얼: 여관 완공 확인
-CatKnight_Tutorial_060,CatKnight,고양이기사,CatKnight_Tutorial_050,9,4,9,10004,60,1,0,,,,,,,,,1,튜토리얼: 엘프궁수 고정 모집
-CatKnight_Tutorial_070,CatKnight,고양이기사,CatKnight_Tutorial_060,9,4,9,10004,70,1,0,,,,,,,,,1,튜토리얼: 용병 명부 확인
-CatKnight_Tutorial_080,CatKnight,고양이기사,CatKnight_Tutorial_070,9,4,9,10004,80,1,0,,,,,,,,,1,튜토리얼: 엘프궁수 파티 등록
-CatKnight_Tutorial_090,CatKnight,고양이기사,CatKnight_Tutorial_080,9,4,9,10004,90,1,0,,,,,,,,,1,튜토리얼: 엘프궁수 회복 시작
-CatKnight_Tutorial_100,CatKnight,고양이기사,CatKnight_Tutorial_090,9,4,9,10004,100,1,0,,,,,,,,,1,튜토리얼: 상점 완공 확인
-CatKnight_Tutorial_110,CatKnight,고양이기사,CatKnight_Tutorial_100,9,4,9,10004,110,1,0,,,,,,,,,1,튜토리얼: 행동력 회복 아이템 구매
-CatKnight_Tutorial_120,CatKnight,고양이기사,CatKnight_Tutorial_110,9,4,9,10004,120,1,0,,,,,,,,,1,튜토리얼: 고양이기사에게 아이템 사용
-CatKnight_Tutorial_130,CatKnight,고양이기사,CatKnight_Tutorial_120,9,4,9,10004,130,1,0,,,,,,,,,1,튜토리얼: 고양이기사 행동력 최대
-CatKnight_Tutorial_140,CatKnight,고양이기사,CatKnight_Tutorial_130,9,4,9,10004,140,1,0,,,,,,,,,1,튜토리얼: 두 번째 던전 입장
-CatKnight_Tutorial_150,CatKnight,고양이기사,CatKnight_Tutorial_140,9,2,9,10002,150,1,0,Currency,jewel,주얼,500,,,,,1,튜토리얼: 두 번째 몬스터 처치
-CatKnight_Tutorial_160,CatKnight,고양이기사,CatKnight_Tutorial_150,9,1,9,10001,160,1,0,,,,,,,,,1,튜토리얼: 레벨 3 달성
-CatKnight_Tutorial_170,CatKnight,고양이기사,CatKnight_Tutorial_160,9,4,9,10004,170,1,0,,,,,,,,,1,튜토리얼: 두 번째 마을 복귀
-CatKnight_Tutorial_180,CatKnight,고양이기사,CatKnight_Tutorial_170,9,4,9,10004,180,1,0,,,,,,,,,1,튜토리얼: 엘프궁수 회복 완료
-CatKnight_Tutorial_190,CatKnight,고양이기사,CatKnight_Tutorial_180,9,4,9,10004,190,1,0,,,,,,,,,1,튜토리얼: 엘프궁수 회복소 합류
-CatKnight_Tutorial_200,CatKnight,고양이기사,CatKnight_Tutorial_190,9,4,9,10004,200,1,0,Currency,jewel,주얼,500,,,,,1,튜토리얼: 엘프궁수로 수동 교체
 CatKnight_10001,CatKnight,고양이기사,CatKnight_Tutorial_200,9,1,9,10001,210,0,0,Currency,jewel,주얼,100,,,,,1,
 CatKnight_10002,CatKnight,고양이기사,CatKnight_10001,9,4,9,10004,20,0,0,Currency,jewel,주얼,150,,,,,1,
 CatKnight_10003,CatKnight,고양이기사,CatKnight_10002,9,2,9,10002,30,0,1,Currency,jewel,주얼,200,Item,50001,더미아이템2,3,1,
@@ -28,3 +8,23 @@ Barbarian_10003,Barbarian,바바리안,Barbarian_10002,9,3,9,10003,30,0,1,Curren
 ElfArcher_10001,ElfArcher,엘프궁수,,9,4,9,10004,10,0,0,Currency,jewel,주얼,100,,,,,1,함께 나서는 길 — 출전 파티에 합류해 던전 진입을 경험한다.
 ElfArcher_10002,ElfArcher,엘프궁수,ElfArcher_10001,9,1,9,10001,20,0,0,Currency,jewel,주얼,150,,,,,1,시위를 익히다 — 직접 전투 경험을 쌓아 첫 스킬을 익힌다.
 ElfArcher_10003,ElfArcher,엘프궁수,ElfArcher_10002,9,2,9,10002,30,0,1,Currency,jewel,주얼,200,,,,,1,자신의 사격 — 성장과 직접 처치로 전투 참여를 확인한다.
+CatKnight_Tutorial_010,CatKnight,고양이기사,,9,20010,9,30010,10,1,0,Currency,jewel,주얼,300,,,,,1,튜토리얼: 던전 입장
+CatKnight_Tutorial_020,CatKnight,고양이기사,CatKnight_Tutorial_010,9,20020,9,30020,20,1,0,Currency,jewel,주얼,500,,,,,1,튜토리얼: 몬스터 10마리 처치
+CatKnight_Tutorial_030,CatKnight,고양이기사,CatKnight_Tutorial_020,9,20030,9,30030,30,1,0,Currency,jewel,주얼,700,,,,,1,튜토리얼: 레벨 2 달성
+CatKnight_Tutorial_040,CatKnight,고양이기사,CatKnight_Tutorial_030,9,20040,9,30040,40,1,0,Currency,jewel,주얼,1000,,,,,1,튜토리얼: 마을 복귀 및 여관 건설 재화 누적
+CatKnight_Tutorial_050,CatKnight,고양이기사,CatKnight_Tutorial_040,9,20050,9,30050,50,1,0,Currency,jewel,주얼,500,,,,,1,튜토리얼: 여관 완공 확인
+CatKnight_Tutorial_060,CatKnight,고양이기사,CatKnight_Tutorial_050,9,20060,9,30060,60,1,0,Currency,jewel,주얼,700,,,,,1,튜토리얼: 토끼힐러 고정 모집
+CatKnight_Tutorial_070,CatKnight,고양이기사,CatKnight_Tutorial_060,9,20070,9,30070,70,1,0,Currency,jewel,주얼,800,,,,,1,튜토리얼: 용병 명부 확인
+CatKnight_Tutorial_080,CatKnight,고양이기사,CatKnight_Tutorial_070,9,20080,9,30080,80,1,0,Currency,jewel,주얼,1000,,,,,1,튜토리얼: 토끼힐러 파티 등록
+CatKnight_Tutorial_090,CatKnight,고양이기사,CatKnight_Tutorial_080,9,20090,9,30090,90,1,0,,,,,,,,,1,튜토리얼: 토끼힐러 회복 시작
+CatKnight_Tutorial_100,CatKnight,고양이기사,CatKnight_Tutorial_090,9,20100,9,30100,100,1,0,,,,,,,,,1,튜토리얼: 상점 완공 확인
+CatKnight_Tutorial_110,CatKnight,고양이기사,CatKnight_Tutorial_100,9,20110,9,30110,110,1,0,,,,,,,,,1,튜토리얼: 행동력 회복 아이템 구매
+CatKnight_Tutorial_120,CatKnight,고양이기사,CatKnight_Tutorial_110,9,20120,9,30120,120,1,0,,,,,,,,,1,튜토리얼: 고양이기사에게 아이템 사용
+CatKnight_Tutorial_130,CatKnight,고양이기사,CatKnight_Tutorial_120,9,20130,9,30130,130,1,0,,,,,,,,,1,튜토리얼: 고양이기사 행동력 최대
+CatKnight_Tutorial_140,CatKnight,고양이기사,CatKnight_Tutorial_130,9,20140,9,30140,140,1,0,,,,,,,,,1,튜토리얼: 두 번째 던전 입장
+CatKnight_Tutorial_150,CatKnight,고양이기사,CatKnight_Tutorial_140,9,20150,9,30150,150,1,0,Currency,jewel,주얼,500,,,,,1,튜토리얼: 두 번째 몬스터 처치
+CatKnight_Tutorial_160,CatKnight,고양이기사,CatKnight_Tutorial_150,9,20160,9,30160,160,1,0,,,,,,,,,1,튜토리얼: 레벨 3 달성
+CatKnight_Tutorial_170,CatKnight,고양이기사,CatKnight_Tutorial_160,9,20170,9,30170,170,1,0,,,,,,,,,1,튜토리얼: 두 번째 마을 복귀
+CatKnight_Tutorial_180,CatKnight,고양이기사,CatKnight_Tutorial_170,9,20180,9,30180,180,1,0,,,,,,,,,1,튜토리얼: 토끼힐러 회복 완료
+CatKnight_Tutorial_190,CatKnight,고양이기사,CatKnight_Tutorial_180,9,20190,9,30190,190,1,0,,,,,,,,,1,튜토리얼: 토끼힐러 회복소 합류
+CatKnight_Tutorial_200,CatKnight,고양이기사,CatKnight_Tutorial_190,9,20200,9,30200,200,1,0,Currency,jewel,주얼,500,,,,,1,튜토리얼: 토끼힐러로 수동 교체

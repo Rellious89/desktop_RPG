@@ -11,7 +11,13 @@ namespace Quest
     public static class CharacterStoryQuestPresentation
     {
         public const string QuestTableGuid = "11805744adb144cd3bb37f325635e0d9";
-        public static readonly int[] ObjectiveLocalizationKeys = { 1, 2, 3, 4, 10001, 10002, 10003, 10004, 100002, 100004 };
+        public static readonly int[] ObjectiveLocalizationKeys =
+        {
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+            10001, 10002, 10003, 10004, 10005, 10006, 10007, 10008,
+            10009, 10010, 10011, 10012, 10013, 10014, 10015, 10016,
+            100002, 100004,
+        };
         public static int Progress(CharacterStoryQuestSnapshot snapshot, CharacterStoryQuestObjectiveDefinition objective)
         {
             if (objective == null) return 0;
@@ -70,29 +76,39 @@ namespace Quest
                 case CharacterStoryQuestConditionType.StaminaSpent:
                     return Format(questText, 10003, "행동력 {0} ({1}/{2})", required, current, required);
                 case CharacterStoryQuestConditionType.TownReturnCount:
-                    return $"마을 복귀 ({current}/{required})";
+                    return Format(questText, 10005, "마을 복귀 ({0}/{1})", current, required);
                 case CharacterStoryQuestConditionType.BuildingCompleted:
-                    return $"건물 {FirstTargetOrDash(objective)} 완공 확인 ({current}/{required})";
+                    return Format(questText, 10006, "건물 {0} 완공 확인 ({1}/{2})",
+                        FirstTargetOrDash(objective), current, required);
                 case CharacterStoryQuestConditionType.CharacterOwned:
-                    return $"캐릭터 {FirstTargetOrDash(objective)} 영입 ({current}/{required})";
+                    return Format(questText, 10007, "캐릭터 {0} 영입 ({1}/{2})",
+                        FirstTargetOrDash(objective), current, required);
                 case CharacterStoryQuestConditionType.CharacterArchiveOpenCount:
-                    return $"용병 명부 확인 ({current}/{required})";
+                    return Format(questText, 10008, "용병 명부 확인 ({0}/{1})", current, required);
                 case CharacterStoryQuestConditionType.PartyContainsCharacter:
-                    return $"캐릭터 {FirstTargetOrDash(objective)} 파티 등록 ({current}/{required})";
+                    return Format(questText, 10009, "캐릭터 {0} 파티 등록 ({1}/{2})",
+                        FirstTargetOrDash(objective), current, required);
                 case CharacterStoryQuestConditionType.RecoveryStarted:
-                    return $"캐릭터 {FirstTargetOrDash(objective)} 회복 시작 ({current}/{required})";
+                    return Format(questText, 10010, "캐릭터 {0} 회복 시작 ({1}/{2})",
+                        FirstTargetOrDash(objective), current, required);
                 case CharacterStoryQuestConditionType.CharacterRecoveryComplete:
-                    return $"캐릭터 {FirstTargetOrDash(objective)} 회복 완료 ({current}/{required})";
+                    return Format(questText, 10011, "캐릭터 {0} 회복 완료 ({1}/{2})",
+                        FirstTargetOrDash(objective), current, required);
                 case CharacterStoryQuestConditionType.RecoveryJoined:
-                    return $"캐릭터 {FirstTargetOrDash(objective)} 합류 ({current}/{required})";
+                    return Format(questText, 10012, "캐릭터 {0} 합류 ({1}/{2})",
+                        FirstTargetOrDash(objective), current, required);
                 case CharacterStoryQuestConditionType.ItemPurchaseCount:
-                    return $"아이템 {FirstTargetOrDash(objective)} 구매 ({current}/{required})";
+                    return Format(questText, 10013, "아이템 {0} 구매 ({1}/{2})",
+                        FirstTargetOrDash(objective), current, required);
                 case CharacterStoryQuestConditionType.ItemUseCount:
-                    return $"아이템 {FirstTargetOrDash(objective)} 사용 ({current}/{required})";
+                    return Format(questText, 10014, "아이템 {0} 사용 ({1}/{2})",
+                        FirstTargetOrDash(objective), current, required);
                 case CharacterStoryQuestConditionType.CharacterStaminaFull:
-                    return $"캐릭터 {FirstTargetOrDash(objective)} 행동력 최대 ({current}/{required})";
+                    return Format(questText, 10015, "캐릭터 {0} 행동력 최대 ({1}/{2})",
+                        FirstTargetOrDash(objective), current, required);
                 case CharacterStoryQuestConditionType.ManualCharacterSwitchCount:
-                    return $"캐릭터 {FirstTargetOrDash(objective)} 교체 ({current}/{required})";
+                    return Format(questText, 10016, "캐릭터 {0} 교체 ({1}/{2})",
+                        FirstTargetOrDash(objective), current, required);
                 default:
                     return string.Format("{0}/{1}", current, required);
             }
@@ -130,18 +146,18 @@ namespace Quest
                 case CharacterStoryQuestConditionType.MonsterDefeatCount: return TextOrFallback(questText, 2, "몬스터 처치");
                 case CharacterStoryQuestConditionType.DungeonEnterCount: return TextOrFallback(questText, 4, "던전 입장");
                 case CharacterStoryQuestConditionType.StaminaSpent: return TextOrFallback(questText, 3, "행동력 소모");
-                case CharacterStoryQuestConditionType.TownReturnCount: return "마을 복귀";
-                case CharacterStoryQuestConditionType.BuildingCompleted: return "건물 완공";
-                case CharacterStoryQuestConditionType.CharacterOwned: return "용병 영입";
-                case CharacterStoryQuestConditionType.CharacterArchiveOpenCount: return "용병 명부";
-                case CharacterStoryQuestConditionType.PartyContainsCharacter: return "파티 등록";
-                case CharacterStoryQuestConditionType.RecoveryStarted: return "회복 시작";
-                case CharacterStoryQuestConditionType.CharacterRecoveryComplete: return "회복 완료";
-                case CharacterStoryQuestConditionType.RecoveryJoined: return "합류";
-                case CharacterStoryQuestConditionType.ItemPurchaseCount: return "아이템 구매";
-                case CharacterStoryQuestConditionType.ItemUseCount: return "아이템 사용";
-                case CharacterStoryQuestConditionType.CharacterStaminaFull: return "행동력 회복";
-                case CharacterStoryQuestConditionType.ManualCharacterSwitchCount: return "캐릭터 교체";
+                case CharacterStoryQuestConditionType.TownReturnCount: return TextOrFallback(questText, 5, "마을 복귀");
+                case CharacterStoryQuestConditionType.BuildingCompleted: return TextOrFallback(questText, 6, "건물 완공");
+                case CharacterStoryQuestConditionType.CharacterOwned: return TextOrFallback(questText, 7, "용병 영입");
+                case CharacterStoryQuestConditionType.CharacterArchiveOpenCount: return TextOrFallback(questText, 8, "용병 명부");
+                case CharacterStoryQuestConditionType.PartyContainsCharacter: return TextOrFallback(questText, 9, "파티 등록");
+                case CharacterStoryQuestConditionType.RecoveryStarted: return TextOrFallback(questText, 10, "회복 시작");
+                case CharacterStoryQuestConditionType.CharacterRecoveryComplete: return TextOrFallback(questText, 11, "회복 완료");
+                case CharacterStoryQuestConditionType.RecoveryJoined: return TextOrFallback(questText, 12, "합류");
+                case CharacterStoryQuestConditionType.ItemPurchaseCount: return TextOrFallback(questText, 13, "아이템 구매");
+                case CharacterStoryQuestConditionType.ItemUseCount: return TextOrFallback(questText, 14, "아이템 사용");
+                case CharacterStoryQuestConditionType.CharacterStaminaFull: return TextOrFallback(questText, 15, "행동력 회복");
+                case CharacterStoryQuestConditionType.ManualCharacterSwitchCount: return TextOrFallback(questText, 16, "캐릭터 교체");
                 default: return string.Empty;
             }
         }

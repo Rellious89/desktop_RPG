@@ -3,5 +3,5 @@ Inn_Normal,1,CatKnight,100,1,
 Inn_Normal,2,ElfArcher,60,1,
 Inn_Normal,3,Barbarian,80,1,
 Inn_Normal,4,ElfGuardian,50,0,
-Inn_Normal,5,RabbitHealer,30,0,
+Inn_Normal,5,RabbitHealer,30,1,튜토리얼 고정 모집 대상
 Inn_Normal,6,CatMage,60,0,

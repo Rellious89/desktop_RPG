@@ -58,6 +58,262 @@ MonoBehaviour:
     m_Localized: "\uC544\uBB34 \uB358\uC804"
     m_Metadata:
       m_Items: []
+  - m_Id: 30000050005
+    m_Localized: "마을 복귀"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000050006
+    m_Localized: "건물 완공"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000050007
+    m_Localized: "용병 영입"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000050008
+    m_Localized: "용병 명부"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000050009
+    m_Localized: "파티 등록"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000050010
+    m_Localized: "회복 시작"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000050011
+    m_Localized: "회복 완료"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000050012
+    m_Localized: "합류"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000050013
+    m_Localized: "아이템 구매"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000050014
+    m_Localized: "아이템 사용"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000050015
+    m_Localized: "행동력 회복"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000050016
+    m_Localized: "캐릭터 교체"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000100005
+    m_Localized: "마을 복귀 ({0}/{1})"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000100006
+    m_Localized: "건물 {0} 완공 확인 ({1}/{2})"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000100007
+    m_Localized: "캐릭터 {0} 영입 ({1}/{2})"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000100008
+    m_Localized: "용병 명부 확인 ({0}/{1})"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000100009
+    m_Localized: "캐릭터 {0} 파티 등록 ({1}/{2})"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000100010
+    m_Localized: "캐릭터 {0} 회복 시작 ({1}/{2})"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000100011
+    m_Localized: "캐릭터 {0} 회복 완료 ({1}/{2})"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000100012
+    m_Localized: "캐릭터 {0} 합류 ({1}/{2})"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000100013
+    m_Localized: "아이템 {0} 구매 ({1}/{2})"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000100014
+    m_Localized: "아이템 {0} 사용 ({1}/{2})"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000100015
+    m_Localized: "캐릭터 {0} 행동력 최대 ({1}/{2})"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000100016
+    m_Localized: "캐릭터 {0} 교체 ({1}/{2})"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200010
+    m_Localized: "첫 던전 탐험"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300010
+    m_Localized: "던전에 1회 입장하세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200020
+    m_Localized: "첫 전투"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300020
+    m_Localized: "던전에서 몬스터를 10마리 처치하세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200030
+    m_Localized: "첫 성장"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300030
+    m_Localized: "고양이기사의 레벨을 2까지 올리세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200040
+    m_Localized: "마을로 복귀"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300040
+    m_Localized: "던전 탐험을 마치고 마을로 복귀하세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200050
+    m_Localized: "여관 건설"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300050
+    m_Localized: "여관을 건설하고 완공을 확인하세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200060
+    m_Localized: "새로운 용병"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300060
+    m_Localized: "여관에서 토끼힐러를 모집하세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200070
+    m_Localized: "용병 명부 확인"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300070
+    m_Localized: "용병 명부를 열어 새로 모집한 용병을 확인하세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200080
+    m_Localized: "파티 등록"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300080
+    m_Localized: "토끼힐러를 파티에 등록하세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200090
+    m_Localized: "회복 시작"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300090
+    m_Localized: "행동력이 소진된 토끼힐러를 회복소에 등록하세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200100
+    m_Localized: "상점 건설"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300100
+    m_Localized: "상점을 건설하고 완공을 확인하세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200110
+    m_Localized: "회복 아이템 구매"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300110
+    m_Localized: "상점에서 행동력 회복 아이템을 1개 구매하세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200120
+    m_Localized: "회복 아이템 사용"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300120
+    m_Localized: "구매한 행동력 회복 아이템을 고양이기사에게 사용하세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200130
+    m_Localized: "행동력 회복"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300130
+    m_Localized: "고양이기사의 행동력을 최대치까지 회복하세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200140
+    m_Localized: "다시 던전으로"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300140
+    m_Localized: "두 번째 던전 탐험을 시작하세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200150
+    m_Localized: "전투 훈련"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300150
+    m_Localized: "던전에서 몬스터를 10마리 처치하세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200160
+    m_Localized: "한 단계 더 성장"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300160
+    m_Localized: "고양이기사의 레벨을 3까지 올리세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200170
+    m_Localized: "두 번째 귀환"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300170
+    m_Localized: "던전 탐험을 마치고 마을로 복귀하세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200180
+    m_Localized: "토끼힐러 회복 완료"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300180
+    m_Localized: "토끼힐러의 행동력이 최대치가 될 때까지 회복하세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200190
+    m_Localized: "회복소 합류"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300190
+    m_Localized: "회복이 완료된 토끼힐러를 회복소에서 합류시키세요."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000200200
+    m_Localized: "캐릭터 교체"
+    m_Metadata:
+      m_Items: []
+  - m_Id: 30000300200
+    m_Localized: "현재 캐릭터를 토끼힐러로 교체하세요."
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []
