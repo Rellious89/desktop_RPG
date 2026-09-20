@@ -29,6 +29,10 @@ Shader "KeyBuddy/Actor Outer Outline"
         [PerRendererData] _AlphaTex ("External Alpha", 2D) = "white" {}
         [PerRendererData] _EnableExternalAlpha ("Enable External Alpha", Float) = 0
 
+        // 휴식 이벤트처럼 특정 액터만 일시적으로 채도를 제거할 때 MaterialPropertyBlock으로 전달한다.
+        // 공용 Material 값은 항상 0이며, 렌더러별 상태만 바뀌므로 다른 캐릭터/몬스터에 전파되지 않는다.
+        [HideInInspector] _GrayscaleAmount ("Grayscale Amount", Range(0, 1)) = 0
+
         [Header(Outline)]
         [MaterialToggle] _OutlineEnabled ("Outline Enabled", Float) = 1
         _OutlineColor ("Outline Color", Color) = (0.86, 0.93, 1, 0.85)
@@ -72,6 +76,7 @@ Shader "KeyBuddy/Actor Outer Outline"
             float _OutlineWidth;
             float _OutlineEnabled;
             float _OutlineAlphaCutoff;
+            float _GrayscaleAmount;
 
             // 이 픽셀이 불투명하다고 볼 기준. 이보다 진하면 주변 검사를 아예 건너뛴다(원본 그대로 출력).
             #define OUTLINE_OPAQUE_SKIP 0.999
@@ -147,6 +152,8 @@ Shader "KeyBuddy/Actor Outer Outline"
                 // IN.color = 정점 색 * _Color * _RendererColor. FlashOnCue의 색 변경과 처치/리젠
                 // Fade의 알파가 전부 여기에 들어 있으므로, 원본 출력 경로는 Sprites/Default와 동일하다.
                 fixed4 c = tex * IN.color;
+                fixed grayscale = dot(c.rgb, fixed3(0.299, 0.587, 0.114));
+                c.rgb = lerp(c.rgb, grayscale.xxx, saturate(_GrayscaleAmount));
                 c.rgb *= c.a;
 
                 if (_OutlineEnabled < 0.5 || tex.a >= OUTLINE_OPAQUE_SKIP)
@@ -168,6 +175,11 @@ Shader "KeyBuddy/Actor Outer Outline"
                 // 임계값으로 딱 잘라 판정한다 - 필터링 때문에 알파가 부드럽게 번져도 출력은 항상
                 // "외곽선 색" 아니면 "없음"이라 블러 진 그라데이션이 생기지 않는다.
                 fixed4 outlineColor = _OutlineColor;
+                fixed outlineGrayscale = dot(outlineColor.rgb, fixed3(0.299, 0.587, 0.114));
+                outlineColor.rgb = lerp(
+                    outlineColor.rgb,
+                    outlineGrayscale.xxx,
+                    saturate(_GrayscaleAmount));
                 // 외곽선 RGB는 Flash 등 본체 Tint의 영향을 받지 않고 설정값을 그대로 유지한다.
                 // 알파만 SpriteRenderer 전체 알파를 따라가므로, 몬스터가 Fade-out되면 외곽선도 같이 사라진다.
                 outlineColor.a *= IN.color.a * step(_OutlineAlphaCutoff, neighborAlpha);

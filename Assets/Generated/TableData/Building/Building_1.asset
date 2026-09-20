@@ -31,7 +31,7 @@ MonoBehaviour:
     m_FallbackState: 0
     m_WaitForCompletion: 0
     m_LocalVariables: []
-  buildTimeSeconds: 60
+  buildTimeSeconds: 0
   costCurrencyId: jewel
   costCurrency: {fileID: 11400000, guid: 25530e3cfd6944ca4873f62520cd7d22, type: 2}
   costCurrencyAmount: 2000

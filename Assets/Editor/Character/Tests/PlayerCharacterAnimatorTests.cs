@@ -103,6 +103,25 @@ namespace CharacterEditor.Tests
         }
 
         [Test]
+        public void PartyRestBlock_CancelsAttackWithoutChangingFieldCombatState()
+        {
+            animator.SetCombatEnabled(true);
+            SetField("activeMotion", motion);
+            SetAttackPhase("Windup");
+
+            animator.SetPartyRestCombatBlocked(true);
+
+            Assert.IsTrue(animator.CombatEnabled, "휴식 이벤트가 필드 모드의 전투 허용 상태를 덮어쓰면 안 된다.");
+            Assert.IsTrue(animator.PartyRestCombatBlocked);
+            Assert.AreEqual("None", AttackPhaseName(), "휴식 진입 프레임에 진행 중인 공격을 정리해야 한다.");
+
+            animator.SetPartyRestCombatBlocked(false);
+
+            Assert.IsTrue(animator.CombatEnabled);
+            Assert.IsFalse(animator.PartyRestCombatBlocked);
+        }
+
+        [Test]
         public void Strike_WithoutReentrantChangeContinuesToRecovery()
         {
             Invoke("Strike");

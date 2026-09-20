@@ -544,6 +544,20 @@ MonoBehaviour:
     m_Localized: Lv.{0}
     m_Metadata:
       m_Items: []
+  - m_Id: 17568631058587648
+    m_Localized: "{0}\uC774(\uAC00) \uD30C\uD2F0\uB85C \uBCF5\uADC0\uD558\uC600\uC2B5\uB2C8\uB2E4."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 19570495937568768
+    m_Localized: UnLcok
+    m_Metadata:
+      m_Items: []
+  - m_Id: 19570495954345984
+    m_Localized: 'Time - {1}
+
+      Cost - {2}'
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

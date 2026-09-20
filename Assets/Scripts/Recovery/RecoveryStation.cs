@@ -680,6 +680,19 @@ namespace Recovery
         }
 
         /// <summary>
+        /// 캐릭터를 기준으로 완료 슬롯을 찾아 합류시킨다. 캐릭터 교체처럼 슬롯 번호를 모르는
+        /// 호출부가 저장 슬롯을 직접 순회하거나 지우지 않도록 제공하는 도메인 경로다.
+        /// 완료 판정과 저장/퀘스트/알림 순서는 슬롯 번호 기반 <see cref="TryJoin(int, out CharacterDefinition)"/>
+        /// 에 그대로 위임한다.
+        /// </summary>
+        public bool TryJoinCompleted(CharacterDefinition definition, out CharacterDefinition joined)
+        {
+            joined = null;
+            int slotIndex = IndexOfRecoverySlot(definition);
+            return slotIndex >= 0 && TryJoin(slotIndex, out joined);
+        }
+
+        /// <summary>
         /// 회복이 <b>끝난</b> 캐릭터만 전부 Available로 되돌리고 그 슬롯을 비운다. 아직 진행 중인
         /// 슬롯은 그대로 남는다. 사용자가 버튼을 한 번 누른 동작이므로 저장도 한 번만 한다.
         /// </summary>

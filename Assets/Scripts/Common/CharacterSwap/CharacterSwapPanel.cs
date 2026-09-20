@@ -157,7 +157,8 @@ namespace Common
         /// 넘긴다 - 두 규칙의 소유자가 다르기 때문이다.
         ///
         /// <code>
-        /// 교체 가능   : CharacterRoster.GetSwapBlockReason  (Active/행동력 0/회복 중이면 불가)
+        /// 교체 가능   : CharacterSwapFlow.GetBlockReason
+        ///              (Active/행동력 0/회복 중이면 불가, 회복 완료 후 합류 대기 중이면 가능)
         /// 드래그 가능 : RecoveryStation.CanRegister          (Active/최대치/이미 등록됨/빈 슬롯 없음이면 불가)
         /// </code>
         ///
@@ -177,7 +178,7 @@ namespace Common
                 ? station.GetState(character)
                 : RecoveryCharacterState.Available;
 
-            CharacterRoster.SwapBlockReason swapReason = roster.GetSwapBlockReason(character);
+            CharacterRoster.SwapBlockReason swapReason = CharacterSwapFlow.GetBlockReason(roster, character, station);
             bool canSwap = swapReason == CharacterRoster.SwapBlockReason.None;
 
             // 회복소가 없는 씬/구성에서는 드래그 기능 자체가 없다.
@@ -211,9 +212,9 @@ namespace Common
             CharacterRoster roster = CharacterRoster.Instance;
             if (roster == null) return;
 
-            // 교체할 수 없는 캐릭터는 선택 자체를 남기지 않는다 - 선택 표시만 되고 교체 버튼은 계속
-            // 꺼져 있는 애매한 상태를 만들지 않기 위함이다.
-            if (roster.GetSwapBlockReason(character) != CharacterRoster.SwapBlockReason.None) return;
+            // 회복 완료 캐릭터는 공통 교체 흐름이 합류까지 처리할 수 있으므로 선택 가능하다.
+            // 그 밖에 교체할 수 없는 캐릭터는 선택 자체를 남기지 않는다.
+            if (CharacterSwapFlow.GetBlockReason(roster, character) != CharacterRoster.SwapBlockReason.None) return;
 
             pendingCharacter = character;
             RefreshAllItems();
@@ -225,7 +226,9 @@ namespace Common
             CharacterRoster roster = CharacterRoster.Instance;
             if (roster == null || pendingCharacter == null) return;
 
-            if (!roster.TrySwitchToManual(pendingCharacter, out CharacterRoster.SwapBlockReason reason))
+            CharacterDefinition target = pendingCharacter;
+            if (!CharacterSwapFlow.TrySwitch(
+                    roster, target, out CharacterRoster.SwapBlockReason reason, out bool joinedFromRecovery))
             {
                 // 버튼을 누를 수 있었는데 막혔다면 그 사이 상태가 바뀐 것이다 - 리스트를 최신으로
                 // 되돌려 사용자가 이유를 볼 수 있게 하고, 패널은 닫지 않는다.
@@ -235,6 +238,8 @@ namespace Common
                 UpdateSwapButton();
                 return;
             }
+
+            if (joinedFromRecovery) CharacterSwapFlow.ShowRecoveryReturnToast(target);
 
             RefreshAfterSuccessfulSwap();
         }
@@ -256,7 +261,7 @@ namespace Common
             CharacterRoster roster = CharacterRoster.Instance;
             swapButton.interactable = roster != null
                                       && pendingCharacter != null
-                                      && roster.GetSwapBlockReason(pendingCharacter) == CharacterRoster.SwapBlockReason.None;
+                                      && CharacterSwapFlow.GetBlockReason(roster, pendingCharacter) == CharacterRoster.SwapBlockReason.None;
         }
 
         private void HandleCurrentCharacterChanged(CharacterDefinition character)

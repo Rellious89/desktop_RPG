@@ -238,19 +238,28 @@ namespace Character
 
         public CharacterMotionProfile MotionProfile => motionProfile;
 
-        /// <summary>지금 <b>새 공격 사이클</b>을 시작해도 되는지. 세 조건을 모두 만족해야 한다.
+        /// <summary>지금 <b>새 공격 사이클</b>을 시작해도 되는지. 네 조건을 모두 만족해야 한다.
         ///   - 전투가 허용된 필드 모드다(<see cref="SetCombatEnabled"/> - 마을에서는 false)
+        ///   - 파티 휴식 이벤트가 공격을 막고 있지 않다
         ///   - 공격 가능한 Target이 있다(처치 직후 Fade-out/리젠 대기 중이 아니다)
         ///   - 현재 캐릭터의 행동력이 남아 있다(CharacterRoster)
         /// 진행 중인 공격을 끊는 판단에는 절대 쓰지 않는다 - 새 입력을 받을지, 타격 직후 다음
         /// Windup으로 이어갈지에만 쓴다. 행동력이 0이 되는 순간은 "몬스터를 방금 처치한 순간"이라
         /// 이 값이 false가 되면 다음 몬스터가 리젠돼도 새 전투가 시작되지 않는다.</summary>
         private bool CanStartNewAttack =>
-            combatEnabled && Target.HasAttackableTarget && CharacterRoster.CurrentCharacterCanAct;
+            combatEnabled && !partyRestCombatBlocked
+                          && Target.HasAttackableTarget && CharacterRoster.CurrentCharacterCanAct;
 
         /// <summary>지금 이 캐릭터가 공격을 시작할 수 있는 상태인지(읽기 전용 런타임 상태).
         /// 필드 모드 전환이 이 값을 소유하며, 씬에 그 컨트롤러가 없으면 항상 true다.</summary>
         public bool CombatEnabled => combatEnabled;
+
+        /// <summary>파티 전원이 행동력을 회복하며 쉬는 동안 새 공격 입력을 막는 별도 상태다.
+        /// 필드 모드의 전투 허용 상태와 섞지 않으므로, 휴식이 끝났을 때 던전/마을 전환 상태를
+        /// 임의로 덮어쓰지 않는다.</summary>
+        public bool PartyRestCombatBlocked => partyRestCombatBlocked;
+
+        private bool partyRestCombatBlocked;
 
         /// <summary>
         /// 전투(공격 입력과 공격 시작)를 켜고 끄는 <b>유일한 런타임 진입점</b> - 필드 모드 전환이
@@ -272,6 +281,15 @@ namespace Character
 
             // 몇 번을 다시 꺼도 안전하다(이미 접힌 세션은 아무 이벤트도 만들지 않는다).
             if (!value) CancelActiveAttack();
+        }
+
+        /// <summary>던전 파티 휴식 이벤트가 소유하는 공격 차단 진입점. 차단하는 순간 진행 중인 공격도
+        /// 기존 필드 전환과 같은 정리 경로로 접으며, 해제는 필드 모드의 <see cref="CombatEnabled"/>
+        /// 값을 바꾸지 않고 새 공격 입력만 다시 허용한다.</summary>
+        public void SetPartyRestCombatBlocked(bool blocked)
+        {
+            partyRestCombatBlocked = blocked;
+            if (blocked) CancelActiveAttack();
         }
 
         /// <summary>진행 중이던 공격 사이클을 즉시 접는다 - 프로필 교체와 완전히 같은 정리 경로

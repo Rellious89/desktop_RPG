@@ -74,7 +74,8 @@ namespace Common
             if (confirmButton != null)
             {
                 confirmButton.interactable = roster != null && selectedCharacter != null &&
-                                             roster.GetSwapBlockReason(selectedCharacter) == CharacterRoster.SwapBlockReason.None;
+                                             CharacterSwapFlow.GetBlockReason(roster, selectedCharacter) ==
+                                             CharacterRoster.SwapBlockReason.None;
             }
         }
 
@@ -84,7 +85,9 @@ namespace Common
             if (roster == null || selectedCharacter == null) { RefreshContents(); return; }
 
             // 열려 있는 동안 행동력/회복 상태가 달라질 수 있으므로 반드시 다시 권한을 확인한다.
-            if (!roster.TrySwitchToManual(selectedCharacter, out CharacterRoster.SwapBlockReason reason))
+            CharacterDefinition target = selectedCharacter;
+            if (!CharacterSwapFlow.TrySwitch(
+                    roster, target, out CharacterRoster.SwapBlockReason reason, out bool joinedFromRecovery))
             {
                 if (reason == CharacterRoster.SwapBlockReason.NoStamina)
                 {
@@ -97,6 +100,8 @@ namespace Common
                 RefreshContents();
                 return;
             }
+
+            if (joinedFromRecovery) CharacterSwapFlow.ShowRecoveryReturnToast(target);
 
             Close();
         }

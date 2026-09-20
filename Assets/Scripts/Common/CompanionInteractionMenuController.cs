@@ -25,6 +25,8 @@ namespace Common
         [SerializeField] private RectTransform interactionCanvasRect;
         [SerializeField] private Camera stageCamera;
         [SerializeField] private SpriteRenderer playerRenderer;
+        [Tooltip("던전 휴식 중에는 숨겨진 Player Renderer 대신 활성화된 각 휴식 캐릭터 슬롯을 클릭 기준으로 사용합니다.")]
+        [SerializeField] private DungeonPartyRestEventController dungeonRestEventController;
         [SerializeField] private Vector2 hitPadding = new Vector2(4f, 4f);
 
         [Header("Interaction Menu")]
@@ -81,8 +83,9 @@ namespace Common
         [SerializeField] private UnityEngine.UI.Button returnTownButton;
 
         private readonly List<UnityEngine.UI.Button> menuButtons = new List<UnityEngine.UI.Button>();
-        private RectTransform characterHitRect;
-        private UnityEngine.UI.Button characterHitButton;
+        private readonly List<CharacterHitArea> characterHitAreas = new List<CharacterHitArea>(4);
+        private CharacterHitArea playerCharacterHitArea;
+        private CharacterHitArea[] restCharacterHitAreas = System.Array.Empty<CharacterHitArea>();
         private RectTransform dragInputCaptureRect;
         private Coroutine pendingMenuClose;
         private Coroutine pendingDragClickReset;
@@ -95,6 +98,8 @@ namespace Common
         private bool companionDragActive;
         private bool suppressCharacterClick;
         private float characterPointerDownTime;
+        private int pressedInteractionSlot = -1;
+        private int selectedInteractionSlot = -1;
 
         private void Awake()
         {
@@ -214,41 +219,64 @@ namespace Common
 
         private void CreateCharacterHitArea()
         {
-            if (interactionCanvasRect == null || characterHitRect != null) return;
+            if (interactionCanvasRect == null || playerCharacterHitArea != null) return;
 
-            var hitArea = new GameObject("CompanionCharacterClickArea");
+            playerCharacterHitArea = CreateCharacterHitArea("CompanionCharacterClickArea", -1);
+
+            int restSlotCount = dungeonRestEventController != null
+                ? dungeonRestEventController.InteractionSlotCount
+                : 0;
+            restCharacterHitAreas = new CharacterHitArea[Mathf.Max(0, restSlotCount)];
+            for (int i = 0; i < restCharacterHitAreas.Length; i++)
+            {
+                restCharacterHitAreas[i] = CreateCharacterHitArea($"CompanionRestCharacterClickArea{i + 1}", i);
+            }
+        }
+
+        private CharacterHitArea CreateCharacterHitArea(string objectName, int restSlotIndex)
+        {
+            var hitArea = new GameObject(objectName);
             hitArea.SetActive(false);
             hitArea.layer = interactionCanvasRect.gameObject.layer;
 
-            characterHitRect = hitArea.AddComponent<RectTransform>();
-            characterHitRect.SetParent(interactionCanvasRect, false);
-            characterHitRect.anchorMin = new Vector2(0.5f, 0.5f);
-            characterHitRect.anchorMax = new Vector2(0.5f, 0.5f);
-            characterHitRect.pivot = new Vector2(0.5f, 0.5f);
+            RectTransform hitRect = hitArea.AddComponent<RectTransform>();
+            hitRect.SetParent(interactionCanvasRect, false);
+            hitRect.anchorMin = new Vector2(0.5f, 0.5f);
+            hitRect.anchorMax = new Vector2(0.5f, 0.5f);
+            hitRect.pivot = new Vector2(0.5f, 0.5f);
 
             hitArea.AddComponent<CanvasRenderer>();
             UnityEngine.UI.Image image = hitArea.AddComponent<UnityEngine.UI.Image>();
             image.color = Color.clear;
             image.raycastTarget = true;
 
-            characterHitButton = hitArea.AddComponent<UnityEngine.UI.Button>();
-            characterHitButton.transition = UnityEngine.UI.Selectable.Transition.None;
-            characterHitButton.targetGraphic = image;
+            UnityEngine.UI.Button hitButton = hitArea.AddComponent<UnityEngine.UI.Button>();
+            hitButton.transition = UnityEngine.UI.Selectable.Transition.None;
+            hitButton.targetGraphic = image;
 
             var eventTrigger = hitArea.AddComponent<EventTrigger>();
-            AddPointerTrigger(eventTrigger, EventTriggerType.PointerDown, HandleCharacterPointerDown);
-            AddPointerTrigger(eventTrigger, EventTriggerType.PointerExit, HandleCharacterPointerExit);
-            AddPointerTrigger(eventTrigger, EventTriggerType.PointerUp, HandleCharacterPointerUp);
-            AddPointerTrigger(eventTrigger, EventTriggerType.PointerClick, HandleCharacterPointerClick);
-            AddPointerTrigger(eventTrigger, EventTriggerType.Drag, HandleCharacterPointerDrag);
+            AddPointerTrigger(eventTrigger, EventTriggerType.PointerDown,
+                eventData => HandleCharacterPointerDown(eventData, restSlotIndex));
+            AddPointerTrigger(eventTrigger, EventTriggerType.PointerExit,
+                eventData => HandleCharacterPointerExit(eventData, restSlotIndex));
+            AddPointerTrigger(eventTrigger, EventTriggerType.PointerUp,
+                eventData => HandleCharacterPointerUp(eventData, restSlotIndex));
+            AddPointerTrigger(eventTrigger, EventTriggerType.PointerClick,
+                eventData => HandleCharacterPointerClick(eventData, restSlotIndex));
+            AddPointerTrigger(eventTrigger, EventTriggerType.Drag,
+                eventData => HandleCharacterPointerDrag(eventData, restSlotIndex));
 
             WindowInputRegion inputRegion = hitArea.AddComponent<WindowInputRegion>();
             inputRegion.ReceiveMouseInput = true;
 
             if (menuRoot != null)
             {
-                characterHitRect.SetSiblingIndex(menuRoot.GetSiblingIndex());
+                hitRect.SetSiblingIndex(menuRoot.GetSiblingIndex());
             }
+
+            var result = new CharacterHitArea(hitRect, restSlotIndex);
+            characterHitAreas.Add(result);
+            return result;
         }
 
         private void CreateDragInputCaptureArea()
@@ -283,7 +311,7 @@ namespace Common
             trigger.triggers.Add(entry);
         }
 
-        private void HandleCharacterPointerDown(BaseEventData eventData)
+        private void HandleCharacterPointerDown(BaseEventData eventData, int restSlotIndex)
         {
             if (!(eventData is PointerEventData pointer)
                 || pointer.button != PointerEventData.InputButton.Left
@@ -302,9 +330,10 @@ namespace Common
             companionDragActive = false;
             suppressCharacterClick = false;
             characterPointerDownTime = Time.unscaledTime;
+            pressedInteractionSlot = restSlotIndex;
         }
 
-        private void HandleCharacterPointerUp(BaseEventData eventData)
+        private void HandleCharacterPointerUp(BaseEventData eventData, int ignoredRestSlotIndex)
         {
             if (!(eventData is PointerEventData pointer)
                 || pointer.button != PointerEventData.InputButton.Left)
@@ -317,6 +346,7 @@ namespace Common
             companionDragActive = false;
             SetCompanionDragOutlineActive(false);
             SetDragInputCaptureActive(false);
+            pressedInteractionSlot = -1;
 
             if (!wasDragging) return;
 
@@ -324,7 +354,7 @@ namespace Common
             pendingDragClickReset = StartCoroutine(ClearDragClickSuppressionNextFrame());
         }
 
-        private void HandleCharacterPointerExit(BaseEventData eventData)
+        private void HandleCharacterPointerExit(BaseEventData eventData, int ignoredRestSlotIndex)
         {
             if (!(eventData is PointerEventData) || !characterPointerHeld)
             {
@@ -336,7 +366,7 @@ namespace Common
             if (!companionDragActive) CancelCharacterDrag();
         }
 
-        private void HandleCharacterPointerClick(BaseEventData eventData)
+        private void HandleCharacterPointerClick(BaseEventData eventData, int restSlotIndex)
         {
             if (!(eventData is PointerEventData pointer)
                 || pointer.button != PointerEventData.InputButton.Left)
@@ -350,10 +380,10 @@ namespace Common
                 return;
             }
 
-            ToggleMenu();
+            ToggleMenu(restSlotIndex);
         }
 
-        private void HandleCharacterPointerDrag(BaseEventData eventData)
+        private void HandleCharacterPointerDrag(BaseEventData eventData, int ignoredRestSlotIndex)
         {
             if (!companionDragActive || !(eventData is PointerEventData pointer)) return;
 
@@ -393,6 +423,7 @@ namespace Common
             suppressCharacterClick = false;
             SetCompanionDragOutlineActive(false);
             SetDragInputCaptureActive(false);
+            pressedInteractionSlot = -1;
         }
 
         private void SetCompanionDragOutlineActive(bool active)
@@ -407,10 +438,12 @@ namespace Common
                 return;
             }
 
-            ActorOutlineController target = companionDragOutlineTarget;
-            if (target == null && playerRenderer != null)
+            SpriteRenderer interactionRenderer = ResolveInteractionRenderer(pressedInteractionSlot);
+            bool usingRestCharacter = interactionRenderer != null && interactionRenderer != playerRenderer;
+            ActorOutlineController target = usingRestCharacter ? null : companionDragOutlineTarget;
+            if (target == null && interactionRenderer != null)
             {
-                target = playerRenderer.GetComponent<ActorOutlineController>();
+                target = interactionRenderer.GetComponent<ActorOutlineController>();
             }
             if (target == null) return;
 
@@ -497,12 +530,16 @@ namespace Common
             SetActiveIfNeeded(dungeonMenuRoot, mode == FieldMode.Dungeon);
         }
 
-        private void ToggleMenu()
+        private void ToggleMenu(int interactionSlot)
         {
             if (CurrentPresentationMode() != PresentationMode.Companion) return;
             if (menuRoot == null) return;
 
-            if (menuRoot.gameObject.activeSelf)
+            bool sameOpenTarget = menuRoot.gameObject.activeSelf
+                                  && selectedInteractionSlot == interactionSlot;
+            selectedInteractionSlot = interactionSlot;
+
+            if (sameOpenTarget)
             {
                 CloseMenu();
                 return;
@@ -713,11 +750,101 @@ namespace Common
 
         private void UpdateCharacterScreenLayout()
         {
-            if (!TryGetCharacterScreenRect(out Vector2 screenMin, out Vector2 screenMax))
+            if (CurrentPresentationMode() != PresentationMode.Companion
+                || interactionCanvasRect == null
+                || stageCamera == null)
             {
                 CloseMenu();
                 SetCharacterHitAreaActive(false);
                 return;
+            }
+
+            bool resting = dungeonRestEventController != null && dungeonRestEventController.IsResting;
+            SetHitAreaActive(playerCharacterHitArea, false);
+            for (int i = 0; i < restCharacterHitAreas.Length; i++)
+                SetHitAreaActive(restCharacterHitAreas[i], false);
+
+            bool anyVisible = false;
+            bool selectedVisible = false;
+            int firstVisibleSlot = -1;
+            Vector2 firstRectMin = default;
+            Vector2 firstRectMax = default;
+            Vector2 selectedRectMin = default;
+            Vector2 selectedRectMax = default;
+
+            if (resting)
+            {
+                for (int i = 0; i < restCharacterHitAreas.Length; i++)
+                {
+                    SpriteRenderer renderer = dungeonRestEventController.GetInteractionRenderer(i);
+                    if (!TryApplyRendererToHitArea(restCharacterHitAreas[i], renderer, out Vector2 rectMin, out Vector2 rectMax))
+                        continue;
+
+                    if (!anyVisible)
+                    {
+                        firstVisibleSlot = i;
+                        firstRectMin = rectMin;
+                        firstRectMax = rectMax;
+                    }
+                    anyVisible = true;
+
+                    if (selectedInteractionSlot == i)
+                    {
+                        selectedVisible = true;
+                        selectedRectMin = rectMin;
+                        selectedRectMax = rectMax;
+                    }
+                }
+            }
+            else if (TryApplyRendererToHitArea(
+                         playerCharacterHitArea,
+                         playerRenderer,
+                         out Vector2 rectMin,
+                         out Vector2 rectMax))
+            {
+                anyVisible = true;
+                firstVisibleSlot = -1;
+                firstRectMin = rectMin;
+                firstRectMax = rectMax;
+                selectedVisible = selectedInteractionSlot == -1;
+                selectedRectMin = rectMin;
+                selectedRectMax = rectMax;
+            }
+
+            if (!anyVisible)
+            {
+                CloseMenu();
+                return;
+            }
+
+            if (!selectedVisible)
+            {
+                selectedInteractionSlot = firstVisibleSlot;
+                selectedRectMin = firstRectMin;
+                selectedRectMax = firstRectMax;
+            }
+
+            if (menuRoot != null)
+            {
+                Vector2 characterTop = new Vector2(
+                    (selectedRectMin.x + selectedRectMax.x) * 0.5f,
+                    selectedRectMax.y);
+                menuRoot.anchoredPosition = characterTop + menuOffset;
+            }
+        }
+
+        private bool TryApplyRendererToHitArea(
+            CharacterHitArea hitArea,
+            SpriteRenderer renderer,
+            out Vector2 rectMin,
+            out Vector2 rectMax)
+        {
+            rectMin = default;
+            rectMax = default;
+            if (hitArea == null || !TryGetCharacterScreenRect(renderer, out Vector2 screenMin, out Vector2 screenMax))
+            {
+                SetHitAreaActive(hitArea, false);
+                return false;
             }
 
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
@@ -725,39 +852,36 @@ namespace Common
                 || !RectTransformUtility.ScreenPointToLocalPointInRectangle(
                     interactionCanvasRect, screenMax, null, out Vector2 localMax))
             {
-                CloseMenu();
-                SetCharacterHitAreaActive(false);
-                return;
+                SetHitAreaActive(hitArea, false);
+                return false;
             }
 
-            Vector2 rectMin = Vector2.Min(localMin, localMax);
-            Vector2 rectMax = Vector2.Max(localMin, localMax);
+            rectMin = Vector2.Min(localMin, localMax);
+            rectMax = Vector2.Max(localMin, localMax);
             Vector2 padding = new Vector2(Mathf.Max(0f, hitPadding.x), Mathf.Max(0f, hitPadding.y));
-
-            characterHitRect.anchoredPosition = (rectMin + rectMax) * 0.5f;
-            characterHitRect.sizeDelta = Vector2.Max(rectMax - rectMin + padding * 2f, Vector2.one);
-            SetCharacterHitAreaActive(true);
-
-            if (menuRoot != null)
-            {
-                Vector2 characterTop = new Vector2((rectMin.x + rectMax.x) * 0.5f, rectMax.y);
-                menuRoot.anchoredPosition = characterTop + menuOffset;
-            }
+            hitArea.Rect.anchoredPosition = (rectMin + rectMax) * 0.5f;
+            hitArea.Rect.sizeDelta = Vector2.Max(rectMax - rectMin + padding * 2f, Vector2.one);
+            SetHitAreaActive(hitArea, true);
+            return true;
         }
 
-        private bool TryGetCharacterScreenRect(out Vector2 screenMin, out Vector2 screenMax)
+        private bool TryGetCharacterScreenRect(
+            SpriteRenderer interactionRenderer,
+            out Vector2 screenMin,
+            out Vector2 screenMax)
         {
             screenMin = default;
             screenMax = default;
 
-            if (CurrentPresentationMode() != PresentationMode.Companion) return false;
-            if (interactionCanvasRect == null || stageCamera == null || playerRenderer == null) return false;
-            if (!playerRenderer.enabled || !playerRenderer.gameObject.activeInHierarchy || playerRenderer.sprite == null)
+            if (interactionRenderer == null
+                || !interactionRenderer.enabled
+                || !interactionRenderer.gameObject.activeInHierarchy
+                || interactionRenderer.sprite == null)
             {
                 return false;
             }
 
-            Bounds bounds = playerRenderer.bounds;
+            Bounds bounds = interactionRenderer.bounds;
             Vector3 bottomLeft = stageCamera.WorldToScreenPoint(
                 new Vector3(bounds.min.x, bounds.min.y, bounds.center.z));
             Vector3 topRight = stageCamera.WorldToScreenPoint(
@@ -771,10 +895,26 @@ namespace Common
                                     && screenMax.y >= 0f && screenMin.y <= Screen.height;
         }
 
+        private SpriteRenderer ResolveInteractionRenderer(int restSlotIndex)
+        {
+            if (dungeonRestEventController != null && dungeonRestEventController.IsResting)
+            {
+                return dungeonRestEventController.GetInteractionRenderer(restSlotIndex);
+            }
+
+            return playerRenderer;
+        }
+
         private void SetCharacterHitAreaActive(bool active)
         {
-            if (characterHitRect == null) return;
-            SetActiveIfNeeded(characterHitRect.gameObject, active);
+            for (int i = 0; i < characterHitAreas.Count; i++)
+                SetHitAreaActive(characterHitAreas[i], active);
+        }
+
+        private static void SetHitAreaActive(CharacterHitArea hitArea, bool active)
+        {
+            if (hitArea != null && hitArea.Rect != null)
+                SetActiveIfNeeded(hitArea.Rect.gameObject, active);
         }
 
         private PresentationMode CurrentPresentationMode() =>
@@ -831,6 +971,18 @@ namespace Common
         private static void SetActiveIfNeeded(GameObject target, bool active)
         {
             if (target != null && target.activeSelf != active) target.SetActive(active);
+        }
+
+        private sealed class CharacterHitArea
+        {
+            public CharacterHitArea(RectTransform rect, int restSlotIndex)
+            {
+                Rect = rect;
+                RestSlotIndex = restSlotIndex;
+            }
+
+            public RectTransform Rect { get; }
+            public int RestSlotIndex { get; }
         }
 
         private sealed class MenuButtonEnterState

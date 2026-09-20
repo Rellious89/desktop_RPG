@@ -120,6 +120,7 @@ namespace CommonEditor.Tests
                 Assert.IsNotNull(serializedInteraction.FindProperty("interactionCanvasRect").objectReferenceValue);
                 Assert.IsNotNull(serializedInteraction.FindProperty("stageCamera").objectReferenceValue);
                 Assert.IsNotNull(serializedInteraction.FindProperty("playerRenderer").objectReferenceValue);
+                Assert.IsNotNull(serializedInteraction.FindProperty("dungeonRestEventController").objectReferenceValue);
                 Assert.IsNotNull(serializedInteraction.FindProperty("companionDragTarget").objectReferenceValue);
                 Assert.GreaterOrEqual(serializedInteraction.FindProperty("dragHoldSeconds").floatValue, 0.1f);
 
