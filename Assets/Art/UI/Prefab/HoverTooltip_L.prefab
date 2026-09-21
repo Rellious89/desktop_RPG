@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 5077955899920688541}
   - component: {fileID: 5060686670726830006}
   m_Layer: 5
-  m_Name: HoverTooltip
+  m_Name: HoverTooltip_L
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

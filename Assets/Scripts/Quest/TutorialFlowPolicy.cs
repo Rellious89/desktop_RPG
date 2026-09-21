@@ -129,6 +129,20 @@ namespace Quest
         public static bool CanSwitchCharacter(string characterId) =>
             !IsTutorialActive || HasReached(CharacterStoryQuestConditionType.PartyContainsCharacter);
 
+        /// <summary>
+        /// 회복 완료 캐릭터를 회복소에서 합류시킬 수 있는지 판정한다. 일반 튜토리얼에서는
+        /// RecoveryJoined 목표만 허용하지만, 수동 캐릭터 교체 목표에서는 완료 캐릭터를
+        /// 합류시킨 뒤 즉시 교체하는 흐름이 필요하므로 해당 목표 캐릭터에 한해 예외를 둔다.
+        /// 회복 중 캐릭터의 상태 판정은 호출하는 RecoveryStation이 계속 소유한다.
+        /// </summary>
+        public static bool CanJoinRecovery(string characterId)
+        {
+            if (!IsTutorialActive) return true;
+            if (Allows(CharacterStoryQuestConditionType.RecoveryJoined, characterId)) return true;
+            return IsCurrentStep(CharacterStoryQuestConditionType.ManualCharacterSwitchCount) &&
+                   Allows(CharacterStoryQuestConditionType.ManualCharacterSwitchCount, characterId);
+        }
+
         private static bool MatchesTarget(CharacterStoryQuestObjectiveDefinition objective, string targetId)
         {
             if (objective == null) return false;

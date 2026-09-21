@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   objectiveId: CatKnight_Tutorial_190_01
   questId: CatKnight_Tutorial_190
-  conditionType: 11
+  conditionType: 8
   targetIds:
   - RabbitHealer
   requiredValue: 1

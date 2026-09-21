@@ -118,6 +118,8 @@ namespace TableDataEditorTests
                 objectives.ForQuest("CatKnight_Tutorial_130")[0].TargetIds);
             Assert.AreEqual(CharacterStoryQuestConditionType.ManualCharacterSwitchCount,
                 objectives.ForQuest("CatKnight_Tutorial_200")[0].ConditionType);
+            Assert.AreEqual(CharacterStoryQuestConditionType.PartyContainsCharacter,
+                objectives.ForQuest("CatKnight_Tutorial_190")[0].ConditionType);
         }
 
         [Test]
