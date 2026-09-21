@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using System.Reflection;
 using Common;
+using Character;
+using Inventory;
 using NUnit.Framework;
 using Quest;
 using UnityEditor;
@@ -201,6 +203,67 @@ namespace QuestEditorTests
             Assert.IsNotNull(receipt);
             Assert.IsTrue(data.characterStoryQuests[0].readyToComplete);
             Assert.AreEqual(2, data.characterStoryQuests[0].objectiveProgress.Count);
+        }
+
+        [Test]
+        public void TutorialStaminaItemUse_WhenTargetAlreadyFull_BecomesReadyWithoutConsumingItem()
+        {
+            CharacterStoryQuestDefinition quest = Quest("TutorialUse", "CatKnight", "", false);
+            Set(quest, "tutorialStep", true);
+            CharacterStoryQuestObjectiveDefinition objective = Objective("UseCat", "TutorialUse",
+                CharacterStoryQuestConditionType.ItemUseCount, 1, "50007@CatKnight");
+            CharacterStoryQuestService service = Service(new[] { quest }, new[] { objective });
+
+            CharacterDefinition cat = Create<CharacterDefinition>();
+            Set(cat, "characterId", "CatKnight");
+            Set(cat, "maxStamina", 80);
+            CharacterCatalog characters = Create<CharacterCatalog>();
+            Set(characters, "characters", new List<CharacterDefinition> { cat });
+            var rosterHost = new GameObject("quest-cat-roster-test"); created.Add(rosterHost);
+            rosterHost.SetActive(false);
+            CharacterRoster roster = rosterHost.AddComponent<CharacterRoster>();
+            Set(roster, "catalog", characters);
+            Set(service, "roster", roster);
+
+            ItemDefinition staminaItem = Create<ItemDefinition>();
+            Set(staminaItem, "itemId", "50007");
+            Set(staminaItem, "useEffectType", ItemUseEffectType.RestoreStamina);
+            Set(staminaItem, "useEffectValue", 30);
+            var inventoryHost = new GameObject("quest-cat-inventory-test"); created.Add(inventoryHost);
+            InventoryManager inventory = inventoryHost.AddComponent<InventoryManager>();
+            Set(inventory, "itemCatalog", new List<ItemDefinition> { staminaItem });
+            typeof(InventoryManager).GetMethod("BuildDefinitionLookup", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(inventory, null);
+            Set(service, "inventoryManager", inventory);
+
+            var catState = new CharacterSaveState { characterId = "CatKnight", currentStamina = 79 };
+            var questState = new CharacterStoryQuestSaveState
+                { characterId = "CatKnight", activeQuestId = "TutorialUse" };
+            var data = new SaveData
+            {
+                characters = new List<CharacterSaveState> { catState },
+                characterStoryQuests = new List<CharacterStoryQuestSaveState> { questState },
+            };
+
+            service.EvaluateStateObjectivesWithoutSave(data);
+            Assert.IsFalse(questState.readyToComplete, "아직 행동력이 부족하고 아이템도 쓰지 않았다면 진행하지 않습니다.");
+            Assert.IsEmpty(questState.objectiveProgress);
+
+            catState.currentStamina = 80;
+            service.EvaluateStateObjectivesWithoutSave(data);
+            Assert.IsTrue(questState.readyToComplete, "이미 가득 차서 아이템을 쓸 수 없다면 튜토리얼을 막지 않습니다.");
+            Assert.AreEqual(1, questState.objectiveProgress[0].progress);
+
+            Set(quest, "tutorialStep", false);
+            questState.readyToComplete = false;
+            questState.objectiveProgress.Clear();
+            service.EvaluateStateObjectivesWithoutSave(data);
+            Assert.IsFalse(questState.readyToComplete, "일반 아이템 사용 목표에는 최대 행동력 예외가 없습니다.");
+
+            Set(quest, "tutorialStep", true);
+            Set(staminaItem, "useEffectType", ItemUseEffectType.None);
+            service.EvaluateStateObjectivesWithoutSave(data);
+            Assert.IsFalse(questState.readyToComplete, "회복 아이템이 아닌 튜토리얼 목표는 자동 달성되지 않습니다.");
         }
 
         private CharacterStoryQuestService Service(

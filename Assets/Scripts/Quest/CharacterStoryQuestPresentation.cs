@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using Common;
+using Building;
+using Character;
 using Dungeon;
+using Inventory;
 using UnityEngine.Localization.Tables;
 using UnityEngine;
 
@@ -58,7 +61,10 @@ namespace Quest
             CharacterStoryQuestSnapshot snapshot,
             MonsterCatalog monsterCatalog,
             DungeonCatalog dungeonCatalog,
-            Func<int, string> questText)
+            Func<int, string> questText,
+            BuildingCatalog buildingCatalog = null,
+            CharacterCatalog characterCatalog = null,
+            ItemCatalog itemCatalog = null)
         {
             if (objective == null) return string.Empty;
             int current = Progress(snapshot, objective);
@@ -78,37 +84,37 @@ namespace Quest
                 case CharacterStoryQuestConditionType.TownReturnCount:
                     return Format(questText, 10005, "마을 복귀 ({0}/{1})", current, required);
                 case CharacterStoryQuestConditionType.BuildingCompleted:
-                    return Format(questText, 10006, "건물 {0} 완공 확인 ({1}/{2})",
-                        FirstTargetOrDash(objective), current, required);
+                    return Format(questText, 10006, "기능 {0} 해금 확인 ({1}/{2})",
+                        BuildingTargetName(objective, buildingCatalog), current, required);
                 case CharacterStoryQuestConditionType.CharacterOwned:
                     return Format(questText, 10007, "캐릭터 {0} 영입 ({1}/{2})",
-                        FirstTargetOrDash(objective), current, required);
+                        CharacterTargetName(objective, characterCatalog), current, required);
                 case CharacterStoryQuestConditionType.CharacterArchiveOpenCount:
                     return Format(questText, 10008, "용병 명부 확인 ({0}/{1})", current, required);
                 case CharacterStoryQuestConditionType.PartyContainsCharacter:
                     return Format(questText, 10009, "캐릭터 {0} 파티 등록 ({1}/{2})",
-                        FirstTargetOrDash(objective), current, required);
+                        CharacterTargetName(objective, characterCatalog), current, required);
                 case CharacterStoryQuestConditionType.RecoveryStarted:
                     return Format(questText, 10010, "캐릭터 {0} 회복 시작 ({1}/{2})",
-                        FirstTargetOrDash(objective), current, required);
+                        CharacterTargetName(objective, characterCatalog), current, required);
                 case CharacterStoryQuestConditionType.CharacterRecoveryComplete:
                     return Format(questText, 10011, "캐릭터 {0} 회복 완료 ({1}/{2})",
-                        FirstTargetOrDash(objective), current, required);
+                        CharacterTargetName(objective, characterCatalog), current, required);
                 case CharacterStoryQuestConditionType.RecoveryJoined:
                     return Format(questText, 10012, "캐릭터 {0} 합류 ({1}/{2})",
-                        FirstTargetOrDash(objective), current, required);
+                        CharacterTargetName(objective, characterCatalog), current, required);
                 case CharacterStoryQuestConditionType.ItemPurchaseCount:
                     return Format(questText, 10013, "아이템 {0} 구매 ({1}/{2})",
-                        FirstTargetOrDash(objective), current, required);
+                        ItemTargetName(objective, itemCatalog), current, required);
                 case CharacterStoryQuestConditionType.ItemUseCount:
                     return Format(questText, 10014, "아이템 {0} 사용 ({1}/{2})",
-                        FirstTargetOrDash(objective), current, required);
+                        ItemTargetName(objective, itemCatalog), current, required);
                 case CharacterStoryQuestConditionType.CharacterStaminaFull:
                     return Format(questText, 10015, "캐릭터 {0} 행동력 최대 ({1}/{2})",
-                        FirstTargetOrDash(objective), current, required);
+                        CharacterTargetName(objective, characterCatalog), current, required);
                 case CharacterStoryQuestConditionType.ManualCharacterSwitchCount:
                     return Format(questText, 10016, "캐릭터 {0} 교체 ({1}/{2})",
-                        FirstTargetOrDash(objective), current, required);
+                        CharacterTargetName(objective, characterCatalog), current, required);
                 default:
                     return string.Format("{0}/{1}", current, required);
             }
@@ -170,7 +176,10 @@ namespace Quest
         public static IEnumerable<LocalizedTextReference> ObjectiveTextReferences(
             IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives,
             MonsterCatalog monsterCatalog,
-            DungeonCatalog dungeonCatalog)
+            DungeonCatalog dungeonCatalog,
+            BuildingCatalog buildingCatalog = null,
+            CharacterCatalog characterCatalog = null,
+            ItemCatalog itemCatalog = null)
         {
             foreach (int key in ObjectiveLocalizationKeys) yield return CreateQuestTextReference(key);
             if (objectives == null) yield break;
@@ -180,13 +189,19 @@ namespace Quest
                 if (objective?.TargetIds == null) continue;
                 bool monster = objective.ConditionType == CharacterStoryQuestConditionType.MonsterDefeatCount;
                 bool dungeon = objective.ConditionType == CharacterStoryQuestConditionType.DungeonEnterCount;
-                if (!monster && !dungeon) continue;
+                bool building = objective.ConditionType == CharacterStoryQuestConditionType.BuildingCompleted;
+                bool character = IsCharacterTarget(objective.ConditionType);
+                bool item = IsItemTarget(objective.ConditionType);
+                if (!monster && !dungeon && !building && !character && !item) continue;
                 for (int target = 0; target < objective.TargetIds.Count; target++)
                 {
                     string id = objective.TargetIds[target];
                     LocalizedTextReference reference = monster
                         ? monsterCatalog?.Find(id)?.LocalizedName
-                        : DungeonNameReference(dungeonCatalog, id);
+                        : dungeon ? DungeonNameReference(dungeonCatalog, id)
+                        : building ? buildingCatalog?.Find(id)?.LocalizedFunctionName
+                        : character ? characterCatalog?.Find(id)?.LocalizedName
+                        : itemCatalog?.Find(ItemTargetId(id))?.LocalizedName;
                     if (reference != null && reference.HasReference) yield return reference;
                 }
             }
@@ -214,6 +229,56 @@ namespace Quest
                    !string.IsNullOrWhiteSpace(objective.TargetIds[0])
                 ? objective.TargetIds[0]
                 : "-";
+        }
+
+        private static bool IsItemTarget(CharacterStoryQuestConditionType type)
+        {
+            return type == CharacterStoryQuestConditionType.ItemPurchaseCount ||
+                   type == CharacterStoryQuestConditionType.ItemUseCount;
+        }
+
+        private static string ItemTargetId(string targetId)
+        {
+            return CharacterStoryQuestTarget.TrySplitItemUse(targetId, out string itemId, out _)
+                ? itemId : targetId;
+        }
+
+        private static string ItemTargetName(CharacterStoryQuestObjectiveDefinition objective, ItemCatalog catalog)
+        {
+            string id = ItemTargetId(FirstTargetOrDash(objective));
+            return LocalizedOrId(catalog?.Find(id)?.LocalizedName, id);
+        }
+
+        public static bool IsCharacterTarget(CharacterStoryQuestConditionType type)
+        {
+            switch (type)
+            {
+                case CharacterStoryQuestConditionType.CharacterOwned:
+                case CharacterStoryQuestConditionType.PartyContainsCharacter:
+                case CharacterStoryQuestConditionType.RecoveryStarted:
+                case CharacterStoryQuestConditionType.CharacterRecoveryComplete:
+                case CharacterStoryQuestConditionType.RecoveryJoined:
+                case CharacterStoryQuestConditionType.CharacterStaminaFull:
+                case CharacterStoryQuestConditionType.ManualCharacterSwitchCount:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static string CharacterTargetName(CharacterStoryQuestObjectiveDefinition objective, CharacterCatalog catalog)
+        {
+            string id = FirstTargetOrDash(objective);
+            return LocalizedOrId(catalog?.Find(id)?.LocalizedName, id);
+        }
+
+        private static string BuildingTargetName(CharacterStoryQuestObjectiveDefinition objective, BuildingCatalog catalog)
+        {
+            string id = FirstTargetOrDash(objective);
+            BuildingDefinition building = catalog?.Find(id);
+            return building != null && building.HasLocalizedFunctionName
+                ? LocalizedOrId(building.LocalizedFunctionName, id)
+                : id;
         }
 
         private static string TargetName(CharacterStoryQuestObjectiveDefinition objective, DungeonCatalog catalog,

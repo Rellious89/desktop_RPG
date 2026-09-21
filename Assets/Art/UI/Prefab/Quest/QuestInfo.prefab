@@ -5615,8 +5615,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   questCatalog: {fileID: 11400000, guid: ac4ef6a93ca73405b9e6d3e23b75f32a, type: 2}
   objectiveCatalog: {fileID: 11400000, guid: 25c0dc7582a904651aceb74e9c37cf76, type: 2}
+  characterCatalog: {fileID: 11400000, guid: 5f24823f983054d358a82014246a9fa7, type: 2}
   monsterCatalog: {fileID: 11400000, guid: 0846229ba87f7442a8cabec60e64dd41, type: 2}
   dungeonCatalog: {fileID: 11400000, guid: 5a3dc674fb40a445ba6d768b5775d116, type: 2}
+  buildingCatalog: {fileID: 11400000, guid: d0ec875d301594c0cb66130069403d35, type: 2}
+  itemCatalog: {fileID: 11400000, guid: 749d57bd062ae47619e6dc1de90453fd, type: 2}
   characterInfoPage: {fileID: 0}
   questInfoPage: {fileID: 6715505123224442081}
   swapButton: {fileID: 0}

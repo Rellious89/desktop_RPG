@@ -4,6 +4,7 @@ using Inventory;
 using NUnit.Framework;
 using Recovery;
 using System.Collections.Generic;
+using System;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
@@ -39,7 +40,7 @@ namespace CommonEditor.Tests
             }
             finally
             {
-                Object.DestroyImmediate(item);
+                UnityEngine.Object.DestroyImmediate(item);
             }
         }
 
@@ -60,7 +61,7 @@ namespace CommonEditor.Tests
             }
             finally
             {
-                Object.DestroyImmediate(root);
+                UnityEngine.Object.DestroyImmediate(root);
             }
         }
 
@@ -94,7 +95,7 @@ namespace CommonEditor.Tests
             }
             finally
             {
-                Object.DestroyImmediate(root);
+                UnityEngine.Object.DestroyImmediate(root);
             }
         }
 
@@ -125,7 +126,7 @@ namespace CommonEditor.Tests
             }
             finally
             {
-                Object.DestroyImmediate(parent);
+                UnityEngine.Object.DestroyImmediate(parent);
             }
         }
 
@@ -251,10 +252,90 @@ namespace CommonEditor.Tests
             Assert.AreEqual(0, roster.NotifyCalls);
         }
 
-        private CharacterDefinition NewCharacter()
+        [Test]
+        public void CharacterItemUse_OnRecoveringRabbitHealer_ShortensSlotAndCompletesAtMaximum()
+        {
+            CharacterDefinition rabbit = NewCharacter("RabbitHealer");
+            var roster = new FakeUseRoster(rabbit, 32, 80);
+            var inventory = new FakeUseInventory();
+            DateTime now = new DateTime(2026, 9, 21, 0, 0, 0, DateTimeKind.Utc);
+            var data = new SaveData();
+            data.recoverySlots.Add(new RecoverySlotSaveState
+            {
+                characterId = "RabbitHealer",
+                startStamina = 20,
+                startedAtUtc = RecoveryStation.FormatUtc(now.AddMinutes(-2)),
+                completeAtUtc = RecoveryStation.FormatUtc(now.AddMinutes(8)),
+            });
+            var station = new RecoveryStation(new RecoveryBalance("test", "Jewel", 0, 10, 1),
+                roster, new FakeUseWallet(), () => data, () => true, () => now);
+            int completed = 0;
+            station.RecoveryCompleted += (_, __) => completed++;
+            int saves = 0;
+            var service = new CharacterItemUseService(inventory, roster,
+                () => { saves++; return true; }, station);
+
+            CharacterItemUseResult first = service.TryUse(NewStaminaItem(30), rabbit);
+            Assert.IsTrue(first.Success);
+            Assert.AreEqual(62, roster.Stamina);
+            Assert.AreEqual(50, data.recoverySlots[0].startStamina);
+            Assert.AreEqual(TimeSpan.FromMinutes(3), station.GetSlot(0).Remaining);
+            Assert.AreEqual(0, completed);
+
+            CharacterItemUseResult second = service.TryUse(NewStaminaItem(30), rabbit);
+            Assert.IsTrue(second.Success);
+            Assert.AreEqual(18, second.StaminaRecovered);
+            Assert.AreEqual(80, roster.Stamina);
+            Assert.AreEqual(RecoveryCharacterState.RecoveryComplete, station.GetSlotState(0));
+            Assert.AreEqual(TimeSpan.Zero, station.GetSlot(0).Remaining);
+            Assert.AreEqual(1, completed);
+            Assert.AreEqual(2, saves);
+            Assert.AreEqual(2, inventory.SpendCalls);
+        }
+
+        [Test]
+        public void CharacterItemUse_SaveFailureRestoresRecoverySlotTiming()
+        {
+            CharacterDefinition rabbit = NewCharacter("RabbitHealer");
+            var roster = new FakeUseRoster(rabbit, 32, 80);
+            var inventory = new FakeUseInventory();
+            DateTime now = new DateTime(2026, 9, 21, 0, 0, 0, DateTimeKind.Utc);
+            var data = new SaveData();
+            var slot = new RecoverySlotSaveState
+            {
+                characterId = "RabbitHealer",
+                startStamina = 20,
+                startedAtUtc = RecoveryStation.FormatUtc(now.AddMinutes(-2)),
+                completeAtUtc = RecoveryStation.FormatUtc(now.AddMinutes(8)),
+            };
+            data.recoverySlots.Add(slot);
+            var station = new RecoveryStation(new RecoveryBalance("test", "Jewel", 0, 10, 1),
+                roster, new FakeUseWallet(), () => data, () => true, () => now);
+            int completed = 0;
+            station.RecoveryCompleted += (_, __) => completed++;
+            var service = new CharacterItemUseService(inventory, roster, () => false, station);
+
+            CharacterItemUseResult result = service.TryUse(NewStaminaItem(50), rabbit);
+
+            Assert.AreEqual(CharacterItemUseResultCode.SaveFailed, result.Code);
+            Assert.AreEqual(32, roster.Stamina);
+            Assert.AreEqual(20, slot.startStamina);
+            Assert.AreEqual(RecoveryStation.FormatUtc(now.AddMinutes(8)), slot.completeAtUtc);
+            Assert.AreEqual(1, inventory.RefundCalls);
+            Assert.AreEqual(0, completed);
+            Assert.AreEqual(0, roster.NotifyCalls);
+        }
+
+        private CharacterDefinition NewCharacter(string characterId = null)
         {
             CharacterDefinition character = ScriptableObject.CreateInstance<CharacterDefinition>();
             created.Add(character);
+            if (!string.IsNullOrEmpty(characterId))
+            {
+                var serialized = new SerializedObject(character);
+                serialized.FindProperty("characterId").stringValue = characterId;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
             return character;
         }
 
@@ -382,8 +463,9 @@ namespace CommonEditor.Tests
             public IReadOnlyList<CharacterDefinition> RecoverableCharacters => new[] { character };
             public CharacterDefinition CurrentCharacter => character;
             public bool Contains(CharacterDefinition definition) => ReferenceEquals(character, definition);
-            public CharacterDefinition FindById(string characterId) => null;
-            public string GetCharacterId(CharacterDefinition definition) => string.Empty;
+            public CharacterDefinition FindById(string characterId) =>
+                string.Equals(character.CharacterId, characterId, StringComparison.Ordinal) ? character : null;
+            public string GetCharacterId(CharacterDefinition definition) => definition != null ? definition.CharacterId : null;
             public int GetStamina(CharacterDefinition definition) => Contains(definition) ? Stamina : 0;
             public int GetMaxStamina(CharacterDefinition definition) => Contains(definition) ? Maximum : 0;
             public bool ApplyRecoveryStamina(CharacterDefinition definition, int value)
@@ -396,6 +478,15 @@ namespace CommonEditor.Tests
             {
                 if (Contains(definition)) NotifyCalls++;
             }
+        }
+
+        private sealed class FakeUseWallet : IRecoveryWallet
+        {
+            public string CurrencyId => "Jewel";
+            public int Balance => int.MaxValue;
+            public bool TrySpendWithoutSave(int amount) => true;
+            public void RefundWithoutSave(int amount) { }
+            public void NotifyChangedAfterExternalSave() { }
         }
     }
 }

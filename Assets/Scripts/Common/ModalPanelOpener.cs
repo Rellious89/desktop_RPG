@@ -33,12 +33,14 @@ namespace Common
 
         private void OnEnable()
         {
-            button.onClick.AddListener(OpenPanel);
+            if (button == null) button = GetComponent<Button>();
+            if (button != null) button.onClick.AddListener(OpenPanel);
         }
 
         private void OnDisable()
         {
-            button.onClick.RemoveListener(OpenPanel);
+            if (button == null) button = GetComponent<Button>();
+            if (button != null) button.onClick.RemoveListener(OpenPanel);
         }
 
         public void OpenPanel()

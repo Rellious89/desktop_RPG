@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using Building;
 using Character;
 using Common;
 using Dungeon;
+using Inventory;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -34,8 +36,11 @@ namespace Quest
         [SerializeField] private float objectiveLineSpacing = 16f;
 
         [Header("Objective Localization")]
+        [SerializeField] private CharacterCatalog characterCatalog;
         [SerializeField] private MonsterCatalog monsterCatalog;
         [SerializeField] private DungeonCatalog dungeonCatalog;
+        [SerializeField] private BuildingCatalog buildingCatalog;
+        [SerializeField] private ItemCatalog itemCatalog;
 
         [Header("Reward")]
         [SerializeField] private GameObject rewardRoot;
@@ -76,7 +81,7 @@ namespace Quest
                                              clearSelectedSprite != null &&
                                              portrait != null && levelText != null && nameText != null &&
                                              questTitleText != null && allClearText != null && objectiveLineTemplate != null &&
-                                             monsterCatalog != null && dungeonCatalog != null &&
+                                             characterCatalog != null && monsterCatalog != null && dungeonCatalog != null && buildingCatalog != null && itemCatalog != null &&
                                              rewardRoot != null && rewardCurrencyRoot != null && rewardCurrencyAmountText != null &&
                                              rewardItemRoot != null && rewardItemSlot != null && rewardItemAmountText != null &&
                                              completeButton != null && completeButtonText != null;
@@ -185,7 +190,7 @@ namespace Quest
             {
                 TMP_Text line = GetOrCreateObjectiveLine(i);
                 if (line != null) line.text = CharacterStoryQuestPresentation.ObjectiveText(
-                    objectives[i], snapshot, monsterCatalog, dungeonCatalog, QuestText);
+                    objectives[i], snapshot, monsterCatalog, dungeonCatalog, QuestText, buildingCatalog, characterCatalog, itemCatalog);
             }
             SetLinesActive(count);
         }
@@ -193,7 +198,7 @@ namespace Quest
         private void BindObjectiveLocalization(IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives)
         {
             foreach (LocalizedTextReference reference in CharacterStoryQuestPresentation.ObjectiveTextReferences(
-                objectives, monsterCatalog, dungeonCatalog))
+                objectives, monsterCatalog, dungeonCatalog, buildingCatalog, characterCatalog, itemCatalog))
             {
                 if (reference == null || !reference.HasReference || objectiveLocalizationHandlers.ContainsKey(reference)) continue;
                 LocalizedString.ChangeHandler handler = value =>

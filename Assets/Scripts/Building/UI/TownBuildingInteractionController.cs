@@ -91,6 +91,9 @@ namespace Building
                  "<b>바깥</b>에 있어야 한다 - 안에 있으면 한 번 끈 뒤 스스로 다시 켤 수 없다.")]
         [SerializeField] private GameObject interactionRoot;
 
+        [Tooltip("구형 월드 앵커 건축 버튼/타이머/완료 버튼의 표시. 끄면 이 세 요소만 숨기고, 용병 모집 UI가 함께 쓰는 상위 레이어는 건드리지 않는다.")]
+        [SerializeField] private bool showWorldInteraction = true;
+
         [Tooltip("버튼 위치를 계산할 기준 사각형(TownInteractionLayer/Interaction). btn_Build_Inn의 " +
                  "부모여야 한다 - 화면 좌표를 이 사각형의 로컬 좌표로 바꿔 anchoredPosition에 넣는다.")]
         [SerializeField] private RectTransform interactionParent;
@@ -268,6 +271,9 @@ namespace Building
         /// <summary>이 컨트롤러가 쓰는 건설 서비스. 인벤토리가 연결되지 않았으면 null이다(진단용).</summary>
         public BuildingConstructionService ConstructionService => constructionService;
 
+        /// <summary>메뉴 해금 UI가 같은 건물 정의와 건설 서비스를 재사용한다.</summary>
+        public BuildingDefinition Building => building;
+
         /// <summary>이 버튼이 맡은 건물의 건설이 이미 시작됐는지. 판정의 근거는 저장 기록 하나이며,
         /// <b>완성 시각이 지났는지는 보지 않는다</b> - 기록이 있으면 건설 버튼은 다시 나오지 않는다.
         /// 서비스나 정의가 없으면 "아직 시작하지 않았다"로 본다(감출 근거가 없다).</summary>
@@ -325,7 +331,16 @@ namespace Building
                 visible = true;
             }
 
-            SetInteractionVisible(visible);
+            if (showWorldInteraction)
+            {
+                SetInteractionVisible(visible);
+            }
+            else
+            {
+                // TownInteractionLayer에는 여관 모집 UI도 있으므로 건축 UI를 끈다는 이유로
+                // 공용 루트를 비활성화하지 않는다. 개별 요소는 ApplyConstructionVisibility가 숨긴다.
+                IsInteractionVisible = false;
+            }
         }
 
         /// <summary>지금 단계를 서비스에 물어본다. 서비스나 정의가 없으면 "아직 시작하지 않았다"로
@@ -365,11 +380,11 @@ namespace Building
         {
             SetActiveIfNeeded(
                 buildButton != null ? buildButton.gameObject : null,
-                status.Phase == BuildingConstructionPhase.NotStarted);
+                showWorldInteraction && status.Phase == BuildingConstructionPhase.NotStarted);
             SetActiveIfNeeded(
-                constructionTimerRoot, status.Phase == BuildingConstructionPhase.InProgress);
+                constructionTimerRoot, showWorldInteraction && status.Phase == BuildingConstructionPhase.InProgress);
             SetActiveIfNeeded(
-                openInnButton, status.Phase == BuildingConstructionPhase.AwaitingConfirmation);
+                openInnButton, showWorldInteraction && status.Phase == BuildingConstructionPhase.AwaitingConfirmation);
         }
 
         /// <summary>

@@ -117,6 +117,73 @@ namespace Recovery
 
         public RecoveryBalance Balance => balance;
 
+        /// <summary>아이템 사용과 같은 외부 저장 트랜잭션에서 회복소 시간 변경을 되돌리기 위한 값.</summary>
+        public readonly struct ItemRecoveryAdjustment
+        {
+            public readonly int SlotIndex;
+            public readonly string CharacterId;
+            public readonly int StartStamina;
+            public readonly string CompleteAtUtc;
+
+            public ItemRecoveryAdjustment(int slotIndex, string characterId, int startStamina, string completeAtUtc)
+            {
+                SlotIndex = slotIndex;
+                CharacterId = characterId;
+                StartStamina = startStamina;
+                CompleteAtUtc = completeAtUtc;
+            }
+        }
+
+        /// <summary>
+        /// 회복 중인 대상에게 사용한 아이템의 실제 회복량을 시간 기반 진행에도 더한다.
+        /// 시작 시각을 유지해 이미 진행된 부분 단위 시간이 사라지지 않게 하고, 저장은 호출자가
+        /// 아이템 소비·행동력·퀘스트 변경과 함께 한 번만 수행한다.
+        /// </summary>
+        public ItemRecoveryAdjustment? ApplyItemRecoveryWithoutSave(CharacterDefinition character, int recovered)
+        {
+            if (!balance.IsValid || character == null || recovered <= 0) return null;
+            int slotIndex = IndexOfRecoverySlot(character);
+            if (slotIndex < 0) return null;
+
+            RecoverySlotSaveState slot = GetSlots()[slotIndex];
+            if (!TryParseUtc(slot.startedAtUtc, out DateTime startedAt)) return null;
+            int maxStamina = roster.GetMaxStamina(character);
+            if (maxStamina <= 0) return null;
+
+            var previous = new ItemRecoveryAdjustment(slotIndex, slot.characterId,
+                slot.startStamina, slot.completeAtUtc);
+            slot.startStamina = (int)Math.Min(maxStamina, (long)slot.startStamina + recovered);
+            DateTime acceleratedCompleteAt = startedAt + balance.GetDuration(maxStamina - slot.startStamina);
+            if (!TryParseUtc(slot.completeAtUtc, out DateTime previousCompleteAt) ||
+                acceleratedCompleteAt < previousCompleteAt)
+                slot.completeAtUtc = FormatUtc(acceleratedCompleteAt);
+            return previous;
+        }
+
+        public void RollbackItemRecovery(ItemRecoveryAdjustment? adjustment)
+        {
+            if (!adjustment.HasValue) return;
+            ItemRecoveryAdjustment previous = adjustment.Value;
+            List<RecoverySlotSaveState> slots = GetSlots();
+            if (previous.SlotIndex < 0 || previous.SlotIndex >= slots.Count) return;
+            RecoverySlotSaveState slot = slots[previous.SlotIndex];
+            if (!string.Equals(slot.characterId, previous.CharacterId, StringComparison.Ordinal)) return;
+            slot.startStamina = previous.StartStamina;
+            slot.completeAtUtc = previous.CompleteAtUtc;
+        }
+
+        public void NotifyItemRecoveryAfterExternalSave(ItemRecoveryAdjustment? adjustment)
+        {
+            if (!adjustment.HasValue) return;
+            ItemRecoveryAdjustment changed = adjustment.Value;
+            CharacterDefinition character = roster.FindById(changed.CharacterId);
+            if (character == null) return;
+            StaminaStepChanged?.Invoke(character, roster.GetStamina(character), roster.GetMaxStamina(character));
+            if (IsSlotCompleteNow(changed.SlotIndex) && completionReported.Add(changed.SlotIndex))
+                RecoveryCompleted?.Invoke(changed.SlotIndex, character);
+            SlotsChanged?.Invoke();
+        }
+
         public int PendingCount
         {
             get
@@ -921,10 +988,11 @@ namespace Recovery
                 ? ComputeCurrentStamina(slot, character, startedAt, now, maxStamina)
                 : slot.startStamina;
 
-            TimeSpan remaining = completeAt > now ? completeAt - now : TimeSpan.Zero;
             RecoveryCharacterState state = IsSlotCompleteNow(slotIndex)
                 ? RecoveryCharacterState.RecoveryComplete
                 : RecoveryCharacterState.Recovering;
+            TimeSpan remaining = state == RecoveryCharacterState.RecoveryComplete || completeAt <= now
+                ? TimeSpan.Zero : completeAt - now;
 
             return new RecoverySlotView(slotIndex, character, state, current, maxStamina,
                                         startedAt, completeAt, remaining,

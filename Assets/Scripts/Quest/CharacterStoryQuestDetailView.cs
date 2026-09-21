@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using Building;
+using Character;
 using Common;
 using Dungeon;
+using Inventory;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Localization;
@@ -41,8 +44,11 @@ namespace Quest
         [SerializeField] private TMP_Text completeButtonText;
 
         [Header("Objective Localization")]
+        [SerializeField] private CharacterCatalog characterCatalog;
         [SerializeField] private MonsterCatalog monsterCatalog;
         [SerializeField] private DungeonCatalog dungeonCatalog;
+        [SerializeField] private BuildingCatalog buildingCatalog;
+        [SerializeField] private ItemCatalog itemCatalog;
 
         private readonly List<TMP_Text> typeLines = new List<TMP_Text>();
         private readonly List<TMP_Text> descriptionLines = new List<TMP_Text>();
@@ -69,7 +75,7 @@ namespace Quest
                                              questTitleText != null && questDescriptionText != null &&
                                              objectiveTypeLineTemplate != null && objectiveDescriptionLineTemplate != null &&
                                              progressSlider != null && progressPercentText != null && objectiveScroll != null &&
-                                             monsterCatalog != null && dungeonCatalog != null &&
+                                             characterCatalog != null && monsterCatalog != null && dungeonCatalog != null && buildingCatalog != null && itemCatalog != null &&
                                              rewardRoot != null && rewardCurrencyRoot != null && rewardCurrencyAmountText != null &&
                                              rewardItemRoot != null && rewardItemSlot != null &&
                                              completeButton != null && completeButtonText != null;
@@ -168,7 +174,7 @@ namespace Quest
                 TMP_Text description = GetOrCreateLine(objectiveDescriptionLineTemplate, descriptionLines, i);
                 if (type != null) type.text = CharacterStoryQuestPresentation.ConditionTitle(objectives[i].ConditionType, QuestText);
                 if (description != null) description.text = CharacterStoryQuestPresentation.ObjectiveText(
-                    objectives[i], snapshot, monsterCatalog, dungeonCatalog, QuestText);
+                    objectives[i], snapshot, monsterCatalog, dungeonCatalog, QuestText, buildingCatalog, characterCatalog, itemCatalog);
             }
             SetLinesActive(typeLines, count);
             SetLinesActive(descriptionLines, count);
@@ -297,7 +303,7 @@ namespace Quest
         private void BindObjectiveLocalization(IReadOnlyList<CharacterStoryQuestObjectiveDefinition> objectives)
         {
             foreach (LocalizedTextReference reference in CharacterStoryQuestPresentation.ObjectiveTextReferences(
-                objectives, monsterCatalog, dungeonCatalog))
+                objectives, monsterCatalog, dungeonCatalog, buildingCatalog, characterCatalog, itemCatalog))
             {
                 if (reference == null || !reference.HasReference || objectiveLocalizationHandlers.ContainsKey(reference)) continue;
                 LocalizedString.ChangeHandler handler = value =>

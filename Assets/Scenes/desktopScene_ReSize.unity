@@ -6312,6 +6312,7 @@ MonoBehaviour:
   stageCamera: {fileID: 2046182837}
   uiAnchor: {fileID: 392733944}
   interactionRoot: {fileID: 639766286}
+  showWorldInteraction: 0
   interactionParent: {fileID: 1358418168}
   buildButton: {fileID: 1127613350}
   openInnButton: {fileID: 976232702}
@@ -6612,6 +6613,7 @@ GameObject:
   - component: {fileID: 468841867}
   - component: {fileID: 468841868}
   - component: {fileID: 468841869}
+  - component: {fileID: 9175836196665670250}
   m_Layer: 0
   m_Name: FieldSystem
   m_TagString: Untagged
@@ -6745,6 +6747,7 @@ MonoBehaviour:
   stageCamera: {fileID: 2046182837}
   uiAnchor: {fileID: 351379136}
   interactionRoot: {fileID: 639766286}
+  showWorldInteraction: 0
   interactionParent: {fileID: 2065249270}
   buildButton: {fileID: 1017242664}
   openInnButton: {fileID: 940358989}
@@ -6861,6 +6864,7 @@ MonoBehaviour:
   stageCamera: {fileID: 2046182837}
   uiAnchor: {fileID: 96665347}
   interactionRoot: {fileID: 639766286}
+  showWorldInteraction: 0
   interactionParent: {fileID: 597025922}
   buildButton: {fileID: 1109028176}
   openInnButton: {fileID: 938732506}
@@ -16341,7 +16345,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1090761469
 Transform:
   m_ObjectHideFlags: 0
@@ -17579,7 +17583,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1140199824}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8a5036cb8c0b4baf8e512cfd204998f1, type: 3}
   m_Name: 
@@ -20840,19 +20844,19 @@ MonoBehaviour:
     showInTown: 1
     showInDungeon: 0
     panelToCloseWhenHidden: {fileID: 6525342035292623680}
-    requiredBuildingId: 1
+    requiredBuildingId: 
   - label: "\uAE30\uB3C4"
     buttonRoot: {fileID: 1140199824}
     showInTown: 1
     showInDungeon: 0
     panelToCloseWhenHidden: {fileID: 7599717200964692829}
-    requiredBuildingId: 2
+    requiredBuildingId: 
   - label: "\uC0C1\uC810"
     buttonRoot: {fileID: 2133339270}
     showInTown: 1
     showInDungeon: 0
     panelToCloseWhenHidden: {fileID: 2587038583982536830}
-    requiredBuildingId: 3
+    requiredBuildingId: 
   - label: "\uD018\uC2A4\uD2B8"
     buttonRoot: {fileID: 457711798}
     showInTown: 1
@@ -24956,7 +24960,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1892224294
 Transform:
   m_ObjectHideFlags: 0
@@ -26268,7 +26272,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2002873700}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8a5036cb8c0b4baf8e512cfd204998f1, type: 3}
   m_Name: 
@@ -31350,6 +31354,8 @@ MonoBehaviour:
   inputBlocker: {fileID: 0}
   inputBlockerColor: {r: 0, g: 0, b: 0, a: 0}
   buildingNameText: {fileID: 8863256914932539407}
+  showFunctionPresentation: 1
+  functionIcon: {fileID: 5624327188146158877}
   descriptionText: {fileID: 4068035043359861317}
   warningText: {fileID: 4007930007141218836}
   descriptionFormat:
@@ -39153,6 +39159,47 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 0
+--- !u!114 &9175836196665670250
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 468841860}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d961a7d5c154097bfc1c0c049fc8e21, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  inventoryManager: {fileID: 1047247884}
+  fieldModeManager: {fileID: 468841861}
+  unlockPopup: {fileID: 2409668541357468157}
+  entries:
+  - menuButton: {fileID: 328858090}
+    companionButton: {fileID: 767773451}
+    townBuilding: {fileID: 468841867}
+    lockIcon: {fileID: 249419908}
+    unlockIcon: {fileID: 564685258}
+    decoration: {fileID: 870500497}
+    companionDecoration: {fileID: 1184259438}
+    timerText: {fileID: 45989074}
+  - menuButton: {fileID: 1140199831}
+    companionButton: {fileID: 2002873707}
+    townBuilding: {fileID: 468841869}
+    lockIcon: {fileID: 910662742}
+    unlockIcon: {fileID: 966971156}
+    decoration: {fileID: 608265418}
+    companionDecoration: {fileID: 410941469}
+    timerText: {fileID: 2020305844}
+  - menuButton: {fileID: 2133339277}
+    companionButton: {fileID: 215398336}
+    townBuilding: {fileID: 445422826}
+    lockIcon: {fileID: 1783966893}
+    unlockIcon: {fileID: 1932508239}
+    decoration: {fileID: 208674226}
+    companionDecoration: {fileID: 2019555554}
+    timerText: {fileID: 74596392}
+  maxDisplayedSeconds: 30
 --- !u!222 &9185687543140812854
 CanvasRenderer:
   m_ObjectHideFlags: 0

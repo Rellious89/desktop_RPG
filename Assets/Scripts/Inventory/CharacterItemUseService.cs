@@ -47,13 +47,16 @@ namespace Inventory
         private readonly ICharacterItemUseInventory inventory;
         private readonly IRecoveryRoster roster;
         private readonly Func<bool> saveAction;
+        private readonly RecoveryStation recoveryStation;
 
         public CharacterItemUseService(
-            ICharacterItemUseInventory inventory, IRecoveryRoster roster, Func<bool> saveAction)
+            ICharacterItemUseInventory inventory, IRecoveryRoster roster, Func<bool> saveAction,
+            RecoveryStation recoveryStation = null)
         {
             this.inventory = inventory;
             this.roster = roster;
             this.saveAction = saveAction;
+            this.recoveryStation = recoveryStation;
         }
 
         public CharacterItemUseResult TryUse(ItemDefinition item, CharacterDefinition target)
@@ -90,10 +93,17 @@ namespace Inventory
                 return new CharacterItemUseResult(CharacterItemUseResultCode.TargetUnavailable);
             }
 
-            CharacterStoryQuestMutationReceipt questReceipt = CharacterStoryQuestService.Instance != null
-                ? CharacterStoryQuestService.Instance.ApplyGlobalActionWithoutSave(
+            RecoveryStation.ItemRecoveryAdjustment? recoveryAdjustment =
+                recoveryStation?.ApplyItemRecoveryWithoutSave(target, recovered);
+
+            CharacterStoryQuestService questService = CharacterStoryQuestService.Instance;
+            CharacterStoryQuestMutationReceipt questReceipt = questService != null
+                ? questService.ApplyGlobalActionWithoutSave(
                     SaveSystem.Data, CharacterStoryQuestConditionType.ItemUseCount,
                     CharacterStoryQuestTarget.ItemUse(item.ItemId, roster.GetCharacterId(target)))
+                : null;
+            CharacterStoryQuestMutationReceipt stateReceipt = questService != null
+                ? questService.EvaluateStateObjectivesWithoutSave(SaveSystem.Data)
                 : null;
 
             bool saved;
@@ -108,14 +118,18 @@ namespace Inventory
 
             if (!saved)
             {
-                CharacterStoryQuestService.Instance?.Rollback(questReceipt);
+                questService?.Rollback(stateReceipt);
+                questService?.Rollback(questReceipt);
+                recoveryStation?.RollbackItemRecovery(recoveryAdjustment);
                 roster.ApplyRecoveryStamina(target, before);
                 inventory.RefundCostWithoutSave(receipt);
                 return new CharacterItemUseResult(CharacterItemUseResultCode.SaveFailed);
             }
 
             inventory.NotifyChangedAfterExternalSave();
-            CharacterStoryQuestService.Instance?.NotifyReadyAfterExternalSave(questReceipt);
+            questService?.NotifyReadyAfterExternalSave(questReceipt);
+            questService?.NotifyReadyAfterExternalSave(stateReceipt);
+            recoveryStation?.NotifyItemRecoveryAfterExternalSave(recoveryAdjustment);
             roster.RaiseCharacterStateChanged(target);
             return new CharacterItemUseResult(CharacterItemUseResultCode.Used, recovered);
         }

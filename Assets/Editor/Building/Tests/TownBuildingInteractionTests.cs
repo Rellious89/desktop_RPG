@@ -223,6 +223,25 @@ namespace BuildingEditor.Tests
         }
 
         [Test]
+        public void 월드_건축_UI를_숨겨도_공용_레이어와_용병_모집_UI는_유지된다()
+        {
+            Fixture fixture = CreateFixture();
+            var recruitmentRoot = new GameObject("RecruitmentStandby", typeof(RectTransform));
+            created.Add(recruitmentRoot);
+            recruitmentRoot.transform.SetParent(fixture.InteractionRoot.transform, false);
+
+            var so = new SerializedObject(fixture.Controller);
+            so.FindProperty("showWorldInteraction").boolValue = false;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            Update(fixture);
+
+            Assert.IsTrue(fixture.InteractionRoot.activeSelf, "모집 UI와 공유하는 레이어를 끄면 안 된다.");
+            Assert.IsTrue(recruitmentRoot.activeInHierarchy, "별도 모집 UI의 표시를 건축 컨트롤러가 막으면 안 된다.");
+            Assert.IsFalse(fixture.Controller.IsInteractionVisible);
+            AssertOnlyOneVisible(fixture, false, false, false);
+        }
+
+        [Test]
         public void 던전이면_상호작용_UI가_꺼진다()
         {
             Fixture fixture = CreateFixture();

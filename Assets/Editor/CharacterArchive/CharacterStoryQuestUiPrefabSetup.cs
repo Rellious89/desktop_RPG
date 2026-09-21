@@ -2,6 +2,7 @@ using CharacterArchive;
 using Common;
 using Dungeon;
 using Inventory;
+using Character;
 using Quest;
 using TMPro;
 using UnityEditor;
@@ -61,8 +62,10 @@ namespace CharacterArchiveEditor
                 SerializedObject serialized = new SerializedObject(controller);
                 Set(serialized, "questCatalog", AssetDatabase.LoadAssetAtPath<CharacterStoryQuestCatalog>("Assets/Generated/TableData/CharacterStoryQuest/CharacterStoryQuestCatalog.asset"));
                 Set(serialized, "objectiveCatalog", AssetDatabase.LoadAssetAtPath<CharacterStoryQuestObjectiveCatalog>("Assets/Generated/TableData/CharacterStoryQuestObjective/CharacterStoryQuestObjectiveCatalog.asset"));
+                Set(serialized, "characterCatalog", AssetDatabase.LoadAssetAtPath<CharacterCatalog>("Assets/Generated/TableData/Character/CharacterCatalog.asset"));
                 Set(serialized, "monsterCatalog", AssetDatabase.LoadAssetAtPath<MonsterCatalog>("Assets/Generated/TableData/Monster/MonsterCatalog.asset"));
                 Set(serialized, "dungeonCatalog", AssetDatabase.LoadAssetAtPath<DungeonCatalog>("Assets/Generated/TableData/Dungeon/DungeonCatalog.asset"));
+                Set(serialized, "itemCatalog", AssetDatabase.LoadAssetAtPath<ItemCatalog>("Assets/Generated/TableData/Item/ItemCatalog.asset"));
                 Set(serialized, "characterInfoPage", Find(root.transform, "pn_right/CharacterInfo").gameObject);
                 Set(serialized, "questInfoPage", Find(root.transform, "pn_right/QuestInfo").gameObject);
                 Set(serialized, "swapButton", Find(root.transform, "pn_right/btn_swap").GetComponent<Button>());
@@ -139,6 +142,7 @@ namespace CharacterArchiveEditor
                 CharacterStoryQuestUiController controller = root.GetComponent<CharacterStoryQuestUiController>();
                 if (controller == null) throw new System.InvalidOperationException("공용 QuestInfo 컨트롤러를 찾을 수 없습니다.");
                 SerializedObject serialized = new SerializedObject(controller);
+                Set(serialized, "itemCatalog", AssetDatabase.LoadAssetAtPath<ItemCatalog>("Assets/Generated/TableData/Item/ItemCatalog.asset"));
                 Set(serialized, "allClearText", Find(root.transform, "QuestInfo/lb_AllClear").GetComponent<TMP_Text>());
                 serialized.ApplyModifiedPropertiesWithoutUndo();
                 PrefabUtility.SaveAsPrefabAsset(root, SharedQuestInfoPrefabPath);

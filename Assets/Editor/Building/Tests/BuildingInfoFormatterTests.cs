@@ -146,6 +146,18 @@ namespace BuildingEditor.Tests
         }
 
         [Test]
+        public void 기능_해금_팝업은_같은_설명틀에서_시간과_비용_줄만_재활용한다()
+        {
+            string format = BuildingInfoFormatter.WithoutFunctionLine(
+                "Unlock - {0}\r\n\r\nTime - {1}\r\nCost - {2}");
+            string result = BuildingInfoFormatter.ComposeDescription(
+                format, "Mercenary", "00:00:30", "2,000 Jewel", out bool failed);
+
+            Assert.IsFalse(failed);
+            Assert.AreEqual("Time - 00:00:30\nCost - 2,000 Jewel", result);
+        }
+
+        [Test]
         public void 자리표시자가_맞지_않으면_틀을_그대로_돌려주고_알린다()
         {
             string result = BuildingInfoFormatter.ComposeDescription(

@@ -2,6 +2,7 @@ using Character;
 using CharacterArchive;
 using Common;
 using Dungeon;
+using Inventory;
 using Quest;
 using TMPro;
 using UnityEditor;
@@ -28,6 +29,7 @@ namespace QuestEditor
         private const string ClearSelectedSpritePath = "Assets/Art/UI/PixelDesign/Pixel UI & HUD/Sprites/Panels/Blue/GridPanelInactive_AllClearSelect.png";
         private const string MonsterCatalogPath = "Assets/Generated/TableData/Monster/MonsterCatalog.asset";
         private const string DungeonCatalogPath = "Assets/Generated/TableData/Dungeon/DungeonCatalog.asset";
+        private const string ItemCatalogPath = "Assets/Generated/TableData/Item/ItemCatalog.asset";
 
         [MenuItem("Tools/Keybuddy/Quest/Setup Independent Quest Panel", priority = 130)]
         public static void Setup()
@@ -67,8 +69,10 @@ namespace QuestEditor
                 Set(serialized, "questTitleText", questTitle);
                 Set(serialized, "allClearText", FindDescendant(questInfo, "lb_QuestAllClear").GetComponent<TMP_Text>());
                 Set(serialized, "objectiveLineTemplate", questTitle);
+                Set(serialized, "characterCatalog", AssetDatabase.LoadAssetAtPath<CharacterCatalog>(CharacterCatalogPath));
                 Set(serialized, "monsterCatalog", AssetDatabase.LoadAssetAtPath<MonsterCatalog>(MonsterCatalogPath));
                 Set(serialized, "dungeonCatalog", AssetDatabase.LoadAssetAtPath<DungeonCatalog>(DungeonCatalogPath));
+                Set(serialized, "itemCatalog", AssetDatabase.LoadAssetAtPath<ItemCatalog>(ItemCatalogPath));
                 Set(serialized, "rewardRoot", reward.gameObject);
                 Set(serialized, "rewardCurrencyRoot", currency.gameObject);
                 Set(serialized, "rewardCurrencyAmountText", FindDescendant(currency, "lb_RewardValue").GetComponent<TMP_Text>());
@@ -159,8 +163,10 @@ namespace QuestEditor
             Set(serialized, "progressSlider", progress.GetComponent<Slider>());
             Set(serialized, "progressPercentText", FindDescendant(progress, "lb_percent").GetComponent<TMP_Text>());
             Set(serialized, "objectiveScroll", scroll.GetComponent<ScrollRect>());
+            Set(serialized, "characterCatalog", AssetDatabase.LoadAssetAtPath<CharacterCatalog>(CharacterCatalogPath));
             Set(serialized, "monsterCatalog", AssetDatabase.LoadAssetAtPath<MonsterCatalog>(MonsterCatalogPath));
             Set(serialized, "dungeonCatalog", AssetDatabase.LoadAssetAtPath<DungeonCatalog>(DungeonCatalogPath));
+            Set(serialized, "itemCatalog", AssetDatabase.LoadAssetAtPath<ItemCatalog>(ItemCatalogPath));
             Set(serialized, "rewardRoot", reward.gameObject);
             Set(serialized, "rewardCurrencyRoot", currency.gameObject);
             Set(serialized, "rewardCurrencyAmountText", FindDescendant(currency, "lb_RewardValue").GetComponent<TMP_Text>());

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Building;
 using Character;
 using Common;
 using Dungeon;
@@ -26,13 +27,16 @@ namespace CharacterArchive
         private const int CompleteButtonReadyKey = 91;
         private const int CompleteButtonInProgressKey = 93;
         private const int QuestListStageFormatKey = 106;
-        private static readonly int[] QuestLocalizationKeys = { 1, 2, 3, 4, 10001, 10002, 10003, 10004, 100002, 100004 };
+        private static readonly int[] QuestLocalizationKeys = { 1, 2, 3, 4, 6, 10001, 10002, 10003, 10004, 10006, 100002, 100004 };
 
         [Header("Catalogs (Inspector에서만 연결)")]
         [SerializeField] private CharacterStoryQuestCatalog questCatalog;
         [SerializeField] private CharacterStoryQuestObjectiveCatalog objectiveCatalog;
+        [SerializeField] private CharacterCatalog characterCatalog;
         [SerializeField] private MonsterCatalog monsterCatalog;
         [SerializeField] private DungeonCatalog dungeonCatalog;
+        [SerializeField] private BuildingCatalog buildingCatalog;
+        [SerializeField] private ItemCatalog itemCatalog;
 
         [Header("Pages")]
         [SerializeField] private GameObject characterInfoPage;
@@ -102,8 +106,8 @@ namespace CharacterArchive
 
         public event Action CloseRequested;
 
-        public bool HasRequiredReferences => questCatalog != null && objectiveCatalog != null &&
-                                             monsterCatalog != null && dungeonCatalog != null &&
+        public bool HasRequiredReferences => questCatalog != null && objectiveCatalog != null && characterCatalog != null &&
+                                             monsterCatalog != null && dungeonCatalog != null && itemCatalog != null &&
                                              characterInfoPage != null && questInfoPage != null &&
                                              swapButton != null && closeButton != null && completeButton != null &&
                                              currentProgressSlider != null && totalProgressSlider != null &&
@@ -281,10 +285,20 @@ namespace CharacterArchive
                 if (objective == null || objective.TargetIds == null) continue;
                 bool monster = objective.ConditionType == CharacterStoryQuestConditionType.MonsterDefeatCount;
                 bool dungeon = objective.ConditionType == CharacterStoryQuestConditionType.DungeonEnterCount;
-                if (!monster && !dungeon) continue;
+                bool building = objective.ConditionType == CharacterStoryQuestConditionType.BuildingCompleted;
+                bool character = CharacterStoryQuestPresentation.IsCharacterTarget(objective.ConditionType);
+                bool item = objective.ConditionType == CharacterStoryQuestConditionType.ItemPurchaseCount ||
+                            objective.ConditionType == CharacterStoryQuestConditionType.ItemUseCount;
+                if (!monster && !dungeon && !building && !character && !item) continue;
                 foreach (string id in objective.TargetIds)
                 {
-                    LocalizedTextReference reference = monster ? MonsterLocalizedName(id) : DungeonLocalizedName(id);
+                    string itemId = CharacterStoryQuestTarget.TrySplitItemUse(id, out string splitItemId, out _)
+                        ? splitItemId : id;
+                    LocalizedTextReference reference = monster ? MonsterLocalizedName(id)
+                        : dungeon ? DungeonLocalizedName(id)
+                        : building ? buildingCatalog?.Find(id)?.LocalizedFunctionName
+                        : character ? characterCatalog?.Find(id)?.LocalizedName
+                        : itemCatalog?.Find(itemId)?.LocalizedName;
                     AddLocalization(reference, HandleLocaleChanged);
                 }
             }
@@ -717,7 +731,7 @@ namespace CharacterArchive
         {
             var snapshot = new CharacterStoryQuestSnapshot(string.Empty, string.Empty, false, false,
                 new List<string>(), new Dictionary<string, int> { { objective.ObjectiveId, current } });
-            return CharacterStoryQuestPresentation.ObjectiveText(objective, snapshot, monsterCatalog, dungeonCatalog, Quest);
+            return CharacterStoryQuestPresentation.ObjectiveText(objective, snapshot, monsterCatalog, dungeonCatalog, Quest, buildingCatalog, characterCatalog, itemCatalog);
         }
 
         private string ConditionTitle(CharacterStoryQuestConditionType type)

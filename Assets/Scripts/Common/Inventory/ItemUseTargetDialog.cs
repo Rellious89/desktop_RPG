@@ -272,7 +272,8 @@ namespace Common
             if (inventory != null && roster != null)
             {
                 var service = new CharacterItemUseService(
-                    inventory, new CharacterRosterRecoveryAdapter(roster), SaveSystem.Save);
+                    inventory, new CharacterRosterRecoveryAdapter(roster), SaveSystem.Save,
+                    RecoveryService.Station);
                 CharacterItemUseResult result = service.TryUse(item, character);
                 if (result.Success)
                 {

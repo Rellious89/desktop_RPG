@@ -346,7 +346,8 @@ namespace Common
         /// <summary>CharacterDefinition.CharacterId와 같은 값. 비어 있으면 빈 슬롯이다.</summary>
         public string characterId;
 
-        /// <summary>회복을 시작한 순간의 현재 행동력. 지금 값 = min(최대, 이 값 + 경과 단계).</summary>
+        /// <summary>시간 기반 회복의 기준 행동력. 시작 시 현재 행동력으로 기록하고, 회복 중
+        /// 아이템을 쓰면 실제 회복량만큼 증가한다. 지금 값 = min(최대, 이 값 + 경과 단계).</summary>
         public int startStamina;
 
         /// <summary>회복 시작 시각(UTC). ISO-8601 왕복 서식("o")에 InvariantCulture로 기록하므로

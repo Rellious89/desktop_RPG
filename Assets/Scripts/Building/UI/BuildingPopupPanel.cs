@@ -54,6 +54,12 @@ namespace Building
                  "그대로 표시한다.")]
         [SerializeField] private TextMeshProUGUI buildingNameText;
 
+        [Tooltip("기능 해금 팝업에서만 켠다. 상단에 건물 이름 대신 해금 기능 이름을 표시한다.")]
+        [SerializeField] private bool showFunctionPresentation;
+
+        [Tooltip("기능 해금 팝업의 Top/ItemIcon/mask_FuncIcon/sp_ItemIcon. 메뉴 아이콘 Sprite를 표시한다.")]
+        [SerializeField] private UnityEngine.UI.Image functionIcon;
+
         [Tooltip("해금 기능/소요 시간/비용을 한 덩어리로 그릴 TMP(middle/lb_description).")]
         [SerializeField] private TextMeshProUGUI descriptionText;
 
@@ -203,6 +209,14 @@ namespace Building
         public void SetConstructionService(BuildingConstructionService service)
         {
             constructionService = service;
+        }
+
+        /// <summary>메뉴에서 열린 기능 해금 팝업의 아이콘을 누른 버튼과 맞춘다.</summary>
+        public void SetFunctionIcon(Sprite sprite)
+        {
+            if (functionIcon == null) return;
+            functionIcon.sprite = sprite;
+            functionIcon.enabled = sprite != null;
         }
 
         /// <summary>기준 버튼을 정하고 <see cref="ModalPanel.Open"/>을 부른다 - 여는 쪽이 두 줄을
@@ -459,6 +473,7 @@ namespace Building
         private void ApplyLocalizedFunctionName(string value)
         {
             localizedFunctionName = value;
+            if (showFunctionPresentation) ApplyBuildingName();
             ApplyDescription();
             UpdatePlacement();
         }
@@ -477,7 +492,9 @@ namespace Building
             if (buildingNameText == null) return;
 
             // 아직 도착하지 않았으면 비워 둔다 - 이전 건물의 이름이 남아 있으면 안 된다.
-            buildingNameText.text = localizedBuildingName ?? string.Empty;
+            buildingNameText.text = showFunctionPresentation
+                ? localizedFunctionName ?? string.Empty
+                : localizedBuildingName ?? string.Empty;
         }
 
         private void ApplyDescription()
@@ -494,8 +511,12 @@ namespace Building
             string time = BuildingInfoFormatter.FormatBuildTime(building.BuildTimeSeconds);
             string cost = BuildingInfoFormatter.ComposeCost(BuildCostComponents(building));
 
+            // 기능 이름은 상단에 별도로 표시한다. UI/40의 {1}, {2} 줄은 그대로 재사용한다.
+            string format = showFunctionPresentation
+                ? BuildingInfoFormatter.WithoutFunctionLine(localizedFormat)
+                : localizedFormat;
             string composed = BuildingInfoFormatter.ComposeDescription(
-                localizedFormat, localizedFunctionName ?? string.Empty, time, cost, out bool formatFailed);
+                format, localizedFunctionName ?? string.Empty, time, cost, out bool formatFailed);
 
             if (formatFailed && !formatFailureLogged)
             {
@@ -591,7 +612,15 @@ namespace Building
             if (warningText != null)
             {
                 GameObject warningObject = warningText.gameObject;
-                if (warningObject.activeSelf == payable) warningObject.SetActive(!payable);
+                bool showWarning = !payable;
+                if (showFunctionPresentation)
+                {
+                    InventoryCostFailureReason reason = LastCostEvaluation != null
+                        ? LastCostEvaluation.Reason : InventoryCostFailureReason.None;
+                    showWarning = reason == InventoryCostFailureReason.InsufficientCurrency ||
+                                  reason == InventoryCostFailureReason.InsufficientItem;
+                }
+                if (warningObject.activeSelf != showWarning) warningObject.SetActive(showWarning);
             }
 
             if (confirmButton != null && confirmButton.interactable != payable)

@@ -175,5 +175,20 @@ namespace Building
                 return format;
             }
         }
+
+        /// <summary>기능 이름을 별도 상단에 표시하는 팝업용으로 UI/40의 {0} 줄만 뺀다.</summary>
+        public static string WithoutFunctionLine(string format)
+        {
+            if (string.IsNullOrEmpty(format)) return string.Empty;
+            string[] lines = format.Replace("\r\n", "\n").Split('\n');
+            var builder = new StringBuilder();
+            for (int i = 0; i < lines.Length; i++)
+            {
+                if (lines[i].Contains("{0}")) continue;
+                if (builder.Length > 0) builder.Append('\n');
+                builder.Append(lines[i]);
+            }
+            return builder.ToString().Trim('\n', '\r');
+        }
     }
 }

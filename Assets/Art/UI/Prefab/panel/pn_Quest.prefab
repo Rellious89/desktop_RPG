@@ -6325,8 +6325,11 @@ MonoBehaviour:
   rewardItemSlot: {fileID: 2158704608721881672}
   completeButton: {fileID: 7214193475663625625}
   completeButtonText: {fileID: 7164515511708722355}
+  characterCatalog: {fileID: 11400000, guid: 5f24823f983054d358a82014246a9fa7, type: 2}
   monsterCatalog: {fileID: 11400000, guid: 0846229ba87f7442a8cabec60e64dd41, type: 2}
   dungeonCatalog: {fileID: 11400000, guid: 5a3dc674fb40a445ba6d768b5775d116, type: 2}
+  buildingCatalog: {fileID: 11400000, guid: d0ec875d301594c0cb66130069403d35, type: 2}
+  itemCatalog: {fileID: 11400000, guid: 749d57bd062ae47619e6dc1de90453fd, type: 2}
 --- !u!1 &1223279057228013076 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 4679507693361300138, guid: 5a167b8ee23b3466887e05bab0c4b09a, type: 3}

@@ -623,6 +623,13 @@ namespace Inventory
 
         // ---- 조회 ----
 
+        /// <summary>등록된 아이템 정의를 ID로 조회한다. 보유 수량과 무관하게 효과 판정에 사용한다.</summary>
+        public ItemDefinition FindItemDefinition(string itemId)
+        {
+            return !string.IsNullOrEmpty(itemId) && definitionsById.TryGetValue(itemId, out ItemDefinition item)
+                ? item : null;
+        }
+
         public int GetItemCount(ItemDefinition definition)
         {
             return definition == null ? 0 : GetItemCount(definition.ItemId);

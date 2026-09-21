@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Reflection;
+using Building;
 using Character;
 using CharacterArchive;
 using Common;
@@ -18,6 +19,7 @@ namespace QuestEditorTests
     {
         private const string CardPath = "Assets/Art/UI/Prefab/Quest/item_CharacterQuestInfo.prefab";
         private const string PanelPath = "Assets/Art/UI/Prefab/panel/pn_Quest.prefab";
+        private const string ArchiveQuestInfoPath = "Assets/Art/UI/Prefab/Quest/QuestInfo.prefab";
         private const string ScenePath = "Assets/Scenes/desktopScene_ReSize.unity";
         private readonly List<Object> created = new List<Object>();
 
@@ -401,6 +403,143 @@ namespace QuestEditorTests
 
             Assert.AreEqual("Localized Return", title);
             Assert.AreEqual("Localized Progress 1/1", description);
+        }
+
+        [Test]
+        public void BuildingUnlockObjective_BindsItsFunctionNameInsteadOfTreatingTargetIdAsDisplayText()
+        {
+            BuildingCatalog buildings = AssetDatabase.LoadAssetAtPath<BuildingCatalog>(
+                "Assets/Generated/TableData/Building/BuildingCatalog.asset");
+            Assert.NotNull(buildings);
+            BuildingDefinition building = buildings.Find("1");
+            Assert.NotNull(building);
+            Assert.IsTrue(building.HasLocalizedFunctionName);
+
+            CharacterStoryQuestObjectiveDefinition objective = Objective("unlock", 1);
+            Set(objective, "conditionType", CharacterStoryQuestConditionType.BuildingCompleted);
+            Set(objective, "targetIds", new List<string> { "1" });
+
+            CollectionAssert.Contains(new List<Common.LocalizedTextReference>(
+                CharacterStoryQuestPresentation.ObjectiveTextReferences(
+                    new[] { objective }, null, null, buildings)), building.LocalizedFunctionName);
+
+            GameObject cardRoot = PrefabUtility.LoadPrefabContents(CardPath);
+            GameObject panelRoot = PrefabUtility.LoadPrefabContents(PanelPath);
+            try
+            {
+                Assert.AreSame(buildings, new SerializedObject(cardRoot.GetComponent<CharacterQuestCardView>())
+                    .FindProperty("buildingCatalog").objectReferenceValue);
+                Assert.AreSame(buildings, new SerializedObject(panelRoot.GetComponentInChildren<CharacterStoryQuestDetailView>(true))
+                    .FindProperty("buildingCatalog").objectReferenceValue);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(cardRoot);
+                PrefabUtility.UnloadPrefabContents(panelRoot);
+            }
+        }
+
+        [TestCase(CharacterStoryQuestConditionType.CharacterOwned)]
+        [TestCase(CharacterStoryQuestConditionType.PartyContainsCharacter)]
+        [TestCase(CharacterStoryQuestConditionType.RecoveryStarted)]
+        [TestCase(CharacterStoryQuestConditionType.CharacterRecoveryComplete)]
+        [TestCase(CharacterStoryQuestConditionType.RecoveryJoined)]
+        [TestCase(CharacterStoryQuestConditionType.CharacterStaminaFull)]
+        [TestCase(CharacterStoryQuestConditionType.ManualCharacterSwitchCount)]
+        public void CharacterTargetObjective_BindsCatalogLocalizedName(CharacterStoryQuestConditionType type)
+        {
+            CharacterCatalog characters = AssetDatabase.LoadAssetAtPath<CharacterCatalog>(
+                "Assets/Generated/TableData/Character/CharacterCatalog.asset");
+            Assert.NotNull(characters);
+            CharacterDefinition rabbit = characters.Find("RabbitHealer");
+            Assert.NotNull(rabbit);
+            Assert.IsTrue(rabbit.HasLocalizedName);
+
+            CharacterStoryQuestObjectiveDefinition objective = Objective("character", 1);
+            Set(objective, "conditionType", type);
+            Set(objective, "targetIds", new List<string> { "RabbitHealer" });
+
+            CollectionAssert.Contains(new List<LocalizedTextReference>(
+                CharacterStoryQuestPresentation.ObjectiveTextReferences(
+                    new[] { objective }, null, null, null, characters)), rabbit.LocalizedName);
+            Assert.IsTrue(objective.Targets(objective.TargetIds[0]), "표시 이름 변경이 목표 판정을 바꾸면 안 됩니다.");
+        }
+
+        [Test]
+        public void CharacterTargetObjective_AllQuestSurfacesWireCharacterCatalog()
+        {
+            CharacterCatalog characters = AssetDatabase.LoadAssetAtPath<CharacterCatalog>(
+                "Assets/Generated/TableData/Character/CharacterCatalog.asset");
+            GameObject cardRoot = PrefabUtility.LoadPrefabContents(CardPath);
+            GameObject panelRoot = PrefabUtility.LoadPrefabContents(PanelPath);
+            GameObject archiveRoot = PrefabUtility.LoadPrefabContents(ArchiveQuestInfoPath);
+            try
+            {
+                Assert.AreSame(characters, new SerializedObject(cardRoot.GetComponent<CharacterQuestCardView>())
+                    .FindProperty("characterCatalog").objectReferenceValue);
+                Assert.AreSame(characters, new SerializedObject(panelRoot.GetComponentInChildren<CharacterStoryQuestDetailView>(true))
+                    .FindProperty("characterCatalog").objectReferenceValue);
+                Assert.AreSame(characters, new SerializedObject(archiveRoot.GetComponentInChildren<CharacterStoryQuestUiController>(true))
+                    .FindProperty("characterCatalog").objectReferenceValue);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(cardRoot);
+                PrefabUtility.UnloadPrefabContents(panelRoot);
+                PrefabUtility.UnloadPrefabContents(archiveRoot);
+            }
+        }
+
+        [TestCase(CharacterStoryQuestConditionType.ItemPurchaseCount, "50007")]
+        [TestCase(CharacterStoryQuestConditionType.ItemUseCount, "50007@CatKnight")]
+        public void ItemTargetObjective_UsesLocalizedItemNameWithoutChangingTarget(
+            CharacterStoryQuestConditionType type, string targetId)
+        {
+            ItemCatalog items = AssetDatabase.LoadAssetAtPath<ItemCatalog>(
+                "Assets/Generated/TableData/Item/ItemCatalog.asset");
+            Assert.NotNull(items);
+            ItemDefinition item = items.Find("50007");
+            Assert.NotNull(item);
+            Assert.IsTrue(item.HasLocalizedName);
+
+            CharacterStoryQuestObjectiveDefinition objective = Objective("item", 1);
+            Set(objective, "conditionType", type);
+            Set(objective, "targetIds", new List<string> { targetId });
+
+            CollectionAssert.Contains(new List<LocalizedTextReference>(
+                CharacterStoryQuestPresentation.ObjectiveTextReferences(
+                    new[] { objective }, null, null, null, null, items)), item.LocalizedName);
+            Assert.IsTrue(objective.Targets(targetId));
+            Assert.AreEqual(targetId, objective.TargetIds[0]);
+
+            string fallback = CharacterStoryQuestPresentation.ObjectiveText(objective, null);
+            StringAssert.DoesNotContain("@RabbitHealer", fallback,
+                "카탈로그가 없어도 복합 목표 ID 전체를 UI에 노출하지 않습니다.");
+        }
+
+        [Test]
+        public void ItemTargetObjective_AllQuestSurfacesWireItemCatalog()
+        {
+            ItemCatalog items = AssetDatabase.LoadAssetAtPath<ItemCatalog>(
+                "Assets/Generated/TableData/Item/ItemCatalog.asset");
+            GameObject cardRoot = PrefabUtility.LoadPrefabContents(CardPath);
+            GameObject panelRoot = PrefabUtility.LoadPrefabContents(PanelPath);
+            GameObject archiveRoot = PrefabUtility.LoadPrefabContents(ArchiveQuestInfoPath);
+            try
+            {
+                Assert.AreSame(items, new SerializedObject(cardRoot.GetComponent<CharacterQuestCardView>())
+                    .FindProperty("itemCatalog").objectReferenceValue);
+                Assert.AreSame(items, new SerializedObject(panelRoot.GetComponentInChildren<CharacterStoryQuestDetailView>(true))
+                    .FindProperty("itemCatalog").objectReferenceValue);
+                Assert.AreSame(items, new SerializedObject(archiveRoot.GetComponentInChildren<CharacterStoryQuestUiController>(true))
+                    .FindProperty("itemCatalog").objectReferenceValue);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(cardRoot);
+                PrefabUtility.UnloadPrefabContents(panelRoot);
+                PrefabUtility.UnloadPrefabContents(archiveRoot);
+            }
         }
 
         private CharacterStoryQuestObjectiveDefinition Objective(string id, int required)

@@ -459,10 +459,24 @@ namespace Quest
                 CharacterStoryQuestSaveState state = data.characterStoryQuests[i];
                 if (state == null || state.readyToComplete || string.IsNullOrEmpty(state.activeQuestId)) continue;
                 receipt.Capture(state.characterId, state);
+                CharacterStoryQuestDefinition activeQuest = questCatalog != null
+                    ? questCatalog.Find(state.activeQuestId) : null;
                 foreach (CharacterStoryQuestObjectiveDefinition objective in ObjectivesFor(state.activeQuestId))
                 {
-                    if (!IsStateCondition(objective.ConditionType)) continue;
-                    receipt.Changed |= SetProgress(state, objective, EvaluateStateProgress(data, state, objective));
+                    if (IsStateCondition(objective.ConditionType))
+                    {
+                        receipt.Changed |= SetProgress(state, objective, EvaluateStateProgress(data, state, objective));
+                    }
+                    else if (activeQuest != null && activeQuest.TutorialStep &&
+                             objective.ConditionType == CharacterStoryQuestConditionType.ItemUseCount)
+                    {
+                        // 회복소에서 대기하는 동안 최대 행동력이 되면 아이템을 더는 쓸 수 없다.
+                        // 해당 튜토리얼 단계만 완료 가능하게 하되, 일반 아이템 사용 목표는 그대로 둔다.
+                        int fullTargets = CountFullStaminaItemTargets(data, objective);
+                        if (fullTargets > 0)
+                            receipt.Changed |= SetProgress(state, objective,
+                                Mathf.Max(GetProgress(state, objective.ObjectiveId), fullTargets));
+                    }
                 }
                 receipt.Changed |= RefreshReady(state);
             }
@@ -629,6 +643,26 @@ namespace Quest
             for (int i = 0; i < targets.Count; i++)
                 if (EvaluateSingleStateTarget(data, targets[i], objective.ConditionType)) matched++;
             return matched;
+        }
+
+        private int CountFullStaminaItemTargets(SaveData data, CharacterStoryQuestObjectiveDefinition objective)
+        {
+            InventoryManager inventory = ResolveInventory();
+            if (inventory == null || roster == null || roster.Catalog == null) return 0;
+            IReadOnlyList<string> targets = objective.TargetIds;
+            int fullCount = 0;
+            for (int i = 0; i < targets.Count; i++)
+            {
+                if (!CharacterStoryQuestTarget.TrySplitItemUse(targets[i], out string itemId,
+                        out string characterId)) continue;
+                ItemDefinition item = inventory.FindItemDefinition(itemId);
+                if (item == null || !item.CanTargetCharacter) continue;
+                CharacterSaveState character = FindCharacter(data, characterId);
+                CharacterDefinition definition = roster.Catalog.Find(characterId);
+                if (character != null && definition != null &&
+                    character.currentStamina >= definition.MaxStamina) fullCount++;
+            }
+            return fullCount;
         }
 
         private bool EvaluateSingleStateTarget(

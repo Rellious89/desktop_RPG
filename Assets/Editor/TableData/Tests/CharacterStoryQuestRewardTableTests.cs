@@ -114,6 +114,8 @@ namespace TableDataEditorTests
             }
             CollectionAssert.AreEqual(new[] { "50007@CatKnight" },
                 objectives.ForQuest("CatKnight_Tutorial_120")[0].TargetIds);
+            CollectionAssert.AreEqual(new[] { "CatKnight" },
+                objectives.ForQuest("CatKnight_Tutorial_130")[0].TargetIds);
             Assert.AreEqual(CharacterStoryQuestConditionType.ManualCharacterSwitchCount,
                 objectives.ForQuest("CatKnight_Tutorial_200")[0].ConditionType);
         }
