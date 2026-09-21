@@ -57,8 +57,8 @@ namespace Common
         [SerializeField] [Range(0f, 1f)] private float defaultRightMarginFraction = 0.02f;
         [SerializeField] [Range(0f, 1f)] private float defaultBottomMarginFraction = 0.02f;
 
-        [Header("Layout Mode 시각 피드백 (선택)")]
-        [Tooltip("Layout Mode 중 강조 표시할 대상(선택) - 예: 반투명 외곽선 스프라이트를 담은 자식 오브젝트. 비워두면 로그만 남긴다.")]
+        [Header("롱프레스 이동 시각 피드백 (선택)")]
+        [Tooltip("롱프레스 이동 중 강조 표시할 대상(선택) - 예: 반투명 외곽선 스프라이트를 담은 자식 오브젝트. 비워두면 로그만 남긴다.")]
         [SerializeField] private GameObject highlightVisual;
 
         [Header("전투 연출")]
@@ -180,7 +180,7 @@ namespace Common
             }
             else
             {
-                Debug.Log($"[StageVisualRootController] Layout Mode {(active ? "진입" : "종료")} - highlightVisual이 연결돼 있지 않아 시각 피드백 없이 동작합니다.");
+                Debug.Log($"[StageVisualRootController] 롱프레스 이동 {(active ? "시작" : "종료")} - highlightVisual이 연결돼 있지 않아 시각 피드백 없이 동작합니다.");
             }
         }
 

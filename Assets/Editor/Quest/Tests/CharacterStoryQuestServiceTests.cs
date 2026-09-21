@@ -206,6 +206,39 @@ namespace QuestEditorTests
         }
 
         [Test]
+        public void ConfirmingPreviousQuest_EvaluatesNextPartyMembershipImmediately()
+        {
+            CharacterStoryQuestDefinition recoveryComplete = Quest("Q180", "CatKnight", "", false);
+            CharacterStoryQuestDefinition partyJoin = Quest("Q190", "CatKnight", "Q180", true);
+            CharacterStoryQuestObjectiveDefinition recoveryObjective = Objective(
+                "O180", "Q180", CharacterStoryQuestConditionType.CharacterRecoveryComplete, 1, "RabbitHealer");
+            CharacterStoryQuestObjectiveDefinition partyObjective = Objective(
+                "O190", "Q190", CharacterStoryQuestConditionType.PartyContainsCharacter, 1, "RabbitHealer");
+            CharacterStoryQuestService service = Service(
+                new[] { recoveryComplete, partyJoin }, new[] { recoveryObjective, partyObjective });
+            var data = new SaveData
+            {
+                partyCharacterIds = new List<string> { "CatKnight", "RabbitHealer" },
+                characterStoryQuests = new List<CharacterStoryQuestSaveState>
+                {
+                    new CharacterStoryQuestSaveState
+                    {
+                        characterId = "CatKnight", activeQuestId = "Q180", readyToComplete = true,
+                    },
+                },
+            };
+
+            MethodInfo confirm = typeof(CharacterStoryQuestService).GetMethod(
+                "ConfirmWithoutSave", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsTrue((bool)confirm.Invoke(service, new object[] { data, "CatKnight" }));
+
+            CharacterStoryQuestSaveState state = data.characterStoryQuests[0];
+            Assert.AreEqual("Q190", state.activeQuestId);
+            Assert.IsTrue(state.readyToComplete);
+            Assert.AreEqual(1, state.objectiveProgress.Find(p => p.objectiveId == "O190").progress);
+        }
+
+        [Test]
         public void TutorialStaminaItemUse_WhenTargetAlreadyFull_BecomesReadyWithoutConsumingItem()
         {
             CharacterStoryQuestDefinition quest = Quest("TutorialUse", "CatKnight", "", false);

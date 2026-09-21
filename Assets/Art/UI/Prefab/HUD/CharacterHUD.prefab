@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 2632286461757875785}
   - component: {fileID: 900000000000000003}
   - component: {fileID: 900000000000000004}
+  - component: {fileID: 900000000000000005}
   m_Layer: 5
   m_Name: CharacterHUD
   m_TagString: Untagged
@@ -115,6 +116,23 @@ MonoBehaviour:
   verticalOffset: 8
   pointerOffsetX: 10
   placementOffset: {x: 15, y: 10}
+--- !u!114 &900000000000000005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4342456993724718831}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7fcc88e6b6247bd8c9af0d6b4dcb6ed, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  groupId: characterHud
+  targetRect: {fileID: 0}
+  highlightColor: {r: 0.3, g: 0.6, b: 1, a: 0.25}
+  safetyMarginPixels: 8
+  directDragEnabled: 1
 --- !u!1001 &594280211065672331
 PrefabInstance:
   m_ObjectHideFlags: 0

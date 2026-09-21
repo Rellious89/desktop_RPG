@@ -558,6 +558,21 @@ MonoBehaviour:
       Cost - {2}'
     m_Metadata:
       m_Items: []
+  - m_Id: 20120806280388608
+    m_Localized: Resting
+    m_Metadata:
+      m_Items: []
+  - m_Id: 20120806280388609
+    m_Localized: "\uC790\uC5F0\uD68C\uBCF5 \uC911\uC785\uB2C8\uB2E4.\n\uBE60\uB978
+      \uD68C\uBCF5\uC744 \uC704\uD574\uC120 \uD68C\uBCF5\uC18C\uB97C \uC774\uC6A9\uD558\uAC70\uB098,\n\uD589\uB3D9\uB825
+      \uD68C\uBCF5 \uC544\uC774\uD15C\uC744 \uC0AC\uC6A9\uD558\uC138\uC694."
+    m_Metadata:
+      m_Items: []
+  - m_Id: 20120806284582912
+    m_Localized: "\uD544\uC694 \uCD5C\uC18C \uD589\uB3D9\uB825 : {0}% (\uAC1C\uBCC4
+      \uD544\uC694 \uC218\uCE58)"
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

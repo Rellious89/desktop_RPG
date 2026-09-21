@@ -122,7 +122,14 @@ namespace CommonEditor.Tests
                 Assert.IsNotNull(serializedInteraction.FindProperty("playerRenderer").objectReferenceValue);
                 Assert.IsNotNull(serializedInteraction.FindProperty("dungeonRestEventController").objectReferenceValue);
                 Assert.IsNotNull(serializedInteraction.FindProperty("companionDragTarget").objectReferenceValue);
-                Assert.GreaterOrEqual(serializedInteraction.FindProperty("dragHoldSeconds").floatValue, 0.1f);
+                Assert.AreEqual(1f, serializedInteraction.FindProperty("autoCloseDelay").floatValue, 0.001f);
+
+                LayoutModeController layout = scene.GetRootGameObjects()
+                    .SelectMany(root => root.GetComponentsInChildren<LayoutModeController>(true))
+                    .Single();
+                var serializedLayout = new SerializedObject(layout);
+                Assert.GreaterOrEqual(serializedLayout.FindProperty("holdSeconds").floatValue, 0.05f);
+                Assert.GreaterOrEqual(serializedLayout.FindProperty("preActivationMovementPixels").floatValue, 0f);
 
                 var interactionMenu = serializedInteraction.FindProperty("menuRoot").objectReferenceValue as RectTransform;
                 Assert.IsNotNull(interactionMenu);

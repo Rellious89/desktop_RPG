@@ -3,8 +3,8 @@ using UnityEngine;
 namespace Common
 {
     /// <summary>
-    /// Layout Mode에서 직접 드래그로 옮길 수 있는 그룹(StageVisualRoot/GameHUDGroup/ControlDockGroup)의
-    /// 공통 계약. LayoutModeController가 이 인터페이스만으로 세 그룹을 동일하게 다루고,
+    /// 직접 롱프레스로 옮길 수 있는 그룹(StageVisualRoot와 개별 HUD 그룹)의 공통 계약.
+    /// LayoutModeController가 이 인터페이스만으로 모든 그룹을 동일하게 다루고,
     /// TransparentWindowController가 클릭 관통/드래그 판정을 위해 화면 영역을 조회한다.
     ///
     /// 배치는 항상 "화면 우측/하단 기준 정규화 여백(0~1)"으로 주고받는다 - 절대 픽셀이 아니라서
@@ -37,9 +37,7 @@ namespace Common
         bool TryGetUnityScreenRect(out Rect unityScreenRect);
 
         /// <summary>
-        /// Layout Mode 진입/종료 시 호출된다. UI 기반 그룹(GameHUDGroup/ControlDockGroup)은 이 안에서
-        /// 드래그 캐처의 레이캐스트와 하이라이트 표시를 함께 켜고 끈다. StageVisualRoot처럼 별도 시각
-        /// 표시가 없는 그룹은 no-op으로 둬도 된다.
+        /// 롱프레스 이동 시작/종료 시 호출된다. 대상별 강조 표시를 켜고 끄는 용도다.
         /// </summary>
         void SetLayoutModeActive(bool active);
 

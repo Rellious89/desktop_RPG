@@ -29,5 +29,5 @@ CatKnight_Tutorial_150_01,CatKnight_Tutorial_150,MONSTER_DEFEAT_COUNT,몬스터 
 CatKnight_Tutorial_160_01,CatKnight_Tutorial_160,CHARACTER_LEVEL_AT_LEAST,캐릭터 레벨 달성,,3,160,1,
 CatKnight_Tutorial_170_01,CatKnight_Tutorial_170,TOWN_RETURN_COUNT,없음,,1,170,1,
 CatKnight_Tutorial_180_01,CatKnight_Tutorial_180,CHARACTER_RECOVERY_COMPLETE,없음,RabbitHealer,1,180,1,
-CatKnight_Tutorial_190_01,CatKnight_Tutorial_190,RECOVERY_JOINED,없음,RabbitHealer,1,190,1,
-CatKnight_Tutorial_200_01,CatKnight_Tutorial_200,MANUAL_CHARACTER_SWITCH_COUNT,없음,RabbitHealer,1,200,1,
+CatKnight_Tutorial_190_01,CatKnight_Tutorial_190,PARTY_CONTAINS_CHARACTER,없음,RabbitHealer,1,190,1,
+CatKnight_Tutorial_200_01,CatKnight_Tutorial_200,MANUAL_CHARACTER_SWITCH_COUNT,없음,RabbitHealer,1,200,1,

@@ -733,9 +733,7 @@ namespace Recovery
             if (GetSlotState(slotIndex) != RecoveryCharacterState.RecoveryComplete) return false;
 
             CharacterDefinition character = roster.FindById(GetSlots()[slotIndex].characterId);
-            if (TutorialFlowPolicy.IsTutorialActive &&
-                (character == null || !TutorialFlowPolicy.Allows(
-                    CharacterStoryQuestConditionType.RecoveryJoined, roster.GetCharacterId(character))))
+            if (character == null || !TutorialFlowPolicy.CanJoinRecovery(roster.GetCharacterId(character)))
                 return false;
 
             joinSlotBuffer.Clear();
@@ -771,8 +769,7 @@ namespace Recovery
             for (int i = 0; i < savedSlotCount; i++)
             {
                 if (GetSlotState(i) != RecoveryCharacterState.RecoveryComplete) continue;
-                if (TutorialFlowPolicy.IsTutorialActive && !TutorialFlowPolicy.Allows(
-                        CharacterStoryQuestConditionType.RecoveryJoined, GetSlots()[i].characterId)) continue;
+                if (!TutorialFlowPolicy.CanJoinRecovery(GetSlots()[i].characterId)) continue;
                 joinSlotBuffer.Add(i);
             }
 

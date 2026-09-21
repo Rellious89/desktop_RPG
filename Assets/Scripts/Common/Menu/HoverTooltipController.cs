@@ -14,9 +14,9 @@ namespace Common
     /// 같은 프레임에 A의 Exit와 B의 Enter를 보내는데, 순서가 어느 쪽이든 <see cref="CancelShow"/>는
     /// 자기가 주인일 때만 동작한다. 그래서 뒤늦게 도착한 A의 Exit가 이미 예약된 B의 툴팁을 지우지 않는다.
     ///
-    /// <b>위치는 버튼의 RectTransform 월드 코너로 잡는다.</b> 버튼 위쪽 변의 중앙을 구해 그 지점에
-    /// 툴팁의 아래-가운데(pivot 0.5, 0)를 붙이므로, CanvasScaler 배율이나 해상도가 달라져도 언제나
-    /// 버튼 바로 위에 붙는다. 여백만 부모 로컬 단위(= Canvas 기준 해상도 픽셀)로 더한다.
+    /// <b>위치는 버튼의 RectTransform 월드 코너로 잡는다.</b> 기본 메뉴는 버튼 위쪽에 표시하고,
+    /// Companion 메뉴는 버튼 왼쪽을 우선하되 화면 공간이 부족하면 오른쪽으로 옮긴 뒤 경계 안에 맞춘다.
+    /// CanvasScaler 배율이나 해상도가 달라져도 여백은 부모 로컬 단위(= Canvas 기준 해상도 픽셀)로 유지된다.
     ///
     /// <b>툴팁은 입력을 받지 않는다.</b> 인스턴스를 만들 때 안쪽 모든 Graphic의 Raycast Target을 끄므로,
     /// 툴팁이 버튼과 겹쳐도 Hover가 끊기거나 버튼 클릭을 가로채지 않는다.
@@ -24,12 +24,30 @@ namespace Common
     [DisallowMultipleComponent]
     public class HoverTooltipController : MonoBehaviour
     {
+        private enum TooltipPlacement
+        {
+            Above,
+            HorizontalAdaptive
+        }
+
         [Tooltip("표시에 사용할 HoverTooltip 프리팹. 안쪽의 TextMeshProUGUI를 문구 표시에 사용한다.")]
         [SerializeField] private GameObject tooltipPrefab;
+
+        [Tooltip("버튼 왼쪽에 표시할 HoverTooltip_R 프리팹. 비워두면 기본 HoverTooltip을 사용한다.")]
+        [SerializeField] private GameObject tooltipOnLeftPrefab;
+
+        [Tooltip("버튼 오른쪽에 표시할 HoverTooltip_L 프리팹. 비워두면 기본 HoverTooltip을 사용한다.")]
+        [SerializeField] private GameObject tooltipOnRightPrefab;
 
         [Tooltip("툴팁 인스턴스를 붙일 부모. 비워두면 이 컴포넌트가 붙은 오브젝트를 사용한다. " +
                  "메뉴보다 앞에 그려져야 하므로 표시할 때마다 형제 중 맨 뒤로 보낸다.")]
         [SerializeField] private RectTransform tooltipRoot;
+
+        [Tooltip("툴팁을 화면 안에 유지할 기준 RectTransform. 비워두면 Tooltip Root를 사용한다.")]
+        [SerializeField] private RectTransform tooltipBounds;
+
+        [Tooltip("기본 메뉴는 Above, Companion 인터렉션 메뉴는 Horizontal Adaptive를 사용한다.")]
+        [SerializeField] private TooltipPlacement placement = TooltipPlacement.Above;
 
         [Tooltip("마우스를 올린 뒤 툴팁이 나타나기까지의 대기시간(초). 이 시간 안에 마우스가 " +
                  "벗어나면 예약이 취소되어 툴팁은 나타나지 않는다.")]
@@ -37,6 +55,12 @@ namespace Common
 
         [Tooltip("버튼 위쪽 변과 툴팁 사이 여백(Canvas 기준 해상도 픽셀).")]
         [SerializeField] private float verticalOffset = 8f;
+
+        [Tooltip("버튼 좌우 변과 툴팁 사이 여백(Canvas 기준 해상도 픽셀).")]
+        [SerializeField] private float horizontalOffset = 8f;
+
+        [Tooltip("툴팁을 화면 경계에서 떨어뜨릴 최소 여백(Canvas 기준 해상도 픽셀).")]
+        [SerializeField] private float boundsPadding = 4f;
 
         [Header("대상 버튼")]
         [Tooltip("툴팁을 붙일 버튼들이 들어 있는 영역(btnArea). 비워두면 같은 오브젝트의 " +
@@ -53,6 +77,7 @@ namespace Common
 
         private RectTransform tooltipRect;
         private TextMeshProUGUI tooltipLabel;
+        private GameObject instantiatedPrefab;
         private bool instantiateFailed;
 
         // 표시를 예약했거나 이미 표시 중인 대상. 둘 중 하나만 값을 가진다.
@@ -65,8 +90,6 @@ namespace Common
 
         private void Awake()
         {
-            if (!autoAttachTriggers) return;
-
             if (menuRoot == null)
             {
                 var expander = GetComponent<MenuBarExpander>();
@@ -81,7 +104,8 @@ namespace Common
                 return;
             }
 
-            AttachTriggers();
+            if (autoAttachTriggers) AttachTriggers();
+            else BindExistingTriggers();
         }
 
         /// <summary>대상 영역 안의 Button마다 <see cref="HoverTooltipTrigger"/>를 보장한다.
@@ -104,9 +128,20 @@ namespace Common
 
             foreach (Button button in buttons)
             {
-                if (button.GetComponent<HoverTooltipTrigger>() != null) continue;
+                HoverTooltipTrigger trigger = button.GetComponent<HoverTooltipTrigger>();
+                if (trigger == null) trigger = button.gameObject.AddComponent<HoverTooltipTrigger>();
+                trigger.BindController(this);
+            }
+        }
 
-                button.gameObject.AddComponent<HoverTooltipTrigger>();
+        /// <summary>수동으로 구성한 트리거를 이 메뉴의 컨트롤러에 명시적으로 연결한다.
+        /// MainMenu와 CompanionInteractionMenu가 같은 TooltipLayer를 사용하더라도, 트리거가 다른
+        /// 메뉴의 방향 프리팹 설정을 가져갈 수 없도록 소유권을 메뉴 루트 단위로 고정한다.</summary>
+        private void BindExistingTriggers()
+        {
+            foreach (HoverTooltipTrigger trigger in menuRoot.GetComponentsInChildren<HoverTooltipTrigger>(true))
+            {
+                trigger.BindController(this);
             }
         }
 
@@ -156,6 +191,7 @@ namespace Common
         private void OnDisable()
         {
             // 컴포넌트가 꺼지면 코루틴은 Unity가 멈추지만, 남은 상태와 화면의 툴팁은 직접 정리해야 한다.
+            // Tooltip Root가 메뉴 밖의 공용 TooltipLayer여도 인스턴스를 여기서 직접 숨긴다.
             Hide();
         }
 
@@ -184,15 +220,76 @@ namespace Common
                 return;
             }
 
-            if (!EnsureInstance())
+            pendingSource = null;
+            visibleSource = source;
+
+            if (placement == TooltipPlacement.HorizontalAdaptive)
+                ShowHorizontal(source.TargetRect, text);
+            else
+                ShowAbove(source.TargetRect, text);
+        }
+
+        private void ShowAbove(RectTransform target, string text)
+        {
+            if (!PrepareTooltip(tooltipPrefab, text))
             {
                 Hide();
                 return;
             }
 
-            pendingSource = null;
-            visibleSource = source;
+            tooltipRect.pivot = new Vector2(0.5f, 0f);
+            PlaceAbove(target);
+        }
 
+        private void ShowHorizontal(RectTransform target, string text)
+        {
+            RectTransform boundsRect = ResolveBounds();
+            if (boundsRect == null)
+            {
+                ShowAbove(target, text);
+                return;
+            }
+
+            if (!PrepareTooltip(ResolveDirectionalPrefab(true), text))
+            {
+                Hide();
+                return;
+            }
+
+            target.GetWorldCorners(targetCorners);
+            float targetMinX = float.PositiveInfinity;
+            float targetMaxX = float.NegativeInfinity;
+            for (int i = 0; i < targetCorners.Length; i++)
+            {
+                float x = boundsRect.InverseTransformPoint(targetCorners[i]).x;
+                targetMinX = Mathf.Min(targetMinX, x);
+                targetMaxX = Mathf.Max(targetMaxX, x);
+            }
+
+            Rect bounds = boundsRect.rect;
+            float padding = Mathf.Max(0f, boundsPadding);
+            float gap = Mathf.Max(0f, horizontalOffset);
+            float leftSpace = targetMinX - bounds.xMin - padding - gap;
+            float rightSpace = bounds.xMax - padding - targetMaxX - gap;
+            bool placeOnLeft = ChooseLeftSide(leftSpace, rightSpace, tooltipRect.rect.width);
+
+            if (!placeOnLeft && !PrepareTooltip(ResolveDirectionalPrefab(false), text))
+            {
+                Hide();
+                return;
+            }
+
+            tooltipRect.pivot = placeOnLeft ? new Vector2(1f, 0.5f) : new Vector2(0f, 0.5f);
+            tooltipRect.position = placeOnLeft
+                ? (targetCorners[0] + targetCorners[1]) * 0.5f
+                : (targetCorners[2] + targetCorners[3]) * 0.5f;
+            tooltipRect.anchoredPosition += new Vector2(placeOnLeft ? -gap : gap, 0f);
+            ClampInsideBounds(tooltipRect, boundsRect, padding);
+        }
+
+        private bool PrepareTooltip(GameObject prefab, string text)
+        {
+            if (!EnsureInstance(prefab)) return false;
             if (tooltipLabel != null) tooltipLabel.text = text;
 
             tooltipRect.gameObject.SetActive(true);
@@ -200,8 +297,54 @@ namespace Common
 
             // ContentSizeFitter가 다음 프레임에 크기를 잡으면 한 프레임 어긋난 크기가 보인다 - 지금 맞춘다.
             LayoutRebuilder.ForceRebuildLayoutImmediate(tooltipRect);
+            return true;
+        }
 
-            PlaceAbove(source.TargetRect);
+        private static bool ChooseLeftSide(float leftSpace, float rightSpace, float tooltipWidth)
+        {
+            if (leftSpace >= tooltipWidth) return true;
+            if (rightSpace >= tooltipWidth) return false;
+            return leftSpace >= rightSpace;
+        }
+
+        private GameObject ResolveDirectionalPrefab(bool placeOnLeft)
+        {
+            GameObject directional = placeOnLeft ? tooltipOnLeftPrefab : tooltipOnRightPrefab;
+            return directional != null ? directional : tooltipPrefab;
+        }
+
+        private RectTransform ResolveBounds()
+        {
+            if (tooltipBounds != null) return tooltipBounds;
+            if (tooltipRoot != null) return tooltipRoot;
+            return transform as RectTransform;
+        }
+
+        private static void ClampInsideBounds(RectTransform tooltip, RectTransform boundsRect, float padding)
+        {
+            Bounds tooltipInBounds = RectTransformUtility.CalculateRelativeRectTransformBounds(boundsRect, tooltip);
+            Rect bounds = boundsRect.rect;
+            float minX = bounds.xMin + padding;
+            float maxX = bounds.xMax - padding;
+            float minY = bounds.yMin + padding;
+            float maxY = bounds.yMax - padding;
+            Vector3 correction = Vector3.zero;
+
+            if (tooltipInBounds.size.x <= maxX - minX)
+            {
+                if (tooltipInBounds.min.x < minX) correction.x = minX - tooltipInBounds.min.x;
+                else if (tooltipInBounds.max.x > maxX) correction.x = maxX - tooltipInBounds.max.x;
+            }
+            else correction.x = bounds.center.x - tooltipInBounds.center.x;
+
+            if (tooltipInBounds.size.y <= maxY - minY)
+            {
+                if (tooltipInBounds.min.y < minY) correction.y = minY - tooltipInBounds.min.y;
+                else if (tooltipInBounds.max.y > maxY) correction.y = maxY - tooltipInBounds.max.y;
+            }
+            else correction.y = bounds.center.y - tooltipInBounds.center.y;
+
+            tooltip.position += boundsRect.TransformVector(correction);
         }
 
         private void PlaceAbove(RectTransform target)
@@ -217,12 +360,13 @@ namespace Common
             tooltipRect.anchoredPosition += new Vector2(0f, verticalOffset);
         }
 
-        private bool EnsureInstance()
+        private bool EnsureInstance(GameObject prefab)
         {
-            if (tooltipRect != null) return true;
-            if (instantiateFailed) return false;
+            if (tooltipRect != null && instantiatedPrefab == prefab) return true;
+            if (tooltipRect != null) ReleaseInstance();
+            if (instantiateFailed && prefab == null) return false;
 
-            if (tooltipPrefab == null)
+            if (prefab == null)
             {
                 Debug.LogError($"[HoverTooltipController] '{name}': HoverTooltip 프리팹이 연결되지 " +
                                "않았습니다 - Inspector에서 연결하세요.", this);
@@ -231,7 +375,7 @@ namespace Common
             }
 
             Transform parent = tooltipRoot != null ? tooltipRoot : transform;
-            GameObject instance = Instantiate(tooltipPrefab, parent);
+            GameObject instance = Instantiate(prefab, parent);
             tooltipRect = instance.transform as RectTransform;
 
             if (tooltipRect == null)
@@ -243,6 +387,7 @@ namespace Common
                 return false;
             }
 
+            instantiatedPrefab = prefab;
             tooltipLabel = instance.GetComponentInChildren<TextMeshProUGUI>(true);
             if (tooltipLabel == null)
             {
@@ -256,11 +401,21 @@ namespace Common
                 graphic.raycastTarget = false;
             }
 
-            // 버튼 위쪽 변에 붙이므로 기준점은 아래-가운데다.
-            tooltipRect.pivot = new Vector2(0.5f, 0f);
-
             instance.SetActive(false);
             return true;
+        }
+
+        private void ReleaseInstance()
+        {
+            if (tooltipRect != null)
+            {
+                tooltipRect.gameObject.SetActive(false);
+                Destroy(tooltipRect.gameObject);
+            }
+
+            tooltipRect = null;
+            tooltipLabel = null;
+            instantiatedPrefab = null;
         }
 
         private void CancelPendingRoutine()

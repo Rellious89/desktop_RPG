@@ -34,21 +34,9 @@ namespace DesktopWindow
     /// 불필요한 시스템 콜을 피한다. 창이 모니터 전체로 커진 지금은 이 "그 외 전 영역은 클릭 관통"
     /// 원칙이 오히려 더 중요해졌다 - GlobalMouseWheelForwarder가 마우스 휠도 같은 원칙으로 별도 처리한다.
     ///
-    /// Layout Mode: StageVisualRoot/GameHUDGroup/ControlDockGroup 세 그룹을 직접 드래그로 배치하는
-    /// 모드다(Common.LayoutModeController가 상태와 세 그룹을 소유). 진입 경로는 두 가지다:
-    /// - ControlDock의 배치 버튼(LayoutModeToggleButton, 크로스 플랫폼 스크립트) 클릭
-    /// - F9 키(placementModeToggleKey, 레거시 - 제거하지 않음)
-    /// 둘 다 LayoutModeController.ToggleLayoutMode()를 호출할 뿐이다. Layout Mode 중에는
-    /// UpdateClickThroughState가 ControlDock 판정 대신 세 그룹의 화면 영역(LayoutModeController.AllGroups)
-    /// 중 하나 안에 있는지로 클릭 관통 여부를 정한다. StageVisualRoot는 UI가 아니라서 자체 영역
-    /// 안에서 마우스 버튼이 눌리면 이 클래스가 직접 드래그를 시작하고(TryStartStageDragInLayoutMode),
-    /// GameHUDGroup/ControlDockGroup은 UiGroupDraggable의 OnPointerDown(Unity UI 이벤트)이 드래그를
-    /// 시작한다 - 어느 쪽이든 실제 드래그 진행/종료 폴링(GetCursorPos/GetAsyncKeyState)은 이 클래스가
-    /// 소유하고, 매 프레임 커서 델타를 LayoutModeController.ApplyActiveDragDeltaPixels로 넘겨서 지금
-    /// 드래그 중인 그룹에만 반영한다(네이티브 창 자체는 절대 움직이지 않는다).
-    ///
-    /// 배치 모드 전환 키는 GlobalKeyboardHook.RegisterExcludedKey로 등록되어, 이 키를 눌러도
-    /// AnyKeyDownThisFrame(공격/콤보가 구독하는 신호)에는 포함되지 않는다.
+    /// StageVisualRoot와 작은 HUD 그룹은 별도 모드 없이 각 대상 위에서 직접 롱프레스해 이동한다.
+    /// 대기 중 대상 밖으로 나가거나 허용 거리보다 움직이면 취소하고, 활성화된 뒤에는 버튼을 놓을 때까지
+    /// 창 전체의 입력을 잠시 유지한다. 빈 투명 영역은 그 외 시간에 계속 클릭 관통된다.
     ///
     /// DefaultExecutionOrder(-100): SizeToggleButton 등 다른 GameObject의 Awake가 이 컴포넌트의
     /// Awake보다 먼저 실행되면 Instance가 아직 null이라 시작 시점 호출을 놓친다(AudioManager와 같은
@@ -110,15 +98,11 @@ namespace DesktopWindow
         [Tooltip("이 RectTransform의 화면 영역 위에 커서가 있을 때만 클릭 가능하게 하고, 나머지는 클릭 관통 처리한다.")]
         [SerializeField] private RectTransform controlDockRect;
 
-        [Header("Layout Mode (레거시 키보드 단축키 - ControlDock 배치 버튼 사용을 기본으로 한다)")]
-        [Tooltip("이 키로 Layout Mode On/Off를 전환한다(LayoutModeController.ToggleLayoutMode). 공격/콤보 입력으로 처리되지 않도록 GlobalKeyboardHook에서 자동으로 제외 등록된다. 지원 범위: A-Z / 0-9 / F1-F15.")]
-        [SerializeField] private KeyCode placementModeToggleKey = KeyCode.F9;
-
         [Header("Rendering")]
         [SerializeField] private Camera targetCamera;
 
-        [Header("진단용 (Layout Mode 클릭 판정 로그)")]
-        [Tooltip("켜면 클릭 관통 상태가 바뀔 때마다 [LayoutHitTest] 로그로 현재 모드/커서 좌표/세 그룹 판정 결과를 남긴다.")]
+        [Header("진단용 (이동 대상 클릭 판정 로그)")]
+        [Tooltip("켜면 클릭 관통 상태가 바뀔 때마다 [LayoutHitTest] 로그로 커서 좌표와 이동 대상 판정 결과를 남긴다.")]
         [SerializeField] private bool logLayoutHitTests = true;
 
 #if UNITY_STANDALONE_WIN
@@ -163,7 +147,7 @@ namespace DesktopWindow
         /// CheckForMonitorWorkAreaChange가 창을 다시 맞춘다.</summary>
         private Win32Interop.RECT lastWorkArea;
 
-        // Layout Mode에 등록된 모든 그룹의 네이티브 화면 좌표 캐시. Update()에서 메인 스레드가 매
+        // 직접 이동 대상으로 등록된 모든 그룹의 네이티브 화면 좌표 캐시. Update()에서 메인 스레드가 매
         // 프레임 갱신하고, GlobalMouseWheelForwarder의 후크 스레드는 이 값만 읽는다 -
         // Screen.height/RectTransformUtility 등 Unity API는 메인 스레드에서만 안전하게 호출할 수
         // 있어서, 후크 스레드가 부를 수 있는 IsScreenPointClickThrough 경로에서는 절대 라이브로
@@ -173,11 +157,7 @@ namespace DesktopWindow
         // 여부에만 영향을 주므로 충분히 안전하다.
         private Win32Interop.RECT[] cachedGroupScreenRects;
         private bool[] hasCachedGroupScreenRect;
-
-        // Stage는 Canvas UI가 아니라서 TryStartStageDragInLayoutMode가 폴링으로 직접 드래그 시작을
-        // 판정해야 한다 - 그 판정 전용으로 별도 캐싱한다(배열 인덱스에 의존하지 않기 위함).
-        private Win32Interop.RECT cachedStageScreenRect;
-        private bool hasCachedStageScreenRect;
+        private int cachedStageGroupIndex = -1;
 
         /// <summary>
         /// 프로세스가 실제로 Per-Monitor DPI 인식 상태인지(매니페스트로 고정됐든 API 호출로
@@ -196,10 +176,6 @@ namespace DesktopWindow
                 targetCamera = Camera.main;
             }
 
-            // 에디터에서도 이 키가 AnyKeyDownThisFrame(공격/콤보)로 새지 않도록 항상 등록해둔다 -
-            // 실제 창 이동/클릭 관통 토글은 Windows 빌드에서만 일어나지만, 제외 등록 자체는
-            // 플랫폼과 무관하게 필요하다.
-            GlobalKeyboardHook.RegisterExcludedKey(placementModeToggleKey);
         }
 
         private void Start()
@@ -216,11 +192,6 @@ namespace DesktopWindow
 
         private void Update()
         {
-            if (GlobalKeyboardHook.WasExcludedKeyDownThisFrame(placementModeToggleKey))
-            {
-                LayoutModeController.Instance?.ToggleLayoutMode();
-            }
-
 #if UNITY_STANDALONE_WIN
             if (hwnd == IntPtr.Zero) return;
 
@@ -228,12 +199,6 @@ namespace DesktopWindow
             RecomputeInputRegionScreenRects();
             RecomputeLayoutGroupScreenRects();
             UpdateClickThroughState();
-
-            bool isLayoutMode = LayoutModeController.Instance != null && LayoutModeController.Instance.IsLayoutMode;
-            if (isLayoutMode && !isDragging)
-            {
-                TryStartStageDragInLayoutMode();
-            }
 
             if (isDragging)
             {
@@ -258,8 +223,8 @@ namespace DesktopWindow
 #endif
 
         /// <summary>
-        /// LayoutModeController.BeginGroupDrag가 호출하는 진입점(UiGroupDraggable.OnPointerDown 또는
-        /// TryStartStageDragInLayoutMode에서 시작됨). 이 메서드 자체는 #if 밖에 있어야 컴파일이 깨지지
+        /// LayoutModeController.BeginGroupDrag가 호출하는 진입점(UI 또는 Stage 롱프레스에서 시작됨).
+        /// 이 메서드 자체는 #if 밖에 있어야 컴파일이 깨지지
         /// 않는다 - 실제 Win32 동작만 내부에서 플랫폼 가드로 감싼다. 네이티브 창은 움직이지 않고,
         /// ContinueOrEndDrag가 매 프레임 측정한 커서 델타를 LayoutModeController를 통해 지금 활성화된
         /// 그룹에만 전달한다.
@@ -272,6 +237,19 @@ namespace DesktopWindow
             isDragging = true;
             Win32Interop.GetCursorPos(out dragLastCursor);
 #endif
+        }
+
+        /// <summary>UI PointerUp 또는 네이티브 폴링이 공통으로 호출하는 드래그 종료 진입점.</summary>
+        public void EndManualDrag()
+        {
+#if UNITY_STANDALONE_WIN
+            if (isDragging)
+            {
+                isDragging = false;
+                SaveOverlayPlacement();
+            }
+#endif
+            LayoutModeController.Instance?.EndActiveDrag();
         }
 
         /// <summary>
@@ -564,10 +542,9 @@ namespace DesktopWindow
         {
             if (!logLayoutHitTests) return;
 
-            bool isLayoutMode = LayoutModeController.Instance != null && LayoutModeController.Instance.IsLayoutMode;
             bool anyGroupHit = IsPointInsideAnyLayoutGroup(cursor.X, cursor.Y);
 
-            Debug.Log($"[LayoutHitTest] mode={(isLayoutMode ? "On" : "Off")} screenPoint=({cursor.X},{cursor.Y}) " +
+            Debug.Log($"[LayoutHitTest] directLongPress=true screenPoint=({cursor.X},{cursor.Y}) " +
                 $"anyGroupHit={anyGroupHit} result={(shouldPassThrough ? "HTTRANSPARENT" : "HTCLIENT")}");
 
             if (LayoutModeController.Instance == null) return;
@@ -586,17 +563,13 @@ namespace DesktopWindow
         /// 갱신하는 값이라 아주 드물게 한 프레임 정도 오래된 값을 읽을 수 있지만, 결과가 스크롤/클릭
         /// 이벤트 하나의 관통 여부에만 영향을 주므로 별도 동기화 없이 충분히 안전하다.
         ///
-        /// 일반 모드: ControlDock의 실제 버튼 영역(dock_btn) 밖이면 관통.
-        /// Layout Mode: 등록된 그룹 중 어느 영역에도 들어있지 않으면 관통 - ControlDock의 일반 클릭
-        /// 판정은 Layout Mode 중에는 쓰지 않는다(그룹 드래그가 우선이라 UiGroupDraggable의 드래그
-        /// 캐처가 그 영역을 대신 담당한다).
+        /// 이동 대상이나 기존 UI 입력 영역 위에서는 입력을 받고, 그 밖은 관통한다. 활성 드래그 중에는
+        /// 대상 밖으로 나가도 PointerUp을 잃지 않도록 창 전체 입력을 잠시 유지한다.
         /// </summary>
         public bool IsScreenPointClickThrough(int x, int y)
         {
-            if (LayoutModeController.Instance != null && LayoutModeController.Instance.IsLayoutMode)
-            {
-                return !IsPointInsideAnyLayoutGroup(x, y);
-            }
+            if (LayoutModeController.Instance != null && LayoutModeController.Instance.HasActiveDrag) return false;
+            if (IsPointInsideAnyLayoutGroup(x, y)) return false;
 
             // 등록된 입력 영역(WindowInputRegion) 중 하나에라도 들어가면 클릭을 받는다 - ControlDock의
             // 추가 버튼이나 열려 있는 패널이 여기에 해당한다. 여러 영역이 동시에 유효하다.
@@ -637,6 +610,10 @@ namespace DesktopWindow
 
             for (int i = 0; i < cachedGroupScreenRects.Length; i++)
             {
+                // Stage의 넓은 배치 footprint는 클릭 시작 영역이 아니다. 실제 캐릭터에 맞춘
+                // WindowInputRegion이 별도로 입력을 받는다. 이 경로는 훅 스레드에서도 호출되므로
+                // Unity 객체/그룹 목록을 읽지 않고 메인 스레드가 캐싱한 인덱스만 비교한다.
+                if (i == cachedStageGroupIndex) continue;
                 if (IsPointInCachedRect(nativeX, nativeY, hasCachedGroupScreenRect[i], cachedGroupScreenRects[i])) return true;
             }
 
@@ -650,10 +627,9 @@ namespace DesktopWindow
 
         /// <summary>
         /// 등록된 모든 그룹의 화면 영역을 메인 스레드에서 매 프레임 다시 계산해 캐시에 남긴다(그룹
-        /// 이름을 나열하지 않음 - LayoutModeController.AllGroups를 그대로 순회). Layout Mode가 꺼져
-        /// 있어도 항상 갱신한다 - RecomputeControlDockScreenRect와 같은 방식(단순 매 프레임 재계산,
-        /// 별도 dirty 플래그 없음)으로 켜지는 순간 바로 최신 값을 쓸 수 있게 한다. Stage는
-        /// TryStartStageDragInLayoutMode 전용으로 별도 필드에도 함께 캐싱한다.
+        /// 이름을 나열하지 않음 - LayoutModeController.AllGroups를 그대로 순회). 항상 갱신해서
+        /// RecomputeControlDockScreenRect와 같은 방식으로 최신 클릭 영역을 유지한다. Stage는
+        /// 네이티브 롱프레스 판정 전용 필드에도 함께 캐싱한다.
         /// </summary>
         private void RecomputeLayoutGroupScreenRects()
         {
@@ -672,8 +648,7 @@ namespace DesktopWindow
 
                 if (groups[i].GroupId == LayoutModeController.StageGroupId)
                 {
-                    cachedStageScreenRect = nativeRect;
-                    hasCachedStageScreenRect = hasRect;
+                    cachedStageGroupIndex = i;
                 }
             }
         }
@@ -686,6 +661,7 @@ namespace DesktopWindow
 
             cachedGroupScreenRects = new Win32Interop.RECT[count];
             hasCachedGroupScreenRect = new bool[count];
+            cachedStageGroupIndex = -1;
         }
 
         /// <summary>Unity 스크린 좌표(좌하단 원점) 사각형을 네이티브 화면 픽셀 좌표(좌상단 원점,
@@ -1025,30 +1001,11 @@ namespace DesktopWindow
             a.Left == b.Left && a.Top == b.Top && a.Right == b.Right && a.Bottom == b.Bottom;
 
         /// <summary>
-        /// Layout Mode 중 StageVisualRoot 영역 드래그 시작 판정. StageVisualRoot는 Canvas UI가 아니라
-        /// Unity 이벤트(OnPointerDown)를 받을 수 없으므로, GameHUDGroup/ControlDockGroup(UiGroupDraggable)과
-        /// 달리 이 클래스가 직접 "클릭이 눌린 순간 커서가 Stage 화면 영역 안에 있었는지"를 폴링으로
-        /// 판정해서 드래그를 시작한다. RecomputeLayoutGroupScreenRects가 매 프레임 갱신해둔
-        /// cachedStageScreenRect를 그대로 쓴다.
-        /// </summary>
-        private void TryStartStageDragInLayoutMode()
-        {
-            if (!hasCachedStageScreenRect) return;
-
-            if (!Win32Interop.GetCursorPos(out Win32Interop.POINT cursor)) return;
-            bool leftDown = (Win32Interop.GetAsyncKeyState(Win32Interop.VK_LBUTTON) & 0x8000) != 0;
-            if (!leftDown || !IsPointInCachedRect(cursor.X, cursor.Y, hasCachedStageScreenRect, cachedStageScreenRect)) return;
-
-            if (LayoutModeController.Instance == null || !LayoutModeController.Instance.TryGetGroup(LayoutModeController.StageGroupId, out ILayoutDraggable stage)) return;
-            LayoutModeController.Instance.BeginGroupDrag(stage);
-        }
-
-        /// <summary>
         /// 왼쪽 마우스 버튼 상태와 커서의 절대 화면 좌표를 폴링해서 드래그를 진행/종료한다
         /// (GetAsyncKeyState + GetCursorPos) - Unity의 Input 이벤트에 의존하지 않고 전역 상태를 직접
         /// 폴링하는 이유는 클래스 상단 설명 참고. 매 프레임 커서 델타를 측정해서
         /// LayoutModeController.ApplyActiveDragDeltaPixels로 넘긴다(네이티브 창 위치는 절대 바꾸지
-        /// 않는다) - Stage 폴링 시작/UiGroupDraggable의 OnPointerDown 시작 어느 쪽이든 공유한다.
+        /// 않는다) - 캐릭터 hit area/UiGroupDraggable 중 어느 경로에서 시작돼도 공유한다.
         /// </summary>
         private void ContinueOrEndDrag()
         {
@@ -1065,9 +1022,7 @@ namespace DesktopWindow
             }
             else
             {
-                isDragging = false;
-                LayoutModeController.Instance?.EndActiveDrag();
-                SaveOverlayPlacement(); // 이동 완료 후 저장
+                EndManualDrag();
             }
         }
 
@@ -1077,8 +1032,7 @@ namespace DesktopWindow
         /// 레거시 positionX/Y/hasSavedPosition, stageXxx/hudXxx/dockXxx 필드는 더 이상 새로 쓰지
         /// 않는다(마이그레이션 읽기 전용) - hasMonitorSelection이 한 번 true로 저장되면 다음
         /// 로드부터는 groupPlacements 목록이 항상 우선이라 레거시 필드가 다시 읽히는 일이 없다.
-        /// LayoutModeController.SetLayoutMode(false)도 이 메서드를 호출한다(Layout Mode 종료 시
-        /// 한 번 더 저장하라는 요구사항).</summary>
+        /// 각 직접 드래그가 끝날 때 이 메서드를 호출한다.</summary>
         public void SaveOverlayPlacement()
         {
             var data = new WindowPlacementData

@@ -72,7 +72,10 @@ namespace Common
 
         private void OnEnable()
         {
-            if (controller == null) controller = GetComponentInParent<HoverTooltipController>();
+            // 복제하거나 계층을 옮긴 버튼에 이전 메뉴의 직렬화 참조가 남아 있어도, 현재 계층에서 가장
+            // 가까운 컨트롤러를 사용한다. 방향형 프리팹은 Companion 메뉴에만 한정되어야 한다.
+            HoverTooltipController parentController = GetComponentInParent<HoverTooltipController>();
+            if (parentController != null) controller = parentController;
             if (controller == null)
             {
                 Debug.LogWarning($"[HoverTooltipTrigger] '{name}': HoverTooltipController를 찾지 못해 " +
@@ -82,6 +85,12 @@ namespace Common
 
             ResolveReference();
             Subscribe();
+        }
+
+        /// <summary>메뉴 컨트롤러가 자기 하위 버튼의 소유권을 명시적으로 고정할 때 사용한다.</summary>
+        internal void BindController(HoverTooltipController owner)
+        {
+            if (owner != null) controller = owner;
         }
 
         private void OnDisable()

@@ -10,8 +10,8 @@ using UnityEngine.EventSystems;
 namespace Common
 {
     /// <summary>
-    /// Companion 모드에서 현재 플레이어 캐릭터 위에 클릭 영역을 맞추고, 클릭하면 필드에 맞는
-    /// 인터렉션 메뉴를 연다. 캐릭터와 게임 로직은 건드리지 않고 UI 표시와 버튼 연결만 담당한다.
+    /// Game/Companion 양쪽에서 현재 캐릭터 위에 Stage 롱프레스 입력 영역을 맞춘다. 짧은 클릭은
+    /// Companion에서만 인터렉션 메뉴를 열고 Game에서는 아무 동작도 하지 않는다.
     /// </summary>
     [DefaultExecutionOrder(-70)]
     [DisallowMultipleComponent]
@@ -34,6 +34,11 @@ namespace Common
         [SerializeField] private GameObject townMenuRoot;
         [SerializeField] private GameObject dungeonMenuRoot;
         [SerializeField] private Vector2 menuOffset = new Vector2(0f, 8f);
+
+        [Header("자동 닫힘")]
+        [Tooltip("인터렉션 메뉴 영역에서 마우스가 벗어난 뒤 자동으로 닫히기까지의 시간(초)입니다. " +
+                 "메뉴나 자식 버튼 위에 마우스가 있는 동안은 계속 초기화됩니다. 0 이하면 자동 닫힘을 사용하지 않습니다.")]
+        [SerializeField] private float autoCloseDelay = 1f;
 
         [Header("Interaction Menu Enter Tween")]
         [Tooltip("Companion 인터렉션 메뉴를 열 때 활성 필드 메뉴의 버튼을 순서대로 등장시킵니다.")]
@@ -66,11 +71,8 @@ namespace Common
         [Tooltip("등장 연출이 끝날 때까지 버튼과 Windows 입력 영역을 잠급니다.")]
         [SerializeField] private bool blockMenuInputDuringEnter = true;
 
-        [Header("Companion Character Drag")]
+        [Header("Companion Character Drag Feedback")]
         [SerializeField] private StageVisualRootController companionDragTarget;
-        [Tooltip("캐릭터 클릭 영역 안에서 이 시간(초) 동안 누르고 있으면 드래그가 시작됩니다. 짧은 클릭 메뉴 동작은 유지됩니다.")]
-        [SerializeField] [Min(0.1f)] private float dragHoldSeconds = 0.5f;
-
         [Tooltip("드래그 중 외곽선 색상을 바꿀 플레이어 Actor Outline Controller입니다. 비워두면 Player Renderer에서 자동으로 찾습니다.")]
         [SerializeField] private ActorOutlineController companionDragOutlineTarget;
 
@@ -86,18 +88,15 @@ namespace Common
         private readonly List<CharacterHitArea> characterHitAreas = new List<CharacterHitArea>(4);
         private CharacterHitArea playerCharacterHitArea;
         private CharacterHitArea[] restCharacterHitAreas = System.Array.Empty<CharacterHitArea>();
-        private RectTransform dragInputCaptureRect;
+        private MenuPointerRegion menuPointerRegion;
         private Coroutine pendingMenuClose;
-        private Coroutine pendingDragClickReset;
         private Sequence menuEnterSequence;
         private ActorOutlineController activeCompanionDragOutlineTarget;
         private readonly List<MenuButtonEnterState> menuButtonEnterStates = new List<MenuButtonEnterState>();
         private readonly List<UnityEngine.UI.LayoutGroup> pausedMenuLayouts =
             new List<UnityEngine.UI.LayoutGroup>();
-        private bool characterPointerHeld;
-        private bool companionDragActive;
-        private bool suppressCharacterClick;
-        private float characterPointerDownTime;
+        private readonly LongPressDragGesture stageDragGesture = new LongPressDragGesture();
+        private float closeMenuAtRealtime;
         private int pressedInteractionSlot = -1;
         private int selectedInteractionSlot = -1;
 
@@ -105,9 +104,9 @@ namespace Common
         {
             ValidateReferences();
             CreateCharacterHitArea();
-            CreateDragInputCaptureArea();
             CacheMenuButtons();
             EnsureMenuInputRegions();
+            EnsureMenuPointerRegion();
             CloseMenu();
             SyncFieldMenu(CurrentFieldMode());
             ApplyPresentationMode(CurrentPresentationMode());
@@ -116,6 +115,7 @@ namespace Common
         private void OnEnable()
         {
             Subscribe();
+            SubscribeLayoutDrag();
             AddButtonListeners();
             SyncFieldMenu(CurrentFieldMode());
             ApplyPresentationMode(CurrentPresentationMode());
@@ -124,6 +124,7 @@ namespace Common
         private void OnDisable()
         {
             Unsubscribe();
+            UnsubscribeLayoutDrag();
             RemoveButtonListeners();
 
             if (pendingMenuClose != null)
@@ -132,23 +133,21 @@ namespace Common
                 pendingMenuClose = null;
             }
 
-            if (pendingDragClickReset != null)
-            {
-                StopCoroutine(pendingDragClickReset);
-                pendingDragClickReset = null;
-            }
-
-            CancelCharacterDrag();
+            SetCompanionDragOutlineActive(false);
+            stageDragGesture.Cancel();
             CloseMenu();
             SetCharacterHitAreaActive(false);
         }
 
         private void LateUpdate()
         {
-            if (CurrentPresentationMode() != PresentationMode.Companion) return;
-            UpdateCharacterHoldState();
             UpdateCharacterScreenLayout();
+            UpdateStageLongPressGesture();
+            UpdateMenuAutoClose();
         }
+
+        public static bool ShouldMaintainCharacterHitAreas(PresentationMode mode) =>
+            mode == PresentationMode.Game || mode == PresentationMode.Companion;
 
         private void Subscribe()
         {
@@ -176,6 +175,22 @@ namespace Common
             {
                 fieldModeManager.FieldModeChanged -= HandleFieldModeChanged;
             }
+        }
+
+        private void SubscribeLayoutDrag()
+        {
+            if (LayoutModeController.Instance == null) return;
+            LayoutModeController.Instance.DragStarted -= HandleLayoutDragStarted;
+            LayoutModeController.Instance.DragStarted += HandleLayoutDragStarted;
+            LayoutModeController.Instance.DragEnded -= HandleLayoutDragEnded;
+            LayoutModeController.Instance.DragEnded += HandleLayoutDragEnded;
+        }
+
+        private void UnsubscribeLayoutDrag()
+        {
+            if (LayoutModeController.Instance == null) return;
+            LayoutModeController.Instance.DragStarted -= HandleLayoutDragStarted;
+            LayoutModeController.Instance.DragEnded -= HandleLayoutDragEnded;
         }
 
         private void AddButtonListeners()
@@ -279,28 +294,6 @@ namespace Common
             return result;
         }
 
-        private void CreateDragInputCaptureArea()
-        {
-            if (interactionCanvasRect == null || dragInputCaptureRect != null) return;
-
-            var capture = new GameObject("CompanionDragNativeInputCapture");
-            capture.SetActive(false);
-            capture.layer = interactionCanvasRect.gameObject.layer;
-
-            dragInputCaptureRect = capture.AddComponent<RectTransform>();
-            dragInputCaptureRect.SetParent(interactionCanvasRect, false);
-            dragInputCaptureRect.anchorMin = Vector2.zero;
-            dragInputCaptureRect.anchorMax = Vector2.one;
-            dragInputCaptureRect.offsetMin = Vector2.zero;
-            dragInputCaptureRect.offsetMax = Vector2.zero;
-
-            // Graphic을 두지 않아 Unity UI 레이캐스트는 가로채지 않는다. Windows 네이티브 창의
-            // 클릭 관통만 드래그가 끝날 때까지 전체 화면에서 잠시 막는 용도다.
-            WindowInputRegion inputRegion = capture.AddComponent<WindowInputRegion>();
-            inputRegion.ReceiveMouseInput = true;
-            dragInputCaptureRect.SetAsFirstSibling();
-        }
-
         private static void AddPointerTrigger(
             EventTrigger trigger,
             EventTriggerType eventType,
@@ -314,23 +307,14 @@ namespace Common
         private void HandleCharacterPointerDown(BaseEventData eventData, int restSlotIndex)
         {
             if (!(eventData is PointerEventData pointer)
-                || pointer.button != PointerEventData.InputButton.Left
-                || CurrentPresentationMode() != PresentationMode.Companion)
+                || pointer.button != PointerEventData.InputButton.Left)
             {
                 return;
             }
 
-            if (pendingDragClickReset != null)
-            {
-                StopCoroutine(pendingDragClickReset);
-                pendingDragClickReset = null;
-            }
-
-            characterPointerHeld = true;
-            companionDragActive = false;
-            suppressCharacterClick = false;
-            characterPointerDownTime = Time.unscaledTime;
+            LayoutModeController.Instance?.ClearClickSuppression();
             pressedInteractionSlot = restSlotIndex;
+            stageDragGesture.Press(pointer.position, Time.unscaledTime);
         }
 
         private void HandleCharacterPointerUp(BaseEventData eventData, int ignoredRestSlotIndex)
@@ -341,29 +325,20 @@ namespace Common
                 return;
             }
 
-            bool wasDragging = companionDragActive;
-            characterPointerHeld = false;
-            companionDragActive = false;
-            SetCompanionDragOutlineActive(false);
-            SetDragInputCaptureActive(false);
+            bool wasActive = stageDragGesture.Release();
+            if (wasActive)
+            {
+                TransparentWindowController window = TransparentWindowController.Instance;
+                if (window != null) window.EndManualDrag();
+                else LayoutModeController.Instance?.EndActiveDrag();
+            }
+
             pressedInteractionSlot = -1;
-
-            if (!wasDragging) return;
-
-            if (pendingDragClickReset != null) StopCoroutine(pendingDragClickReset);
-            pendingDragClickReset = StartCoroutine(ClearDragClickSuppressionNextFrame());
         }
 
         private void HandleCharacterPointerExit(BaseEventData eventData, int ignoredRestSlotIndex)
         {
-            if (!(eventData is PointerEventData) || !characterPointerHeld)
-            {
-                return;
-            }
-
-            // Hold 대기 중에는 영역 밖으로 나간 순간 취소한다. 이미 드래그 중이면
-            // PointerExit가 발생해도 PointerUp까지 계속 이동할 수 있어야 한다.
-            if (!companionDragActive) CancelCharacterDrag();
+            stageDragGesture.Exit();
         }
 
         private void HandleCharacterPointerClick(BaseEventData eventData, int restSlotIndex)
@@ -374,56 +349,68 @@ namespace Common
                 return;
             }
 
-            if (suppressCharacterClick)
+            if (LayoutModeController.Instance != null &&
+                LayoutModeController.Instance.ConsumeClickSuppression(LayoutModeController.StageGroupId))
             {
-                suppressCharacterClick = false;
                 return;
             }
 
-            ToggleMenu(restSlotIndex);
+            if (CurrentPresentationMode() == PresentationMode.Companion) ToggleMenu(restSlotIndex);
         }
 
         private void HandleCharacterPointerDrag(BaseEventData eventData, int ignoredRestSlotIndex)
         {
-            if (!companionDragActive || !(eventData is PointerEventData pointer)) return;
+            if (!(eventData is PointerEventData pointer)) return;
+
+            LayoutModeController controller = LayoutModeController.Instance;
+            if (controller == null) return;
+
+            if (stageDragGesture.IsWaiting)
+            {
+                stageDragGesture.Move(pointer.position, controller.PreActivationMovementPixels);
+                return;
+            }
+
+            if (stageDragGesture.IsActive && LayoutModeController.UsesPointerEventDragDeltas)
+            {
+                CompanionDragTarget()?.ApplyDragDeltaPixels(
+                    Mathf.RoundToInt(pointer.delta.x),
+                    Mathf.RoundToInt(-pointer.delta.y));
+            }
+        }
+
+        private void UpdateStageLongPressGesture()
+        {
+            LayoutModeController controller = LayoutModeController.Instance;
+            if (controller == null || !stageDragGesture.IsWaiting) return;
+
+            stageDragGesture.Move(Input.mousePosition, controller.PreActivationMovementPixels);
+            if (!stageDragGesture.TryActivate(Time.unscaledTime, controller.HoldSeconds)) return;
 
             StageVisualRootController target = CompanionDragTarget();
-            if (target == null) return;
+            if (target == null)
+            {
+                stageDragGesture.Cancel();
+                return;
+            }
 
-            // PointerEventData는 Y가 위로 증가하고, ILayoutDraggable은 Win32 화면 좌표(Y 아래로 증가)를
-            // 받으므로 Y축만 반전해 기존 Layout Mode 이동 계산을 그대로 재사용한다.
-            target.ApplyDragDeltaPixels(
-                Mathf.RoundToInt(pointer.delta.x),
-                Mathf.RoundToInt(-pointer.delta.y));
+            controller.BeginGroupDrag(target);
+            if (!controller.HasActiveDrag) stageDragGesture.Cancel();
         }
 
-        private void UpdateCharacterHoldState()
+        private void HandleLayoutDragStarted(ILayoutDraggable target)
         {
-            if (!characterPointerHeld || companionDragActive) return;
-            if (Time.unscaledTime - characterPointerDownTime < Mathf.Max(0.1f, dragHoldSeconds)) return;
+            if (target == null || target.GroupId != LayoutModeController.StageGroupId ||
+                CurrentPresentationMode() != PresentationMode.Companion) return;
 
-            companionDragActive = true;
-            suppressCharacterClick = true;
             SetCompanionDragOutlineActive(true);
             CloseMenu();
-            SetDragInputCaptureActive(true);
         }
 
-        private IEnumerator ClearDragClickSuppressionNextFrame()
+        private void HandleLayoutDragEnded(ILayoutDraggable target)
         {
-            yield return null;
-            pendingDragClickReset = null;
-            suppressCharacterClick = false;
-        }
-
-        private void CancelCharacterDrag()
-        {
-            characterPointerHeld = false;
-            companionDragActive = false;
-            suppressCharacterClick = false;
+            if (target == null || target.GroupId != LayoutModeController.StageGroupId) return;
             SetCompanionDragOutlineActive(false);
-            SetDragInputCaptureActive(false);
-            pressedInteractionSlot = -1;
         }
 
         private void SetCompanionDragOutlineActive(bool active)
@@ -458,12 +445,6 @@ namespace Common
             activeCompanionDragOutlineTarget.SetOutlineColorOverride(companionDragOutlineColor);
         }
 
-        private void SetDragInputCaptureActive(bool active)
-        {
-            if (dragInputCaptureRect == null) return;
-            SetActiveIfNeeded(dragInputCaptureRect.gameObject, active);
-        }
-
         private StageVisualRootController CompanionDragTarget() =>
             companionDragTarget != null ? companionDragTarget : StageVisualRootController.Instance;
 
@@ -496,6 +477,37 @@ namespace Common
             }
         }
 
+        private void EnsureMenuPointerRegion()
+        {
+            if (menuRoot == null) return;
+
+            menuPointerRegion = menuRoot.GetComponent<MenuPointerRegion>();
+            if (menuPointerRegion == null)
+            {
+                // Scene/Prefab에 별도 컴포넌트를 붙이지 않아도 자식 버튼의
+                // Pointer Enter/Exit가 부모로 전달되어 자동 닫힘을 중단할 수 있게 한다.
+                menuPointerRegion = menuRoot.gameObject.AddComponent<MenuPointerRegion>();
+            }
+        }
+
+        private void UpdateMenuAutoClose()
+        {
+            if (menuRoot == null || !menuRoot.gameObject.activeSelf || autoCloseDelay <= 0f) return;
+
+            if (menuPointerRegion != null && menuPointerRegion.PointerInside)
+            {
+                NotifyMenuActivity();
+                return;
+            }
+
+            if (Time.unscaledTime >= closeMenuAtRealtime) CloseMenu();
+        }
+
+        private void NotifyMenuActivity()
+        {
+            closeMenuAtRealtime = Time.unscaledTime + autoCloseDelay;
+        }
+
         private void HandlePresentationModeChanged(PresentationMode mode)
         {
             ApplyPresentationMode(mode);
@@ -503,13 +515,17 @@ namespace Common
 
         private void ApplyPresentationMode(PresentationMode mode)
         {
-            bool companion = mode == PresentationMode.Companion;
-
-            if (!companion)
+            if (!ShouldMaintainCharacterHitAreas(mode) && stageDragGesture.IsWaiting)
             {
-                CancelCharacterDrag();
+                stageDragGesture.Cancel();
+                pressedInteractionSlot = -1;
+            }
+
+            if (mode != PresentationMode.Companion)
+            {
+                SetCompanionDragOutlineActive(false);
                 CloseMenu();
-                SetCharacterHitAreaActive(false);
+                UpdateCharacterScreenLayout();
                 return;
             }
 
@@ -549,6 +565,7 @@ namespace Common
             UpdateCharacterScreenLayout();
             menuRoot.SetAsLastSibling();
             menuRoot.gameObject.SetActive(true);
+            NotifyMenuActivity();
             PlayMenuEnterAnimation();
         }
 
@@ -750,10 +767,12 @@ namespace Common
 
         private void UpdateCharacterScreenLayout()
         {
-            if (CurrentPresentationMode() != PresentationMode.Companion
+            PresentationMode presentationMode = CurrentPresentationMode();
+            if (!ShouldMaintainCharacterHitAreas(presentationMode)
                 || interactionCanvasRect == null
                 || stageCamera == null)
             {
+                if (stageDragGesture.IsWaiting) stageDragGesture.Cancel();
                 CloseMenu();
                 SetCharacterHitAreaActive(false);
                 return;
@@ -813,6 +832,7 @@ namespace Common
 
             if (!anyVisible)
             {
+                if (stageDragGesture.IsWaiting) stageDragGesture.Cancel();
                 CloseMenu();
                 return;
             }
@@ -824,7 +844,7 @@ namespace Common
                 selectedRectMax = firstRectMax;
             }
 
-            if (menuRoot != null)
+            if (presentationMode == PresentationMode.Companion && menuRoot != null)
             {
                 Vector2 characterTop = new Vector2(
                     (selectedRectMin.x + selectedRectMax.x) * 0.5f,

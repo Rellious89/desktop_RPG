@@ -12,7 +12,8 @@ namespace Common
     /// 초상화, 행동력 막대, 오염도 10칸과 클릭만 표시한다.
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class CharacterHudSlotView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+    public sealed class CharacterHudSlotView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler,
+        IPointerDownHandler, IPointerUpHandler, IDragHandler
     {
         public const int CorruptionCellCount = 10;
 
@@ -47,6 +48,7 @@ namespace Common
         private bool cellsBuilt;
         private bool cellsSortedForVisualOrder;
         private CharacterHudTooltipController tooltipController;
+        private UiGroupDraggable hudDraggable;
 
         private readonly struct CellImage
         {
@@ -168,6 +170,8 @@ namespace Common
 
         private void HandleClicked()
         {
+            if (ResolveHudDraggable()?.ConsumeCompletedDragClick() == true) return;
+
             // 교체 확인창을 열기 전 이 슬롯의 Hover 툴팁을 먼저 거둔다. 남겨 두면 작은 HUD 위에
             // 툴팁과 확인창이 겹치고, 클릭이 툴팁을 위한 것처럼 보인다.
             tooltipController?.CancelShow(this);
@@ -184,6 +188,28 @@ namespace Common
         public void OnPointerExit(PointerEventData eventData)
         {
             tooltipController?.CancelShow(this);
+            ResolveHudDraggable()?.OnPointerExit(eventData);
+        }
+
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            ResolveHudDraggable()?.OnPointerDown(eventData);
+        }
+
+        public void OnPointerUp(PointerEventData eventData)
+        {
+            ResolveHudDraggable()?.OnPointerUp(eventData);
+        }
+
+        public void OnDrag(PointerEventData eventData)
+        {
+            ResolveHudDraggable()?.OnDrag(eventData);
+        }
+
+        private UiGroupDraggable ResolveHudDraggable()
+        {
+            if (hudDraggable == null) hudDraggable = GetComponentInParent<UiGroupDraggable>();
+            return hudDraggable;
         }
 
         private void ResolveReferences()

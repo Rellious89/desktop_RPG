@@ -5,7 +5,7 @@ using UnityEngine;
 namespace Common
 {
     /// <summary>
-    /// Layout Mode로 드래그 가능한 모든 그룹(Stage/Combo/Progress/KillCount/Dock)을 한 곳에서
+    /// 직접 롱프레스로 드래그 가능한 모든 그룹(Stage/CharacterHUD/Combo/Progress/KillCount)을 한 곳에서
     /// 관리하는 상태 허브다. TransparentWindowController(Win32 클릭 관통/드래그 폴링을 소유)와 각
     /// ILayoutDraggable 구현체(StageVisualRootController, UiGroupDraggable) 사이의 중재자 역할만
     /// 한다 - Win32 API를 직접 호출하지 않는다.
@@ -31,25 +31,59 @@ namespace Common
         public static LayoutModeController Instance { get; private set; }
 
         public const string StageGroupId = StageVisualRootController.Id;
+        public const string CharacterHudGroupId = "characterHud";
         public const string ComboGroupId = "combo";
         public const string ProgressGroupId = "progress";
         public const string KillCountGroupId = "killCount";
+        // 새 목록에는 등록하지 않지만 기존 저장 파일의 dock 배치를 읽어 넘기기 위해 ID는 유지한다.
         public const string DockGroupId = "dock";
 
-        [Header("Layout Mode 대상")]
+        [Header("직접 롱프레스 이동 대상")]
         [SerializeField] private StageVisualRootController stageDraggableSource;
+        [SerializeField] private UiGroupDraggable characterHudDraggableSource;
         [SerializeField] private UiGroupDraggable comboDraggableSource;
         [SerializeField] private UiGroupDraggable progressDraggableSource;
         [SerializeField] private UiGroupDraggable killCountDraggableSource;
-        [SerializeField] private UiGroupDraggable dockDraggableSource;
 
-        public bool IsLayoutMode { get; private set; }
+        [Header("롱프레스 조작감")]
+        [Tooltip("대상을 누른 뒤 이동이 활성화될 때까지 기다리는 시간(초).")]
+        [SerializeField] [Min(0.05f)] private float holdSeconds = 0.5f;
+        [Tooltip("활성화 전에 허용할 포인터 이동 거리(px). 이보다 움직이면 해당 롱프레스는 취소됩니다.")]
+        [SerializeField] [Min(0f)] private float preActivationMovementPixels = 8f;
 
         private List<ILayoutDraggable> allGroups;
 
         private ILayoutDraggable activeDragTarget;
+        private string suppressedClickGroupId;
 
         public IReadOnlyList<ILayoutDraggable> AllGroups => allGroups;
+        public float HoldSeconds => Mathf.Max(0.05f, holdSeconds);
+        public float PreActivationMovementPixels => Mathf.Max(0f, preActivationMovementPixels);
+        public bool HasActiveDrag => activeDragTarget != null;
+
+        /// <summary>
+        /// 에디터와 Win32 네이티브 폴링을 사용할 수 없는 플랫폼에서는 EventSystem의 pointer delta로
+        /// 이동한다. Windows가 활성 빌드 타깃이어도 Editor Play 모드에서는 네이티브 창 핸들을
+        /// 초기화하지 않으므로 반드시 pointer delta 경로를 사용해야 한다.
+        /// </summary>
+        public static bool UsesPointerEventDragDeltas
+        {
+            get
+            {
+#if UNITY_EDITOR || !UNITY_STANDALONE_WIN
+                return true;
+#else
+                return false;
+#endif
+            }
+        }
+
+        /// <summary>Windows 클릭 관통을 상시 해제할 수 있는 UI 그룹인지 판정한다. Stage는 실제 캐릭터
+        /// hit area가 별도 WindowInputRegion을 제공하므로 넓은 배치 footprint를 입력 영역으로 쓰지 않는다.</summary>
+        public static bool IsDirectPointerInputGroup(string groupId) => groupId != StageGroupId;
+
+        public event System.Action<ILayoutDraggable> DragStarted;
+        public event System.Action<ILayoutDraggable> DragEnded;
 
         private void Awake()
         {
@@ -58,12 +92,26 @@ namespace Common
             allGroups = new List<ILayoutDraggable>();
 
             Register(stageDraggableSource, "stageDraggableSource", "StageVisualRoot의 StageVisualRootController");
+            characterHudDraggableSource = ResolveOptionalUiGroup(
+                characterHudDraggableSource, CharacterHudGroupId);
+            Register(characterHudDraggableSource, "characterHudDraggableSource", "CharacterHUD의 UiGroupDraggable");
             Register(comboDraggableSource, "comboDraggableSource", "ComboGroup의 UiGroupDraggable");
             Register(progressDraggableSource, "progressDraggableSource", "ProgressGroup의 UiGroupDraggable");
             Register(killCountDraggableSource, "killCountDraggableSource", "KillCountGroup의 UiGroupDraggable");
-            Register(dockDraggableSource, "dockDraggableSource", "ControlDock의 UiGroupDraggable");
 
             Debug.Log($"[LayoutModeController] 초기화 완료 - 등록된 그룹: {allGroups.Count}/5 ({string.Join(", ", allGroups.ConvertAll(g => g.GroupId))})");
+        }
+
+        private static UiGroupDraggable ResolveOptionalUiGroup(UiGroupDraggable assigned, string groupId)
+        {
+            if (assigned != null) return assigned;
+
+            UiGroupDraggable[] candidates = FindObjectsOfType<UiGroupDraggable>(true);
+            foreach (UiGroupDraggable candidate in candidates)
+            {
+                if (candidate != null && candidate.GroupId == groupId) return candidate;
+            }
+            return null;
         }
 
         private void Register(ILayoutDraggable source, string fieldName, string hint)
@@ -78,49 +126,15 @@ namespace Common
             }
         }
 
-        /// <summary>ControlDock의 배치 버튼(LayoutModeToggleButton) 또는 F9 키가 호출한다.</summary>
-        public void ToggleLayoutMode()
-        {
-            SetLayoutMode(!IsLayoutMode);
-        }
-
-        public void SetLayoutMode(bool active)
-        {
-            if (IsLayoutMode == active) return;
-
-            IsLayoutMode = active;
-
-            foreach (ILayoutDraggable group in allGroups)
-            {
-                group.SetLayoutModeActive(active);
-            }
-
-            if (!active)
-            {
-                // Layout Mode 종료 시 한 번 더 저장(드래그 종료 시 이미 저장되지만, 요구사항이 명시적으로
-                // "Layout Mode 종료 시" 저장을 요구하므로 안전하게 한 번 더 시도한다).
-                //
-                // SaveOverlayPlacement는 TransparentWindowController의 Win32 전용 블록 안에만 존재하므로
-                // (BeginManualDrag/RegisterInputRegion처럼 #if 밖으로 노출된 진입점이 아니다) 이 호출만
-                // 플랫폼 가드로 감싼다 - Windows 빌드 동작은 그대로고, 그 밖(macOS Editor 등)에서는
-                // 저장 대상 네이티브 창 자체가 없으므로 아무 일도 하지 않는 것이 맞다.
-#if UNITY_STANDALONE_WIN
-                TransparentWindowController.Instance?.SaveOverlayPlacement();
-#endif
-            }
-
-            Debug.Log(active
-                ? "[LayoutModeController] Layout Mode ON - Stage/Combo/Progress/KillCount/Dock 영역을 직접 드래그해 옮길 수 있습니다."
-                : "[LayoutModeController] Layout Mode OFF - 일반 클릭 관통/버튼 동작으로 돌아갑니다.");
-        }
-
-        /// <summary>UiGroupDraggable.OnPointerDown 또는 TransparentWindowController의 Stage 영역
-        /// 폴링 판정이 호출한다. 실제 드래그 폴링 루프는 TransparentWindowController가 소유한다.</summary>
+        /// <summary>롱프레스가 성립한 뒤 호출한다. 실제 Windows 드래그 폴링은 투명창 컨트롤러가 맡는다.</summary>
         public void BeginGroupDrag(ILayoutDraggable target)
         {
-            if (!IsLayoutMode || target == null) return;
+            if (target == null || !allGroups.Contains(target) || activeDragTarget != null) return;
 
             activeDragTarget = target;
+            suppressedClickGroupId = target.GroupId;
+            target.SetLayoutModeActive(true);
+            DragStarted?.Invoke(target);
             TransparentWindowController.Instance?.BeginManualDrag();
         }
 
@@ -133,7 +147,24 @@ namespace Common
         /// <summary>드래그가 끝났을 때(마우스 버튼을 뗐을 때) TransparentWindowController가 호출한다.</summary>
         public void EndActiveDrag()
         {
+            ILayoutDraggable ended = activeDragTarget;
+            if (ended == null) return;
+
+            ended.SetLayoutModeActive(false);
             activeDragTarget = null;
+            DragEnded?.Invoke(ended);
+        }
+
+        public void ClearClickSuppression()
+        {
+            suppressedClickGroupId = null;
+        }
+
+        public bool ConsumeClickSuppression(string groupId)
+        {
+            if (string.IsNullOrEmpty(groupId) || suppressedClickGroupId != groupId) return false;
+            suppressedClickGroupId = null;
+            return true;
         }
 
         public bool TryGetGroup(string groupId, out ILayoutDraggable group)
