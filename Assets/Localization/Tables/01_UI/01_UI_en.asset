@@ -573,6 +573,15 @@ MonoBehaviour:
       \uD544\uC694 \uC218\uCE58)"
     m_Metadata:
       m_Items: []
+  - m_Id: 20271478892126208
+    m_Localized: Ready
+    m_Metadata:
+      m_Items: []
+  - m_Id: 20426473960628224
+    m_Localized: "\uCD5C\uC18C \uD589\uB3D9\uB825\uC774 \uBD80\uC871\uD558\uC5EC
+      \uB358\uC804\uC5D0 \uC785\uC7A5\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

@@ -15,7 +15,7 @@ namespace Dungeon
     /// 로그만 남기고 끝난다 - 그래도 패널은 요청이 받아들여진 것으로 보고 닫힌다. 이 동작이 나중에
     /// 구독자가 생겼을 때와 같은 경로를 지나게 하기 위함이다(구독자 유무로 UI 흐름이 갈라지지 않는다).
     ///
-    /// <b>검증은 여기서 끝낸다.</b> 던전이 없거나 식별자가 없는 요청, 그리고 필요 레벨에 못 미치는
+    /// <b>검증은 여기서 끝낸다.</b> 던전이 없거나 식별자가 없는 요청, 그리고 레벨·행동력 기준에 못 미치는
     /// 요청은 이벤트를 발행하지 않고 false를 돌려주므로, 구독자는 "언제나 유효하고 입장 가능한 던전"만
     /// 받는다.
     /// </summary>
@@ -50,11 +50,18 @@ namespace Dungeon
         /// 같은 클릭이 두 번 도달하지 않게 막는 것은 버튼을 소유한 UI의 몫이다(패널은 요청이
         /// 받아들여지면 즉시 버튼을 끄고 닫는다).
         ///
-        /// <b>레벨 판정은 요청 직전에 현재 상태로 한다.</b> UI가 미리 계산한 값은 이 통로가 보지
+        /// <b>레벨·행동력 판정은 요청 직전에 현재 상태로 한다.</b> UI가 미리 계산한 값은 이 통로가 보지
         /// 않으며, 우회할 수 없다.
         /// </summary>
         public static bool RequestEnterDungeon(DungeonDefinition dungeon)
         {
+            return RequestEnterDungeon(dungeon, out _);
+        }
+
+        /// <summary>거부 시 패널이 행동력 부족 사유를 표시할 수 있도록 최종 판정도 반환한다.</summary>
+        public static bool RequestEnterDungeon(DungeonDefinition dungeon, out DungeonAccessResult access)
+        {
+            access = DungeonAccessResult.Deny(DungeonAccessFailureReason.MissingOrInvalidDungeon);
             if (dungeon == null)
             {
                 Debug.LogError("[DungeonEntryService] 입장 요청에 던전이 없습니다 - 요청을 무시합니다.");
@@ -75,11 +82,12 @@ namespace Dungeon
                 return false;
             }
 
-            DungeonAccessResult access = EvaluateAccess(dungeon);
+            access = EvaluateAccess(dungeon);
             if (!access.Allowed)
             {
                 Debug.Log($"[DungeonEntryService] 던전 '{dungeon.DungeonId}' 입장 거부: {access.FailureReason} " +
-                          $"(필요 {access.DungeonRequiredLevel}, 파티 최고 {access.HighestPartyLevel}).");
+                          $"(필요 레벨 {access.DungeonRequiredLevel}, 파티 최고 {access.HighestPartyLevel}, " +
+                          $"필요 행동력 {access.RequiredStamina}, 현재 행동력 {access.CurrentStamina}).");
                 return false;
             }
 

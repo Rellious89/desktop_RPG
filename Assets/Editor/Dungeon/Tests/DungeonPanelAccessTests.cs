@@ -413,6 +413,47 @@ namespace DungeonEditor.Tests
             Assert.IsFalse(enterButton.interactable, "버튼은 다시 잠겨야 한다");
         }
 
+        [Test]
+        public void Panel_InsufficientStamina_KeepsButtonClickableButDoesNotEnter()
+        {
+            Inject(State("hero", stamina: 8));
+            CharacterRoster roster = ReadyRoster("hero");
+            SetRosterInstance(roster);
+            DungeonDefinition dungeon = Dungeon("d1");
+            DungeonPanel panel = CreatePanel(dungeon);
+            DungeonEntryService.DungeonEnterRequested += RecordEntryEvent;
+
+            ActivatePanel(panel);
+            Assert.IsTrue(panel.IsEnterInteractable, "행동력 부족일 때 클릭하여 사유를 확인할 수 있어야 한다");
+            Assert.IsTrue(panel.GetSpawnedItem(0).IsLocked, "목록에는 접근 불가 상태가 표시되어야 한다");
+
+            EnterButtonOf(panel).onClick.Invoke();
+            Assert.IsFalse(panel.IsEnterRequestSent);
+            Assert.IsTrue(panel.gameObject.activeSelf);
+            Assert.IsTrue(panel.IsEnterInteractable);
+            Assert.AreEqual(0, entryEventLog.Count);
+            Assert.AreEqual(0, DungeonEntryService.AcceptedRequestCount);
+
+            SaveSystem.Data.characters[0].currentStamina = 9;
+            RaiseCharacterStateChangedViaReflection(roster.Entries[0].definition);
+            Assert.IsFalse(panel.GetSpawnedItem(0).IsLocked);
+            Assert.IsTrue(panel.IsEnterInteractable);
+        }
+
+        [Test]
+        public void ProductionDungeonPrefab_ReferencesInsufficientStaminaToastKey()
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/Art/UI/Prefab/panel/pn_Dungeon.prefab");
+            Assert.IsNotNull(prefab);
+            DungeonPanel panel = prefab.GetComponent<DungeonPanel>();
+            Assert.IsNotNull(panel);
+            var reference = (LocalizedTextReference)GetPrivate(panel, "insufficientStaminaToast");
+            Assert.IsNotNull(reference);
+            Assert.IsTrue(reference.HasReference);
+            Assert.AreEqual(20426473960628224L, reference.TableEntryReference.KeyId);
+        }
+
         // ---- 프로덕션 프리팹 검증 ----
 
         [Test]

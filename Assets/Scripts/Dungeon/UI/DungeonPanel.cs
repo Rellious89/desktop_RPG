@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using Character;
 using Common;
 using Inventory;
+using Party;
+using Recovery;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -28,9 +30,8 @@ namespace Dungeon
     /// 한 번 보낼 뿐이고, 필드 모드 전환이나 전투 시작은 나중에 그 이벤트를 구독하는 쪽이 담당한다 -
     /// 지금은 구독자가 없어도 정상 동작한다(요청 로그만 남고 패널이 닫힌다).
     ///
-    /// <b>레벨 판정은 <see cref="DungeonAccessService"/>를 재사용한다.</b> 로스터가 없으면 전원 잠금(fail
-    /// closed). 패널이 열린 동안 <see cref="CharacterRoster.CharacterStateChanged"/>를 구독해서 레벨이
-    /// 오르면 즉시 모든 항목의 잠김 표시와 입장 버튼을 다시 판정한다.
+    /// <b>레벨·행동력 판정은 <see cref="DungeonAccessService"/>를 재사용한다.</b> 로스터가 없으면 전원 잠금(fail
+    /// closed). 패널이 열린 동안 캐릭터·파티·회복소 변경 신호를 구독해 접근 표시를 다시 판정한다.
     /// </summary>
     [DisallowMultipleComponent]
     public class DungeonPanel : ModalPanel
@@ -78,6 +79,9 @@ namespace Dungeon
         [Header("Enter (list_right/bottom/btn_Enter)")]
         [Tooltip("입장 버튼(btn_Enter). 선택이 없거나 유효하지 않으면 꺼진다.")]
         [SerializeField] private Button enterButton;
+
+        [Tooltip("행동력이 부족해 입장할 수 없을 때 표시할 토스트 문구(UI/132).")]
+        [SerializeField] private LocalizedTextReference insufficientStaminaToast = new LocalizedTextReference();
 
         private readonly List<DungeonListItemView> spawnedItems = new List<DungeonListItemView>();
         private readonly List<DungeonMonsterPreviewView> spawnedMonsterPreviews = new List<DungeonMonsterPreviewView>();
@@ -176,6 +180,9 @@ namespace Dungeon
             if (subscribedToStateChanged) return;
             subscribedToStateChanged = true;
             CharacterRoster.CharacterStateChanged += HandleCharacterStateChanged;
+            CharacterRoster.RosterEntriesChanged += RefreshAllAccessVisuals;
+            PartyCompositionEvents.ChangedAfterSave += RefreshAllAccessVisuals;
+            RecoveryService.SlotsChanged += RefreshAllAccessVisuals;
         }
 
         private void UnsubscribeFromStateChanged()
@@ -183,6 +190,9 @@ namespace Dungeon
             if (!subscribedToStateChanged) return;
             subscribedToStateChanged = false;
             CharacterRoster.CharacterStateChanged -= HandleCharacterStateChanged;
+            CharacterRoster.RosterEntriesChanged -= RefreshAllAccessVisuals;
+            PartyCompositionEvents.ChangedAfterSave -= RefreshAllAccessVisuals;
+            RecoveryService.SlotsChanged -= RefreshAllAccessVisuals;
         }
 
         private void HandleCharacterStateChanged(CharacterDefinition _)
@@ -515,7 +525,7 @@ namespace Dungeon
         /// 않는 경로이므로, 되돌리지 않으면 열려 있는 패널의 입장 버튼이 영영 잠긴 채로 남는다.
         /// 왜 거부됐는지는 요청 통로가 로그로 남긴다.
         ///
-        /// <b>레벨 판정을 여기서 다시 하지 않는다.</b> 최종 거부자는 <see cref="DungeonEntryService"/>이며
+        /// <b>접근 판정을 여기서 다시 하지 않는다.</b> 최종 거부자는 <see cref="DungeonEntryService"/>이며
         /// 요청 직전에 현재 상태로 판정한다 - 그래서 버튼의 interactable이 어떤 이유로 낡아 있어도
         /// (외부에서 강제로 켜더라도) 입장 요청이 통과하지 못하고, 이 경로가 그대로 되돌린다.
         /// </summary>
@@ -532,8 +542,10 @@ namespace Dungeon
             enterRequestSent = true;
             if (enterButton != null) enterButton.interactable = false;
 
-            if (!DungeonEntryService.RequestEnterDungeon(selectedDungeon))
+            if (!DungeonEntryService.RequestEnterDungeon(selectedDungeon, out DungeonAccessResult access))
             {
+                if (access.FailureReason == DungeonAccessFailureReason.InsufficientStamina)
+                    ShowInsufficientStaminaToast();
                 enterRequestSent = false;
                 UpdateEnterButton();
                 return;
@@ -542,9 +554,8 @@ namespace Dungeon
             Close();
         }
 
-        /// <summary>입장 버튼은 "지금 이 선택으로 입장 요청이 실제로 나갈 수 있을 때"만 켠다 - 선택이
-        /// 유효한지에 더해 <see cref="DungeonAccessService"/>의 레벨 판정까지 통과해야 한다. 이것은
-        /// 표시일 뿐이고, 실제 거부는 <see cref="DungeonEntryService"/>가 요청 시점에 다시 한다.</summary>
+        /// <summary>입장 버튼은 선택이 유효하고 레벨 기준을 통과하면 켠다. 행동력 부족은 클릭해
+        /// 토스트로 사유를 확인할 수 있게 유지한다. 최종 거부는 입장 서비스가 다시 판정한다.</summary>
         private void UpdateEnterButton()
         {
             if (enterButton == null) return;
@@ -553,10 +564,22 @@ namespace Dungeon
             if (!enterRequestSent && selectedDungeon != null && selectedDungeon.IsValid)
             {
                 DungeonAccessResult result = EvaluateAccess(selectedDungeon);
-                allowed = result.Allowed;
+                // 행동력 부족은 클릭해 사유를 확인할 수 있어야 한다. 레벨/기타 잠금은 유지한다.
+                allowed = result.Allowed || result.FailureReason == DungeonAccessFailureReason.InsufficientStamina;
             }
 
             enterButton.interactable = allowed;
+        }
+
+        private void ShowInsufficientStaminaToast()
+        {
+            if (ToastManager.Instance == null || insufficientStaminaToast == null ||
+                !insufficientStaminaToast.HasReference) return;
+
+            string message = insufficientStaminaToast.GetLocalizedString();
+            if (!string.IsNullOrEmpty(message) &&
+                !message.StartsWith("No translation found", StringComparison.Ordinal))
+                ToastManager.Instance.Show(message);
         }
 
         // ---- 참조 ----
@@ -642,6 +665,11 @@ namespace Dungeon
             if (enterButton == null)
             {
                 Debug.LogError($"[DungeonPanel] '{name}': 입장 버튼(btn_Enter)이 연결되지 않았습니다.", this);
+            }
+
+            if (insufficientStaminaToast == null || !insufficientStaminaToast.HasReference)
+            {
+                Debug.LogWarning($"[DungeonPanel] '{name}': 행동력 부족 토스트(Localization UI/132)가 연결되지 않았습니다.", this);
             }
         }
     }

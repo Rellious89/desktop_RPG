@@ -1974,6 +1974,15 @@ MonoBehaviour:
   rewardPreviewContent: {fileID: 3410321000256828123}
   rewardPreviewTemplate: {fileID: 4534572599468100820, guid: 59cf4cd9fc52b48bcb640bf18054c0da, type: 3}
   enterButton: {fileID: 4697031232264850176}
+  insufficientStaminaToast:
+    m_TableReference:
+      m_TableCollectionName: GUID:32fd067a20b754a50b20446b9c78d2ae
+    m_TableEntryReference:
+      m_KeyId: 20426473960628224
+      m_Key:
+    m_FallbackState: 0
+    m_WaitForCompletion: 0
+    m_LocalVariables: []
   references:
     version: 2
     RefIds: []

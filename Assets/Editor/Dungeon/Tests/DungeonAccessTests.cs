@@ -42,6 +42,7 @@ namespace DungeonEditor.Tests
 
             DungeonEntryService.ResetRequestState();
             SetRosterInstance(null);
+            SetRulesInstance(null);
         }
 
         [TearDown]
@@ -53,6 +54,7 @@ namespace DungeonEditor.Tests
 
             DungeonEntryService.ResetRequestState();
             SetRosterInstance(null);
+            SetRulesInstance(null);
 
             ConfigureMethod.Invoke(null, new object[] { null, null, null });
 
@@ -84,6 +86,75 @@ namespace DungeonEditor.Tests
 
             Assert.IsTrue(result.Allowed);
             Assert.AreEqual(10, result.HighestPartyLevel);
+        }
+
+        [Test]
+        public void Access_PartyMemberBelowSharedMinimum_DeniedAtEntryBoundary()
+        {
+            Inject(State("hero", stamina: 9), State("ally", stamina: 8));
+            CharacterRoster roster = ReadyRoster("hero", "ally");
+            SetRosterInstance(roster);
+            DungeonDefinition dungeon = Dungeon("d1");
+            DungeonEntryService.DungeonEnterRequested += RecordEvent;
+
+            DungeonAccessResult access = new DungeonAccessService(roster).Evaluate(dungeon);
+            Assert.IsFalse(access.Allowed);
+            Assert.AreEqual(DungeonAccessFailureReason.InsufficientStamina, access.FailureReason);
+            Assert.AreEqual("ally", access.InsufficientStaminaCharacterId);
+            Assert.AreEqual(9, access.RequiredStamina);
+            Assert.AreEqual(8, access.CurrentStamina);
+
+            Assert.IsFalse(DungeonEntryService.RequestEnterDungeon(dungeon, out DungeonAccessResult finalAccess));
+            Assert.AreEqual(DungeonAccessFailureReason.InsufficientStamina, finalAccess.FailureReason);
+            Assert.AreEqual(0, eventLog.Count);
+            Assert.AreEqual(0, DungeonEntryService.AcceptedRequestCount);
+        }
+
+        [Test]
+        public void Access_ExactlySharedMinimum_Allowed()
+        {
+            Inject(State("hero", stamina: 9), State("ally", stamina: 9));
+            CharacterRoster roster = ReadyRoster("hero", "ally");
+
+            Assert.IsTrue(new DungeonAccessService(roster).Evaluate(Dungeon("d1")).Allowed);
+        }
+
+        [Test]
+        public void Access_RecoveryMemberExcluded_AndNoEligibleMemberDenied()
+        {
+            SaveData data = Inject(State("hero", stamina: 9), State("recovering", stamina: 0));
+            CharacterRoster roster = ReadyRoster("hero", "recovering");
+            data.recoverySlots = new List<RecoverySlotSaveState>
+            {
+                new RecoverySlotSaveState { characterId = "recovering" },
+            };
+
+            var service = new DungeonAccessService(roster);
+            Assert.IsTrue(service.Evaluate(Dungeon("d1")).Allowed);
+
+            data.recoverySlots.Add(new RecoverySlotSaveState { characterId = "hero" });
+            DungeonAccessResult denied = service.Evaluate(Dungeon("d2"));
+            Assert.IsFalse(denied.Allowed);
+            Assert.AreEqual(DungeonAccessFailureReason.NoUsablePartyCharacter, denied.FailureReason);
+        }
+
+        [Test]
+        public void Access_UsesControlTowerRatioImmediately()
+        {
+            Inject(State("hero", stamina: 9));
+            CharacterRoster roster = ReadyRoster("hero");
+            GameObject host = new GameObject("DungeonCombatRulesTest");
+            created.Add(host);
+            DungeonCombatRules rules = host.AddComponent<DungeonCombatRules>();
+            SetRulesInstance(rules);
+            var service = new DungeonAccessService(roster);
+
+            SetPrivate(rules, "minimumStaminaRatio", 0.5f);
+            Assert.AreEqual(0.5f, DungeonCombatRules.MinimumStaminaRatio);
+            Assert.AreEqual(15, service.Evaluate(Dungeon("d1")).RequiredStamina);
+
+            SetPrivate(rules, "minimumStaminaRatio", 0.3f);
+            Assert.IsTrue(service.Evaluate(Dungeon("d2")).Allowed);
         }
 
         [Test]
@@ -566,6 +637,16 @@ namespace DungeonEditor.Tests
             MethodInfo setter = prop.GetSetMethod(nonPublic: true);
             Assert.IsNotNull(setter);
             setter.Invoke(null, new object[] { roster });
+        }
+
+        private static void SetRulesInstance(DungeonCombatRules rules)
+        {
+            PropertyInfo prop = typeof(DungeonCombatRules).GetProperty(
+                "Instance", BindingFlags.Public | BindingFlags.Static);
+            Assert.IsNotNull(prop);
+            MethodInfo setter = prop.GetSetMethod(nonPublic: true);
+            Assert.IsNotNull(setter);
+            setter.Invoke(null, new object[] { rules });
         }
 
         private static void SetPrivate(object target, string field, object value)

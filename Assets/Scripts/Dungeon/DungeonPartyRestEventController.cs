@@ -18,6 +18,24 @@ namespace Dungeon
     [DisallowMultipleComponent]
     public sealed class DungeonPartyRestEventController : MonoBehaviour
     {
+        /// <summary>
+        /// 현재 휴식 연출 슬롯에 배치된 캐릭터의 행동력 상태. 슬롯 순서와 회복 대상 제외는
+        /// 컨트롤러의 partyBuffer를 그대로 사용하므로 Presenter가 roster를 다시 해석하지 않는다.
+        /// </summary>
+        public readonly struct RestSlotStatus
+        {
+            public RestSlotStatus(string characterId, int currentStamina, int requiredStamina)
+            {
+                CharacterId = characterId ?? string.Empty;
+                CurrentStamina = Mathf.Max(0, currentStamina);
+                RequiredStamina = Mathf.Max(0, requiredStamina);
+            }
+
+            public string CharacterId { get; }
+            public int CurrentStamina { get; }
+            public int RequiredStamina { get; }
+        }
+
         private sealed class GrayscaleRendererState
         {
             public readonly SpriteRenderer Renderer;
@@ -176,11 +194,6 @@ namespace Dungeon
         [Range(0f, 1f)]
         [SerializeField] private float grayscaleAmount = 1f;
 
-        [Header("Resume Rule")]
-        [Tooltip("파티 전원이 각자 최대 행동력의 이 비율 이상이 되면 휴식을 끝냅니다. 1 = 100%, 0.8 = 80%.")]
-        [Range(0.01f, 1f)]
-        [SerializeField] private float resumeStaminaRatio = 1f;
-
         private readonly List<CharacterDefinition> partyBuffer = new List<CharacterDefinition>(3);
         private RestCharacterView[] views = Array.Empty<RestCharacterView>();
         private CharacterDefinition returnCharacter;
@@ -195,8 +208,14 @@ namespace Dungeon
         private MaterialPropertyBlock grayscalePropertyBlock;
 
         public bool IsResting { get; private set; }
-        public float ResumeStaminaRatio => Mathf.Clamp(resumeStaminaRatio, 0.01f, 1f);
+        public float ResumeStaminaRatio => DungeonCombatRules.MinimumStaminaRatio;
         public float GrayscaleAmount => Mathf.Clamp01(grayscaleAmount);
+
+        /// <summary>최대 행동력과 복귀 비율로 실제 복귀에 필요한 정수 행동력을 계산한다.</summary>
+        public static int CalculateRequiredStamina(int maximumStamina, float resumeRatio)
+        {
+            return DungeonCombatRules.CalculateRequiredStamina(maximumStamina, resumeRatio);
+        }
 
         /// <summary>Companion 모드가 휴식 캐릭터마다 독립된 클릭 영역을 만들 때 사용하는 슬롯 수.</summary>
         public int InteractionSlotCount => characterSlots != null ? characterSlots.Length : 0;
@@ -207,6 +226,29 @@ namespace Dungeon
             if (!IsResting || slotIndex < 0 || slotIndex >= views.Length || views[slotIndex] == null) return null;
             SpriteRenderer renderer = views[slotIndex].Renderer;
             return renderer != null && renderer.enabled && renderer.gameObject.activeInHierarchy ? renderer : null;
+        }
+
+        /// <summary>
+        /// 휴식 연출에 실제로 포함된 슬롯의 최신 행동력 상태를 반환한다. 비어 있거나 휴식 중이
+        /// 아니면 false이며, partyBuffer의 고정 파티 순서와 회복소 제외 정책을 그대로 따른다.
+        /// </summary>
+        public bool TryGetRestSlotStatus(int slotIndex, out RestSlotStatus status)
+        {
+            status = default;
+            if (!IsResting || roster == null || slotIndex < 0 || slotIndex >= partyBuffer.Count)
+                return false;
+
+            CharacterDefinition definition = partyBuffer[slotIndex];
+            if (definition == null) return false;
+
+            int required = CalculateRequiredStamina(roster.GetMaxStamina(definition), ResumeStaminaRatio);
+            if (required <= 0) return false;
+
+            status = new RestSlotStatus(
+                definition.CharacterId,
+                roster.GetStamina(definition),
+                required);
+            return true;
         }
 
         private void Awake()
@@ -277,7 +319,6 @@ namespace Dungeon
 
         private void OnValidate()
         {
-            resumeStaminaRatio = Mathf.Clamp(resumeStaminaRatio, 0.01f, 1f);
             grayscaleAmount = Mathf.Clamp01(grayscaleAmount);
         }
 
@@ -390,13 +431,13 @@ namespace Dungeon
 
         private bool AllPartyMembersReady()
         {
-            float ratio = ResumeStaminaRatio;
             for (int i = 0; i < partyBuffer.Count; i++)
             {
                 CharacterDefinition definition = partyBuffer[i];
-                int maximum = roster.GetMaxStamina(definition);
-                if (maximum <= 0) return false;
-                int required = Mathf.Max(1, Mathf.CeilToInt(maximum * ratio));
+                int required = CalculateRequiredStamina(
+                    roster.GetMaxStamina(definition),
+                    ResumeStaminaRatio);
+                if (required <= 0) return false;
                 if (roster.GetStamina(definition) < required) return false;
             }
             return true;

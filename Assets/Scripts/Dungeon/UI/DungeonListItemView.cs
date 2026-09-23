@@ -22,7 +22,7 @@ namespace Dungeon
     /// 하이라이트/눌림 색은 프리팹 값 그대로 동작한다. 원래 ColorBlock은 바인딩 시점에 기억해 두고
     /// 선택이 풀리면 되돌린다.
     ///
-    /// <b>잠김 상태에서도 선택은 된다.</b> 레벨 미달로 입장할 수 없는 던전도 목록에서 고를 수 있어
+    /// <b>잠김 상태에서도 선택은 된다.</b> 입장 기준 미달인 던전도 목록에서 고를 수 있어
     /// 상세(몬스터/보상)를 볼 수 있다 - 입장 버튼만 <see cref="DungeonPanel"/>이 잠근다. 잠김 표시는
     /// 이름과 레벨 텍스트의 알파를 낮추는 것으로, Button.interactable은 건드리지 않는다.
     ///
@@ -79,7 +79,7 @@ namespace Dungeon
         /// <summary>지금 화면에 그려져 있는 필요 레벨 문구(예: "Lv. 5"). 검증/테스트용 읽기 전용 값이다.</summary>
         public string CurrentRequirementText => requiredLevelText != null ? requiredLevelText.text : null;
 
-        /// <summary>이 항목이 잠김 표시(레벨 미달) 상태인지. 검증/테스트용 읽기 전용 값이다.</summary>
+        /// <summary>이 항목이 잠김 표시(입장 기준 미달) 상태인지. 검증/테스트용 읽기 전용 값이다.</summary>
         public bool IsLocked => locked;
 
         private void Reset()

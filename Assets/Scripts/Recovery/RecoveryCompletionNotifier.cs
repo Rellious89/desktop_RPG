@@ -5,9 +5,9 @@ using UnityEngine;
 namespace Recovery
 {
     /// <summary>
-    /// "회복이 끝났다"는 도메인 사실과 시스템 알림을 잇는 <b>얇은 연결 컴포넌트</b>. 회복 규칙과 저장은
+    /// "회복이 끝났다"는 도메인 사실과 일회성 토스트를 잇는 <b>얇은 연결 컴포넌트</b>. 회복 규칙과 저장은
     /// <see cref="RecoveryStation"/>이 그대로 소유하고, 여기서는 그 결과를
-    /// <see cref="SystemNotificationManager"/> 요청으로 바꾸는 일만 한다
+    /// <see cref="ToastManager"/> 요청으로 바꾸는 일만 한다
     /// (<see cref="CurrentCharacterStaminaNotification"/>과 같은 역할 분담이다).
     ///
     /// <b>회복소 패널과 무관하게 동작한다.</b> 패널이 닫혀 있어도, 한 번도 열지 않았어도 알림은 뜬다 -
@@ -32,10 +32,7 @@ namespace Recovery
     public class RecoveryCompletionNotifier : MonoBehaviour
     {
         [Header("References")]
-        [Tooltip("알림을 만들 관리자. 비워두면 SystemNotificationManager.Instance를 쓴다.")]
-        [SerializeField] private SystemNotificationManager notificationManager;
-
-        [Tooltip("회복 완료 알림 Definition(Notification ID: recovery_completed). " +
+        [Tooltip("회복 완료 토스트의 문구 Definition(Notification ID: recovery_completed). " +
                  "문구는 캐릭터 이름을 {0}으로 받는다.")]
         [SerializeField] private SystemNotificationDefinition recoveryCompletedNotification;
 
@@ -57,6 +54,7 @@ namespace Recovery
         private float retryTimer;
         private bool missingDefinitionLogged;
         private bool missingManagerLogged;
+        private bool missingMessageLogged;
 
         private void OnEnable()
         {
@@ -122,7 +120,21 @@ namespace Recovery
                 return;
             }
 
-            SystemNotificationManager manager = ResolveManager();
+            if (recoveryCompletedNotification != null && !recoveryCompletedNotification.HasMessage)
+            {
+                // 잘못 설정된 문구는 재시도해도 회복되지 않는다. marker는 남겨두고 대기 상태로 종료한다.
+                flushRequested = false;
+                if (!missingMessageLogged)
+                {
+                    missingMessageLogged = true;
+                    Debug.LogError("[RecoveryCompletionNotifier] Recovery Completed Notification Definition에 " +
+                                   "현지화 메시지 참조가 없어 완료 토스트를 표시할 수 없습니다. " +
+                                   "회복 완료 표시는 대기 상태로 유지됩니다.", this);
+                }
+                return;
+            }
+
+            ToastManager manager = ToastManager.Instance;
             if (manager == null || recoveryCompletedNotification == null)
             {
                 // 알림 쪽이 아직 없다. 요청할 것이 남아 있으므로 재시도 상태를 반드시 켜 둔다 -
@@ -138,10 +150,8 @@ namespace Recovery
                 RecoveryCompletionNotice notice = pendingNotices[i];
                 string characterName = Character.CharacterNameBinding.GetCurrent(notice.Character);
 
-                SystemNotificationItemView view = manager.Show(recoveryCompletedNotification, characterName);
-                if (view == null)
+                if (!manager.TryShow(recoveryCompletedNotification.Message.GetLocalizedString(characterName)))
                 {
-                    // 매니저가 요청을 거절했다(설정 오류 등). 여기까지 성공한 것만 표시로 남기고 멈춘다.
                     break;
                 }
 
@@ -155,14 +165,9 @@ namespace Recovery
             flushRequested = acceptedSlots.Count < pendingNotices.Count;
         }
 
-        private SystemNotificationManager ResolveManager()
-        {
-            return notificationManager != null ? notificationManager : SystemNotificationManager.Instance;
-        }
-
         /// <summary>준비되지 않은 의존성은 알려야 하지만, 재시도마다 로그가 쏟아지면 안 된다 -
         /// 종류별로 한 번씩만 남긴다.</summary>
-        private void WarnMissingDependenciesOnce(SystemNotificationManager manager)
+        private void WarnMissingDependenciesOnce(ToastManager manager)
         {
             if (recoveryCompletedNotification == null && !missingDefinitionLogged)
             {
@@ -173,7 +178,7 @@ namespace Recovery
             if (manager == null && !missingManagerLogged)
             {
                 missingManagerLogged = true;
-                Debug.LogWarning("[RecoveryCompletionNotifier] SystemNotificationManager를 아직 찾지 못해 완료 " +
+                Debug.LogWarning("[RecoveryCompletionNotifier] ToastManager를 아직 찾지 못해 완료 " +
                                  "알림을 미뤘습니다 - 준비되면 자동으로 다시 시도합니다.", this);
             }
         }

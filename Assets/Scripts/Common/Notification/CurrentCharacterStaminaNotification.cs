@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Common
 {
     /// <summary>
-    /// "지금 소환된 캐릭터의 행동력이 0이 됐다"는 조건과 시스템 알림을 잇는 얇은 연결 컴포넌트.
+    /// "지금 소환된 캐릭터의 행동력이 0이 됐다"는 조건과 일회성 토스트를 잇는 얇은 연결 컴포넌트.
     /// 행동력 규칙(소비/저장/교체)은 <see cref="CharacterRoster"/>가 그대로 소유하고, 이 컴포넌트는
     /// 판정 결과를 알림 요청으로 바꾸는 일만 한다.
     ///
@@ -27,10 +27,7 @@ namespace Common
     public class CurrentCharacterStaminaNotification : MonoBehaviour
     {
         [Header("References")]
-        [Tooltip("알림을 만들 관리자. 비워두면 SystemNotificationManager.Instance를 쓴다.")]
-        [SerializeField] private SystemNotificationManager notificationManager;
-
-        [Tooltip("행동력 소진 알림 Definition(Notification ID: stamina_depleted).")]
+        [Tooltip("행동력 소진 토스트의 문구 Definition(Notification ID: stamina_depleted).")]
         [SerializeField] private SystemNotificationDefinition staminaDepletedNotification;
 
         // 지금 알림 단위로 보고 있는 캐릭터.
@@ -44,6 +41,7 @@ namespace Common
         // Start에서 최초 동기화를 한 뒤에만 재활성화 동기화를 한다 - Awake/OnEnable 순서에 따라
         // CharacterRoster가 아직 시작 캐릭터를 정하지 않았을 수 있다.
         private bool initialSyncDone;
+        private bool missingMessageLogged;
 
         private void OnEnable()
         {
@@ -74,10 +72,14 @@ namespace Common
                 Debug.LogError("[CurrentCharacterStaminaNotification] Stamina Depleted Notification Definition이 " +
                                "지정되지 않아 행동력 소진 알림을 만들 수 없습니다.", this);
             }
-            if (ResolveManager() == null)
+            else if (!staminaDepletedNotification.HasMessage)
             {
-                Debug.LogError("[CurrentCharacterStaminaNotification] SystemNotificationManager를 찾을 수 없습니다 - " +
-                               "Notification Manager를 연결하거나 씬에 SystemNotificationManager를 두세요.", this);
+                WarnMissingMessageOnce();
+            }
+            if (ToastManager.Instance == null)
+            {
+                Debug.LogError("[CurrentCharacterStaminaNotification] ToastManager를 찾을 수 없습니다 - " +
+                               "행동력 소진 토스트를 표시할 수 없습니다.", this);
             }
             if (CharacterRoster.Instance == null)
             {
@@ -160,17 +162,22 @@ namespace Common
         {
             if (staminaDepletedNotification == null) return;
 
-            SystemNotificationManager manager = ResolveManager();
+            ToastManager manager = ToastManager.Instance;
             if (manager == null) return;
-
-            // 설정 오류로 실패해도 이번 활성화 기간의 표시는 되돌리지 않는다 - 매 이벤트마다 같은
-            // 오류 로그가 반복되는 것을 막는다(원인은 Start의 오류 로그가 이미 가리키고 있다).
-            manager.Show(staminaDepletedNotification);
+            if (!staminaDepletedNotification.HasMessage)
+            {
+                WarnMissingMessageOnce();
+                return;
+            }
+            manager.TryShow(staminaDepletedNotification.Message.GetLocalizedString());
         }
 
-        private SystemNotificationManager ResolveManager()
+        private void WarnMissingMessageOnce()
         {
-            return notificationManager != null ? notificationManager : SystemNotificationManager.Instance;
+            if (missingMessageLogged) return;
+            missingMessageLogged = true;
+            Debug.LogError("[CurrentCharacterStaminaNotification] Stamina Depleted Notification Definition에 " +
+                           "현지화 메시지 참조가 없어 토스트를 표시할 수 없습니다.", this);
         }
     }
 }

@@ -87,12 +87,23 @@ namespace Common
         /// <summary>기존 단일 문자열 호출부와의 호환 경로. 기본 ToastRequest로 변환해 처리한다.</summary>
         public void Show(string message)
         {
-            Show(ToastRequest.FromMessage(message));
+            TryShow(ToastRequest.FromMessage(message));
         }
 
         public void Show(ToastRequest request)
         {
-            if (template == null || anchor == null) return;
+            TryShow(request);
+        }
+
+        /// <summary>Shows a toast and reports whether the request was accepted by a configured manager.</summary>
+        public bool TryShow(string message)
+        {
+            return TryShow(ToastRequest.FromMessage(message));
+        }
+
+        public bool TryShow(ToastRequest request)
+        {
+            if (template == null || anchor == null) return false;
 
             int max = Mathf.Max(1, maxVisibleCount);
             if (active.Count >= max)
@@ -112,6 +123,7 @@ namespace Common
             float duration = request.duration > 0f ? request.duration : visibleDuration;
             instance.EnterAt(anchor.anchoredPosition, request, enterDuration, duration, exitDuration, HandleBeginExit, ReturnToPool);
             active.Add(instance);
+            return true;
         }
 
         /// <summary>새 토스트가 slot 0을 차지하기 전에, 현재 active 목록만으로 기존 토스트들의 목표

@@ -54,8 +54,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_Padding:
     m_Left: 10
-    m_Right: 6
-    m_Top: 10
+    m_Right: 10
+    m_Top: 8
     m_Bottom: 10
   m_ChildAlignment: 0
   m_Spacing: 0
@@ -108,7 +108,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: ae149820318e747959e4623c3753111b, type: 3}
+  m_Sprite: {fileID: 21300000, guid: a32ccb52d2421415fb61cbadcf155adc, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1

@@ -44,6 +44,22 @@ namespace DungeonEditor.Tests
             Assert.IsNotNull(ConfigureSaveMethod);
         }
 
+        [TestCase(31, 0.3f, 10)]
+        [TestCase(30, 0.3f, 9)]
+        [TestCase(1, 0.01f, 1)]
+        [TestCase(0, 0.3f, 0)]
+        [TestCase(100, 2f, 100)]
+        [TestCase(100, -1f, 1)]
+        public void CalculateRequiredStamina_UsesCeilingAndControllerRatioClamp(
+            int maximum,
+            float ratio,
+            int expected)
+        {
+            Assert.AreEqual(
+                expected,
+                DungeonPartyRestEventController.CalculateRequiredStamina(maximum, ratio));
+        }
+
         [TearDown]
         public void TearDown()
         {
@@ -103,6 +119,54 @@ namespace DungeonEditor.Tests
             data.characters[0].currentStamina = active.MaxStamina;
             RecoveryService.NotifyRosterChangedAfterExternalSave();
             Assert.IsFalse(controller.IsResting);
+        }
+
+        [Test]
+        public void RestSlotStatusQuery_PreservesPartyOrderAndRecoveryExclusion()
+        {
+            CharacterDefinition first = Definition("CatKnight", 31);
+            CharacterDefinition recovering = Definition("ElfArcher", 60);
+            CharacterDefinition third = Definition("CatMage", 50);
+            SaveData data = Inject(
+                State(first.CharacterId, 0),
+                State(recovering.CharacterId, 0),
+                State(third.CharacterId, 0));
+            data.recoverySlots = new List<RecoverySlotSaveState>
+            {
+                new RecoverySlotSaveState { characterId = recovering.CharacterId },
+            };
+
+            CharacterRoster roster = ReadyRoster(data, first, recovering, third);
+            SetPrivate(roster, "current", first);
+            DungeonPartyRestEventController controller = Controller(roster, first, out _);
+            Assert.That(controller.ResumeStaminaRatio, Is.EqualTo(0.3f).Within(0.0001f));
+            Invoke(controller, "OnEnable");
+            subscribedController = controller;
+
+            RecoveryService.NotifyRosterChangedAfterExternalSave();
+            Assert.IsTrue(controller.IsResting);
+
+            data.characters[0].currentStamina = 9;
+            data.characters[1].currentStamina = 55;
+            data.characters[2].currentStamina = 20;
+
+            Assert.IsTrue(controller.TryGetRestSlotStatus(
+                0,
+                out DungeonPartyRestEventController.RestSlotStatus firstStatus));
+            Assert.AreEqual(first.CharacterId, firstStatus.CharacterId);
+            Assert.AreEqual(9, firstStatus.CurrentStamina);
+            Assert.AreEqual(10, firstStatus.RequiredStamina);
+
+            Assert.IsTrue(controller.TryGetRestSlotStatus(
+                1,
+                out DungeonPartyRestEventController.RestSlotStatus secondStatus));
+            Assert.AreEqual(third.CharacterId, secondStatus.CharacterId,
+                "회복 중인 가운데 파티원은 기존 partyBuffer 정책대로 빠져야 합니다.");
+            Assert.AreEqual(20, secondStatus.CurrentStamina);
+            Assert.AreEqual(15, secondStatus.RequiredStamina);
+
+            Assert.IsFalse(controller.TryGetRestSlotStatus(2, out _));
+            Assert.IsFalse(controller.TryGetRestSlotStatus(-1, out _));
         }
 
         [Test]
@@ -357,6 +421,16 @@ namespace DungeonEditor.Tests
                 }
 
                 Assert.IsNotNull(controller, "씬에서 DungeonPartyRestEventController를 찾지 못했습니다.");
+                DungeonCombatRules combatRules = null;
+                foreach (GameObject root in scene.GetRootGameObjects())
+                {
+                    combatRules = root.GetComponent<DungeonCombatRules>();
+                    if (combatRules != null) break;
+                }
+                Assert.IsNotNull(combatRules, "던전 전투 규칙 관리 오브젝트가 씬 루트에 있어야 합니다.");
+                var rulesSerialized = new SerializedObject(combatRules);
+                Assert.That(rulesSerialized.FindProperty("minimumStaminaRatio").floatValue,
+                    Is.EqualTo(0.3f).Within(0.0001f));
                 Assert.AreSame(expectedPrefab, GetPrivate(controller, "campfirePrefab"));
                 MonsterEncounterQueue queue = (MonsterEncounterQueue)GetPrivate(controller, "monsterEncounterQueue");
                 Assert.IsNotNull(queue, "휴식 컨트롤러의 Monster Encounter Queue 씬 참조가 비어 있습니다.");
