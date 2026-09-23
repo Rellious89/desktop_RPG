@@ -536,6 +536,52 @@ namespace Inventory
             }
         }
 
+        /// <summary>슬롯 화면이 사용할 배치. 오래된 저장 파일은 획득 순서대로 채우고,
+        /// 사라진 아이템의 자리에는 새 아이템을 첫 빈 칸부터 배치한다. 조회만 하므로 저장하지 않는다.</summary>
+        public IReadOnlyList<string> GetSlotItemIds(int visibleSlotCount)
+        {
+            SaveData data = SaveSystem.Data;
+            return InventorySlotLayout.Build(data.items, data.inventorySlotItemIds, visibleSlotCount);
+        }
+
+        /// <summary>화면 슬롯 두 칸을 교환한다. 빈 칸이면 스택 전체가 이동한다.
+        /// 저장이 실패하면 이전 배치로 복원하며 이벤트도 보내지 않는다.</summary>
+        public bool TryMoveSlot(int sourceIndex, int targetIndex, int visibleSlotCount, string expectedItemId)
+        {
+            if (visibleSlotCount <= 0 || sourceIndex < 0 || targetIndex < 0 ||
+                sourceIndex >= visibleSlotCount || targetIndex >= visibleSlotCount ||
+                sourceIndex == targetIndex || string.IsNullOrEmpty(expectedItemId)) return false;
+
+            SaveData data = SaveSystem.Data;
+            List<string> layout = InventorySlotLayout.Build(data.items, data.inventorySlotItemIds, visibleSlotCount);
+            if (layout[sourceIndex] != expectedItemId) return false;
+
+            string moved = layout[sourceIndex];
+            layout[sourceIndex] = layout[targetIndex];
+            layout[targetIndex] = moved;
+
+            List<string> previous = data.inventorySlotItemIds;
+            data.inventorySlotItemIds = layout;
+            bool saved;
+            try { saved = PersistToDisk(); }
+            catch (Exception exception)
+            {
+                data.inventorySlotItemIds = previous;
+                Debug.LogError($"[InventoryManager] 슬롯 이동 저장 중 오류: {exception}", this);
+                return false;
+            }
+
+            if (!saved)
+            {
+                data.inventorySlotItemIds = previous;
+                Debug.LogError("[InventoryManager] 슬롯 이동을 저장하지 못해 이전 배치로 되돌렸습니다.", this);
+                return false;
+            }
+
+            InventoryChanged?.Invoke();
+            return true;
+        }
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -1347,10 +1393,12 @@ namespace Inventory
         public void ClearInventory()
         {
             SaveData data = SaveSystem.Data;
-            if (data.currency == 0 && data.items.Count == 0) return;
+            if (data.currency == 0 && data.items.Count == 0 &&
+                (data.inventorySlotItemIds == null || data.inventorySlotItemIds.Count == 0)) return;
 
             data.currency = 0;
             data.items.Clear();
+            data.inventorySlotItemIds = new List<string>();
             SaveAndNotify();
         }
 
@@ -1527,6 +1575,39 @@ namespace Inventory
         public void DebugClearInventory()
         {
             ClearInventory();
+        }
+    }
+
+    /// <summary>수량 목록과 화면 배치를 분리하는 순수 계산기. 모르는 아이템 ID도
+    /// 소유 중이면 자리를 예약하여 다른 아이템이 그 자리를 차지하지 않게 한다.</summary>
+    internal static class InventorySlotLayout
+    {
+        internal static List<string> Build(List<InventoryItemState> items, List<string> saved, int minimumSlots)
+        {
+            var held = new HashSet<string>(StringComparer.Ordinal);
+            if (items != null)
+                foreach (InventoryItemState item in items)
+                    if (item != null && item.count > 0 && !string.IsNullOrEmpty(item.itemId)) held.Add(item.itemId);
+
+            var result = new List<string>(Math.Max(Math.Max(0, minimumSlots), Math.Max(saved?.Count ?? 0, held.Count)));
+            var placed = new HashSet<string>(StringComparer.Ordinal);
+            if (saved != null)
+                foreach (string id in saved)
+                    result.Add(!string.IsNullOrEmpty(id) && held.Contains(id) && placed.Add(id) ? id : string.Empty);
+
+            while (result.Count < minimumSlots) result.Add(string.Empty);
+
+            if (items != null)
+                foreach (InventoryItemState item in items)
+                {
+                    string id = item?.itemId;
+                    if (string.IsNullOrEmpty(id) || item.count <= 0 || !placed.Add(id)) continue;
+                    int free = result.IndexOf(string.Empty);
+                    if (free >= 0) result[free] = id;
+                    else result.Add(id);
+                }
+
+            return result;
         }
     }
 }

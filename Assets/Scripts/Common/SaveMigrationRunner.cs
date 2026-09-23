@@ -243,6 +243,8 @@ namespace Common
             target.characters = CopyCharacters(source.characters);
             target.partyCharacterIds = CopyPartyCharacterIds(source.partyCharacterIds);
             target.items = CopyItems(source.items);
+            target.inventorySlotItemIds = source.inventorySlotItemIds == null
+                ? new List<string>() : new List<string>(source.inventorySlotItemIds);
             target.recoverySlots = CopyRecoverySlots(source.recoverySlots);
             target.purificationSlots = CopyPurificationSlots(source.purificationSlots);
             target.buildingConstructions = CopyBuildingConstructions(source.buildingConstructions);

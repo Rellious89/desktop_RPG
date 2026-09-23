@@ -102,10 +102,14 @@ namespace Common
         /// 읽으면 이 기본값 0이 그대로 쓰인다.</summary>
         public int currency = 0;
 
-        /// <summary>보유 아이템 목록. 같은 아이템이 두 항목으로 나뉘지 않고 하나의 항목에 수량으로
-        /// 누적된다. <b>목록 순서가 곧 획득 순서이자 인벤토리 표시 순서</b>다 - 처음 획득할 때 뒤에
-        /// 추가되고 그 뒤로 자리가 바뀌지 않으므로, 저장/불러오기를 거쳐도 표시 순서가 유지된다.</summary>
+        /// <summary>보유 아이템 목록. 같은 아이템은 하나의 항목에 수량으로 누적된다.
+        /// 목록 순서는 획득 순서이며 슬롯 배치와 별개다.</summary>
         public List<InventoryItemState> items = new List<InventoryItemState>();
+
+        /// <summary>인벤토리 화면의 슬롯별 itemId. 빈 칸은 빈 문자열이다. 옛 저장 파일의
+        /// 빈 목록은 보유 아이템을 획득 순서대로 앞 칸에 채우는 기존 표시 방식으로 해석한다.
+        /// 아이템의 수량과 소유 여부는 오직 <see cref="items"/>가 결정한다.</summary>
+        public List<string> inventorySlotItemIds = new List<string>();
 
         /// <summary>회복소 슬롯. <b>목록의 인덱스가 곧 슬롯 번호</b>이며, 비어 있는 슬롯도 항목을
         /// 유지한다(목록을 줄이면 번호가 밀려 다른 슬롯의 진행이 뒤바뀐다). 회복소 기능이 없던 예전

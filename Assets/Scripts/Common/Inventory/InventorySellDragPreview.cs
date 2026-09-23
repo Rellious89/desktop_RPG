@@ -3,7 +3,7 @@ using UnityEngine.UI;
 
 namespace Common
 {
-    /// <summary>판매 등록 드래그에서만 보이는 list_item의 비상호작용 복제본이다.
+    /// <summary>인벤토리 이동과 판매 등록 드래그에 보이는 list_item의 비상호작용 복제본이다.
     /// 원본 슬롯은 레이아웃과 데이터를 그대로 유지하고, 미리보기만 최상위 Canvas에 올린다.</summary>
     public static class InventorySellDragPreview
     {
@@ -14,7 +14,7 @@ namespace Common
         public static bool HasActivePreview => previewRoot != null;
 
         /// <summary>어떤 판매 행이든 원본을 바꾸지 않고 전체 모양을 복제해 보여 준다.</summary>
-        public static void Begin(MonoBehaviour source, Vector2 screenPosition)
+        public static void Begin(MonoBehaviour source, Vector2 screenPosition, float alpha = 0.6f)
         {
             End();
             if (source == null) return;
@@ -38,7 +38,7 @@ namespace Common
             previewRect.sizeDelta = size;
 
             CanvasGroup group = previewRoot.GetComponent<CanvasGroup>();
-            group.alpha = 0.6f;
+            group.alpha = Mathf.Clamp01(alpha);
             group.blocksRaycasts = false;
             group.interactable = false;
 

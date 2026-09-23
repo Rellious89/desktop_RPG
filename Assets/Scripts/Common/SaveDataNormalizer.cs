@@ -34,6 +34,7 @@ namespace Common
             }
             data.partyCharacterIds = CompactPartyCharacterIds(data.partyCharacterIds, data.characters);
             data.items = CompactItems(data.items);
+            data.inventorySlotItemIds = CompactInventorySlotIds(data.inventorySlotItemIds, data.items);
             data.characterStoryQuests = CompactCharacterStoryQuests(data.characterStoryQuests);
 
             // 건설 기록도 buildingId로 찾으므로 null 항목은 아무것도 가리키지 않는 쓰레기다. 지우는
@@ -135,6 +136,22 @@ namespace Common
                 if (source[i] == null) source.RemoveAt(i);
             }
 
+            return source;
+        }
+
+        private static List<string> CompactInventorySlotIds(List<string> source, List<InventoryItemState> items)
+        {
+            if (source == null) return new List<string>();
+            var held = new HashSet<string>(StringComparer.Ordinal);
+            foreach (InventoryItemState item in items)
+                if (item != null && item.count > 0 && !string.IsNullOrEmpty(item.itemId)) held.Add(item.itemId);
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < source.Count; i++)
+            {
+                string id = source[i];
+                if (string.IsNullOrEmpty(id) || !held.Contains(id) || !seen.Add(id)) source[i] = string.Empty;
+            }
             return source;
         }
 

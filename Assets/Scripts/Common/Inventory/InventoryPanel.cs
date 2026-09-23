@@ -13,7 +13,7 @@ namespace Common
     /// 재화와 아이템 목록을 그리는 일만 한다.
     ///
     /// <b>슬롯은 새로 만들지 않는다.</b> pn_Inventory에 미리 배치된 list_item 슬롯을 그대로 쓰고,
-    /// 앞에서부터 보유 아이템을 채운 뒤 남는 칸은 빈 슬롯으로 비운다 - 런타임 복제본이 없으므로
+    /// 저장된 슬롯 배치에 따라 채운 뒤 남는 칸은 빈 슬롯으로 비운다 - 런타임 복제본이 없으므로
     /// 목록을 몇 번 갱신해도 슬롯이 늘어나거나 중복되지 않는다. 슬롯 확장과 페이지는 이번 범위가
     /// 아니므로, 보유 종류가 배치된 슬롯 수보다 많으면 넘치는 만큼은 표시하지 않고 경고만 남긴다.
     ///
@@ -92,15 +92,22 @@ namespace Common
             if (slots == null || slots.Length == 0) return;
 
             IReadOnlyList<InventoryManager.Entry> items = inventory.Items;
+            IReadOnlyList<string> layout = inventory.GetSlotItemIds(slots.Length);
+            var entriesById = new Dictionary<string, InventoryManager.Entry>(System.StringComparer.Ordinal);
+            for (int i = 0; i < items.Count; i++)
+            {
+                InventoryManager.Entry entry = items[i];
+                if (entry.Definition != null) entriesById[entry.Definition.ItemId] = entry;
+            }
 
             for (int i = 0; i < slots.Length; i++)
             {
                 InventorySlotView slot = slots[i];
                 if (slot == null) continue;
 
-                if (i < items.Count)
+                if (i < layout.Count && !string.IsNullOrEmpty(layout[i]) &&
+                    entriesById.TryGetValue(layout[i], out InventoryManager.Entry entry))
                 {
-                    InventoryManager.Entry entry = items[i];
                     slot.SetItem(entry.Definition, entry.Count);
                 }
                 else
@@ -109,13 +116,30 @@ namespace Common
                 }
             }
 
-            if (items.Count > slots.Length && !overflowWarned)
+            bool overflow = false;
+            for (int i = slots.Length; i < layout.Count; i++)
+                if (!string.IsNullOrEmpty(layout[i])) { overflow = true; break; }
+            if (overflow && !overflowWarned)
             {
                 overflowWarned = true;
                 Debug.LogWarning($"[InventoryPanel] 보유 아이템 종류({items.Count})가 배치된 슬롯 수" +
                                  $"({slots.Length})보다 많아 뒤쪽 아이템은 표시되지 않습니다 - 슬롯 확장은 " +
                                  "이번 범위가 아닙니다.", this);
             }
+        }
+
+        /// <summary>포인터 아래에 있는 이 패널의 슬롯에만 놓을 수 있다. 슬롯 밖이나 같은 칸은 취소한다.</summary>
+        public bool TryDropItem(InventorySlotView source, string expectedItemId, GameObject hitObject)
+        {
+            ResolveReferences();
+            if (source == null || hitObject == null || slots == null) return false;
+            InventorySlotView target = hitObject.GetComponentInParent<InventorySlotView>(true);
+            int from = System.Array.IndexOf(slots, source);
+            int to = System.Array.IndexOf(slots, target);
+            if (from < 0 || to < 0 || from == to) return false;
+
+            InventoryManager inventory = InventoryManager.Instance;
+            return inventory != null && inventory.TryMoveSlot(from, to, slots.Length, expectedItemId);
         }
 
         private void ResolveReferences()

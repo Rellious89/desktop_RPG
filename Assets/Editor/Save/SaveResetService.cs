@@ -206,6 +206,7 @@ namespace CommonEditor.Save
             // 되돌릴 수 있게 바꿀 필드의 원래 값을 들고 있는다. 목록은 새 목록으로 <b>교체</b>하고 예전
             // 참조를 그대로 보관하므로, 되돌리기는 참조를 도로 끼우는 것으로 끝난다(깊은 복사가 없다).
             List<InventoryItemState> oldItems = resetItems ? data.items : null;
+            List<string> oldInventorySlotItemIds = resetItems ? data.inventorySlotItemIds : null;
             int oldCurrency = resetCurrency ? data.currency : 0;
             List<BuildingConstructionSaveState> oldConstructions =
                 resetConstruction ? data.buildingConstructions : null;
@@ -224,7 +225,11 @@ namespace CommonEditor.Save
             if (applyCharacterChanges && !resetConstruction) oldPurificationSlots = data.purificationSlots;
             int removedCount = 0;
 
-            if (resetItems) data.items = new List<InventoryItemState>();
+            if (resetItems)
+            {
+                data.items = new List<InventoryItemState>();
+                data.inventorySlotItemIds = new List<string>();
+            }
             if (resetCurrency) data.currency = 0;
             if (resetConstruction)
             {
@@ -319,7 +324,7 @@ namespace CommonEditor.Save
             {
                 // 대리자가 터져도 메모리는 원래대로 돌려놓고 예외는 그대로 올려보낸다 - 부분 초기화가
                 // 남는 것보다 호출부가 실패를 알아채는 편이 낫다.
-                Rollback(data, resetItems, oldItems, resetCurrency, oldCurrency, resetConstruction,
+                Rollback(data, resetItems, oldItems, oldInventorySlotItemIds, resetCurrency, oldCurrency, resetConstruction,
                     oldConstructions, oldRecruitmentCycles, oldPurificationSlots, applyCharacterChanges, oldCharacters,
                     oldPartyCharacterIds, oldRecoverySlots, oldUnlockedRecruitmentCharacterIds, resetAllUnlocks,
                     oldCharacterStoryQuests);
@@ -328,7 +333,7 @@ namespace CommonEditor.Save
 
             if (!saved)
             {
-                Rollback(data, resetItems, oldItems, resetCurrency, oldCurrency, resetConstruction,
+                Rollback(data, resetItems, oldItems, oldInventorySlotItemIds, resetCurrency, oldCurrency, resetConstruction,
                     oldConstructions, oldRecruitmentCycles, oldPurificationSlots, applyCharacterChanges, oldCharacters,
                     oldPartyCharacterIds, oldRecoverySlots, oldUnlockedRecruitmentCharacterIds, resetAllUnlocks,
                     oldCharacterStoryQuests);
@@ -619,7 +624,7 @@ namespace CommonEditor.Save
 
         private static void Rollback(
             SaveData data,
-            bool resetItems, List<InventoryItemState> oldItems,
+            bool resetItems, List<InventoryItemState> oldItems, List<string> oldInventorySlotItemIds,
             bool resetCurrency, int oldCurrency,
             bool resetConstruction, List<BuildingConstructionSaveState> oldConstructions,
             List<RecruitmentCycleSaveState> oldRecruitmentCycles,
@@ -629,7 +634,11 @@ namespace CommonEditor.Save
             List<string> oldUnlockedRecruitmentCharacterIds, bool resetAllUnlocks,
             List<CharacterStoryQuestSaveState> oldCharacterStoryQuests = null)
         {
-            if (resetItems) data.items = oldItems;
+            if (resetItems)
+            {
+                data.items = oldItems;
+                data.inventorySlotItemIds = oldInventorySlotItemIds;
+            }
             if (resetCurrency) data.currency = oldCurrency;
             if (resetConstruction)
             {

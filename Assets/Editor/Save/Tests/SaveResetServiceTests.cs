@@ -55,6 +55,7 @@ namespace CommonEditor.SaveTests
                     new InventoryItemState { itemId = "red_potion", count = 3 },
                     new InventoryItemState { itemId = "blue_potion", count = 1 },
                 },
+                inventorySlotItemIds = new List<string> { "blue_potion", "", "red_potion" },
                 buildingConstructions = new List<BuildingConstructionSaveState>
                 {
                     new BuildingConstructionSaveState { buildingId = "1", startedAtUtc = "s", completeAtUtc = "c" },
@@ -118,6 +119,7 @@ namespace CommonEditor.SaveTests
 
             Assert.AreEqual(SaveResetOutcome.Success, result.Outcome);
             Assert.AreEqual(0, data.items.Count, "아이템은 빈 목록이 됩니다.");
+            Assert.AreEqual(0, data.inventorySlotItemIds.Count, "아이템 초기화 시 슬롯 배치도 비웁니다.");
             Assert.AreEqual(1250, data.currency, "재화는 그대로입니다.");
             Assert.AreEqual(1, data.buildingConstructions.Count, "건축 기록은 그대로입니다.");
             Assert.AreEqual(1, data.recruitmentCycles.Count, "모집 주기도 그대로입니다.");
@@ -245,6 +247,7 @@ namespace CommonEditor.SaveTests
         {
             SaveData data = MakePopulated();
             List<InventoryItemState> originalItems = data.items;
+            List<string> originalInventorySlotItemIds = data.inventorySlotItemIds;
             List<BuildingConstructionSaveState> originalConstructions = data.buildingConstructions;
             List<RecruitmentCycleSaveState> originalRecruitmentCycles = data.recruitmentCycles;
             List<PurificationSlotSaveState> originalPurificationSlots = data.purificationSlots;
@@ -259,6 +262,8 @@ namespace CommonEditor.SaveTests
 
             // 원래 값으로 전부 복구 - 성공한 일부만 남는 부분 초기화가 없어야 한다.
             Assert.AreSame(originalItems, data.items, "실패하면 원래 아이템 목록 참조로 되돌립니다.");
+            Assert.AreSame(originalInventorySlotItemIds, data.inventorySlotItemIds,
+                "실패하면 원래 슬롯 배치도 되돌립니다.");
             Assert.AreEqual(2, data.items.Count);
             Assert.AreEqual(1250, data.currency, "재화도 되돌립니다.");
             Assert.AreSame(originalConstructions, data.buildingConstructions, "건축 기록도 되돌립니다.");

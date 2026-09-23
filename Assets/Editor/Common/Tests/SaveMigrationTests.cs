@@ -894,6 +894,7 @@ namespace CommonEditor.Tests
                 {
                     new InventoryItemState { itemId = "potion", count = 3 },
                 },
+                inventorySlotItemIds = new List<string> { "", "potion" },
                 recoverySlots = new List<RecoverySlotSaveState>
                 {
                     new RecoverySlotSaveState
@@ -1056,6 +1057,7 @@ namespace CommonEditor.Tests
             Assert.AreEqual(1250, data.currency);
             Assert.AreEqual("potion", data.items[0].itemId);
             Assert.AreEqual(3, data.items[0].count);
+            CollectionAssert.AreEqual(new[] { "", "potion" }, data.inventorySlotItemIds);
             Assert.AreEqual("barbarian", data.characters[0].characterId);
             Assert.AreEqual(9, data.characters[0].currentStamina);
             Assert.AreEqual(5, data.characters[0].currentExp, "사본이 경험치를 빠뜨리면 안 된다.");
@@ -1085,7 +1087,7 @@ namespace CommonEditor.Tests
             {
                 "saveVersion", "saveRevision", "lastSavedAtUtc",
                 "currentLevel", "currentExp", "totalKillCount",
-                "characters", "partyCharacterIds", "currency", "items", "recoverySlots", "buildingConstructions",
+                "characters", "partyCharacterIds", "currency", "items", "inventorySlotItemIds", "recoverySlots", "buildingConstructions",
                 "recruitmentCycles", "unlockedRecruitmentCharacterIds", "purificationSlots", "characterStoryQuests",
             };
 

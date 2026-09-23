@@ -44,6 +44,10 @@ namespace Common
         [Tooltip("수량 표시 형식. 이번 단계에서는 수량이 1이어도 그대로 표시한다.")]
         [SerializeField] private string countFormat = "{0}";
 
+        [Range(0f, 1f)]
+        [Tooltip("인벤토리 슬롯 이동 중 포인터를 따라오는 아이템 표시물의 투명도.")]
+        [SerializeField] private float moveDragPreviewAlpha = 0.6f;
+
         private bool resolved;
 
         private ItemDefinition definition;
@@ -52,6 +56,9 @@ namespace Common
         private ItemTooltipController tooltipController;
         private bool tooltipControllerResolved;
         private bool isSellRegistrationDrag;
+        private bool isInventoryMoveDrag;
+        private InventoryPanel dragPanel;
+        private string draggedItemId;
         private Animator hoverAnimator;
 
         /// <summary>이 슬롯이 지금 그리고 있는 아이템. 빈 칸이면 null이다.</summary>
@@ -177,16 +184,35 @@ namespace Common
 
         public void OnBeginDrag(PointerEventData eventData)
         {
+            isInventoryMoveDrag = false;
+            dragPanel = null;
+            draggedItemId = null;
+            isSellRegistrationDrag = false;
+            if (eventData == null || eventData.button != PointerEventData.InputButton.Left) return;
             isSellRegistrationDrag = definition != null && count > 0 &&
                 InventoryItemRegistrationContext.ActiveTarget != null &&
                 InventoryItemRegistrationContext.ActiveTarget.CanRegisterInventoryItem(definition);
-            if (isSellRegistrationDrag && eventData != null)
-                InventorySellDragPreview.Begin(this, eventData.position);
+
+            if (!isSellRegistrationDrag && InventoryItemRegistrationContext.ActiveTarget == null &&
+                definition != null && count > 0)
+            {
+                dragPanel = GetComponentInParent<InventoryPanel>(true);
+                isInventoryMoveDrag = dragPanel != null;
+                if (isInventoryMoveDrag) draggedItemId = definition.ItemId;
+            }
+
+            if (isSellRegistrationDrag || isInventoryMoveDrag)
+            {
+                CancelTooltip();
+                StopHoverEffect();
+                InventorySellDragPreview.Begin(this, eventData.position,
+                    isInventoryMoveDrag ? moveDragPreviewAlpha : 0.6f);
+            }
         }
 
         public void OnDrag(PointerEventData eventData)
         {
-            if (isSellRegistrationDrag && eventData != null)
+            if ((isSellRegistrationDrag || isInventoryMoveDrag) && eventData != null)
                 InventorySellDragPreview.UpdatePosition(eventData.position);
         }
 
@@ -194,7 +220,12 @@ namespace Common
         {
             if (isSellRegistrationDrag && eventData != null)
                 InventoryItemRegistrationContext.TryRegisterAt(definition, eventData.position, eventData.pressEventCamera);
+            else if (isInventoryMoveDrag && eventData != null && dragPanel != null)
+                dragPanel.TryDropItem(this, draggedItemId, eventData.pointerCurrentRaycast.gameObject);
             isSellRegistrationDrag = false;
+            isInventoryMoveDrag = false;
+            dragPanel = null;
+            draggedItemId = null;
             InventorySellDragPreview.End(this);
         }
 
@@ -205,6 +236,9 @@ namespace Common
             StopHoverEffect();
             CancelTooltip();
             isSellRegistrationDrag = false;
+            isInventoryMoveDrag = false;
+            dragPanel = null;
+            draggedItemId = null;
             InventorySellDragPreview.End(this);
         }
 

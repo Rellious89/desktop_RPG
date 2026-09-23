@@ -333,6 +333,7 @@ MonoBehaviour:
   countText: {fileID: 6584257244050631544}
   hoverEffect: {fileID: 6279606014857111266}
   countFormat: '{0}'
+  moveDragPreviewAlpha: 0.6
 --- !u!1 &6279606014857111266
 GameObject:
   m_ObjectHideFlags: 0
