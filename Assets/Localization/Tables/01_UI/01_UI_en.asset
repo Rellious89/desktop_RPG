@@ -586,6 +586,22 @@ MonoBehaviour:
     m_Localized: Auto Sorting
     m_Metadata:
       m_Items: []
+  - m_Id: 20658099332308992
+    m_Localized: Experience
+    m_Metadata:
+      m_Items: []
+  - m_Id: 21399265149444096
+    m_Localized: Setting
+    m_Metadata:
+      m_Items: []
+  - m_Id: 21401963982741504
+    m_Localized: Character scale
+    m_Metadata:
+      m_Items: []
+  - m_Id: 21401963982741505
+    m_Localized: Master Volume
+    m_Metadata:
+      m_Items: []
   references:
     version: 2
     RefIds: []

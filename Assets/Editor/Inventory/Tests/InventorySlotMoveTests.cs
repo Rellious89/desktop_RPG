@@ -113,6 +113,73 @@ namespace InventoryEditor.Tests
         }
 
         [Test]
+        public void CompactSlots_PreservesDisplayedOrderAndWholeStacks_AcrossReload()
+        {
+            SaveSystem.Data.items.Add(new InventoryItemState { itemId = "a", count = 7 });
+            SaveSystem.Data.items.Add(new InventoryItemState { itemId = "b", count = 3 });
+            SaveSystem.Data.items.Add(new InventoryItemState { itemId = "c", count = 11 });
+            SaveSystem.Data.inventorySlotItemIds = new System.Collections.Generic.List<string>
+                { "", "c", "", "a", "", "b" };
+
+            Assert.IsTrue(manager.TryCompactSlots(6));
+            CollectionAssert.AreEqual(new[] { "c", "a", "b", "", "", "" }, manager.GetSlotItemIds(6));
+            CollectionAssert.AreEqual(new[] { 7, 3, 11 },
+                SaveSystem.Data.items.ConvertAll(item => item.count));
+            Assert.AreEqual(1, changedCount);
+
+            ConfigureSave.Invoke(null, new object[] { null, null, null });
+            CollectionAssert.AreEqual(new[] { "c", "a", "b", "", "", "" }, manager.GetSlotItemIds(6));
+            CollectionAssert.AreEqual(new[] { 7, 3, 11 },
+                SaveSystem.Data.items.ConvertAll(item => item.count));
+        }
+
+        [Test]
+        public void CompactSlots_AlreadyPackedOrLegacySave_DoesNotSaveOrNotify()
+        {
+            SaveSystem.Data.items.Add(new InventoryItemState { itemId = "a", count = 7 });
+            SaveSystem.Data.items.Add(new InventoryItemState { itemId = "b", count = 3 });
+            var original = SaveSystem.Data.inventorySlotItemIds;
+            int saveCalls = 0;
+            SaveOverride.SetValue(null, new Func<bool>(() => { saveCalls++; return true; }));
+
+            Assert.IsFalse(manager.TryCompactSlots(4));
+            Assert.AreSame(original, SaveSystem.Data.inventorySlotItemIds);
+            CollectionAssert.AreEqual(new[] { "a", "b", "", "" }, manager.GetSlotItemIds(4));
+            Assert.AreEqual(0, saveCalls);
+            Assert.AreEqual(0, changedCount);
+        }
+
+        [Test]
+        public void CompactSlots_SaveFailure_RollsBackWithoutNotification()
+        {
+            SaveSystem.Data.items.Add(new InventoryItemState { itemId = "a", count = 7 });
+            SaveSystem.Data.inventorySlotItemIds = new System.Collections.Generic.List<string> { "", "a", "", "" };
+            var original = SaveSystem.Data.inventorySlotItemIds;
+            SaveOverride.SetValue(null, new Func<bool>(() => false));
+            LogAssert.Expect(LogType.Error, "[InventoryManager] 슬롯 정렬을 저장하지 못해 이전 배치로 되돌렸습니다.");
+
+            Assert.IsFalse(manager.TryCompactSlots(4));
+            Assert.AreSame(original, SaveSystem.Data.inventorySlotItemIds);
+            CollectionAssert.AreEqual(new[] { "", "a", "", "" }, manager.GetSlotItemIds(4));
+            Assert.AreEqual(0, changedCount);
+        }
+
+        [Test]
+        public void SortingButton_IsAssignedOnInventoryPrefab()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/Art/UI/Prefab/panel/pn_Inventory.prefab");
+            Assert.IsNotNull(prefab);
+            InventoryPanel panel = prefab.GetComponent<InventoryPanel>();
+            Assert.IsNotNull(panel);
+            Transform buttonTransform = prefab.transform.Find("bot/FuncBtn/btn_sorting");
+            Assert.IsNotNull(buttonTransform);
+            Button button = buttonTransform.GetComponent<Button>();
+            Assert.IsNotNull(button);
+            Assert.AreEqual(button, new SerializedObject(panel).FindProperty("sortingButton").objectReferenceValue);
+        }
+
+        [Test]
         public void DragPreview_ShowsIconAndCount_FollowsPointer_ThenMovesToRaycastSlot()
         {
             var canvas = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas));

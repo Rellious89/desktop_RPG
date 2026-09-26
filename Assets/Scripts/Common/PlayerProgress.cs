@@ -151,6 +151,13 @@ namespace Common
         private CharacterProgressionService Progression =>
             progression ??= new CharacterProgressionService(expToNextLevel);
 
+        /// <summary>지정한 캐릭터 레벨의 다음 레벨까지 필요한 경험치 총량. 현재 캐릭터 캐시와 무관하다.</summary>
+        public static int GetRequiredExperience(int level) =>
+            Instance != null
+                ? Instance.Progression.GetRequiredExperience(level)
+                : new CharacterProgressionService(CharacterProgressionService.DefaultExperiencePerLevel)
+                    .GetRequiredExperience(level);
+
         private void Awake()
         {
             Instance = this;

@@ -132,6 +132,8 @@ namespace Common
 
             view.Bind(definition,
                 roster.GetLevel(definition),
+                roster.GetExp(definition),
+                PlayerProgress.GetRequiredExperience(roster.GetLevel(definition)),
                 roster.GetStamina(definition),
                 roster.GetMaxStamina(definition),
                 roster.GetCorruption(definition),

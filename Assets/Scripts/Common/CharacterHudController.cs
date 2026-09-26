@@ -131,7 +131,8 @@ namespace Common
                 roster.GetMaxStamina(definition),
                 roster.GetCorruption(definition),
                 roster.GetCorruptionDisplayMaximum(),
-                roster.Current == definition);
+                roster.Current == definition,
+                roster.GetLevel(definition));
         }
 
         // CharacterRoster.Awake의 CurrentCharacterChanged가 HUD OnEnable보다 뒤에 올 수 있다.

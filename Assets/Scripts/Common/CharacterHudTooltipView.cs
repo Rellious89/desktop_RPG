@@ -17,6 +17,7 @@ namespace Common
         [Header("Dynamic labels")]
         [SerializeField] private TextMeshProUGUI levelText;
         [SerializeField] private TextMeshProUGUI characterNameText;
+        [SerializeField] private TextMeshProUGUI expValueText;
         [SerializeField] private TextMeshProUGUI staminaValueText;
         [SerializeField] private TextMeshProUGUI purificationValueText;
 
@@ -33,11 +34,14 @@ namespace Common
         private bool resolved;
         private CharacterDefinition definition;
         private int level;
+        private int exp;
+        private int requiredExp;
         private int stamina;
         private int maxStamina;
         private double corruption;
         private int maxCorruption;
         private string levelFormat;
+        private string expFormat;
         private string staminaFormat;
         private string purificationFormat;
 
@@ -64,7 +68,8 @@ namespace Common
         /// 컨디션 문구는 활성화된 상태 오브젝트의 LocalizedTMPText가 자기 구독 수명주기를 소유한다.
         /// 행동력/오염도 title은 프리팹의 LocalizedTMPText가 소유하므로 여기서 덮어쓰지 않는다.
         /// </summary>
-        public void Bind(CharacterDefinition nextDefinition, int nextLevel, int currentStamina, int maximumStamina,
+        public void Bind(CharacterDefinition nextDefinition, int nextLevel, int currentExp, int nextRequiredExp,
+                         int currentStamina, int maximumStamina,
                          double currentCorruption, int maximumCorruption,
                          CharacterSwapListItem.DisplayState condition)
         {
@@ -73,6 +78,8 @@ namespace Common
 
             definition = nextDefinition;
             level = Mathf.Max(0, nextLevel);
+            exp = Mathf.Max(0, currentExp);
+            requiredExp = Mathf.Max(1, nextRequiredExp);
             stamina = Mathf.Max(0, currentStamina);
             maxStamina = Mathf.Max(0, maximumStamina);
             double safeCorruption = double.IsNaN(currentCorruption) || double.IsInfinity(currentCorruption)
@@ -154,6 +161,7 @@ namespace Common
         private void ApplyValues()
         {
             ApplyLevel();
+            ApplyValue(expValueText, expFormat, exp, requiredExp);
             ApplyValue(staminaValueText, staminaFormat, stamina, maxStamina);
             ApplyCorruptionValue();
             RebuildLayout();
@@ -217,12 +225,14 @@ namespace Common
             resolved = true;
 
             Transform characterInfo = FindDeepChild(transform, "CharacterInfo");
+            Transform expSection = FindDeepChild(transform, "Exp");
             Transform staminaSection = FindDeepChild(transform, "Stamina");
             Transform purificationSection = FindDeepChild(transform, "Purification");
             Transform conditionSection = FindDeepChild(transform, "condition") ?? FindDeepChild(transform, "Condition");
 
             if (levelText == null) levelText = FindDeepChild(characterInfo, "lb_CharacterLevel")?.GetComponent<TextMeshProUGUI>();
             if (characterNameText == null) characterNameText = FindDeepChild(characterInfo, "lb_CharacterName")?.GetComponent<TextMeshProUGUI>();
+            if (expValueText == null) expValueText = FindDeepChild(expSection, "lb_value")?.GetComponent<TextMeshProUGUI>();
             if (staminaValueText == null) staminaValueText = FindDeepChild(staminaSection, "lb_value")?.GetComponent<TextMeshProUGUI>();
             if (purificationValueText == null) purificationValueText = FindDeepChild(purificationSection, "lb_value")?.GetComponent<TextMeshProUGUI>();
 
@@ -239,6 +249,7 @@ namespace Common
         private void CaptureStaticFormats()
         {
             if (string.IsNullOrEmpty(levelFormat) && levelText != null) levelFormat = levelText.text;
+            if (string.IsNullOrEmpty(expFormat) && expValueText != null) expFormat = expValueText.text;
             if (string.IsNullOrEmpty(staminaFormat) && staminaValueText != null) staminaFormat = staminaValueText.text;
             if (string.IsNullOrEmpty(purificationFormat) && purificationValueText != null) purificationFormat = purificationValueText.text;
         }

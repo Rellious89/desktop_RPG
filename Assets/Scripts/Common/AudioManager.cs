@@ -11,13 +11,13 @@ namespace Common
     /// RewardToast와 같은 구독 패턴). AudioSource도 이 컴포넌트 하나만 갖고 있고, 다른 스크립트는
     /// AudioSource를 직접 만들거나 제어하지 않는다.
     ///
-    /// 이 매니저는 <b>재생·볼륨·쿨다운·SFX On/Off만</b> 담당한다. 모션에 딸린 사운드(공격별 Hit
+    /// 이 매니저는 <b>재생·쿨다운</b>을 담당한다. 모션에 딸린 사운드(공격별 Hit
     /// Sound/Cast Sound)의 단일 원천은 AttackMotionDefinition이고 여기에는 그 값을 대신할 기본 클립이
     /// 없다 - clip이 null이면 "그 모션에는 소리가 없다"는 뜻이다. 반대로 Defeat/LevelUp은 특정 모션이
     /// 아니라 게임 상태 변화에 붙는 전역 사운드라 여기서 계속 소유한다.
     ///
-    /// keybuddy는 업무 중 상시 실행되는 데스크탑 컴패니언이라 사운드가 방해되면 안 된다 - sfxEnabled
-    /// 기본값은 꺼짐(false)이고, sfxVolume이 0이어도 완전히 무음이다. Defeat/LevelUp 클립은 아직
+    /// 마스터 볼륨은 AudioListener.volume에 적용해 이후 추가되는 AudioSource도 함께 제어한다.
+    /// sfxVolume은 기존 효과음의 개별 튜닝값이다. Defeat/LevelUp 클립은 아직
     /// 연결하지 않아도 되며, 비어 있으면 조용히 무시한다(콘솔 경고도 남기지 않는다).
     /// 씬에 하나만 두면 된다. ControlDock의 SoundToggle처럼 UI에서 접근할 수 있도록 Instance를 둔다.
     ///
@@ -32,14 +32,12 @@ namespace Common
     {
         public static AudioManager Instance { get; private set; }
 
-        /// <summary>sfxEnabled가 바뀔 때마다 발생. SoundToggle 같은 UI가 아이콘/색상을 갱신하는 데 쓴다.</summary>
+        /// <summary>마스터 볼륨의 음소거 상태가 바뀔 때 발생한다.</summary>
         public static event Action<bool> OnSfxEnabledChanged;
+        public static event Action<float> OnMasterVolumeChanged;
 
-        [Header("On/Off")]
-        [Tooltip("꺼져 있으면 어떤 SFX도 재생하지 않는다. 상시 실행 앱이라 기본값은 꺼짐을 권장한다.")]
-        [SerializeField] private bool sfxEnabled = false;
-
-        [Tooltip("0~1. 0이면 sfxEnabled와 무관하게 완전히 무음이다.")]
+        [Header("SFX Tuning")]
+        [Tooltip("기존 효과음의 개별 볼륨. 마스터 볼륨과 별도로 Inspector에서 조정한다.")]
         [Range(0f, 1f)]
         [SerializeField] private float sfxVolume = 0.3f;
 
@@ -55,8 +53,11 @@ namespace Common
 
         private AudioSource audioSource;
         private float lastHitSfxTime = -999f;
+        private float masterVolume = 1f;
+        private float lastNonZeroMasterVolume = 1f;
 
-        public bool SfxEnabled => sfxEnabled;
+        public bool SfxEnabled => masterVolume > 0f;
+        public float MasterVolume => masterVolume;
 
         private void Awake()
         {
@@ -66,17 +67,19 @@ namespace Common
             audioSource.playOnAwake = false;
             audioSource.spatialBlend = 0f; // UI/게임플레이 피드백용 2D 사운드 - 리스너 거리와 무관하게 항상 들려야 한다
 
-            // 저장된 UI 설정이 있으면 Inspector 시작값 대신 그 값을 쓴다(HudToggleButton과 같은 패턴).
+            // 이전 설정의 sfxEnabled는 UiSettingsSaveSystem.Load에서 마스터 값으로 이관된다.
             UiSettingsData saved = UiSettingsSaveSystem.Load();
             if (saved != null)
             {
-                sfxEnabled = saved.sfxEnabled;
+                masterVolume = saved.masterVolume;
+                lastNonZeroMasterVolume = saved.lastNonZeroMasterVolume;
             }
+            AudioListener.volume = masterVolume;
         }
 
         private void OnApplicationQuit()
         {
-            UiSettingsSaveSystem.SaveSfxEnabled(sfxEnabled);
+            SaveMasterVolume();
         }
 
         private void OnEnable()
@@ -150,22 +153,38 @@ namespace Common
 
         private void PlayOneShot(AudioClip clip)
         {
-            if (!sfxEnabled || sfxVolume <= 0f || clip == null) return;
+            if (sfxVolume <= 0f || clip == null) return;
             audioSource.PlayOneShot(clip, sfxVolume);
         }
 
-        /// <summary>ControlDock의 SoundToggle이 호출하는 진입점.</summary>
+        /// <summary>기존 ControlDock 토글은 0과 마지막 양수 마스터 볼륨 사이를 전환한다.</summary>
         public void ToggleSfxEnabled()
         {
-            SetSfxEnabled(!sfxEnabled);
+            SetSfxEnabled(!SfxEnabled);
         }
 
         public void SetSfxEnabled(bool enabled)
         {
-            if (sfxEnabled == enabled) return;
-            sfxEnabled = enabled;
-            OnSfxEnabledChanged?.Invoke(sfxEnabled);
-            UiSettingsSaveSystem.SaveSfxEnabled(sfxEnabled); // 토글 즉시 저장 - 종료 시 저장은 비정상 종료 대비 안전망
+            SetMasterVolume(enabled ? lastNonZeroMasterVolume : 0f);
+            SaveMasterVolume();
+        }
+
+        public void SetMasterVolume(float volume)
+        {
+            float clamped = Mathf.Clamp01(volume);
+            if (Mathf.Approximately(masterVolume, clamped)) return;
+
+            bool wasAudible = SfxEnabled;
+            masterVolume = clamped;
+            if (clamped > 0f) lastNonZeroMasterVolume = clamped;
+            AudioListener.volume = clamped;
+            OnMasterVolumeChanged?.Invoke(clamped);
+            if (wasAudible != SfxEnabled) OnSfxEnabledChanged?.Invoke(SfxEnabled);
+        }
+
+        public void SaveMasterVolume()
+        {
+            UiSettingsSaveSystem.SaveMasterVolume(masterVolume, lastNonZeroMasterVolume);
         }
     }
 }

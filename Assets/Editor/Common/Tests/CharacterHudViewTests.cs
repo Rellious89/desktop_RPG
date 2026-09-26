@@ -4,6 +4,7 @@ using Character;
 using Common;
 using Field;
 using NUnit.Framework;
+using TMPro;
 using Recovery;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -155,6 +156,54 @@ namespace CommonEditor.Tests
             Assert.AreEqual("12.1", CharacterHudTooltipView.FormatCorruption(12.05d));
             Assert.AreEqual("12", CharacterHudTooltipView.FormatCorruption(12d));
             Assert.AreEqual("0", CharacterHudTooltipView.FormatCorruption(double.NaN));
+        }
+
+        [Test]
+        public void HudTooltip_ExpLabelShowsCharacterProgressAndRequiredTotal()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/Art/UI/Prefab/HUD/CharacterHUD_HoverTooltip.prefab");
+            GameObject instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            try
+            {
+                Assert.NotNull(instance);
+                CharacterHudTooltipView view = instance.GetComponent<CharacterHudTooltipView>();
+                TextMeshProUGUI value = FindDeepChild(FindDeepChild(instance.transform, "Exp"), "lb_value")
+                    ?.GetComponent<TextMeshProUGUI>();
+                Assert.NotNull(value);
+                view.Bind(null, 3, 4, 10, 12, 20, 0d, 100, CharacterSwapListItem.DisplayState.Ready);
+                Assert.AreEqual("4 / 10", value.text);
+                view.Bind(null, 4, 2, 10, 12, 20, 0d, 100, CharacterSwapListItem.DisplayState.Ready);
+                Assert.AreEqual("2 / 10", value.text);
+            }
+            finally
+            {
+                if (instance != null) UnityEngine.Object.DestroyImmediate(instance);
+            }
+        }
+
+        [Test]
+        public void HudSlot_LevelLabelUpdatesWithoutOverwritingItsTemplate()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/Art/UI/Prefab/HUD/item_CharacterHUD.prefab");
+            GameObject instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            try
+            {
+                Assert.NotNull(instance);
+                CharacterHudSlotView view = instance.GetComponent<CharacterHudSlotView>();
+                TextMeshProUGUI label = FindDeepChild(FindDeepChild(instance.transform, "bg_level"), "lb_level")
+                    ?.GetComponent<TextMeshProUGUI>();
+                Assert.NotNull(label);
+                view.Refresh(12, 20, 0d, 100, true, 3);
+                Assert.AreEqual("3", label.text);
+                view.Refresh(12, 20, 0d, 100, true, 4);
+                Assert.AreEqual("4", label.text);
+            }
+            finally
+            {
+                if (instance != null) UnityEngine.Object.DestroyImmediate(instance);
+            }
         }
 
         [Test]

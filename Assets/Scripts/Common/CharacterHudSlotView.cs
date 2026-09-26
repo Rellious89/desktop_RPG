@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Character;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -36,6 +38,7 @@ namespace Common
         [SerializeField] private Button slotButton;
         [SerializeField] private CanvasGroup canvasGroup;
         [SerializeField] private Image portraitImage;
+        [SerializeField] private TextMeshProUGUI levelText;
         [SerializeField] private ProgressBarView staminaProgress;
         [SerializeField] private Transform purificationCellsRoot;
 
@@ -49,6 +52,7 @@ namespace Common
         private bool cellsSortedForVisualOrder;
         private CharacterHudTooltipController tooltipController;
         private UiGroupDraggable hudDraggable;
+        private string levelFormat;
 
         private readonly struct CellImage
         {
@@ -68,6 +72,7 @@ namespace Common
         {
             ResolveReferences();
             BuildCells();
+            CaptureLevelFormat();
         }
 
         private void OnEnable()
@@ -117,8 +122,22 @@ namespace Common
         }
 
         public void Refresh(int currentStamina, int maxStamina, double currentCorruption, int maxCorruption,
-                            bool isCurrent)
+                            bool isCurrent, int level)
         {
+            ResolveReferences();
+            CaptureLevelFormat();
+            if (levelText != null)
+            {
+                try
+                {
+                    levelText.text = string.Format(CultureInfo.InvariantCulture, levelFormat, Mathf.Max(0, level));
+                }
+                catch (FormatException)
+                {
+                    Debug.LogWarning($"[CharacterHudSlotView] 잘못된 레벨 형식 문자열 '{levelFormat}'입니다.", this);
+                    levelText.text = levelFormat;
+                }
+            }
             if (canvasGroup != null) canvasGroup.alpha = isCurrent ? 1f : 0.2f;
             if (staminaProgress != null) staminaProgress.SetValue(currentStamina, maxStamina);
             RefreshCorruption(currentCorruption, maxCorruption);
@@ -217,8 +236,14 @@ namespace Common
             if (slotButton == null) slotButton = GetComponent<Button>();
             if (canvasGroup == null) canvasGroup = GetComponent<CanvasGroup>();
             if (portraitImage == null) portraitImage = FindDeepChild(transform, "sp_portrait")?.GetComponent<Image>();
+            if (levelText == null) levelText = FindDeepChild(FindDeepChild(transform, "bg_level"), "lb_level")?.GetComponent<TextMeshProUGUI>();
             if (staminaProgress == null) staminaProgress = FindDeepChild(transform, "Progress_Stamina")?.GetComponent<ProgressBarView>();
             if (purificationCellsRoot == null) purificationCellsRoot = FindDeepChild(transform, "fill_cell");
+        }
+
+        private void CaptureLevelFormat()
+        {
+            if (levelText != null && string.IsNullOrEmpty(levelFormat)) levelFormat = levelText.text;
         }
 
         private void BuildCells()

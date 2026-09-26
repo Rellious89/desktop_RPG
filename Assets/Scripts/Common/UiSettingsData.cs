@@ -3,13 +3,16 @@ using System;
 namespace Common
 {
     /// <summary>
-    /// 로컬에 저장하는 ControlDock 토글 상태(SFX On/Off, HUD 표시 여부, 창 크기 배율). PlayerProgress.SaveData
+    /// 로컬에 저장하는 음량, HUD 표시 여부, 창 크기 배율. PlayerProgress.SaveData
     /// (진행도), WindowPlacementData(창 위치)와는 완전히 별개의 파일에 저장된다 - UI 표시 설정이라 성격이 다르다.
     /// </summary>
     [Serializable]
     public class UiSettingsData
     {
-        public bool sfxEnabled = false;
+        // 이전 버전의 설정 파일을 읽을 때만 마스터 볼륨 초기값으로 사용한다.
+        public bool sfxEnabled = true;
+        public float masterVolume = 1f;
+        public float lastNonZeroMasterVolume = 1f;
         public bool hudVisible = true;
 
         /// <summary>tgl_size 배율(1 = 100%). 그때그때 정해지는 순환 목록(SizeToggleButton.sizePercentages)의

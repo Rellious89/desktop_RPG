@@ -26,6 +26,7 @@ namespace Common
     {
         private const string ListRootName = "list";
         private const string CurrencyTextName = "lb_currency";
+        private const string SortingButtonName = "btn_sorting";
 
         [Header("References (비워두면 이름으로 자동 탐색)")]
         [Tooltip("슬롯이 배치된 영역(list). 이 아래의 InventorySlotView를 순서대로 사용한다.")]
@@ -33,6 +34,9 @@ namespace Common
 
         [Tooltip("보유 재화를 표시할 텍스트(lb_currency).")]
         [SerializeField] private TextMeshProUGUI currencyText;
+
+        [Tooltip("빈 슬롯만 당기는 자동 정렬 버튼(btn_sorting).")]
+        [SerializeField] private UnityEngine.UI.Button sortingButton;
 
         [Tooltip("재화 표시 형식. {0}에 세 자리마다 쉼표가 찍힌 숫자가 들어간다.")]
         [SerializeField] private string currencyFormat = "{0}";
@@ -50,13 +54,26 @@ namespace Common
         {
             ResolveReferences();
 
+            if (sortingButton != null)
+            {
+                sortingButton.onClick.RemoveListener(OnSortingClicked);
+                sortingButton.onClick.AddListener(OnSortingClicked);
+            }
+
             // 패널이 열려 있는 동안 개발용 진입점으로 값을 바꾸면 그 자리에서 반영된다.
             InventoryManager.InventoryChanged += RefreshContents;
         }
 
         protected override void OnModalClosed()
         {
+            if (sortingButton != null) sortingButton.onClick.RemoveListener(OnSortingClicked);
             InventoryManager.InventoryChanged -= RefreshContents;
+        }
+
+        private void OnSortingClicked()
+        {
+            InventoryManager inventory = InventoryManager.Instance;
+            if (inventory != null && slots != null) inventory.TryCompactSlots(slots.Length);
         }
 
         /// <summary>재화와 아이템 슬롯을 지금 저장 데이터 기준으로 다시 그린다. 패널을 열 때마다,
@@ -149,6 +166,7 @@ namespace Common
 
             if (listRoot == null) listRoot = FindDeepChild(transform, ListRootName) as RectTransform;
             if (currencyText == null) currencyText = FindChildComponent<TextMeshProUGUI>(CurrencyTextName);
+            if (sortingButton == null) sortingButton = FindChildComponent<UnityEngine.UI.Button>(SortingButtonName);
 
             // 슬롯 순서는 계층 순서를 그대로 따른다 - Grid Layout Group이 화면에 배치하는 순서와 같다.
             slots = listRoot != null

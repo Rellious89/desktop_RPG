@@ -582,6 +582,38 @@ namespace Inventory
             return true;
         }
 
+        /// <summary>현재 슬롯 순서 그대로 빈 칸만 제거한다. 수량과 아이템 목록은 바꾸지 않는다.</summary>
+        public bool TryCompactSlots(int visibleSlotCount)
+        {
+            if (visibleSlotCount <= 0) return false;
+
+            SaveData data = SaveSystem.Data;
+            List<string> layout = InventorySlotLayout.Build(data.items, data.inventorySlotItemIds, visibleSlotCount);
+            List<string> compacted = InventorySlotLayout.Compact(layout);
+            if (InventorySlotLayout.Same(layout, compacted)) return false;
+
+            List<string> previous = data.inventorySlotItemIds;
+            data.inventorySlotItemIds = compacted;
+            bool saved;
+            try { saved = PersistToDisk(); }
+            catch (Exception exception)
+            {
+                data.inventorySlotItemIds = previous;
+                Debug.LogError($"[InventoryManager] 슬롯 정렬 저장 중 오류: {exception}", this);
+                return false;
+            }
+
+            if (!saved)
+            {
+                data.inventorySlotItemIds = previous;
+                Debug.LogError("[InventoryManager] 슬롯 정렬을 저장하지 못해 이전 배치로 되돌렸습니다.", this);
+                return false;
+            }
+
+            InventoryChanged?.Invoke();
+            return true;
+        }
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -1582,6 +1614,23 @@ namespace Inventory
     /// 소유 중이면 자리를 예약하여 다른 아이템이 그 자리를 차지하지 않게 한다.</summary>
     internal static class InventorySlotLayout
     {
+        internal static List<string> Compact(IReadOnlyList<string> layout)
+        {
+            var result = new List<string>(layout.Count);
+            for (int i = 0; i < layout.Count; i++)
+                if (!string.IsNullOrEmpty(layout[i])) result.Add(layout[i]);
+            while (result.Count < layout.Count) result.Add(string.Empty);
+            return result;
+        }
+
+        internal static bool Same(IReadOnlyList<string> first, IReadOnlyList<string> second)
+        {
+            if (first.Count != second.Count) return false;
+            for (int i = 0; i < first.Count; i++)
+                if (!string.Equals(first[i], second[i], StringComparison.Ordinal)) return false;
+            return true;
+        }
+
         internal static List<string> Build(List<InventoryItemState> items, List<string> saved, int minimumSlots)
         {
             var held = new HashSet<string>(StringComparer.Ordinal);

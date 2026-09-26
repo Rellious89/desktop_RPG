@@ -117,6 +117,11 @@ namespace Common
             rightMarginFraction = defaultRightMarginFraction;
             bottomMarginFraction = defaultBottomMarginFraction;
 
+            // 옵션 패널이 닫힌 상태에서도 이전에 선택한 배율이 첫 프레임부터 적용돼야 한다.
+            float savedScale = UiSettingsSaveSystem.Load()?.sizeScale ?? 1f;
+            if (savedScale > 0f && !float.IsNaN(savedScale) && !float.IsInfinity(savedScale))
+                userScale = savedScale;
+
             if (highlightVisual != null) highlightVisual.SetActive(false);
 
             ApplyPlacement();

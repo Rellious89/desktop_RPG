@@ -887,6 +887,7 @@ MonoBehaviour:
   inputBlockerColor: {r: 0, g: 0, b: 0, a: 0}
   listRoot: {fileID: 7261296033965540891}
   currencyText: {fileID: 8428517405277647274}
+  sortingButton: {fileID: 5831178202279187716}
   currencyFormat: '{0}'
 --- !u!114 &5327538711147503284
 MonoBehaviour:

@@ -4,7 +4,7 @@ using UnityEngine.UI;
 namespace Common
 {
     /// <summary>
-    /// ControlDock의 SoundToggle 버튼. 클릭하면 AudioManager.sfxEnabled를 반전시키고,
+    /// ControlDock의 SoundToggle 버튼. 클릭하면 마스터 볼륨을 0과 마지막 양수 값 사이에서 전환하고,
     /// onTargetGraphic/offTargetGraphic 중 상태에 맞는 쪽만 활성화해서 표시한다. 각 이미지의
     /// 스프라이트/색은 이 스크립트가 관여하지 않고 에디터에서 미리 설정해둔 값을 그대로 쓴다
     /// (버튼 기본 Image는 스프라이트를 비워서 안 보이게 처리한다 - 에디터에서 직접 관리).

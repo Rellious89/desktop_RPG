@@ -40,7 +40,9 @@ namespace Common
             float initialScale = saved != null ? saved.sizeScale : 1f;
             currentIndex = FindClosestIndex(initialScale);
 
-            ApplyCurrentScale(save: false);
+            // 실제 시작 배율은 StageVisualRootController가 저장값 그대로 복원한다.
+            // 구형 토글이 여기서 다시 적용하면 옵션 패널에서 조정한 새 배율값이
+            // 이 컴포넌트의 과거 단계값으로 덮어써질 수 있다.
         }
 
         private void OnEnable()
