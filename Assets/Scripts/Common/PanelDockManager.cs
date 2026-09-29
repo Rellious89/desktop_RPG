@@ -76,6 +76,17 @@ namespace Common
             return FindLink(handle) != null;
         }
 
+        /// <summary>현재 세션의 도킹을 풀고 모든 패널을 각 프리팹/씬의 원래 위치로 되돌린다.</summary>
+        public void ResetAllPanelPositions()
+        {
+            individualDrag = null;
+            for (int i = links.Count - 1; i >= 0; i--) RemoveLink(links[i]);
+            dockDragLink = null;
+
+            foreach (PanelDragHandle handle in PanelUi.GetComponentsInChildren<PanelDragHandle>(true))
+                handle.ResetToDefaultPosition();
+        }
+
         /// <summary>기존 PanelDragHandle가 개별 드래그를 시작할 때 전달한다.</summary>
         public void BeginPanelDrag(PanelDragHandle handle)
         {

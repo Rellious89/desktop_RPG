@@ -39,6 +39,12 @@ namespace DesktopWindow
         public const uint MONITOR_DEFAULTTONULL = 0x00000000;
         public const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
 
+        public const uint QDC_ONLY_ACTIVE_PATHS = 0x00000002;
+        public const int ERROR_SUCCESS = 0;
+        public const int ERROR_INSUFFICIENT_BUFFER = 122;
+        public const uint DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME = 1;
+        public const uint DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME = 2;
+
         public const uint WM_QUIT = 0x0012;
 
         public const int WH_MOUSE_LL = 14;
@@ -121,6 +127,107 @@ namespace DesktopWindow
             [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
             public string szDevice;
         }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public struct DISPLAY_DEVICE
+        {
+            public int cb;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string DeviceName;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceString;
+            public int StateFlags;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceID;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceKey;
+        }
+
+        // CCD structures are blittable except for the fixed-size UTF-16 name buffers.
+        // The mode data is never read here, but QueryDisplayConfig still requires a correctly sized array.
+        [StructLayout(LayoutKind.Sequential)]
+        public struct LUID
+        {
+            public uint LowPart;
+            public int HighPart;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct DISPLAYCONFIG_PATH_SOURCE_INFO
+        {
+            public LUID adapterId;
+            public uint id;
+            public uint modeInfoIdx;
+            public uint statusFlags;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct DISPLAYCONFIG_PATH_TARGET_INFO
+        {
+            public LUID adapterId;
+            public uint id;
+            public uint modeInfoIdx;
+            public uint outputTechnology;
+            public uint rotation;
+            public uint scaling;
+            public uint refreshRateNumerator;
+            public uint refreshRateDenominator;
+            public uint scanLineOrdering;
+            public int targetAvailable;
+            public uint statusFlags;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct DISPLAYCONFIG_PATH_INFO
+        {
+            public DISPLAYCONFIG_PATH_SOURCE_INFO sourceInfo;
+            public DISPLAYCONFIG_PATH_TARGET_INFO targetInfo;
+            public uint flags;
+        }
+
+        // DISPLAYCONFIG_MODE_INFO is 64 bytes on Windows x86 and x64 (16-byte header,
+        // 48-byte largest union member). Only its allocation size matters to this caller.
+        [StructLayout(LayoutKind.Explicit, Size = 64)]
+        public struct DISPLAYCONFIG_MODE_INFO { }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct DISPLAYCONFIG_DEVICE_INFO_HEADER
+        {
+            public uint type;
+            public uint size;
+            public LUID adapterId;
+            public uint id;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public struct DISPLAYCONFIG_SOURCE_DEVICE_NAME
+        {
+            public DISPLAYCONFIG_DEVICE_INFO_HEADER header;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string viewGdiDeviceName;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public struct DISPLAYCONFIG_TARGET_DEVICE_NAME
+        {
+            public DISPLAYCONFIG_DEVICE_INFO_HEADER header;
+            public uint flags;
+            public uint outputTechnology;
+            public ushort edidManufactureId;
+            public ushort edidProductCodeId;
+            public uint connectorInstance;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)] public string monitorFriendlyDeviceName;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string monitorDevicePath;
+        }
+
+        [DllImport("user32.dll")]
+        public static extern int GetDisplayConfigBufferSizes(uint flags, out uint numPathArrayElements, out uint numModeInfoArrayElements);
+
+        [DllImport("user32.dll")]
+        public static extern int QueryDisplayConfig(uint flags, ref uint numPathArrayElements,
+            [Out] DISPLAYCONFIG_PATH_INFO[] pathArray, ref uint numModeInfoArrayElements,
+            [Out] DISPLAYCONFIG_MODE_INFO[] modeInfoArray, IntPtr currentTopologyId);
+
+        [DllImport("user32.dll", EntryPoint = "DisplayConfigGetDeviceInfo")]
+        public static extern int DisplayConfigGetSourceDeviceInfo(ref DISPLAYCONFIG_SOURCE_DEVICE_NAME requestPacket);
+
+        [DllImport("user32.dll", EntryPoint = "DisplayConfigGetDeviceInfo")]
+        public static extern int DisplayConfigGetTargetDeviceInfo(ref DISPLAYCONFIG_TARGET_DEVICE_NAME requestPacket);
 
         /// <summary>EnumDisplayMonitors 콜백. true를 반환하면 다음 모니터로 계속 진행한다.</summary>
         public delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
@@ -253,6 +360,11 @@ namespace DesktopWindow
         /// <summary>연결된 모든 모니터를 순회한다. lprcClip=IntPtr.Zero면 전체 가상 데스크톱을 대상으로 한다.</summary>
         [DllImport("user32.dll")]
         public static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
+
+        /// <summary>MONITORINFOEX.szDevice를 어댑터 이름으로 넘기고 iDevNum=0으로
+        /// 다시 호출하면 연결된 모니터의 사람이 읽을 수 있는 DeviceString을 얻는다.</summary>
+        [DllImport("user32.dll", EntryPoint = "EnumDisplayDevicesW", CharSet = CharSet.Unicode)]
+        public static extern bool EnumDisplayDevices(string lpDevice, uint iDevNum, ref DISPLAY_DEVICE lpDisplayDevice, uint dwFlags);
 
         [DllImport("user32.dll")]
         public static extern bool ClientToScreen(IntPtr hWnd, ref POINT lpPoint);

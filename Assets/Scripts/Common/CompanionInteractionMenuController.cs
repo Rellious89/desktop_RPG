@@ -34,6 +34,8 @@ namespace Common
         [SerializeField] private GameObject townMenuRoot;
         [SerializeField] private GameObject dungeonMenuRoot;
         [SerializeField] private Vector2 menuOffset = new Vector2(0f, 8f);
+        [Tooltip("Companion 메뉴 버튼과 작업 영역 가장자리 사이에 유지할 최소 간격(Canvas 단위)입니다.")]
+        [SerializeField] [Min(0f)] private float menuBoundsPadding = 4f;
 
         [Header("자동 닫힘")]
         [Tooltip("인터렉션 메뉴 영역에서 마우스가 벗어난 뒤 자동으로 닫히기까지의 시간(초)입니다. " +
@@ -96,6 +98,9 @@ namespace Common
         private readonly List<UnityEngine.UI.LayoutGroup> pausedMenuLayouts =
             new List<UnityEngine.UI.LayoutGroup>();
         private readonly LongPressDragGesture stageDragGesture = new LongPressDragGesture();
+        private readonly Vector3[] menuButtonCorners = new Vector3[4];
+        private Rect menuButtonBounds;
+        private bool hasMenuButtonBounds;
         private float closeMenuAtRealtime;
         private int pressedInteractionSlot = -1;
         private int selectedInteractionSlot = -1;
@@ -565,6 +570,9 @@ namespace Common
             UpdateCharacterScreenLayout();
             menuRoot.SetAsLastSibling();
             menuRoot.gameObject.SetActive(true);
+            StopMenuEnterAnimation(true);
+            CacheActiveMenuButtonBounds();
+            UpdateCharacterScreenLayout();
             NotifyMenuActivity();
             PlayMenuEnterAnimation();
         }
@@ -572,6 +580,7 @@ namespace Common
         private void CloseMenu()
         {
             StopMenuEnterAnimation(true);
+            hasMenuButtonBounds = false;
 
             if (menuRoot != null && menuRoot.gameObject.activeSelf)
             {
@@ -850,7 +859,94 @@ namespace Common
                     (selectedRectMin.x + selectedRectMax.x) * 0.5f,
                     selectedRectMax.y);
                 menuRoot.anchoredPosition = characterTop + menuOffset;
+                if (menuRoot.gameObject.activeSelf) KeepMenuButtonsInsideCanvas();
             }
+        }
+
+        private void CacheActiveMenuButtonBounds()
+        {
+            hasMenuButtonBounds = false;
+            if (menuRoot == null) return;
+
+            GameObject activeMenu = CurrentFieldMode() == FieldMode.Dungeon
+                ? dungeonMenuRoot
+                : townMenuRoot;
+            if (activeMenu == null || !activeMenu.activeInHierarchy) return;
+
+            // menuRoot의 100x100 Rect는 실제 버튼 배열을 감싸지 않는다. 등장 Tween이
+            // LayoutGroup을 잠그기 전에 최종 버튼 위치를 확정하여 한 번만 측정한다.
+            Canvas.ForceUpdateCanvases();
+            RectTransform activeMenuRect = activeMenu.transform as RectTransform;
+            if (activeMenuRect != null)
+                UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(activeMenuRect);
+
+            UnityEngine.UI.Button[] activeButtons =
+                activeMenu.GetComponentsInChildren<UnityEngine.UI.Button>(false);
+            Vector2 minimum = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+            Vector2 maximum = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+
+            for (int i = 0; i < activeButtons.Length; i++)
+            {
+                RectTransform buttonRect = activeButtons[i].transform as RectTransform;
+                if (buttonRect == null || !buttonRect.gameObject.activeInHierarchy) continue;
+
+                buttonRect.GetWorldCorners(menuButtonCorners);
+                Vector3 enterOffset = playMenuEnterTween
+                    ? menuRoot.InverseTransformVector(
+                        buttonRect.parent.TransformVector(menuButtonEnterOffset))
+                    : Vector3.zero;
+
+                for (int corner = 0; corner < menuButtonCorners.Length; corner++)
+                {
+                    Vector2 point = menuRoot.InverseTransformPoint(menuButtonCorners[corner]);
+                    minimum = Vector2.Min(minimum, point);
+                    maximum = Vector2.Max(maximum, point);
+                    // 시작 위치까지 포함하여 Tween 도중에도 경계 보정이 흔들리지 않게 한다.
+                    if (playMenuEnterTween)
+                    {
+                        minimum = Vector2.Min(minimum, point + (Vector2)enterOffset);
+                        maximum = Vector2.Max(maximum, point + (Vector2)enterOffset);
+                    }
+                }
+                hasMenuButtonBounds = true;
+            }
+
+            if (hasMenuButtonBounds)
+                menuButtonBounds = Rect.MinMaxRect(minimum.x, minimum.y, maximum.x, maximum.y);
+        }
+
+        private void KeepMenuButtonsInsideCanvas()
+        {
+            if (!hasMenuButtonBounds || interactionCanvasRect == null || menuRoot == null) return;
+
+            // menuRoot는 interactionCanvasRect의 직접 자식이다. 매 프레임 기본 캐릭터
+            // 위치에서 다시 시작하므로 보정량이 누적되지 않는다.
+            Rect canvas = interactionCanvasRect.rect;
+            float padding = Mathf.Max(0f, menuBoundsPadding);
+            float left = canvas.xMin + padding;
+            float right = canvas.xMax - padding;
+            float bottom = canvas.yMin + padding;
+            float top = canvas.yMax - padding;
+            if (left > right || bottom > top) return;
+
+            Vector2 rootPosition = menuRoot.anchoredPosition;
+            float xMin = rootPosition.x + menuButtonBounds.xMin;
+            float xMax = rootPosition.x + menuButtonBounds.xMax;
+            float yMin = rootPosition.y + menuButtonBounds.yMin;
+            float yMax = rootPosition.y + menuButtonBounds.yMax;
+
+            float xShift = CalculateBoundsShift(xMin, xMax, left, right);
+            float yShift = CalculateBoundsShift(yMin, yMax, bottom, top);
+            menuRoot.anchoredPosition = rootPosition + new Vector2(xShift, yShift);
+        }
+
+        private static float CalculateBoundsShift(float minimum, float maximum, float safeMin, float safeMax)
+        {
+            if (maximum - minimum > safeMax - safeMin)
+                return (safeMin + safeMax - minimum - maximum) * 0.5f;
+            if (minimum < safeMin) return safeMin - minimum;
+            if (maximum > safeMax) return safeMax - maximum;
+            return 0f;
         }
 
         private bool TryApplyRendererToHitArea(

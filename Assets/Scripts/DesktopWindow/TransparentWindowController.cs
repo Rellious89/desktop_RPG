@@ -45,7 +45,7 @@ namespace DesktopWindow
     /// 같은 이유로 같은 실행 순서를 쓴다.
     ///
     /// 모니터 선택: 현재 창이 위치한 모니터는 항상 MonitorFromWindow로 판정한다(커서 기준 아님).
-    /// 모니터를 바꾸는 유일한 방법은 명시적으로 MoveOverlayToNextMonitor()를 호출하는 것뿐이다(드래그로
+    /// 모니터는 명시적인 선택 또는 MoveOverlayToNextMonitor()로만 바꾼다(드래그로
     /// 다른 모니터에 걸치는 개념 자체가 없다 - 창은 항상 정확히 한 모니터의 Work Area 전체와 같다).
     /// 매 프레임(Update, 드래그 중이 아닐 때) CheckForMonitorWorkAreaChange가 (1) 선택된 모니터가
     /// 여전히 연결돼 있는지, (2) 그 모니터의 Work Area 사각형이 바뀌었는지(작업 표시줄 크기 변경,
@@ -64,6 +64,117 @@ namespace DesktopWindow
     public class TransparentWindowController : MonoBehaviour
     {
         public static TransparentWindowController Instance { get; private set; }
+
+        public readonly struct MonitorChoice
+        {
+            public readonly string DeviceName;
+            public readonly string DisplayName;
+
+            public MonitorChoice(string deviceName, string displayName)
+            {
+                DeviceName = deviceName;
+                DisplayName = displayName;
+            }
+        }
+
+        /// <summary>설정 UI가 사용할 현재 모니터의 장치 식별자. 이름은 표시 전용이다.</summary>
+        public string CurrentMonitorDeviceName
+        {
+            get
+            {
+#if UNITY_STANDALONE_WIN
+                return hwnd != IntPtr.Zero ? lastMonitorDeviceName : string.Empty;
+#else
+                return string.Empty;
+#endif
+            }
+        }
+
+        /// <summary>Windows 실행 파일에서 창과 모니터 선택이 준비됐는지.</summary>
+        public bool MonitorSelectionReady
+        {
+            get
+            {
+#if UNITY_STANDALONE_WIN
+                return hwnd != IntPtr.Zero && lastMonitor != IntPtr.Zero;
+#else
+                return false;
+#endif
+            }
+        }
+
+        public System.Collections.Generic.List<MonitorChoice> GetConnectedMonitors()
+        {
+            var choices = new System.Collections.Generic.List<MonitorChoice>();
+#if UNITY_STANDALONE_WIN
+            if (!MonitorSelectionReady) return choices;
+
+            var monitors = EnumMonitorsOrdered();
+            // SettingsPanel polls this list while open. Refresh CCD periodically, and immediately
+            // when the GDI monitor list changes (plug/unplug or display reconfiguration).
+            var topologyKey = new StringBuilder();
+            foreach (var monitor in monitors) topologyKey.Append(monitor.device).Append('|');
+            string key = topologyKey.ToString();
+            if (key != cachedFriendlyNameTopology || Time.realtimeSinceStartup >= nextFriendlyNameRefresh)
+            {
+                cachedFriendlyNames = GetActiveFriendlyMonitorNames(out cachedFriendlyNameStatus);
+                cachedFriendlyNameTopology = key;
+                nextFriendlyNameRefresh = Time.realtimeSinceStartup + 2f;
+            }
+            var names = new List<string>(monitors.Count);
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < monitors.Count; i++)
+            {
+                string deviceName = monitors[i].device;
+                cachedFriendlyNames.TryGetValue(deviceName, out string name);
+                if (string.IsNullOrWhiteSpace(name)) name = GetFriendlyMonitorName(deviceName);
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    string diagnostic = cachedFriendlyNameStatus;
+                    if (!loggedMonitorNameFallbacks.TryGetValue(deviceName, out string previous) || previous != diagnostic)
+                    {
+                        Debug.LogWarning($"[TransparentWindowController] 모니터 이름을 가져오지 못했습니다. " +
+                            $"device: {deviceName}, DisplayConfig: {diagnostic}, EnumDisplayDevices: no readable active name. " +
+                            "'디스플레이 N'으로 표시합니다.");
+                        loggedMonitorNameFallbacks[deviceName] = diagnostic;
+                    }
+                }
+                else loggedMonitorNameFallbacks.Remove(deviceName);
+                if (string.IsNullOrWhiteSpace(name)) name = $"디스플레이 {i + 1}";
+                names.Add(name);
+                counts[name] = counts.TryGetValue(name, out int count) ? count + 1 : 1;
+            }
+
+            for (int i = 0; i < monitors.Count; i++)
+            {
+                string name = names[i];
+                if (counts[name] > 1) name += $" ({i + 1})";
+                choices.Add(new MonitorChoice(monitors[i].device, name));
+            }
+#endif
+            return choices;
+        }
+
+        /// <summary>목록을 고른 뒤 다시 열거해 분리된 모니터를 거부한다.</summary>
+        public bool TryMoveOverlayToMonitor(string deviceName)
+        {
+#if UNITY_STANDALONE_WIN
+            if (!MonitorSelectionReady || string.IsNullOrEmpty(deviceName)) return false;
+            var monitors = EnumMonitorsOrdered();
+            int index = monitors.FindIndex(m => string.Equals(m.device, deviceName, StringComparison.OrdinalIgnoreCase));
+            if (index < 0) return false;
+
+            var target = monitors[index];
+            if (target.handle == lastMonitor &&
+                string.Equals(target.device, lastMonitorDeviceName, StringComparison.OrdinalIgnoreCase)) return true;
+            ApplyOverlayToMonitor(target.handle, target.device);
+            ResetAllGroupsToDefaultPlacement();
+            SaveOverlayPlacement();
+            return true;
+#else
+            return false;
+#endif
+        }
 
         /// <summary>
         /// 이 앱 창이 지금 <b>Windows 입력 포커스</b>를 갖고 있는지. UI 단축키(ESC로 패널 닫기)처럼
@@ -146,6 +257,12 @@ namespace DesktopWindow
         /// <summary>lastMonitor의 마지막으로 확인한 Work Area. 값이 바뀌면(해상도/작업 표시줄 변경)
         /// CheckForMonitorWorkAreaChange가 창을 다시 맞춘다.</summary>
         private Win32Interop.RECT lastWorkArea;
+
+        private Dictionary<string, string> cachedFriendlyNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> loggedMonitorNameFallbacks = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private string cachedFriendlyNameTopology;
+        private string cachedFriendlyNameStatus = "not queried";
+        private float nextFriendlyNameRefresh;
 
         // 직접 이동 대상으로 등록된 모든 그룹의 네이티브 화면 좌표 캐시. Update()에서 메인 스레드가 매
         // 프레임 갱신하고, GlobalMouseWheelForwarder의 후크 스레드는 이 값만 읽는다 -
@@ -285,8 +402,7 @@ namespace DesktopWindow
         /// ControlDock에 붙일 수 있는 public 진입점 - 현재 모니터 다음 모니터로 Overlay를 옮긴다.
         /// 모니터가 하나뿐이면 아무 일도 하지 않는다. 이동 후에는 Stage/HUD/Dock 세 그룹 모두 기본
         /// 배치로 되돌린다 - 이전 모니터 기준 배치를 새 모니터에 그대로 적용하면 해상도 차이에 따라
-        /// 화면 밖으로 나갈 수 있어서다. 이번 작업 범위에서는 별도 UI를 만들지 않지만, 나중에 버튼이나
-        /// 모니터 선택 UI를 이 메서드에 연결하면 된다.
+        /// 화면 밖으로 나갈 수 있어서다. 설정 UI의 직접 선택과 같은 이동/저장 경로를 사용한다.
         /// </summary>
         public void MoveOverlayToNextMonitor()
         {
@@ -304,9 +420,7 @@ namespace DesktopWindow
             int nextIndex = currentIndex >= 0 ? (currentIndex + 1) % monitors.Count : 0;
             (IntPtr handle, string device, Win32Interop.RECT work) target = monitors[nextIndex];
 
-            ApplyOverlayToMonitor(target.handle, target.device);
-            ResetAllGroupsToDefaultPlacement();
-            SaveOverlayPlacement();
+            TryMoveOverlayToMonitor(target.device);
 
             Debug.Log($"[TransparentWindowController] Overlay를 다음 모니터로 이동했습니다. (device: {target.device})");
 #endif
@@ -824,6 +938,21 @@ namespace DesktopWindow
         }
 
         /// <summary>
+        /// 설정 패널의 UI 위치 초기화. 진행 저장이나 배율·볼륨은 건드리지 않고, 현재 모니터 선택을
+        /// 유지한 채 Stage/HUD 그룹의 기본 배치를 즉시 적용한 뒤 배치 파일에 덮어쓴다.
+        /// 새 groupPlacements 문서로 저장하므로 과거 전용 위치 필드가 다음 실행에 되살아나지 않는다.
+        /// </summary>
+        public bool ResetUiPlacementToDefaults()
+        {
+            if (LayoutModeController.Instance == null) return false;
+
+            EndManualDrag();
+            ResetAllGroupsToDefaultPlacement();
+            SaveOverlayPlacement();
+            return true;
+        }
+
+        /// <summary>
         /// 네이티브 창을 지정한 모니터의 Work Area 전체로 맞춘다(위치=work.Left/Top, 크기=work의
         /// 가로/세로) - 사용자 배율이나 DPI를 곱하지 않는다. LayoutModeController를 통해 Stage/HUD/Dock
         /// 세 그룹 모두에게 새 Work Area 픽셀 크기를 알려줘서 각자의 배치 환산 기준이 같이 갱신되게 한다.
@@ -901,6 +1030,130 @@ namespace DesktopWindow
                 }, IntPtr.Zero);
 
             return result;
+        }
+
+        /// <summary>현재 GDI 화면 이름(\\.\DISPLAYn)을 활성 CCD 경로의 모니터 친화적 이름과 연결한다.
+        /// 미러링된 화면은 여러 target이 같은 source를 가질 수 있으므로 OS의 경로 우선순위에서
+        /// 처음 발견한 읽을 수 있는 이름을 사용한다. 이 이름은 표시용이며 저장 식별자를 바꾸지 않는다.</summary>
+        private static Dictionary<string, string> GetActiveFriendlyMonitorNames(out string status)
+        {
+            var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                // 두 호출 사이에 토폴로지가 바뀌면 버퍼 크기를 다시 구해야 한다.
+                for (int attempt = 0; attempt < 3; attempt++)
+                {
+                    int result = Win32Interop.GetDisplayConfigBufferSizes(Win32Interop.QDC_ONLY_ACTIVE_PATHS,
+                        out uint pathCount, out uint modeCount);
+                    if (result != Win32Interop.ERROR_SUCCESS)
+                    {
+                        status = $"GetDisplayConfigBufferSizes error {result}";
+                        return names;
+                    }
+
+                    var paths = new Win32Interop.DISPLAYCONFIG_PATH_INFO[Math.Max(1, (int)pathCount)];
+                    var modes = new Win32Interop.DISPLAYCONFIG_MODE_INFO[Math.Max(1, (int)modeCount)];
+                    result = Win32Interop.QueryDisplayConfig(Win32Interop.QDC_ONLY_ACTIVE_PATHS,
+                        ref pathCount, paths, ref modeCount, modes, IntPtr.Zero);
+                    if (result == Win32Interop.ERROR_INSUFFICIENT_BUFFER) continue;
+                    if (result != Win32Interop.ERROR_SUCCESS)
+                    {
+                        status = $"QueryDisplayConfig error {result}";
+                        return names;
+                    }
+
+                    int sourceErrors = 0, targetErrors = 0, emptyNames = 0, emptySources = 0;
+                    for (int i = 0; i < pathCount; i++)
+                    {
+                        var path = paths[i];
+                        var source = new Win32Interop.DISPLAYCONFIG_SOURCE_DEVICE_NAME
+                        {
+                            header = new Win32Interop.DISPLAYCONFIG_DEVICE_INFO_HEADER
+                            {
+                                type = Win32Interop.DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME,
+                                size = (uint)Marshal.SizeOf(typeof(Win32Interop.DISPLAYCONFIG_SOURCE_DEVICE_NAME)),
+                                adapterId = path.sourceInfo.adapterId,
+                                id = path.sourceInfo.id
+                            }
+                        };
+                        if (Win32Interop.DisplayConfigGetSourceDeviceInfo(ref source) != Win32Interop.ERROR_SUCCESS)
+                        {
+                            sourceErrors++;
+                            continue;
+                        }
+                        string device = source.viewGdiDeviceName?.Trim();
+                        if (string.IsNullOrEmpty(device))
+                        {
+                            emptySources++;
+                            continue;
+                        }
+
+                        var target = new Win32Interop.DISPLAYCONFIG_TARGET_DEVICE_NAME
+                        {
+                            header = new Win32Interop.DISPLAYCONFIG_DEVICE_INFO_HEADER
+                            {
+                                type = Win32Interop.DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME,
+                                size = (uint)Marshal.SizeOf(typeof(Win32Interop.DISPLAYCONFIG_TARGET_DEVICE_NAME)),
+                                adapterId = path.targetInfo.adapterId,
+                                id = path.targetInfo.id
+                            }
+                        };
+                        if (Win32Interop.DisplayConfigGetTargetDeviceInfo(ref target) != Win32Interop.ERROR_SUCCESS)
+                        {
+                            targetErrors++;
+                            continue;
+                        }
+                        string friendlyName = target.monitorFriendlyDeviceName?.Trim();
+                        if (string.IsNullOrEmpty(friendlyName))
+                        {
+                            emptyNames++;
+                            continue;
+                        }
+                        if (!names.ContainsKey(device)) names.Add(device, friendlyName);
+                    }
+
+                    status = $"active paths {pathCount}, mapped {names.Count}, source errors {sourceErrors}, " +
+                        $"empty sources {emptySources}, target errors {targetErrors}, empty names {emptyNames}";
+                    return names;
+                }
+                status = "QueryDisplayConfig: display topology kept changing (ERROR_INSUFFICIENT_BUFFER)";
+            }
+            catch (EntryPointNotFoundException)
+            {
+                status = "DisplayConfig API unavailable";
+            }
+            catch (DllNotFoundException)
+            {
+                status = "user32.dll unavailable";
+            }
+            return names;
+        }
+
+        private static string GetFriendlyMonitorName(string deviceName)
+        {
+            if (string.IsNullOrEmpty(deviceName)) return string.Empty;
+            string firstReadableName = string.Empty;
+            bool hasActiveMonitor = false;
+            for (uint index = 0; ; index++)
+            {
+                var display = new Win32Interop.DISPLAY_DEVICE
+                {
+                    cb = Marshal.SizeOf(typeof(Win32Interop.DISPLAY_DEVICE))
+                };
+                if (!Win32Interop.EnumDisplayDevices(deviceName, index, ref display, 0)) break;
+                bool isActive = (display.StateFlags & 1) != 0; // DISPLAY_DEVICE_ACTIVE
+                hasActiveMonitor |= isActive;
+                string name = display.DeviceString?.Trim();
+                if (string.IsNullOrEmpty(name) ||
+                    (name.IndexOf("Generic", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                     name.IndexOf("Monitor", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    name.IndexOf("일반 PnP", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    name.IndexOf("Default Monitor", StringComparison.OrdinalIgnoreCase) >= 0)
+                    continue;
+                if (isActive) return name;
+                if (string.IsNullOrEmpty(firstReadableName)) firstReadableName = name;
+            }
+            return hasActiveMonitor ? string.Empty : firstReadableName;
         }
 
         private static IntPtr FindMonitorByDeviceName(string deviceName)
@@ -1035,10 +1288,20 @@ namespace DesktopWindow
         /// 각 직접 드래그가 끝날 때 이 메서드를 호출한다.</summary>
         public void SaveOverlayPlacement()
         {
+            // Editor에서는 Win32 모니터 핸들을 초기화하지 않는다. 이때 UI 배치만 저장해도
+            // Windows 빌드에서 고른 모니터가 사라지지 않도록 기존 선택을 이어받는다.
+            string monitorDeviceName = lastMonitorDeviceName;
+            if (string.IsNullOrEmpty(monitorDeviceName))
+            {
+                WindowPlacementData previous = WindowPlacementSaveSystem.Load();
+                if (previous != null && previous.hasMonitorSelection)
+                    monitorDeviceName = previous.monitorDeviceName;
+            }
+
             var data = new WindowPlacementData
             {
-                hasMonitorSelection = !string.IsNullOrEmpty(lastMonitorDeviceName),
-                monitorDeviceName = lastMonitorDeviceName,
+                hasMonitorSelection = !string.IsNullOrEmpty(monitorDeviceName),
+                monitorDeviceName = monitorDeviceName,
             };
 
             if (LayoutModeController.Instance != null)

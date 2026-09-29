@@ -61,6 +61,8 @@ namespace Common
         private Vector2 dragStartAnchoredPosition;
         private bool dragging;
         private bool resolved;
+        private Vector2 defaultAnchoredPosition;
+        private bool hasDefaultAnchoredPosition;
 
         /// <summary>이 핸들이 움직이는 패널 루트.</summary>
         public RectTransform TargetPanel => targetPanel;
@@ -178,6 +180,15 @@ namespace Common
             if (targetPanel != null) targetPanel.anchoredPosition = anchoredPosition;
         }
 
+        /// <summary>이 인스턴스가 처음 활성화될 때의 프리팹/씬 배치로 되돌린다.</summary>
+        public void ResetToDefaultPosition()
+        {
+            ResolveReferences();
+            if (targetPanel == null || !hasDefaultAnchoredPosition) return;
+            dragging = false;
+            targetPanel.anchoredPosition = defaultAnchoredPosition;
+        }
+
         private static float ClampAxis(float value, float min, float max)
         {
             if (min <= max) return Mathf.Clamp(value, min, max);
@@ -234,7 +245,7 @@ namespace Common
 
         private void ResolveReferences()
         {
-            if (resolved) return;
+            if (resolved && hasDefaultAnchoredPosition) return;
             resolved = true;
 
             if (targetPanel == null)
@@ -244,6 +255,9 @@ namespace Common
                                "이 핸들은 동작하지 않습니다.", this);
                 return;
             }
+
+            defaultAnchoredPosition = targetPanel.anchoredPosition;
+            hasDefaultAnchoredPosition = true;
 
             parentRect = targetPanel.parent as RectTransform;
             if (parentRect == null)

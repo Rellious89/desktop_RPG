@@ -60,5 +60,36 @@ namespace CommonEditor.Tests
             Assert.That(restored.sizeScale, Is.EqualTo(1.5f));
             Assert.That(restored.hudVisible, Is.False);
         }
+
+        [Test]
+        public void LegacyUiSettings_DefaultToOpaque()
+        {
+            UiSettingsData restored = UiSettingsSaveSystem.Deserialize(
+                "{\"masterVolume\":0.35,\"hudVisible\":false}");
+
+            Assert.That(restored.uiOpacity, Is.EqualTo(1f));
+            Assert.That(restored.masterVolume, Is.EqualTo(0.35f));
+            Assert.That(restored.hudVisible, Is.False);
+        }
+
+        [Test]
+        public void UpdatingOpacity_RoundTripsWithoutChangingOtherSettings()
+        {
+            UiSettingsData data = new UiSettingsData
+            {
+                masterVolume = 0.4f,
+                hudVisible = false,
+                sizeScale = 1.5f
+            };
+
+            data = UiSettingsSaveSystem.UpdateUiOpacity(data, 0.3f);
+            data = UiSettingsSaveSystem.UpdateMasterVolume(data, 0.6f, 0.6f);
+            data = UiSettingsSaveSystem.UpdateSizeScale(data, 1.5f);
+            UiSettingsData restored = UiSettingsSaveSystem.Deserialize(JsonUtility.ToJson(data));
+            Assert.That(restored.uiOpacity, Is.EqualTo(0.3f).Within(0.0001f));
+            Assert.That(restored.masterVolume, Is.EqualTo(0.6f).Within(0.0001f));
+            Assert.That(restored.sizeScale, Is.EqualTo(1.5f));
+            Assert.That(restored.hudVisible, Is.False);
+        }
     }
 }

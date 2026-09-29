@@ -1,7 +1,10 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using Character;
 using Common;
+using Dungeon;
+using Enemy;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -9,7 +12,7 @@ using UnityEngine;
 namespace StageLayoutEditor
 {
     /// <summary>
-    /// StageVisualRoot의 "런타임에 실제로 어떻게 보이는가"를 에디터에서 그대로 확인하고 적용하는 도구.
+    /// StageVisualRoot의 배율과 기본 배치 위치를 에디터에서 미리 계산하고 적용하는 도구.
     ///
     /// <b>왜 필요한가</b>: <see cref="StageVisualRootController"/>는 런타임 전용이다([ExecuteAlways]가
     /// 없다). 그래서 씬을 편집할 때 StageVisualRoot는 스케일 1에 씬에 놔둔 위치 그대로 있고, 플레이를
@@ -19,7 +22,8 @@ namespace StageLayoutEditor
     ///
     /// <b>어떻게 푸는가</b>: [ExecuteAlways]로 매 프레임 덮어쓰면 수동 편집과 계속 충돌하고 씬이
     /// 끊임없이 더티가 된다. 그래서 Motion Editor의 "Apply Preview Layout to Open Stage"와 같은 방식을
-    /// 쓴다 - <b>누를 때만</b> 런타임과 같은 계산을 돌려 Transform에 적용하고 Undo에 등록한다.
+    /// 쓴다 - <b>누를 때만</b> 현재 씬의 액터 스프라이트로 위치를 계산해 Transform에 적용하고
+    /// Undo에 등록한다. 런타임에 교체되는 스프라이트/저장 위치는 에디터에서 알 수 없어 근사 미리보기다.
     ///
     /// <b>같이 보여주는 것</b>: 이 도구의 절반은 계산기다. 스테이지의 화면상 크기는 카메라
     /// orthographicSize 하나로 정해지지 않고 아래 네 값이 함께 정한다.
@@ -341,17 +345,25 @@ namespace StageLayoutEditor
 
             EditorGUILayout.LabelField("Camera Orthographic Size", orthoSize.ToString("0.###"));
             EditorGUILayout.LabelField("Base Visual Scale", baseVisualScale.ToString("0.###"));
-            EditorGUILayout.LabelField("Placement Bounds", $"{bounds.Width:0.#} x {bounds.Height:0.#} px (safety {bounds.SafetyMarginPixels:0.#})");
+            EditorGUILayout.LabelField("논리 기준 박스", $"{bounds.Width:0.#} x {bounds.Height:0.#} px (safety {bounds.SafetyMarginPixels:0.#})");
 
             float stageScale = ComputeStageScale(bounds, baseVisualScale, 1f);
             EditorGUILayout.LabelField("적용될 StageVisualRoot Scale", stageScale.ToString("0.####"));
 
-            Rect box = ComputeStageScreenRect(serialized, bounds, 1f);
-            EditorGUILayout.LabelField("스테이지 박스(화면 px)", $"x {box.x:0} / y {box.y:0} / {box.width:0} x {box.height:0}");
+            Rect box = ComputeStageScreenRect(serialized, camera, bounds, 1f, out Rect actorOffsets, out bool hasActors);
+            EditorGUILayout.LabelField("논리 박스 예상 위치(px)", $"x {box.x:0} / y {box.y:0} / {box.width:0} x {box.height:0}");
+            if (hasActors)
+            {
+                EditorGUILayout.LabelField("현재 액터 예상 외곽(px)",
+                    $"x {box.center.x + actorOffsets.xMin:0}~{box.center.x + actorOffsets.xMax:0}, " +
+                    $"y {box.center.y + actorOffsets.yMin:0}~{box.center.y + actorOffsets.yMax:0}");
+            }
 
             EditorGUILayout.HelpBox(
-                "Placement Bounds는 드래그 한계와 클릭 영역(footprint)이면서, 동시에 위 Scale 계산의 분자이기도 합니다 - " +
-                "footprint를 키우면 캐릭터도 같이 커지므로 Base Visual Scale로 되맞춰야 합니다.",
+                "Height는 표시 배율을 바꾸므로 캐릭터 크기에 직접 영향이 있습니다. Width/Height 박스는 " +
+                "기존 저장 위치의 기준이며, 보이는 액터가 없을 때만 이동 한계입니다. 평소 드래그 한계는 " +
+                "현재 보이는 액터의 스프라이트 외곽과 Safety Margin으로 정합니다. 런타임 애니메이션/" +
+                "프로필이 바뀌면 실제 한계는 이 미리보기와 달라질 수 있습니다.",
                 MessageType.None);
         }
 
@@ -821,14 +833,13 @@ namespace StageLayoutEditor
 
         private void DrawApplySection(SerializedObject serialized, Camera camera, StagePlacementBounds bounds)
         {
-            EditorGUILayout.LabelField("런타임 배치 적용", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("기본 배치 미리 적용", EditorStyles.boldLabel);
 
             EditorGUILayout.HelpBox(
-                "StageVisualRoot의 position/localScale을 런타임과 같은 공식으로 지금 씬에 적용합니다. " +
-                "Undo로 되돌릴 수 있습니다.\n\n" +
-                "여백은 Inspector의 Default Right/Bottom Margin Fraction을 씁니다 - 실제 실행에서는 " +
-                "저장된 배치(windowplacement.json)가 있으면 그쪽이 우선하므로, 배치를 새로 잡는 중이라면 " +
-                "그 파일을 지우고 확인하세요.",
+                "현재 씬에 보이는 액터 스프라이트의 외곽과 Inspector의 기본 여백으로 " +
+                "StageVisualRoot의 position/localScale을 미리 적용합니다. Undo로 되돌릴 수 있습니다.\n\n" +
+                "실행 중에는 캐릭터/몬스터 스프라이트가 교체되고 저장된 배치(windowplacement.json)가 " +
+                "기본 여백보다 우선할 수 있으므로, 실제 위치와 이동 한계는 Play 모드/빌드에서 확인하세요.",
                 MessageType.None);
 
             // Play 모드에서는 씬을 더티로 표시할 수 없고(예외), 애초에 런타임 컨트롤러가 스스로
@@ -842,7 +853,7 @@ namespace StageLayoutEditor
                 return;
             }
 
-            if (GUILayout.Button("런타임 배치를 씬에 적용", GUILayout.Height(28f)))
+            if (GUILayout.Button("현재 씬 기준 기본 배치 적용", GUILayout.Height(28f)))
             {
                 ApplyRuntimePlacement(serialized, camera, bounds);
             }
@@ -866,8 +877,8 @@ namespace StageLayoutEditor
             EditorSceneManager.MarkSceneDirty(controller.gameObject.scene);
         }
 
-        /// <summary>StageVisualRootController.ApplyPlacement와 <b>같은 식</b>을 그대로 옮긴 것이다 -
-        /// 한쪽만 바뀌면 에디터와 런타임이 어긋나므로, 그쪽 계산이 바뀌면 여기도 함께 고쳐야 한다.</summary>
+        /// <summary>현재 씬의 액터 스프라이트로 런타임과 같은 위치·클램프 수식을 적용한다.
+        /// 저장 배치, 런타임 스프라이트 교체 및 애니메이션은 에디터에서 재현하지 않는다.</summary>
         private void ApplyRuntimePlacement(SerializedObject serialized, Camera camera, StagePlacementBounds bounds)
         {
             Transform t = controller.transform;
@@ -877,7 +888,7 @@ namespace StageLayoutEditor
             float scaleFactor = ComputeStageScale(bounds, baseVisualScale, 1f);
             t.localScale = new Vector3(scaleFactor, scaleFactor, t.localScale.z);
 
-            Rect box = ComputeStageScreenRect(serialized, bounds, 1f);
+            Rect box = ComputeStageScreenRect(serialized, camera, bounds, 1f, out _, out _);
             float targetScreenX = box.x + box.width / 2f;
             float targetScreenY = box.y + box.height / 2f;
 
@@ -893,14 +904,15 @@ namespace StageLayoutEditor
                       $"@ {referenceWidth}x{referenceHeight}", controller);
         }
 
-        // ---- 계산 (런타임 ApplyPlacement와 동일한 식) ----
+        // ---- 현재 씬 스프라이트를 사용한 런타임 위치 수식의 미리보기 ----
 
         private float ComputeStageScale(StagePlacementBounds bounds, float baseVisualScale, float userScale)
         {
             return Mathf.Max(0.01f, bounds.Height * baseVisualScale * userScale / referenceHeight);
         }
 
-        private Rect ComputeStageScreenRect(SerializedObject serialized, StagePlacementBounds bounds, float userScale)
+        private Rect ComputeStageScreenRect(SerializedObject serialized, Camera camera, StagePlacementBounds bounds,
+            float userScale, out Rect actorOffsets, out bool hasActors)
         {
             float stageWidthPixels = bounds.Width * userScale;
             float stageHeightPixels = bounds.Height * userScale;
@@ -909,19 +921,95 @@ namespace StageLayoutEditor
             float rightFraction = serialized.FindProperty("defaultRightMarginFraction").floatValue;
             float bottomFraction = serialized.FindProperty("defaultBottomMarginFraction").floatValue;
 
-            float maxRightMarginPixels = Mathf.Max(safetyMargin, referenceWidth - stageWidthPixels - safetyMargin);
-            float maxBottomMarginPixels = Mathf.Max(safetyMargin, referenceHeight - stageHeightPixels - safetyMargin);
-            float rightMarginPixels = Mathf.Clamp(rightFraction * referenceWidth, safetyMargin, maxRightMarginPixels);
-            float bottomMarginPixels = Mathf.Clamp(bottomFraction * referenceHeight, safetyMargin, maxBottomMarginPixels);
+            float targetScreenX = referenceWidth - rightFraction * referenceWidth - stageWidthPixels / 2f;
+            float targetScreenY = bottomFraction * referenceHeight + stageHeightPixels / 2f;
 
-            float targetScreenX = referenceWidth - rightMarginPixels - stageWidthPixels / 2f;
-            float targetScreenY = bottomMarginPixels + stageHeightPixels / 2f;
+            float stageScale = ComputeStageScale(bounds, serialized.FindProperty("baseVisualScale").floatValue, userScale);
+            float worldUnitsPerPixel = 2f * camera.orthographicSize / referenceHeight;
+            hasActors = TryGetActorPixelOffsets(stageScale, worldUnitsPerPixel, out actorOffsets);
+            if (!hasActors)
+                actorOffsets = new Rect(-stageWidthPixels / 2f, -stageHeightPixels / 2f,
+                    stageWidthPixels, stageHeightPixels);
+
+            targetScreenX = ClampActorCenter(targetScreenX, referenceWidth, actorOffsets.xMin,
+                actorOffsets.xMax, safetyMargin);
+            targetScreenY = ClampActorCenter(targetScreenY, referenceHeight, actorOffsets.yMin,
+                actorOffsets.yMax, safetyMargin);
 
             return new Rect(
                 targetScreenX - stageWidthPixels / 2f,
                 targetScreenY - stageHeightPixels / 2f,
                 stageWidthPixels,
                 stageHeightPixels);
+        }
+
+        private static float ClampActorCenter(float desiredCenter, float workSize, float actorMinOffset,
+            float actorMaxOffset, float safetyMargin)
+        {
+            float minimumCenter = safetyMargin - actorMinOffset;
+            float maximumCenter = workSize - safetyMargin - actorMaxOffset;
+            return minimumCenter <= maximumCenter
+                ? Mathf.Clamp(desiredCenter, minimumCenter, maximumCenter)
+                : (minimumCenter + maximumCenter) * 0.5f;
+        }
+
+        private bool TryGetActorPixelOffsets(float targetScale, float worldUnitsPerPixel, out Rect offsets)
+        {
+            offsets = default;
+            if (controller == null || worldUnitsPerPixel <= 0f) return false;
+
+            Transform root = controller.transform;
+            if (Mathf.Abs(root.localScale.x) < 0.0001f || Mathf.Abs(root.localScale.y) < 0.0001f)
+                return false;
+
+            float xRatio = targetScale / root.localScale.x;
+            float yRatio = targetScale / root.localScale.y;
+            bool hasActors = false;
+
+            foreach (PlayerCharacterAnimator actor in controller.GetComponentsInChildren<PlayerCharacterAnimator>(true))
+                IncludeActorRenderer(actor.GetComponent<SpriteRenderer>(), root, xRatio, yRatio,
+                    worldUnitsPerPixel, ref offsets, ref hasActors);
+
+            foreach (TargetCombatController actor in controller.GetComponentsInChildren<TargetCombatController>(true))
+                IncludeActorRenderer(actor.GetComponent<SpriteRenderer>(), root, xRatio, yRatio,
+                    worldUnitsPerPixel, ref offsets, ref hasActors);
+
+            foreach (DungeonPartyRestEventController rest in controller.GetComponentsInChildren<DungeonPartyRestEventController>(true))
+            {
+                if (!rest.gameObject.activeInHierarchy) continue;
+                for (int slot = 0; slot < rest.InteractionSlotCount; slot++)
+                    IncludeActorRenderer(rest.GetInteractionRenderer(slot), root, xRatio, yRatio,
+                        worldUnitsPerPixel, ref offsets, ref hasActors);
+            }
+
+            return hasActors;
+        }
+
+        private static void IncludeActorRenderer(SpriteRenderer renderer, Transform root, float xRatio,
+            float yRatio, float worldUnitsPerPixel, ref Rect offsets, ref bool hasActors)
+        {
+            if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy ||
+                renderer.sprite == null) return;
+
+            Bounds worldBounds = renderer.bounds;
+            float x1 = (worldBounds.min.x - root.position.x) * xRatio / worldUnitsPerPixel;
+            float x2 = (worldBounds.max.x - root.position.x) * xRatio / worldUnitsPerPixel;
+            float y1 = (worldBounds.min.y - root.position.y) * yRatio / worldUnitsPerPixel;
+            float y2 = (worldBounds.max.y - root.position.y) * yRatio / worldUnitsPerPixel;
+            Rect next = Rect.MinMaxRect(Mathf.Min(x1, x2), Mathf.Min(y1, y2),
+                Mathf.Max(x1, x2), Mathf.Max(y1, y2));
+
+            if (!hasActors)
+            {
+                offsets = next;
+                hasActors = true;
+            }
+            else
+            {
+                offsets = Rect.MinMaxRect(Mathf.Min(offsets.xMin, next.xMin),
+                    Mathf.Min(offsets.yMin, next.yMin), Mathf.Max(offsets.xMax, next.xMax),
+                    Mathf.Max(offsets.yMax, next.yMax));
+            }
         }
 
         /// <summary>아트 1픽셀이 화면에서 차지하는 픽셀 수. workAreaHeight가 약분되므로 해상도가

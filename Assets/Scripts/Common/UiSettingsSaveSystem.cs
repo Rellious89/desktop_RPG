@@ -68,6 +68,11 @@ namespace Common
             data.masterVolume = Mathf.Clamp01(data.masterVolume);
             data.lastNonZeroMasterVolume = Mathf.Clamp01(data.lastNonZeroMasterVolume);
             if (data.lastNonZeroMasterVolume <= 0f) data.lastNonZeroMasterVolume = 1f;
+            // 기존 JSON에는 이 키가 없으므로 완전 불투명으로 이관한다.
+            if (json.IndexOf("\"uiOpacity\"", StringComparison.Ordinal) < 0)
+                data.uiOpacity = 1f;
+            if (float.IsNaN(data.uiOpacity) || float.IsInfinity(data.uiOpacity)) data.uiOpacity = 1f;
+            data.uiOpacity = Mathf.Clamp01(data.uiOpacity);
             return data;
         }
 
@@ -97,6 +102,20 @@ namespace Common
         public static void SaveSizeScale(float scale)
         {
             Save(UpdateSizeScale(Load(), scale));
+        }
+
+        public static void SaveUiOpacity(float opacity)
+        {
+            Save(UpdateUiOpacity(Load(), opacity));
+        }
+
+        /// <summary>다른 기기별 UI 설정을 보존하면서 불투명도만 변경한다.</summary>
+        public static UiSettingsData UpdateUiOpacity(UiSettingsData data, float opacity)
+        {
+            data = data ?? new UiSettingsData();
+            data.uiOpacity = float.IsNaN(opacity) || float.IsInfinity(opacity)
+                ? 1f : Mathf.Clamp01(opacity);
+            return data;
         }
 
         /// <summary>파일 IO 없이 배율 필드만 변경한다. 다른 옵션 값은 보존한다.</summary>

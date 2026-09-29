@@ -1,3 +1,6 @@
+using Character;
+using Dungeon;
+using Enemy;
 using UnityEngine;
 
 namespace Common
@@ -15,9 +18,10 @@ namespace Common
     /// stageCamera(Main Camera)의 Viewport Rect는 항상 전체 화면(0,0,1,1)으로 고정한다 - 절대 줄이지
     /// 않는다(Camera.rect를 줄이면 그 밖의 영역이 매 프레임 클리어되지 않아 잔상이 남는 문제가 있었다).
     ///
-    /// 배치 가능 범위는 카메라 여백이 아니라 placementBounds(StagePlacementBounds, 렌더링하지 않는
-    /// 순수 데이터 홀더)의 논리 크기 + safetyMargin으로 계산한다 - 실제 스프라이트 Bounds를 매 프레임
-    /// 재는 방식은 공격 모션 중 검이 크게 움직이는 것만으로 배치 한계가 흔들리는 문제가 있어 쓰지 않는다.
+    /// StagePlacementBounds.Height는 기존 시각 배율 계산에 그대로 사용한다. 이동 한계만 현재 보이는
+    /// 캐릭터/몬스터의 스프라이트 외곽으로 계산하며, 드래그 중에는 시작 시점의 외곽을 고정한다.
+    /// 그래서 애니메이션 프레임이 바뀌어도 포인터 아래 배치 한계가 흔들리지 않는다. 보이는 액터가
+    /// 없을 때는 기존 StagePlacementBounds 논리 박스로 돌아간다.
     ///
     /// 계산 방식: orthographic 카메라는 화면 세로 방향에 worldUnitsPerPixel = 2*orthographicSize /
     /// 화면 높이(px) 비율을 항상 유지한다(가로도 마찬가지 - aspect가 상쇄되어 세로와 같은 비율이 됨).
@@ -41,14 +45,14 @@ namespace Common
         [Tooltip("비워두면 Camera.main을 사용한다.")]
         [SerializeField] private Camera stageCamera;
 
-        [Header("배치 범위 기준 (렌더링하지 않는 데이터 홀더)")]
+        [Header("시각 배율 기준 / 액터가 없을 때의 배치 범위")]
         [Tooltip("StageVisualRoot의 자식으로 둔 StagePlacementBounds. 비워두면 GetComponentInChildren로 찾는다.")]
         [SerializeField] private StagePlacementBounds placementBounds;
 
         [Header("100% 기준 시각 크기")]
-        [Tooltip("StageVisualRoot(캐릭터/적/이펙트)가 실제로 렌더링되는 크기에만 곱해지는 배율이다 - " +
-            "StagePlacementBounds(배치/클램프용 footprint)는 건드리지 않으므로 이 값을 바꿔도 배치 가능 " +
-            "범위나 드래그 히트 영역은 변하지 않는다. tgl_size의 50/100/150은 이 값(=userScale 1일 때의 " +
+        [Tooltip("StageVisualRoot(캐릭터/적/이펙트)가 실제로 렌더링되는 크기에 곱해지는 배율이다. " +
+            "이 값을 바꾸면 보이는 액터 크기에 맞춰 이동 한계도 다시 계산된다. tgl_size의 50/100/150은 " +
+            "이 값(=userScale 1일 때의 " +
             "기준)에 각각 0.5/1.0/1.5를 곱해 적용된다. 기본값 1은 기존 계산식과 동일한 크기이므로, " +
             "실제로 얼마나 키울지는 Play 모드/Windows 빌드에서 눈으로 보며 조정해야 한다.")]
         [SerializeField] private float baseVisualScale = 1f;
@@ -79,6 +83,12 @@ namespace Common
         // 기본값. TransparentWindowController.ApplyStartupPlacement가 실제 값을 곧 밀어준다.
         private int workAreaWidth = 1920;
         private int workAreaHeight = 1080;
+
+        // 기존 배치값은 논리 박스 중심을 기준으로 저장되어 있다. 액터 외곽을 클램프에만 사용해
+        // 기존 windowplacement.json의 위치가 복원 시 갑자기 이동하지 않게 한다.
+        private Rect actorPixelOffsets;
+        private bool hasActorPixelOffsets;
+        private bool isDragging;
 
         // ApplyPlacement가 계산할 때마다 캐싱하는 스테이지 박스의 Unity 스크린 좌표(좌하단 원점).
         // TryGetUnityScreenRect가 매 프레임 재계산 없이 그대로 돌려준다.
@@ -146,8 +156,13 @@ namespace Common
 
         public void SetPlacement(float rightMargin, float bottomMargin)
         {
-            rightMarginFraction = Mathf.Clamp01(rightMargin);
-            bottomMarginFraction = Mathf.Clamp01(bottomMargin);
+            if (float.IsNaN(rightMargin) || float.IsInfinity(rightMargin) ||
+                float.IsNaN(bottomMargin) || float.IsInfinity(bottomMargin)) return;
+
+            // 옛 0~1 저장값의 화면 위치는 보존한다. 액터가 논리 박스보다 작으면 화면 끝까지
+            // 이동할 때 음수 또는 1 초과의 여백값이 필요하므로 여기서는 Clamp01하지 않는다.
+            rightMarginFraction = rightMargin;
+            bottomMarginFraction = bottomMargin;
             ApplyPlacement();
         }
 
@@ -166,8 +181,8 @@ namespace Common
             if (workAreaWidth <= 0 || workAreaHeight <= 0) return;
 
             // 여백은 "가장자리로부터의 거리"라 오른쪽/아래로 끌수록(델타 양수) 줄어드는 방향으로 적용된다.
-            rightMarginFraction = Mathf.Clamp01(rightMarginFraction - (float)deltaXPixels / workAreaWidth);
-            bottomMarginFraction = Mathf.Clamp01(bottomMarginFraction - (float)deltaYPixels / workAreaHeight);
+            rightMarginFraction -= (float)deltaXPixels / workAreaWidth;
+            bottomMarginFraction -= (float)deltaYPixels / workAreaHeight;
             ApplyPlacement();
         }
 
@@ -179,6 +194,19 @@ namespace Common
 
         public void SetLayoutModeActive(bool active)
         {
+            if (active)
+            {
+                // 드래그 중에는 이 스냅샷을 유지한다. 공격/대기 애니메이션에 따라 매 프레임
+                // 바뀌는 SpriteRenderer.bounds를 클램프에 바로 쓰면 위치가 떨린다.
+                CaptureVisibleActorBounds();
+                isDragging = true;
+                ApplyPlacement();
+            }
+            else
+            {
+                isDragging = false;
+            }
+
             if (highlightVisual != null)
             {
                 highlightVisual.SetActive(active);
@@ -205,8 +233,8 @@ namespace Common
             // 모니터가 커질수록 같은 월드 크기가 차지하는 화면 비율이 작아지므로, 기준 높이가 항상
             // "화면의 몇 %"를 차지하도록 역산해서 스케일을 구한다 - 그래야 해상도가 달라져도 체감
             // 크기가 비슷하게 유지된다. baseVisualScale은 이 비율 자체에 곱하는 순수 배율이라
-            // workAreaHeight/DPI 보정과 중복되지 않는다(아래 stageWidthPixels/stageHeightPixels,
-            // 즉 배치 footprint 계산에는 곱하지 않으므로 클램프 범위는 그대로 유지된다).
+            // workAreaHeight/DPI 보정과 중복되지 않는다. 이동 범위 계산은 아래 별도 액터
+            // 외곽으로 처리하므로 StagePlacementBounds 값을 이동 한계 조절에 사용하지 않는다.
             float scaleFactor = Mathf.Max(0.01f, placementBounds.Height * baseVisualScale * userScale / workAreaHeight);
             transform.localScale = new Vector3(scaleFactor, scaleFactor, transform.localScale.z);
 
@@ -214,18 +242,28 @@ namespace Common
             float stageHeightPixels = placementBounds.Height * userScale;
             float safetyMargin = placementBounds.SafetyMarginPixels;
 
-            float maxRightMarginPixels = Mathf.Max(safetyMargin, workAreaWidth - stageWidthPixels - safetyMargin);
-            float maxBottomMarginPixels = Mathf.Max(safetyMargin, workAreaHeight - stageHeightPixels - safetyMargin);
-            float rightMarginPixels = Mathf.Clamp(rightMarginFraction * workAreaWidth, safetyMargin, maxRightMarginPixels);
-            float bottomMarginPixels = Mathf.Clamp(bottomMarginFraction * workAreaHeight, safetyMargin, maxBottomMarginPixels);
-
             // Unity 화면 좌표계는 (0,0)이 좌하단이다. Stage 박스의 "중심"이 목표 화면 좌표에 오도록
-            // 계산한다(StageVisualRoot 로컬 원점이 대략 그 중심 근방에 authoring돼 있다는 전제 -
-            // Character/Scarecrow가 원점 부근에 배치돼 있음).
-            float targetScreenX = workAreaWidth - rightMarginPixels - stageWidthPixels / 2f;
-            float targetScreenY = bottomMarginPixels + stageHeightPixels / 2f;
+            // 계산한다. 이 변환을 유지해야 기존 저장 위치가 복원 시 그대로 보인다.
+            float targetScreenX = workAreaWidth - rightMarginFraction * workAreaWidth - stageWidthPixels / 2f;
+            float targetScreenY = bottomMarginFraction * workAreaHeight + stageHeightPixels / 2f;
 
             float worldUnitsPerPixel = 2f * stageCamera.orthographicSize / workAreaHeight;
+
+            if (!isDragging || !hasActorPixelOffsets) CaptureVisibleActorBounds(worldUnitsPerPixel);
+
+            Rect offsets = hasActorPixelOffsets
+                ? actorPixelOffsets
+                : new Rect(-stageWidthPixels / 2f, -stageHeightPixels / 2f,
+                    stageWidthPixels, stageHeightPixels);
+
+            // 실제로 보이는 액터의 좌/우/아래/위 끝만 작업 영역에 남긴다. 스프라이트가 화면보다
+            // 큰 경우에는 양쪽 끝을 동시에 지킬 수 없으므로 화면 중심을 택한다.
+            targetScreenX = ClampActorCenter(targetScreenX, workAreaWidth, offsets.xMin, offsets.xMax, safetyMargin);
+            targetScreenY = ClampActorCenter(targetScreenY, workAreaHeight, offsets.yMin, offsets.yMax, safetyMargin);
+
+            // 클램프된 좌표를 저장 좌표계로 되돌린다. 새로 확장된 이동 범위의 위치도 다시 로드된다.
+            rightMarginFraction = (workAreaWidth - stageWidthPixels / 2f - targetScreenX) / workAreaWidth;
+            bottomMarginFraction = (targetScreenY - stageHeightPixels / 2f) / workAreaHeight;
 
             Vector3 cameraPosition = stageCamera.transform.position;
             float worldX = cameraPosition.x + (targetScreenX - workAreaWidth / 2f) * worldUnitsPerPixel;
@@ -239,6 +277,67 @@ namespace Common
                 stageWidthPixels,
                 stageHeightPixels);
             hasCachedScreenRect = true;
+        }
+
+        private static float ClampActorCenter(float desiredCenter, float workSize, float actorMinOffset,
+            float actorMaxOffset, float safetyMargin)
+        {
+            float minimumCenter = safetyMargin - actorMinOffset;
+            float maximumCenter = workSize - safetyMargin - actorMaxOffset;
+            return minimumCenter <= maximumCenter
+                ? Mathf.Clamp(desiredCenter, minimumCenter, maximumCenter)
+                : (minimumCenter + maximumCenter) * 0.5f;
+        }
+
+        private void CaptureVisibleActorBounds()
+        {
+            if (stageCamera == null || workAreaHeight <= 0 || !stageCamera.orthographic) return;
+            CaptureVisibleActorBounds(2f * stageCamera.orthographicSize / workAreaHeight);
+        }
+
+        private void CaptureVisibleActorBounds(float worldUnitsPerPixel)
+        {
+            hasActorPixelOffsets = false;
+            if (worldUnitsPerPixel <= 0f) return;
+
+            // 배경/마을 오브젝트, CombatFxRoot의 순간 이펙트는 이동 한계에 넣지 않는다.
+            // 전투 액터와 휴식 이벤트의 실제 캐릭터만 현재 보이는 상태로 측정한다.
+            foreach (PlayerCharacterAnimator actor in GetComponentsInChildren<PlayerCharacterAnimator>(true))
+                IncludeActorRenderer(actor.GetComponent<SpriteRenderer>(), worldUnitsPerPixel);
+
+            foreach (TargetCombatController actor in GetComponentsInChildren<TargetCombatController>(true))
+                IncludeActorRenderer(actor.GetComponent<SpriteRenderer>(), worldUnitsPerPixel);
+
+            foreach (DungeonPartyRestEventController rest in GetComponentsInChildren<DungeonPartyRestEventController>(true))
+            {
+                if (!rest.gameObject.activeInHierarchy) continue;
+                for (int slot = 0; slot < rest.InteractionSlotCount; slot++)
+                    IncludeActorRenderer(rest.GetInteractionRenderer(slot), worldUnitsPerPixel);
+            }
+        }
+
+        private void IncludeActorRenderer(SpriteRenderer renderer, float worldUnitsPerPixel)
+        {
+            if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy ||
+                renderer.sprite == null) return;
+
+            Bounds bounds = renderer.bounds;
+            float minX = (bounds.min.x - transform.position.x) / worldUnitsPerPixel;
+            float maxX = (bounds.max.x - transform.position.x) / worldUnitsPerPixel;
+            float minY = (bounds.min.y - transform.position.y) / worldUnitsPerPixel;
+            float maxY = (bounds.max.y - transform.position.y) / worldUnitsPerPixel;
+
+            if (!hasActorPixelOffsets)
+            {
+                actorPixelOffsets = Rect.MinMaxRect(minX, minY, maxX, maxY);
+                hasActorPixelOffsets = true;
+            }
+            else
+            {
+                actorPixelOffsets = Rect.MinMaxRect(
+                    Mathf.Min(actorPixelOffsets.xMin, minX), Mathf.Min(actorPixelOffsets.yMin, minY),
+                    Mathf.Max(actorPixelOffsets.xMax, maxX), Mathf.Max(actorPixelOffsets.yMax, maxY));
+            }
         }
     }
 }

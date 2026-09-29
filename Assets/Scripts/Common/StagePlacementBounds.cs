@@ -3,25 +3,23 @@ using UnityEngine;
 namespace Common
 {
     /// <summary>
-    /// StageVisualRoot 아래 배치하는 "설계용 기준 영역" - 아무것도 렌더링하지 않는다(SpriteRenderer,
-    /// MeshRenderer 등 시각 컴포넌트 없음). Character/Scarecrow의 실제 스프라이트 Bounds를 매 프레임
-    /// 계산해서 배치 한계를 정하면, 공격 모션 중 검이 일시적으로 크게 움직이는 것만으로도 배치
-    /// 가능 범위가 프레임마다 흔들리는 문제가 생긴다 - 그래서 이 컴포넌트는 디자이너가 Inspector에서
-    /// 고정한 "논리 크기"만 들고 있는 순수 데이터 홀더다.
+    /// StageVisualRoot 아래 배치하는 렌더링하지 않는 기준 데이터다. Width/Height는 기존 저장
+    /// 배치값이 참조하는 논리 박스이고, Height는 Stage의 표시 배율을 계산하는 기준이기도 하다.
+    /// 평소 이동 한계는 현재 보이는 캐릭터/몬스터 스프라이트 외곽으로 정한다. 해당 액터가 하나도
+    /// 없을 때만 이 논리 박스가 이동 한계의 대체값으로 사용된다.
     ///
-    /// StageVisualRootController가 이 값(Width/Height)과 SafetyMarginPixels를 읽어 100% 배율 기준
-    /// 스테이지 박스 크기로 쓴다. 실제 스케일(사용자 배율)은 StageVisualRootController가 곱해서 적용한다.
+    /// 스프라이트 외곽은 드래그 시작 시 한 번 측정해서 고정하므로 애니메이션으로 경계가 떨리지 않는다.
     /// </summary>
     [DisallowMultipleComponent]
     public class StagePlacementBounds : MonoBehaviour
     {
-        [Tooltip("100% 배율 기준 스테이지 박스 논리 너비(px) - 예전 소형 창 크기와 같은 기준.")]
+        [Tooltip("기존 저장 위치의 기준이 되는 논리 박스 너비(px). 보이는 액터가 없을 때만 이동 한계에도 사용됩니다.")]
         [SerializeField] private float width = 480f;
 
-        [Tooltip("100% 배율 기준 스테이지 박스 논리 높이(px).")]
+        [Tooltip("Stage 표시 배율과 기존 저장 위치의 기준이 되는 논리 박스 높이(px). 보이는 액터가 없을 때만 이동 한계에도 사용됩니다. 이 값을 줄이면 캐릭터 표시 크기도 줄어듭니다.")]
         [SerializeField] private float height = 640f;
 
-        [Tooltip("배치 가능 범위를 계산할 때 모니터 Work Area 가장자리로부터 항상 남겨둘 최소 여백(px, 100% 배율 기준) - 화면 끝에 완전히 붙어 이동 핸들에 손이 안 닿는 상황을 막는다.")]
+        [Tooltip("캐릭터/몬스터 외곽과 모니터 Work Area 가장자리 사이에 남길 최소 여백(px). 액터가 없을 때는 논리 박스에 적용됩니다.")]
         [SerializeField] private float safetyMarginPixels = 8f;
 
         public float Width => width;

@@ -15,6 +15,9 @@ namespace Common
         public float lastNonZeroMasterVolume = 1f;
         public bool hudVisible = true;
 
+        /// <summary>Canvas UI와 스테이지 스프라이트에 적용할 전체 불투명도(1 = 원본).</summary>
+        public float uiOpacity = 1f;
+
         /// <summary>tgl_size 배율(1 = 100%). 그때그때 정해지는 순환 목록(SizeToggleButton.sizePercentages)의
         /// 인덱스가 아니라 실제 배율값 자체를 저장한다 - 목록 구성이 나중에 바뀌어도 이 값은 그대로 유효하다.</summary>
         public float sizeScale = 1f;

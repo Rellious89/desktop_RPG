@@ -1,3 +1,4 @@
+using System;
 using UnityEngine.EventSystems;
 
 /// <summary>
@@ -7,9 +8,18 @@ using UnityEngine.EventSystems;
 /// </summary>
 public sealed class MouseOnlySlider : UnityEngine.UI.Slider
 {
+    public event Action PointerReleased;
+
     public override void OnMove(AxisEventData eventData)
     {
         // Intentionally do not call base.OnMove: Left/Right (including A/D) must
         // never change the value, even after a pointer click has selected us.
+    }
+
+    public override void OnPointerUp(PointerEventData eventData)
+    {
+        base.OnPointerUp(eventData);
+        if (eventData.button == PointerEventData.InputButton.Left)
+            PointerReleased?.Invoke();
     }
 }
